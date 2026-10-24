@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "음성 인식 모델",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "음성 입력 닫기",
+        PlaybackKey::VoiceDidOpen => "{} 여는 중",
+        PlaybackKey::VoiceNoSource => "'{}'와(과) 일치하는 데이터셋이 없습니다",
         PlaybackKey::VoiceDidSelect => "{} 선택됨",
         PlaybackKey::VoiceDidPlot => "{}을(를) {}(으)로 표시함",
         PlaybackKey::VoiceDidColormap => "컬러맵 {}",

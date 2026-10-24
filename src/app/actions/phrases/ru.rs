@@ -5,6 +5,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Open, &["открой", "открыть", "загрузи", "перейди к"]),
         (Select, &["выбери", "выберите", "выбрать"]),
         (
             Plot,
@@ -33,5 +34,6 @@ pub(super) static PHRASES: Phrases = Phrases {
         ),
         (ResetView, &["сбрось вид", "сбросить вид", "сброс вида"]),
     ],
+    catalog: &["каталог"],
     then: &["потом", "затем", "а потом"],
 };

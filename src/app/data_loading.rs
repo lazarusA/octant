@@ -1,5 +1,8 @@
 use super::OctantApp;
 use super::state::StoreKind;
+use crate::data::{DatasetMetadata, StoreHandle};
+use crate::i18n::{NoticesKey as N, tr};
+use crate::ui::toast::Severity;
 
 impl OctantApp {
     pub fn inspect_active_store(&mut self) {
@@ -122,5 +125,54 @@ impl OctantApp {
             self.selected.store_target = trimmed.to_string();
             self.inspect_active_store();
         }
+    }
+
+    /// Takes a finished background inspection (`inspect_active_store`): its
+    /// dataset becomes the active one, or its failure a toast.
+    pub(crate) fn poll_inspection(&mut self, ctx: &egui::Context) {
+        let Some(rx) = &self.metadata_rx else {
+            return;
+        };
+        let Ok(result) = rx.try_recv() else {
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+            return;
+        };
+        self.metadata_rx = None;
+        self.is_loading = false;
+        self.layout.hero_state.loading = false;
+        match result {
+            Ok((metadata, handle)) => self.activate_inspected(metadata, handle),
+            Err(err) => {
+                self.layout.hero_state.loaded = false;
+                self.clear_active_metadata();
+                self.status_message = format!("Store inspect error: {}", err);
+                self.notify(Severity::Error, tr(N::CouldntOpenDataset), &err);
+            }
+        }
+    }
+
+    /// Adds an inspected dataset to the open ones and makes it active.
+    fn activate_inspected(&mut self, metadata: DatasetMetadata, handle: StoreHandle) {
+        let is_plate = self.follow_plate(&metadata);
+        if metadata.variables.is_empty() && !is_plate {
+            self.status_message = format!("No variables discovered in '{}'", metadata.name);
+            self.notify(Severity::Warning, tr(N::NoVariablesFound), &metadata.name);
+        } else {
+            self.status_message = format!(
+                "Inspected '{}' (Found {} variables)",
+                metadata.name,
+                metadata.variables.len()
+            );
+        }
+        self.layout.hero_state.loaded = true;
+        self.layout.hero_state.source_label = metadata.name.clone();
+        self.layout.show_variables_overlay = !metadata.variables.is_empty();
+
+        let source_id = self.selected_source_id();
+        let mut dataset = crate::data::Dataset::new(&source_id, handle.source().clone(), handle);
+        dataset.metadata = Some(metadata.clone());
+        self.dataset_manager.add(dataset);
+
+        self.load_new_metadata(metadata);
     }
 }

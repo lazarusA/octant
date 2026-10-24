@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Model ucapan ke teks",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Tutup input suara",
+        PlaybackKey::VoiceDidOpen => "Membuka {}",
+        PlaybackKey::VoiceNoSource => "Tidak ada set data yang cocok dengan '{}'",
         PlaybackKey::VoiceDidSelect => "{} dipilih",
         PlaybackKey::VoiceDidPlot => "{} diplot sebagai {}",
         PlaybackKey::VoiceDidColormap => "Peta warna {}",

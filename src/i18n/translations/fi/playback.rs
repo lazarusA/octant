@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Puheentunnistusmalli",
         PlaybackKey::VoiceModelSize => "{} ({} Mt)",
         PlaybackKey::VoiceCloseHover => "Sulje puhesyöte",
+        PlaybackKey::VoiceDidOpen => "Avataan {}",
+        PlaybackKey::VoiceNoSource => "Mikään aineisto ei vastaa kohdetta '{}'",
         PlaybackKey::VoiceDidSelect => "{} valittu",
         PlaybackKey::VoiceDidPlot => "{} piirretty muodossa {}",
         PlaybackKey::VoiceDidColormap => "Väriskaala {}",

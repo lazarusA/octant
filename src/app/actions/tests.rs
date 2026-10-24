@@ -72,7 +72,7 @@ fn variables_resolve_by_path_suffix_name_and_long_name() {
         ],
         ..Default::default()
     };
-    let vocab = Vocabulary::new(Some(&meta));
+    let vocab = Vocabulary::new(Some(&meta), &[]);
     assert_eq!(vocab.variable("forecast t2m"), Resolution::Resolved(1));
     assert_eq!(
         vocab.variable("T 2 M"),
@@ -91,7 +91,7 @@ fn variables_resolve_by_path_suffix_name_and_long_name() {
 
 #[test]
 fn plot_types_and_colormaps_resolve_in_any_language() {
-    let vocab = Vocabulary::new(None);
+    let vocab = Vocabulary::new(None, &[]);
     assert_eq!(
         vocab.plot_type("volumen"),
         Resolution::Resolved(PlotType::Volume)

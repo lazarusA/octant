@@ -6,6 +6,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Open, &["열어", "열기", "불러와", "로드"]),
         (Select, &["선택"]),
         (Plot, &["표시", "그려", "플롯", "보여", "시각화"]),
         (Play, &["재생", "시작", "애니메이션"]),
@@ -18,5 +19,6 @@ pub(super) static PHRASES: Phrases = Phrases {
             &["뷰 초기화", "보기 초기화", "화면 초기화", "초기화"],
         ),
     ],
+    catalog: &["카탈로그"],
     then: &["그다음", "그 다음", "그리고"],
 };

@@ -6,6 +6,18 @@ use super::Verb::*;
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
         (
+            Open,
+            &[
+                "abre",
+                "abra",
+                "abrir",
+                "carrega",
+                "carregue",
+                "carregar",
+                "muda para",
+            ],
+        ),
+        (
             Select,
             &["seleciona", "selecione", "selecionar", "escolhe", "escolha"],
         ),
@@ -60,5 +72,6 @@ pub(super) static PHRASES: Phrases = Phrases {
             ],
         ),
     ],
+    catalog: &["catálogo", "catalogo"],
     then: &["depois", "então", "e depois"],
 };

@@ -5,6 +5,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Open, &["åpne", "last inn", "bytt til"]),
         (Select, &["velg", "marker"]),
         (Plot, &["vis", "tegn", "plott", "visualiser"]),
         (Play, &["spill", "spill av", "start", "animer"]),
@@ -17,5 +18,6 @@ pub(super) static PHRASES: Phrases = Phrases {
             &["tilbakestill visningen", "tilbakestill visning"],
         ),
     ],
+    catalog: &["katalog", "katalogen"],
     then: &["deretter", "og så", "så"],
 };

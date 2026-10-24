@@ -2,6 +2,7 @@
 //! type, a colormap. Whatever the dataset holds, its tree is read as loaded;
 //! nothing here knows its format.
 
+use super::source_names::{SourceRef, source_candidates};
 use super::text::{Name, Segment, unlikeness};
 use crate::data::DatasetMetadata;
 use crate::i18n::{Language, PlotKey, translate};
@@ -23,10 +24,10 @@ pub enum Resolution<T> {
 }
 
 /// The names a thing goes by, best first; `rank` orders how it matched.
-struct Candidate<T> {
-    value: T,
-    shown: String,
-    names: Vec<(u8, Name)>,
+pub(super) struct Candidate<T> {
+    pub value: T,
+    pub shown: String,
+    pub names: Vec<(u8, Name)>,
 }
 
 /// A variable's names, best first: its path, the path without its leading
@@ -121,15 +122,23 @@ pub struct Vocabulary {
     variables: Vec<Candidate<usize>>,
     plot_types: Vec<Candidate<PlotType>>,
     colormaps: Vec<Candidate<u32>>,
+    sources: Vec<Candidate<SourceRef>>,
 }
 
 impl Vocabulary {
-    pub fn new(meta: Option<&DatasetMetadata>) -> Self {
+    /// The names in `meta` (the active dataset), plot types, colormaps and
+    /// datasets to open, `open` the open ones as (store, name).
+    pub fn new(meta: Option<&DatasetMetadata>, open: &[(String, String)]) -> Self {
         Self {
             variables: meta.map(variable_candidates).unwrap_or_default(),
             plot_types: plot_type_candidates(),
             colormaps: colormap_candidates(),
+            sources: source_candidates(open),
         }
+    }
+
+    pub fn source(&self, text: &str) -> Resolution<SourceRef> {
+        resolve(&self.sources, text)
     }
 
     pub fn variable(&self, text: &str) -> Resolution<usize> {
@@ -152,6 +161,10 @@ impl Vocabulary {
 
     pub(super) fn find_plot_type(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
         find(&self.plot_types, s, taken)
+    }
+
+    pub(super) fn find_source(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
+        find(&self.sources, s, taken)
     }
 
     pub(super) fn find_colormap(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
@@ -180,7 +193,7 @@ fn find<T>(candidates: &[Candidate<T>], s: &Segment, taken: &[std::ops::Range<us
 
 /// `text` against every candidate's names: the best rank that matches
 /// decides; equal ranks of different things are ambiguous.
-fn resolve<T: Copy + PartialEq>(candidates: &[Candidate<T>], text: &str) -> Resolution<T> {
+fn resolve<T: Clone>(candidates: &[Candidate<T>], text: &str) -> Resolution<T> {
     let heard = Name::new(text);
     let mut best: Option<u8> = None;
     let mut matches: Vec<&Candidate<T>> = Vec::new();
@@ -203,7 +216,7 @@ fn resolve<T: Copy + PartialEq>(candidates: &[Candidate<T>], text: &str) -> Reso
         }
     }
     match matches.as_slice() {
-        [one] => Resolution::Resolved(one.value),
+        [one] => Resolution::Resolved(one.value.clone()),
         [] => Resolution::NotFound(closest(candidates, text)),
         many => Resolution::Ambiguous(many.iter().map(|c| c.shown.clone()).collect()),
     }

@@ -6,6 +6,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Open, &["打开", "加载", "切换到"]),
         (Select, &["选择", "选中"]),
         (Plot, &["绘制", "显示", "展示", "可视化", "绘图", "画"]),
         (Play, &["播放", "开始", "动画", "继续"]),
@@ -15,5 +16,6 @@ pub(super) static PHRASES: Phrases = Phrases {
         (Colormap, &["颜色映射", "色图", "配色", "调色板", "色标"]),
         (ResetView, &["重置视图", "复位视图", "重置"]),
     ],
+    catalog: &["目录"],
     then: &["然后", "接着", "之后"],
 };

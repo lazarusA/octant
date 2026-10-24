@@ -1,14 +1,15 @@
 //! Utterances in every language read into actions over the in-memory
 //! dataset's names.
 
-use super::{Parsed, Verb, parse, table};
+use super::{Parsed, Verb, commands, parse, table};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::{Resolution, Vocabulary};
 use crate::app::test_support::memory_app;
 use crate::i18n::{Language, PlotKey, translate};
 use crate::plots::PlotType;
 
-const VERBS: [Verb; 8] = [
+const VERBS: [Verb; 9] = [
+    Verb::Open,
     Verb::Select,
     Verb::Plot,
     Verb::Play,
@@ -21,7 +22,7 @@ const VERBS: [Verb; 8] = [
 
 fn vocab() -> Vocabulary {
     let (_, meta) = memory_app();
-    Vocabulary::new(Some(&meta))
+    Vocabulary::new(Some(&meta), &[])
 }
 
 /// `lang`'s first phrasing of `verb`.
@@ -54,6 +55,7 @@ fn every_language_says_every_verb_and_then() {
             );
         }
         assert!(!phrases.then.is_empty(), "{lang:?} has no 'then'");
+        assert!(!phrases.catalog.is_empty(), "{lang:?} has no catalog");
     }
 }
 
@@ -176,5 +178,53 @@ fn names_alone_select_or_plot() {
             Parsed::NotUnderstood("well".into()),
             Parsed::NotUnderstood("hmm".into())
         ]
+    );
+}
+
+#[test]
+fn every_language_opens_the_catalog_and_a_dataset_by_name() {
+    let vocab = vocab();
+    for &lang in Language::ALL {
+        let open = say(lang, Verb::Open);
+        let catalog = format!("{open} {}", table(lang).catalog[0]);
+        assert_eq!(
+            parse(&catalog, &vocab, lang),
+            [action(AppAction::OpenCatalog)],
+            "{lang:?} '{catalog}'"
+        );
+        let entry = format!("{open} seasfire");
+        assert_eq!(
+            parse(&entry, &vocab, lang),
+            [action(AppAction::OpenSource {
+                source: "seasfire".into()
+            })],
+            "{lang:?} '{entry}'"
+        );
+    }
+}
+
+#[test]
+fn what_follows_open_is_a_command_of_its_own() {
+    let cut = commands("open seasfire plot t2m as a volume", Language::English);
+    let texts: Vec<&str> = cut.iter().map(|(_, s)| s.text.trim()).collect();
+    assert_eq!(texts, ["open seasfire", "plot t2m as a volume"]);
+}
+
+#[test]
+fn a_named_dataset_or_variable_alone_opens_or_selects() {
+    let vocab = vocab();
+    assert_eq!(
+        parse("SeasFire Cube", &vocab, Language::English),
+        [action(AppAction::OpenSource {
+            source: "seasfire cube".into()
+        })]
+    );
+    assert_eq!(
+        parse("open t2m", &vocab, Language::English),
+        [select("t2m")]
+    );
+    assert_eq!(
+        parse("show the catalog", &vocab, Language::English),
+        [action(AppAction::OpenCatalog)]
     );
 }

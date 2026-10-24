@@ -9,8 +9,14 @@
 //! `dispatch` calls the methods the UI calls, never copies of them.
 
 mod answer;
-pub mod phrases;
+mod open;
+#[cfg(test)]
+mod open_tests;
+mod phrases;
+mod queue;
 pub mod resolve;
+pub mod source_names;
+mod staging;
 #[cfg(test)]
 mod tests;
 mod text;
@@ -18,9 +24,9 @@ mod text;
 use serde::{Deserialize, Serialize};
 
 use super::OctantApp;
-use crate::app::layers::{LayerId, LevelChoice};
+use crate::app::layers::LayerId;
 use crate::plots::PlotType;
-use phrases::Parsed;
+pub use queue::CommandQueue;
 use resolve::{Resolution, Vocabulary};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +37,13 @@ pub enum AppAction {
     SelectVariable {
         path: String,
     },
+    /// Opens a dataset: a landing sample, catalog entry or open dataset by
+    /// name, or an address; the commands after it wait until it loads.
+    OpenSource {
+        source: String,
+    },
+    /// Shows the dataset catalog.
+    OpenCatalog,
     /// Plots the staged selection (Plot Data), as `plot_type` when given.
     Plot {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -52,6 +65,8 @@ pub enum AppAction {
 /// What an action did.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Done {
+    Opening(String),
+    CatalogOpened,
     Selected(String),
     Plotted {
         variable: String,
@@ -67,6 +82,7 @@ pub enum Done {
 /// What a name named.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameKind {
+    Source,
     Variable,
     PlotType,
     Colormap,
@@ -93,6 +109,8 @@ pub enum Failure {
     },
     NothingToAnimate,
     NotUnderstood(String),
+    /// The app refused and said why (a desktop-only catalog entry).
+    Refused,
 }
 
 pub type Outcome = Result<Done, Failure>;
@@ -118,12 +136,22 @@ fn resolved<T>(resolution: Resolution<T>, kind: NameKind, text: &str) -> Result<
 impl OctantApp {
     /// What the names of actions can find right now.
     pub fn vocabulary(&self) -> Vocabulary {
-        Vocabulary::new(self.selected.metadata.as_ref())
+        let open: Vec<(String, String)> = self
+            .dataset_manager
+            .iter()
+            .filter_map(|d| Some((d.source.uri.clone(), d.metadata.as_ref()?.name.clone())))
+            .collect();
+        Vocabulary::new(self.selected.metadata.as_ref(), &open)
     }
 
     /// Runs `action` against the app as it is now.
     pub fn dispatch(&mut self, action: AppAction) -> Outcome {
         match action {
+            AppAction::OpenSource { source } => self.open_by_name(&source),
+            AppAction::OpenCatalog => {
+                self.open_sample(crate::app::sources::CATALOG_SAMPLE);
+                Ok(Done::CatalogOpened)
+            }
             AppAction::SelectVariable { path } => self.select_by_name(&path),
             AppAction::Plot { plot_type } => self.plot_as(plot_type.as_deref()),
             AppAction::Play | AppAction::Pause => {
@@ -155,90 +183,6 @@ impl OctantApp {
                 let plot_type = self.effective_canvas_plot_type();
                 crate::app::controllers::controller_for(plot_type).reset_view(&mut self.nav);
                 Ok(Done::ViewReset)
-            }
-        }
-    }
-
-    fn select_by_name(&mut self, path: &str) -> Outcome {
-        if self.selected.metadata.is_none() {
-            return Err(Failure::NoDataset);
-        }
-        let idx = resolved(self.vocabulary().variable(path), NameKind::Variable, path)?;
-        // Selecting the staged variable again would reset its dimensions.
-        if idx != self.selected.variable_idx {
-            crate::ui::variables_overlay::apply_selection(self, idx, LevelChoice::Auto);
-        }
-        Ok(Done::Selected(self.staged_name()))
-    }
-
-    fn plot_as(&mut self, plot_type: Option<&str>) -> Outcome {
-        if self.selected.metadata.is_none() {
-            return Err(Failure::NoDataset);
-        }
-        if let Some(text) = plot_type {
-            let plot_type = resolved(self.vocabulary().plot_type(text), NameKind::PlotType, text)?;
-            let options = crate::ui::plot_type::options::plot_options(self);
-            if let Some(blocked) = options
-                .iter()
-                .find(|o| o.plot_type == plot_type)
-                .and_then(|o| o.blocked)
-            {
-                let mut buf = [0; 256];
-                let reason =
-                    crate::ui::plot_type::options::blocked_text(&mut buf, blocked).to_string();
-                return Err(Failure::Blocked { plot_type, reason });
-            }
-            self.switch_plot_type(plot_type);
-        }
-        self.plot_from_panel();
-        Ok(Done::Plotted {
-            variable: self.staged_name(),
-            plot_type: self.selected.plot_type,
-        })
-    }
-
-    fn staged_name(&self) -> String {
-        self.selected_variable_info()
-            .map(|v| v.display_name().to_string())
-            .unwrap_or_default()
-    }
-
-    /// Whether the plot has an animated dimension to play or step along.
-    fn base_animates(&self) -> Result<(), Failure> {
-        match self.layers.base.selection().animated_dim {
-            Some(_) if self.plotted().metadata.is_some() => Ok(()),
-            _ => Err(Failure::NothingToAnimate),
-        }
-    }
-
-    /// Runs what `utterance` says, command by command, stopping at the first
-    /// that fails; what the last did, or why one failed.
-    pub fn run_utterance(&mut self, utterance: &str) -> Vec<Outcome> {
-        let vocab = self.vocabulary();
-        let mut outcomes = Vec::new();
-        for parsed in phrases::parse(utterance, &vocab, crate::i18n::language()) {
-            let outcome = match parsed {
-                Parsed::Action(action) => self.dispatch(action),
-                Parsed::NotUnderstood(text) => Err(Failure::NotUnderstood(text)),
-            };
-            let failed = outcome.is_err();
-            outcomes.push(outcome);
-            if failed {
-                break;
-            }
-        }
-        outcomes
-    }
-
-    /// Runs the voice bar's finished utterances: what they did is shown in
-    /// the bar, why one failed as a toast.
-    pub(crate) fn run_voice_commands(&mut self) {
-        for utterance in self.voice.take_utterances() {
-            for outcome in self.run_utterance(&utterance) {
-                match outcome {
-                    Ok(done) => self.voice.set_last_action(answer::done_text(&done)),
-                    Err(failure) => self.push_notice(answer::failure_notice(&failure)),
-                }
             }
         }
     }

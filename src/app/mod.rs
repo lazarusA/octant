@@ -49,6 +49,7 @@ mod panels;
 mod pipeline;
 #[cfg(test)]
 mod pyramid_tests;
+pub mod sources;
 mod state;
 #[cfg(test)]
 pub(crate) mod test_support;

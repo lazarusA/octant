@@ -5,6 +5,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Open, &["buka", "membuka", "muat", "beralih ke"]),
         (Select, &["pilih", "memilih"]),
         (
             Plot,
@@ -40,5 +41,6 @@ pub(super) static PHRASES: Phrases = Phrases {
             ],
         ),
     ],
+    catalog: &["katalog"],
     then: &["lalu", "kemudian", "setelah itu"],
 };

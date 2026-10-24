@@ -60,6 +60,8 @@ pub struct OctantApp {
     pub toasts: crate::ui::toast::Toasts,
     /// The voice bar and, while it listens, the microphone.
     pub voice: crate::ui::voice_bar::VoiceBar,
+    /// Spoken or typed commands waiting their turn (`app::actions`).
+    pub commands: crate::app::actions::CommandQueue,
 
     // Coastline Overlay
     /// Whether to render the coastline overlay on geographic plot types.

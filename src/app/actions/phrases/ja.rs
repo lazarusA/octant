@@ -8,6 +8,10 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (
+            Open,
+            &["開いて", "開く", "読み込んで", "読み込む", "切り替えて"],
+        ),
         (Select, &["選択", "選んで", "選ぶ"]),
         (
             Plot,
@@ -26,5 +30,6 @@ pub(super) static PHRASES: Phrases = Phrases {
             &["ビューをリセット", "表示をリセット", "リセット"],
         ),
     ],
+    catalog: &["カタログ"],
     then: &["それから", "その後", "次に"],
 };

@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modello di riconoscimento vocale",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Chiudi input vocale",
+        PlaybackKey::VoiceDidOpen => "Apertura di {}",
+        PlaybackKey::VoiceNoSource => "Nessun dataset corrisponde a '{}'",
         PlaybackKey::VoiceDidSelect => "{} selezionato",
         PlaybackKey::VoiceDidPlot => "{} tracciato come {}",
         PlaybackKey::VoiceDidColormap => "Mappa di colori {}",

@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::VoiceModelHover => "Speech to text model",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Close voice input",
+        PlaybackKey::VoiceDidOpen => "Opening {}",
+        PlaybackKey::VoiceNoSource => "No dataset matches '{}'",
         PlaybackKey::VoiceDidSelect => "Selected {}",
         PlaybackKey::VoiceDidPlot => "Plotted {} as {}",
         PlaybackKey::VoiceDidColormap => "Colormap {}",

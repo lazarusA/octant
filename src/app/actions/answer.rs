@@ -2,11 +2,13 @@
 //! was as a notice. Names from the dataset or the user stay as they are.
 
 use super::{Done, Failure, NameKind};
-use crate::i18n::{KeymapKey, PlaybackKey, filled, tr};
+use crate::i18n::{DatasetKey, KeymapKey, PlaybackKey, filled, tr};
 use crate::ui::toast::{Notice, Severity};
 
 pub(super) fn done_text(done: &Done) -> String {
     match done {
+        Done::Opening(name) => filled(tr(PlaybackKey::VoiceDidOpen), &[name]),
+        Done::CatalogOpened => tr(DatasetKey::CatalogTitle).to_string(),
         Done::Selected(name) => filled(tr(PlaybackKey::VoiceDidSelect), &[name]),
         Done::Plotted {
             variable,
@@ -24,8 +26,10 @@ pub(super) fn done_text(done: &Done) -> String {
     }
 }
 
-pub(super) fn failure_notice(failure: &Failure) -> Notice {
+/// The notice of `failure`; none when the app already gave one.
+pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
     let (title, detail) = match failure {
+        Failure::Refused => return None,
         Failure::NoDataset => (tr(PlaybackKey::VoiceNoDataset).to_string(), String::new()),
         Failure::NotFound {
             kind,
@@ -33,6 +37,7 @@ pub(super) fn failure_notice(failure: &Failure) -> Notice {
             closest,
         } => {
             let key = match kind {
+                NameKind::Source => PlaybackKey::VoiceNoSource,
                 NameKind::Variable => PlaybackKey::VoiceNoVariable,
                 NameKind::PlotType => PlaybackKey::VoiceNoPlotType,
                 NameKind::Colormap => PlaybackKey::VoiceNoColormap,
@@ -59,7 +64,7 @@ pub(super) fn failure_notice(failure: &Failure) -> Notice {
             text.clone(),
         ),
     };
-    Notice::new(Severity::Warning, title, detail)
+    Some(Notice::new(Severity::Warning, title, detail))
 }
 
 fn did_you_mean(names: &[String]) -> String {

@@ -33,6 +33,7 @@ use crate::i18n::Language;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Verb {
+    Open,
     Select,
     Plot,
     Play,
@@ -43,10 +44,12 @@ pub(super) enum Verb {
     ResetView,
 }
 
-/// A language's phrasings of each verb, and the words that end one command
-/// and start the next ("then").
+/// A language's phrasings of each verb, the catalog's name, and the words
+/// that end one command and start the next ("then").
 pub(super) struct Phrases {
     pub verbs: &'static [(Verb, &'static [&'static str])],
+    /// The dataset catalog's name.
+    pub catalog: &'static [&'static str],
     pub then: &'static [&'static str],
 }
 
@@ -72,31 +75,42 @@ pub(super) fn table(lang: Language) -> &'static Phrases {
 
 /// One command of an utterance: an action, or text no table understood.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Parsed {
+pub(super) enum Parsed {
     Action(AppAction),
     NotUnderstood(String),
 }
 
-/// The commands in `utterance`, read with the first language whose verbs
-/// it holds (`first`, then the others); without any verb, by the names it
-/// holds alone.
-pub fn parse(utterance: &str, vocab: &Vocabulary, first: Language) -> Vec<Parsed> {
+/// The commands in `utterance`, each with the language it is read in: the
+/// first language whose verbs it holds (`first`, then the others); without
+/// any verb, `first`, its names read alone.
+pub(super) fn commands(utterance: &str, first: Language) -> Vec<(Language, Segment)> {
     let others = Language::ALL.iter().copied().filter(|&l| l != first);
-    for lang in std::iter::once(first).chain(others) {
-        let phrases = table(lang);
-        let segments = split(utterance, phrases);
-        if segments.iter().any(|s| !verbs_in(phrases, s).is_empty()) {
-            return parse_segments(&segments, phrases, vocab);
-        }
-    }
-    let phrases = table(first);
-    parse_segments(&split(utterance, phrases), phrases, vocab)
+    let lang = std::iter::once(first)
+        .chain(others)
+        .find(|&lang| {
+            let phrases = table(lang);
+            split(utterance, phrases)
+                .iter()
+                .any(|s| !verbs_in(phrases, s).is_empty())
+        })
+        .unwrap_or(first);
+    split(utterance, table(lang))
+        .into_iter()
+        .map(|s| (lang, s))
+        .collect()
 }
 
-fn parse_segments(segments: &[Segment], phrases: &Phrases, vocab: &Vocabulary) -> Vec<Parsed> {
-    segments
+/// One command's actions, its names looked up in `vocab`.
+pub(super) fn parse_command(lang: Language, segment: &Segment, vocab: &Vocabulary) -> Vec<Parsed> {
+    segment::parse_segment(segment, table(lang), vocab)
+}
+
+/// Every command of `utterance` read against one `vocab`.
+#[cfg(test)]
+pub(super) fn parse(utterance: &str, vocab: &Vocabulary, first: Language) -> Vec<Parsed> {
+    commands(utterance, first)
         .iter()
-        .flat_map(|s| segment::parse_segment(s, phrases, vocab))
+        .flat_map(|(lang, s)| parse_command(*lang, s, vocab))
         .collect()
 }
 
@@ -138,10 +152,27 @@ fn split(utterance: &str, phrases: &Phrases) -> Vec<Segment> {
             out.push(Segment::new(&segment.text[..span.start]));
             segment = Segment::new(&segment.text[span.end..]);
         }
-        out.push(segment);
+        cut_after_open(phrases, segment, &mut out);
     }
     out.retain(|s| !s.words.is_empty());
     out
+}
+
+/// `segment` cut where a verb follows "open": what comes after waits for
+/// the dataset, its names unknown until it loads.
+fn cut_after_open(phrases: &Phrases, segment: Segment, out: &mut Vec<Segment>) {
+    let verbs = verbs_in(phrases, &segment);
+    let after_open = verbs
+        .windows(2)
+        .find(|pair| pair[0].1 == Verb::Open)
+        .map(|pair| pair[1].0.start);
+    match after_open {
+        Some(cut) => {
+            out.push(Segment::new(&segment.text[..cut]));
+            cut_after_open(phrases, Segment::new(&segment.text[cut..]), out);
+        }
+        None => out.push(segment),
+    }
 }
 
 /// The first of `names` in `segment`, the longest where several start alike.

@@ -40,6 +40,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modell for talegjenkjenning",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Lukk taleinndata",
+        PlaybackKey::VoiceDidOpen => "Åpner {}",
+        PlaybackKey::VoiceNoSource => "Ingen datasett samsvarer med '{}'",
         PlaybackKey::VoiceDidSelect => "{} valgt",
         PlaybackKey::VoiceDidPlot => "{} tegnet som {}",
         PlaybackKey::VoiceDidColormap => "Fargeskala {}",

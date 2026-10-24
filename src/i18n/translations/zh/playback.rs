@@ -38,6 +38,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "语音转文字模型",
         PlaybackKey::VoiceModelSize => "{}（{} MB）",
         PlaybackKey::VoiceCloseHover => "关闭语音输入",
+        PlaybackKey::VoiceDidOpen => "正在打开 {}",
+        PlaybackKey::VoiceNoSource => "没有与「{}」匹配的数据集",
         PlaybackKey::VoiceDidSelect => "已选择 {}",
         PlaybackKey::VoiceDidPlot => "已将 {} 绘制为{}",
         PlaybackKey::VoiceDidColormap => "色图 {}",
