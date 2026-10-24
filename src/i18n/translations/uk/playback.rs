@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Модель розпізнавання мовлення",
         PlaybackKey::VoiceModelSize => "{} ({} МБ)",
         PlaybackKey::VoiceCloseHover => "Закрити голосове введення",
+        PlaybackKey::VoiceDidSelect => "Вибрано {}",
+        PlaybackKey::VoiceDidPlot => "{} побудовано як {}",
+        PlaybackKey::VoiceDidColormap => "Колірна карта {}",
+        PlaybackKey::VoiceNotUnderstood => "Команду не зрозуміло",
+        PlaybackKey::VoiceNoDataset => "Спочатку відкрийте набір даних",
+        PlaybackKey::VoiceNoVariable => "Жодна змінна не відповідає '{}'",
+        PlaybackKey::VoiceNoPlotType => "Жоден тип графіка не відповідає '{}'",
+        PlaybackKey::VoiceNoColormap => "Жодна колірна карта не відповідає '{}'",
+        PlaybackKey::VoiceAmbiguous => "Кілька змінних відповідають '{}'",
+        PlaybackKey::VoiceDidYouMean => "Можливо, ви мали на увазі: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Графік не має анімованого виміру",
+        PlaybackKey::VoiceCannotPlot => "Неможливо побудувати як {}",
     })
 }

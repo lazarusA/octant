@@ -39,5 +39,17 @@ crate::i18n::keys::define_keys! {
     VoiceModelHover,
     VoiceModelSize,
     VoiceCloseHover,
+    VoiceDidSelect,
+    VoiceDidPlot,
+    VoiceDidColormap,
+    VoiceNotUnderstood,
+    VoiceNoDataset,
+    VoiceNoVariable,
+    VoiceNoPlotType,
+    VoiceNoColormap,
+    VoiceAmbiguous,
+    VoiceDidYouMean,
+    VoiceNothingToAnimate,
+    VoiceCannotPlot,
     }
 }

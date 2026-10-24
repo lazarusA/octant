@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modelo de voz a texto",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Cerrar entrada de voz",
+        PlaybackKey::VoiceDidSelect => "Seleccionado {}",
+        PlaybackKey::VoiceDidPlot => "{} graficado como {}",
+        PlaybackKey::VoiceDidColormap => "Mapa de colores {}",
+        PlaybackKey::VoiceNotUnderstood => "Orden no entendida",
+        PlaybackKey::VoiceNoDataset => "Abra primero un conjunto de datos",
+        PlaybackKey::VoiceNoVariable => "Ninguna variable coincide con '{}'",
+        PlaybackKey::VoiceNoPlotType => "Ningún tipo de gráfico coincide con '{}'",
+        PlaybackKey::VoiceNoColormap => "Ningún mapa de colores coincide con '{}'",
+        PlaybackKey::VoiceAmbiguous => "Varias variables coinciden con '{}'",
+        PlaybackKey::VoiceDidYouMean => "¿Quiso decir: {}?",
+        PlaybackKey::VoiceNothingToAnimate => "El gráfico no tiene dimensión animada",
+        PlaybackKey::VoiceCannotPlot => "No se puede graficar como {}",
     })
 }

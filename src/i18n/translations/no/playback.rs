@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modell for talegjenkjenning",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Lukk taleinndata",
+        PlaybackKey::VoiceDidSelect => "{} valgt",
+        PlaybackKey::VoiceDidPlot => "{} tegnet som {}",
+        PlaybackKey::VoiceDidColormap => "Fargeskala {}",
+        PlaybackKey::VoiceNotUnderstood => "Kommandoen ble ikke forstått",
+        PlaybackKey::VoiceNoDataset => "Åpne et datasett først",
+        PlaybackKey::VoiceNoVariable => "Ingen variabel samsvarer med '{}'",
+        PlaybackKey::VoiceNoPlotType => "Ingen plottype samsvarer med '{}'",
+        PlaybackKey::VoiceNoColormap => "Ingen fargeskala samsvarer med '{}'",
+        PlaybackKey::VoiceAmbiguous => "Flere variabler samsvarer med '{}'",
+        PlaybackKey::VoiceDidYouMean => "Mente du: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Plottet har ingen animert dimensjon",
+        PlaybackKey::VoiceCannotPlot => "Kan ikke tegne som {}",
     })
 }

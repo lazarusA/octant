@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modell för taligenkänning",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Stäng röstinmatning",
+        PlaybackKey::VoiceDidSelect => "{} vald",
+        PlaybackKey::VoiceDidPlot => "{} ritad som {}",
+        PlaybackKey::VoiceDidColormap => "Färgskala {}",
+        PlaybackKey::VoiceNotUnderstood => "Kommandot förstods inte",
+        PlaybackKey::VoiceNoDataset => "Öppna en datamängd först",
+        PlaybackKey::VoiceNoVariable => "Ingen variabel matchar '{}'",
+        PlaybackKey::VoiceNoPlotType => "Ingen diagramtyp matchar '{}'",
+        PlaybackKey::VoiceNoColormap => "Ingen färgskala matchar '{}'",
+        PlaybackKey::VoiceAmbiguous => "Flera variabler matchar '{}'",
+        PlaybackKey::VoiceDidYouMean => "Menade du: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Diagrammet har ingen animerad dimension",
+        PlaybackKey::VoiceCannotPlot => "Kan inte rita som {}",
     })
 }

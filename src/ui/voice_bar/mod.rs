@@ -2,7 +2,9 @@
 //! bar's Voice button), with the microphone toggle, a disk pulsing with its
 //! frequencies and the live transcript (or the listening state) from the
 //! chosen speech to text provider (`voice::stt`). It reads nothing from the
-//! app; the action layer comes later (`VOICE_PLAN.md`).
+//! app: each final utterance is handed out (`take_utterances`) for the app
+//! to run as commands (`app::actions`), and what the last one did is shown
+//! beside the transcript (`set_last_action`).
 
 mod listening;
 mod model_menu;
@@ -48,6 +50,8 @@ pub struct VoiceBar {
     transcript: Transcript,
     /// Until when (egui time) the provider is polled for a last final text.
     final_until: f64,
+    /// Final utterances not yet run as commands.
+    utterances: Vec<String>,
 }
 
 impl VoiceBar {
@@ -57,6 +61,16 @@ impl VoiceBar {
 
     pub fn is_listening(&self) -> bool {
         self.listening.is_some()
+    }
+
+    /// The final utterances heard since the last call.
+    pub fn take_utterances(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.utterances)
+    }
+
+    /// What the last command did, in the UI language.
+    pub fn set_last_action(&mut self, text: String) {
+        self.transcript.action = text;
     }
 
     /// Opens the bar listening, or closes it and releases the microphone.
@@ -158,6 +172,9 @@ impl VoiceBar {
         let was_preparing = self.transcript.is_preparing();
         let mut gave_up = false;
         while let Some(event) = stt.poll() {
+            if let stt::SttEvent::Final(text) = &event {
+                self.utterances.push(text.clone());
+            }
             gave_up |= self.transcript.apply(event);
         }
         if gave_up {
@@ -222,6 +239,7 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
         }
         nav.push(&close, Stop::Button);
         nav.push(&model_menu(voice, ui), Stop::Button);
+        voice.transcript.show_action(ui);
         let rect = ui.available_rect_before_wrap();
         voice.transcript.show(ui, rect, state);
     });

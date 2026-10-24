@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "음성 인식 모델",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "음성 입력 닫기",
+        PlaybackKey::VoiceDidSelect => "{} 선택됨",
+        PlaybackKey::VoiceDidPlot => "{}을(를) {}(으)로 표시함",
+        PlaybackKey::VoiceDidColormap => "컬러맵 {}",
+        PlaybackKey::VoiceNotUnderstood => "명령을 이해하지 못했습니다",
+        PlaybackKey::VoiceNoDataset => "먼저 데이터셋을 여세요",
+        PlaybackKey::VoiceNoVariable => "'{}'와(과) 일치하는 변수가 없습니다",
+        PlaybackKey::VoiceNoPlotType => "'{}'와(과) 일치하는 플롯 유형이 없습니다",
+        PlaybackKey::VoiceNoColormap => "'{}'와(과) 일치하는 컬러맵이 없습니다",
+        PlaybackKey::VoiceAmbiguous => "'{}'와(과) 일치하는 변수가 여러 개 있습니다",
+        PlaybackKey::VoiceDidYouMean => "혹시 이것인가요: {}",
+        PlaybackKey::VoiceNothingToAnimate => "플롯에 애니메이션 차원이 없습니다",
+        PlaybackKey::VoiceCannotPlot => "{}(으)로 표시할 수 없습니다",
     })
 }

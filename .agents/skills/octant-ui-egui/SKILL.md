@@ -1,8 +1,8 @@
 ---
 name: octant-ui-egui
 description: >-
-  Immediate-mode GUI development in Octant using egui and eframe. Covers AppAction
-  event dispatching, dimension sliders, colormap palettes, canvas interactions,
+  Immediate-mode GUI development in Octant using egui and eframe. Covers the AppAction
+  layer for voice commands, dimension sliders, colormap palettes, canvas interactions,
   plot controllers, and animation timelines. Use when modifying src/ui/, src/app/canvas/,
   src/app/controllers/, src/app/state/, or src/app/ui.rs.
 ---
@@ -77,9 +77,8 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   - `clipboard.rs`: Platform-native file manager reveal (`open -R`, `xdg-open`, `explorer.exe`).
 
 ### 2. Event Dispatching & Controller Coordination
-- **Global Actions (`src/app/actions.rs`)**:
-  - Emit an `AppAction` (e.g. `AppAction::SelectVariable(name)`, `AppAction::TogglePlayback`, `AppAction::SetColormap(map)`).
-  - Handle mutations centrally in `OctantApp::apply_action` to keep data flow unidirectional and debuggable.
+- **Action layer (`src/app/actions/`)**:
+  - Voice and typed commands become `AppAction`s (`SelectVariable { path }`, `Plot { plot_type }`, `Play`, `SetColormap { name }`, ...), names resolved against the loaded dataset, run by `OctantApp::dispatch`, which calls the same methods the UI calls. Panels keep calling those methods directly.
 - **Plot-Specific Interactions (`src/app/controllers/`)**:
   - Delegate plot-specific pointer interaction, coordinate probing, and uniform updates to `controller_for(plot_type)`.
 

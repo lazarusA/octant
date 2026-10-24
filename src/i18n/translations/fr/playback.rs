@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modèle de reconnaissance vocale",
         PlaybackKey::VoiceModelSize => "{} ({} Mo)",
         PlaybackKey::VoiceCloseHover => "Fermer la saisie vocale",
+        PlaybackKey::VoiceDidSelect => "{} sélectionné",
+        PlaybackKey::VoiceDidPlot => "{} tracé en {}",
+        PlaybackKey::VoiceDidColormap => "Palette {}",
+        PlaybackKey::VoiceNotUnderstood => "Commande non comprise",
+        PlaybackKey::VoiceNoDataset => "Ouvrez d'abord un jeu de données",
+        PlaybackKey::VoiceNoVariable => "Aucune variable ne correspond à '{}'",
+        PlaybackKey::VoiceNoPlotType => "Aucun type de tracé ne correspond à '{}'",
+        PlaybackKey::VoiceNoColormap => "Aucune palette ne correspond à '{}'",
+        PlaybackKey::VoiceAmbiguous => "Plusieurs variables correspondent à '{}'",
+        PlaybackKey::VoiceDidYouMean => "Vouliez-vous dire : {}",
+        PlaybackKey::VoiceNothingToAnimate => "Le tracé n'a pas de dimension animée",
+        PlaybackKey::VoiceCannotPlot => "Impossible de tracer en {}",
     })
 }

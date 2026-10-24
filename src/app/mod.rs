@@ -2,7 +2,8 @@
 //!
 //! - `state`: struct definition, config enums (`StoreKind`, `SpatialRole`,
 //!   `AnimationRole`, `DimConfig`), and construction.
-//! - `actions`: `AppAction` + `dispatch`: event-driven state mutation.
+//! - `actions`: the action layer: `AppAction`, `dispatch`, and the phrase
+//!   tables reading spoken or typed commands into actions.
 //! - `data_loading`: store inspection, cache lookup/miss handling, and
 //!   slice/variable loading (the I/O boundary).
 //! - `layers`: what a plot is drawn from (`VariableSelection`).

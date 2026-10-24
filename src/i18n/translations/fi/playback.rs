@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Puheentunnistusmalli",
         PlaybackKey::VoiceModelSize => "{} ({} Mt)",
         PlaybackKey::VoiceCloseHover => "Sulje puhesyöte",
+        PlaybackKey::VoiceDidSelect => "{} valittu",
+        PlaybackKey::VoiceDidPlot => "{} piirretty muodossa {}",
+        PlaybackKey::VoiceDidColormap => "Väriskaala {}",
+        PlaybackKey::VoiceNotUnderstood => "Komentoa ei ymmärretty",
+        PlaybackKey::VoiceNoDataset => "Avaa ensin aineisto",
+        PlaybackKey::VoiceNoVariable => "Mikään muuttuja ei vastaa kohdetta '{}'",
+        PlaybackKey::VoiceNoPlotType => "Mikään kuvaajatyyppi ei vastaa kohdetta '{}'",
+        PlaybackKey::VoiceNoColormap => "Mikään väriskaala ei vastaa kohdetta '{}'",
+        PlaybackKey::VoiceAmbiguous => "Useat muuttujat vastaavat kohdetta '{}'",
+        PlaybackKey::VoiceDidYouMean => "Tarkoititko: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Kuvaajassa ei ole animoitua ulottuvuutta",
+        PlaybackKey::VoiceCannotPlot => "Ei voi piirtää muodossa {}",
     })
 }

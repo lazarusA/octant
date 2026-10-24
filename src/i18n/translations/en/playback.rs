@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::VoiceModelHover => "Speech to text model",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Close voice input",
+        PlaybackKey::VoiceDidSelect => "Selected {}",
+        PlaybackKey::VoiceDidPlot => "Plotted {} as {}",
+        PlaybackKey::VoiceDidColormap => "Colormap {}",
+        PlaybackKey::VoiceNotUnderstood => "Command not understood",
+        PlaybackKey::VoiceNoDataset => "Open a dataset first",
+        PlaybackKey::VoiceNoVariable => "No variable matches '{}'",
+        PlaybackKey::VoiceNoPlotType => "No plot type matches '{}'",
+        PlaybackKey::VoiceNoColormap => "No colormap matches '{}'",
+        PlaybackKey::VoiceAmbiguous => "Several variables match '{}'",
+        PlaybackKey::VoiceDidYouMean => "Did you mean: {}",
+        PlaybackKey::VoiceNothingToAnimate => "The plot has no animated dimension",
+        PlaybackKey::VoiceCannotPlot => "Cannot plot as {}",
     }
 }

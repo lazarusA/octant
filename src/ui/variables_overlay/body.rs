@@ -123,7 +123,7 @@ fn show_tree(
 /// Select variable `idx` at `level`: reset its colorbar label and dimension defaults,
 /// open its controls and read its coordinates in the background. Another level of
 /// the multiscale variable already selected keeps its dimensions.
-pub(super) fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoice) {
+pub(crate) fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoice) {
     let other_level = app.selected.variable_idx == idx
         && app
             .selected

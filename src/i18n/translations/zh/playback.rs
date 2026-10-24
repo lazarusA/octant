@@ -38,5 +38,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "语音转文字模型",
         PlaybackKey::VoiceModelSize => "{}（{} MB）",
         PlaybackKey::VoiceCloseHover => "关闭语音输入",
+        PlaybackKey::VoiceDidSelect => "已选择 {}",
+        PlaybackKey::VoiceDidPlot => "已将 {} 绘制为{}",
+        PlaybackKey::VoiceDidColormap => "色图 {}",
+        PlaybackKey::VoiceNotUnderstood => "未能理解该命令",
+        PlaybackKey::VoiceNoDataset => "请先打开数据集",
+        PlaybackKey::VoiceNoVariable => "没有与「{}」匹配的变量",
+        PlaybackKey::VoiceNoPlotType => "没有与「{}」匹配的图表类型",
+        PlaybackKey::VoiceNoColormap => "没有与「{}」匹配的色图",
+        PlaybackKey::VoiceAmbiguous => "有多个变量与「{}」匹配",
+        PlaybackKey::VoiceDidYouMean => "您是否想要：{}",
+        PlaybackKey::VoiceNothingToAnimate => "该图没有动画维度",
+        PlaybackKey::VoiceCannotPlot => "无法绘制为{}",
     })
 }

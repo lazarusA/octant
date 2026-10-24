@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Model ucapan ke teks",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Tutup input suara",
+        PlaybackKey::VoiceDidSelect => "{} dipilih",
+        PlaybackKey::VoiceDidPlot => "{} diplot sebagai {}",
+        PlaybackKey::VoiceDidColormap => "Peta warna {}",
+        PlaybackKey::VoiceNotUnderstood => "Perintah tidak dipahami",
+        PlaybackKey::VoiceNoDataset => "Buka set data terlebih dahulu",
+        PlaybackKey::VoiceNoVariable => "Tidak ada variabel yang cocok dengan '{}'",
+        PlaybackKey::VoiceNoPlotType => "Tidak ada jenis plot yang cocok dengan '{}'",
+        PlaybackKey::VoiceNoColormap => "Tidak ada peta warna yang cocok dengan '{}'",
+        PlaybackKey::VoiceAmbiguous => "Beberapa variabel cocok dengan '{}'",
+        PlaybackKey::VoiceDidYouMean => "Maksud Anda: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Plot tidak memiliki dimensi animasi",
+        PlaybackKey::VoiceCannotPlot => "Tidak dapat diplot sebagai {}",
     })
 }

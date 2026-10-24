@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "音声認識モデル",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "音声入力を閉じる",
+        PlaybackKey::VoiceDidSelect => "{} を選択しました",
+        PlaybackKey::VoiceDidPlot => "{} を{}で表示しました",
+        PlaybackKey::VoiceDidColormap => "カラーマップ {}",
+        PlaybackKey::VoiceNotUnderstood => "コマンドを理解できませんでした",
+        PlaybackKey::VoiceNoDataset => "先にデータセットを開いてください",
+        PlaybackKey::VoiceNoVariable => "「{}」に一致する変数はありません",
+        PlaybackKey::VoiceNoPlotType => "「{}」に一致するプロットの種類はありません",
+        PlaybackKey::VoiceNoColormap => "「{}」に一致するカラーマップはありません",
+        PlaybackKey::VoiceAmbiguous => "「{}」に一致する変数が複数あります",
+        PlaybackKey::VoiceDidYouMean => "もしかして：{}",
+        PlaybackKey::VoiceNothingToAnimate => "このプロットにはアニメーションの次元がありません",
+        PlaybackKey::VoiceCannotPlot => "{}で表示できません",
     })
 }

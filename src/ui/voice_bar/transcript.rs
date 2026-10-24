@@ -23,6 +23,8 @@ const OLDEST: f32 = 0.55;
 const FADE: f32 = 56.0;
 /// Strips the fade is drawn in, eased between.
 const FADE_STEPS: usize = 8;
+/// Share of the line the last command's action may take.
+const ACTION_SHARE: f32 = 0.4;
 
 #[derive(Default)]
 pub(super) struct Transcript {
@@ -34,6 +36,8 @@ pub(super) struct Transcript {
     /// Bumped when the text is cut or cleared, so the line takes its new
     /// place at once instead of gliding there.
     jumps: u32,
+    /// What the last command did, shown beside the text.
+    pub(super) action: String,
 }
 
 impl Transcript {
@@ -41,6 +45,7 @@ impl Transcript {
     pub(super) fn clear(&mut self) {
         self.finals.clear();
         self.partial.clear();
+        self.action.clear();
         self.jumps += 1;
     }
 
@@ -77,6 +82,19 @@ impl Transcript {
             }
         }
         false
+    }
+
+    /// What the last command did, at the right of the line.
+    pub(super) fn show_action(&self, ui: &mut egui::Ui) {
+        if !self.action.is_empty() {
+            let text = egui::RichText::new(&self.action).strong();
+            // Cut long names rather than the words heard.
+            let width = ui.available_width() * ACTION_SHARE;
+            ui.scope(|ui| {
+                ui.set_max_width(width);
+                ui.add(egui::Label::new(text).truncate());
+            });
+        }
     }
 
     /// Draws the text in `rect`; while there is none, the provider getting

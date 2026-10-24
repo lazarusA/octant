@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Модель распознавания речи",
         PlaybackKey::VoiceModelSize => "{} ({} МБ)",
         PlaybackKey::VoiceCloseHover => "Закрыть голосовой ввод",
+        PlaybackKey::VoiceDidSelect => "Выбрано {}",
+        PlaybackKey::VoiceDidPlot => "{} построено как {}",
+        PlaybackKey::VoiceDidColormap => "Цветовая карта {}",
+        PlaybackKey::VoiceNotUnderstood => "Команда не распознана",
+        PlaybackKey::VoiceNoDataset => "Сначала откройте набор данных",
+        PlaybackKey::VoiceNoVariable => "Ни одна переменная не соответствует '{}'",
+        PlaybackKey::VoiceNoPlotType => "Ни один тип графика не соответствует '{}'",
+        PlaybackKey::VoiceNoColormap => "Ни одна цветовая карта не соответствует '{}'",
+        PlaybackKey::VoiceAmbiguous => "Несколько переменных соответствуют '{}'",
+        PlaybackKey::VoiceDidYouMean => "Возможно, вы имели в виду: {}",
+        PlaybackKey::VoiceNothingToAnimate => "У графика нет анимируемого измерения",
+        PlaybackKey::VoiceCannotPlot => "Невозможно построить как {}",
     })
 }

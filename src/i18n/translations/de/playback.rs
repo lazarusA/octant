@@ -40,5 +40,17 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modell für Spracherkennung",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Spracheingabe schließen",
+        PlaybackKey::VoiceDidSelect => "{} ausgewählt",
+        PlaybackKey::VoiceDidPlot => "{} als {} dargestellt",
+        PlaybackKey::VoiceDidColormap => "Farbskala {}",
+        PlaybackKey::VoiceNotUnderstood => "Befehl nicht verstanden",
+        PlaybackKey::VoiceNoDataset => "Öffnen Sie zuerst einen Datensatz",
+        PlaybackKey::VoiceNoVariable => "Keine Variable passt zu '{}'",
+        PlaybackKey::VoiceNoPlotType => "Kein Diagrammtyp passt zu '{}'",
+        PlaybackKey::VoiceNoColormap => "Keine Farbskala passt zu '{}'",
+        PlaybackKey::VoiceAmbiguous => "Mehrere Variablen passen zu '{}'",
+        PlaybackKey::VoiceDidYouMean => "Meinten Sie: {}",
+        PlaybackKey::VoiceNothingToAnimate => "Die Darstellung hat keine animierte Dimension",
+        PlaybackKey::VoiceCannotPlot => "Darstellung als {} nicht möglich",
     })
 }
