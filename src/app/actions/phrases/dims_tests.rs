@@ -221,14 +221,8 @@ fn dates_of_a_range_share_the_year_said_once() {
             "2020-01-20",
         ),
         (
-            Language::English,
-            "time 15 to 20 January 2020",
-            "2020-01-15",
-            "2020-01-20",
-        ),
-        (
             Language::Spanish,
-            "tiempo del 15 al 20 de enero de 2020",
+            "tiempo 15 de enero al 20 de 2020",
             "2020-01-15",
             "2020-01-20",
         ),
@@ -261,4 +255,18 @@ fn a_year_said_first_and_a_stray_number_make_no_range() {
     let parsed = parse("time 2020 January 15 level 3", &vocab, Language::English);
     let range = |p: &Parsed| matches!(p, Parsed::Action(AppAction::SetRange { .. }));
     assert!(!parsed.iter().any(range), "{parsed:?}");
+}
+
+#[test]
+fn another_dimension_s_number_before_a_date_is_no_day() {
+    let vocab = vocab();
+    for (said, lang) in [
+        ("level 10 to 15 January 2020", Language::English),
+        ("nivel 10 y 15 de enero de 2020", Language::Spanish),
+        ("уровень 10 и 15 января 2020", Language::Russian),
+    ] {
+        let parsed = parse(said, &vocab, lang);
+        let range = |p: &Parsed| matches!(p, Parsed::Action(AppAction::SetRange { .. }));
+        assert!(!parsed.iter().any(range), "{said}: {parsed:?}");
+    }
 }

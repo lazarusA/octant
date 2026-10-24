@@ -92,7 +92,7 @@ fn alone(text: &str, r: &Range<usize>) -> bool {
 
 /// The date parts said outside `taken`, in order: month names beside a
 /// number, years (1000-2999) and days (1-31 at most a word from a month
-/// name, before a day marker, or across one of `until` from such a day).
+/// name, before a day marker, or after one of `until` after such a day).
 pub(super) fn parts(
     segment: &Segment,
     months: &[&[&str]; 12],
@@ -133,9 +133,10 @@ pub(super) fn parts(
     found
 }
 
-/// The `loose` numbers (word index, value) said across one of `until`
-/// from a day in `found` ("January 15 to 20", "15 to 20 January"), which
-/// are days too though no month name stands beside them.
+/// The `loose` numbers (word index, value) said after one of `until`
+/// that follows a day in `found` ("January 15 to 20"), which are days too
+/// though no month name stands beside them. Never before a day: the 10 of
+/// "level 10 to 15 January" is the level's.
 fn days_across(
     segment: &Segment,
     until: &[&str],
@@ -149,15 +150,13 @@ fn days_across(
             .is_some_and(|w| until.contains(&&segment.text[w.clone()]))
     };
     for &(k, n) in loose {
-        let before = k.checked_sub(2).filter(|_| between(k - 1));
-        let after = between(k + 1).then_some(k + 2);
         let day = |d: usize| {
             let at = words.get(d);
             found
                 .iter()
                 .any(|(r, p)| Some(r) == at && matches!(p, Part::Day(_)))
         };
-        if before.into_iter().chain(after).any(day) {
+        if k.checked_sub(2).is_some_and(|d| between(k - 1) && day(d)) {
             found.push((words[k].clone(), Part::Day(n)));
         }
     }
