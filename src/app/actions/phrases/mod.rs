@@ -6,6 +6,9 @@
 //! language's table is tried first, then the others.
 
 mod de;
+mod dims;
+#[cfg(test)]
+mod dims_tests;
 mod en;
 mod es;
 mod fi;
@@ -22,18 +25,21 @@ mod sv;
 #[cfg(test)]
 mod tests;
 mod uk;
+mod values;
 mod zh;
 
 use std::ops::Range;
 
 use super::AppAction;
 use super::resolve::Vocabulary;
-use super::text::{Name, Segment};
+use super::text::{Name, Segment, overlaps};
 use crate::i18n::Language;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Verb {
     Open,
+    /// Moves a dimension to a value said with it.
+    Goto,
     Select,
     Plot,
     Play,
@@ -48,10 +54,19 @@ pub(super) enum Verb {
 /// that end one command and start the next ("then").
 pub(super) struct Phrases {
     pub verbs: &'static [(Verb, &'static [&'static str])],
+    /// Each month's names as said (with a day, alone, abbreviated),
+    /// January first.
+    pub months: [&'static [&'static str]; 12],
+    /// The words for the time, latitude, longitude and level axes, read as
+    /// `AXES`.
+    pub axes: [&'static [&'static str]; 4],
     /// The dataset catalog's name.
     pub catalog: &'static [&'static str],
     pub then: &'static [&'static str],
 }
+
+/// The axes as dimension actions name them (`dims::by_role` reads them).
+pub(super) const AXES: [&str; 4] = ["time", "latitude", "longitude", "level"];
 
 pub(super) fn table(lang: Language) -> &'static Phrases {
     match lang {
@@ -114,13 +129,18 @@ pub(super) fn parse(utterance: &str, vocab: &Vocabulary, first: Language) -> Vec
         .collect()
 }
 
-/// Sentence punctuation that ends a command (a full stop only before a
-/// space or the end, so `45.5` stays whole).
-fn ends_command(c: char, next: Option<char>) -> bool {
-    matches!(
+/// Sentence punctuation that ends a command, `before` being the text before
+/// it: a full stop or comma only before a space or the end (`45.5` and
+/// `45,5` stay whole), and no full stop after a day ("15. Januar").
+fn ends_command(c: char, before: &str, next: Option<char>) -> bool {
+    let digits = before.bytes().rev().take_while(u8::is_ascii_digit).count();
+    let after_day = c == '.' && (1..=2).contains(&digits) && {
+        let rest = &before[..before.len() - digits];
+        !rest.chars().next_back().is_some_and(char::is_alphanumeric)
+    };
+    let ends = matches!(
         c,
-        ',' | ';'
-            | '!'
+        ';' | '!'
             | '?'
             | '\u{3001}'
             | '\u{3002}'
@@ -128,7 +148,8 @@ fn ends_command(c: char, next: Option<char>) -> bool {
             | '\u{FF01}'
             | '\u{FF1F}'
             | '\u{FF1B}'
-    ) || (c == '.' && next.is_none_or(char::is_whitespace))
+    ) || (matches!(c, '.' | ',') && next.is_none_or(char::is_whitespace));
+    ends && !after_day
 }
 
 /// `utterance` cut at sentence punctuation and the language's "then" words
@@ -140,7 +161,7 @@ fn split(utterance: &str, phrases: &Phrases) -> Vec<Segment> {
     let mut start = 0;
     let mut pieces = Vec::new();
     while let Some((i, c)) = chars.next() {
-        if ends_command(c, chars.peek().map(|&(_, n)| n)) {
+        if ends_command(c, &utterance[start..i], chars.peek().map(|&(_, n)| n)) {
             pieces.push(&utterance[start..i]);
             start = i + c.len_utf8();
         }
@@ -195,9 +216,22 @@ pub(super) fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize
     found.sort_by_key(|(r, _)| (r.start, std::cmp::Reverse(r.end)));
     let mut kept: Vec<(Range<usize>, Verb)> = Vec::new();
     for (r, verb) in found {
-        if !kept.iter().any(|(k, _)| super::text::overlaps(k, &r)) {
+        if !kept.iter().any(|(k, _)| overlaps(k, &r)) {
             kept.push((r, verb));
         }
     }
     kept
+}
+
+/// Where the catalog is named outside `taken`.
+pub(super) fn catalog_word(
+    segment: &Segment,
+    phrases: &Phrases,
+    taken: &[Range<usize>],
+) -> Option<Range<usize>> {
+    phrases
+        .catalog
+        .iter()
+        .filter_map(|w| segment.find(&Name::new(w)))
+        .find(|s| !taken.iter().any(|t| overlaps(t, s)))
 }

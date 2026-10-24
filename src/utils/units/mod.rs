@@ -3,6 +3,7 @@
 pub mod bytes;
 pub mod calendar;
 pub mod cf;
+pub mod dates;
 pub mod format;
 #[cfg(test)]
 mod tests;

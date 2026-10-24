@@ -67,6 +67,23 @@ impl Default for VariableSelection {
 }
 
 impl VariableSelection {
+    /// Dimension `i` reads one `index`: what its collapsed slider sets.
+    pub fn set_index(&mut self, i: usize, index: usize) {
+        self.set_range(i, (index, index), index);
+    }
+
+    /// Dimension `i` reads `range` at `index` within it: what its range
+    /// slider sets.
+    pub fn set_range(&mut self, i: usize, range: (usize, usize), index: usize) {
+        if i >= self.dim_config.len() || i >= self.dim_ranges.len() || i >= self.dim_indices.len() {
+            return;
+        }
+        self.dim_ranges[i] = range;
+        self.dim_indices[i] = index;
+        self.dim_config[i].range = range;
+        self.dim_config[i].index = index;
+    }
+
     /// The selected variable's metadata.
     pub fn variable_info(&self) -> Option<&crate::data::VariableInfo> {
         self.metadata

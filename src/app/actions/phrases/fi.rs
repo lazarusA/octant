@@ -5,6 +5,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Goto, &["siirry", "hyppää", "aseta"]),
         (Open, &["avaa", "lataa", "vaihda"]),
         (Select, &["valitse"]),
         (Plot, &["näytä", "piirrä", "visualisoi", "plottaa"]),
@@ -17,6 +18,26 @@ pub(super) static PHRASES: Phrases = Phrases {
         ),
         (Colormap, &["väriskaala", "värikartta", "paletti", "värit"]),
         (ResetView, &["palauta näkymä", "nollaa näkymä"]),
+    ],
+    months: [
+        &["tammikuu", "tammikuuta"],
+        &["helmikuu", "helmikuuta"],
+        &["maaliskuu", "maaliskuuta"],
+        &["huhtikuu", "huhtikuuta"],
+        &["toukokuu", "toukokuuta"],
+        &["kesäkuu", "kesäkuuta"],
+        &["heinäkuu", "heinäkuuta"],
+        &["elokuu", "elokuuta"],
+        &["syyskuu", "syyskuuta"],
+        &["lokakuu", "lokakuuta"],
+        &["marraskuu", "marraskuuta"],
+        &["joulukuu", "joulukuuta"],
+    ],
+    axes: [
+        &["aika", "päivämäärä"],
+        &["leveysaste"],
+        &["pituusaste"],
+        &["taso", "syvyys", "korkeus"],
     ],
     catalog: &["luettelo", "katalogi"],
     then: &["sitten", "sen jälkeen", "ja sitten"],

@@ -5,6 +5,7 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Goto, &["vai a", "salta a", "imposta"]),
         (Open, &["apri", "aprire", "carica", "caricare", "passa a"]),
         (Select, &["seleziona", "selezionare", "scegli", "scegliere"]),
         (
@@ -44,6 +45,26 @@ pub(super) static PHRASES: Phrases = Phrases {
                 "reimposta vista",
             ],
         ),
+    ],
+    months: [
+        &["gennaio"],
+        &["febbraio"],
+        &["marzo"],
+        &["aprile"],
+        &["maggio"],
+        &["giugno"],
+        &["luglio"],
+        &["agosto"],
+        &["settembre"],
+        &["ottobre"],
+        &["novembre"],
+        &["dicembre"],
+    ],
+    axes: [
+        &["tempo", "data"],
+        &["latitudine"],
+        &["longitudine"],
+        &["livello", "profondità", "altezza"],
     ],
     catalog: &["catalogo"],
     then: &["poi", "quindi", "e poi", "dopo"],

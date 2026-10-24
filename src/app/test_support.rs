@@ -60,6 +60,28 @@ fn write_array_with(
     array.store_array_subset(&all, &values).expect("values");
 }
 
+/// Writes the 1D coordinate array `name` holding `values`, with `attrs`.
+pub(crate) fn write_coordinate(
+    store: &Arc<MemoryStore>,
+    name: &str,
+    values: &[f32],
+    attrs: serde_json::Value,
+) {
+    let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
+    let len = values.len() as u64;
+    let mut builder = ArrayBuilder::new(vec![len], vec![len], f32_dt, FillValue::from(0f32));
+    builder.dimension_names(Some(vec![name]));
+    if let serde_json::Value::Object(map) = attrs {
+        builder.attributes(map);
+    }
+    let array = builder
+        .build(store.clone(), &format!("/{name}"))
+        .expect("build");
+    array.store_metadata().expect("metadata");
+    let all = ArraySubset::new_with_shape(vec![len]);
+    array.store_array_subset(&all, values).expect("values");
+}
+
 /// An app whose dataset manager holds an in-memory store: `elev(lat, lon)` (5x4),
 /// `t2m`, `sst(time, lat, lon)` (3x5x4, one step per chunk) and `rgb(band, lat,
 /// lon)` (3x5x4). Nothing is plotted.

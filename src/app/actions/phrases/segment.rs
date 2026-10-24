@@ -1,13 +1,13 @@
-//! One command of an utterance read into actions: its verbs, then the
-//! names it holds (a plot type, a colormap after a colormap verb, a
-//! variable, a dataset to open, the catalog), each found outside the verbs.
+//! One command of an utterance read into actions: its verbs, then the names
+//! it holds (a plot type, a colormap after a colormap verb, the catalog,
+//! dimensions and values, a variable, a dataset to open).
 
 use std::ops::Range;
 
-use super::{Parsed, Phrases, Verb, verbs_in};
+use super::{Parsed, Phrases, Verb, catalog_word, verbs_in};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::{Resolution, Vocabulary};
-use crate::app::actions::text::{Name, Segment, overlaps};
+use crate::app::actions::text::{Segment, overlaps};
 
 fn spans(found: &[(Range<usize>, Verb)]) -> Vec<Range<usize>> {
     found.iter().map(|(r, _)| r.clone()).collect()
@@ -23,6 +23,8 @@ struct Named {
     source: Option<String>,
     /// Whether it names the dataset catalog.
     catalog: bool,
+    /// What it says of dimensions (`dims::dim_actions`).
+    dims: Vec<AppAction>,
     /// The words left over: a name not found, or filler.
     rest: String,
 }
@@ -56,12 +58,8 @@ fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) -> Named {
     } else {
         None
     };
-    let catalog_word = phrases
-        .catalog
-        .iter()
-        .filter_map(|w| segment.find(&Name::new(w)))
-        .find(|s| !taken.iter().any(|t| overlaps(t, s)));
-    let catalog = take(catalog_word, &mut taken).is_some();
+    let catalog = take(catalog_word(segment, phrases, &taken), &mut taken).is_some();
+    let dims = super::dims::dim_actions(segment, phrases, vocab, &verbs, &mut taken);
     // A variable and a dataset may share a name; the verb decides.
     let names_from = taken.clone();
     let variable = take(vocab.find_variable(segment, &names_from), &mut taken);
@@ -74,6 +72,7 @@ fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) -> Named {
         variable,
         source,
         catalog,
+        dims,
     }
 }
 
@@ -84,11 +83,27 @@ pub(super) fn parse_segment(
     vocab: &Vocabulary,
 ) -> Vec<Parsed> {
     let n = named(segment, phrases, vocab);
-    if n.verbs.is_empty() {
+    let mut out = if n.verbs.is_empty() {
         names_alone(&n, segment)
     } else {
         verb_actions(&n, segment, vocab)
-    }
+    };
+    // Dimensions are set once the variable is chosen, before it is plotted
+    // or played.
+    let starts_plot = |p: &Parsed| {
+        matches!(
+            p,
+            Parsed::Action(
+                AppAction::Plot { .. }
+                    | AppAction::Play
+                    | AppAction::Pause
+                    | AppAction::Step { .. }
+            )
+        )
+    };
+    let at = out.iter().position(starts_plot).unwrap_or(out.len());
+    out.splice(at..at, n.dims.into_iter().map(Parsed::Action));
+    out
 }
 
 /// A command without a verb: a plot type plots (the variable named, if
@@ -105,6 +120,7 @@ fn names_alone(n: &Named, segment: &Segment) -> Vec<Parsed> {
         (Some(v), None, _) => out.push(select(v)),
         (None, None, Some(source)) => out.push(open(source)),
         (None, None, None) if n.catalog => out.push(action(AppAction::OpenCatalog)),
+        (None, None, None) if !n.dims.is_empty() => {}
         (None, None, None) => out.push(not_understood(segment)),
     }
     out
@@ -128,6 +144,8 @@ fn verb_actions(n: &Named, segment: &Segment, vocab: &Vocabulary) -> Vec<Parsed>
                 selected = true;
                 choose(n, verb, segment)
             }
+            Verb::Goto if n.dims.is_empty() => not_understood(segment),
+            Verb::Goto => continue,
             Verb::Plot if n.catalog && n.variable.is_none() => action(AppAction::OpenCatalog),
             Verb::Plot => {
                 if !selected && let Some(v) = plot_target(n, vocab) {

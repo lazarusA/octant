@@ -9,6 +9,12 @@
 //! `dispatch` calls the methods the UI calls, never copies of them.
 
 mod answer;
+mod axes;
+mod candidates;
+mod coord_match;
+mod dims;
+#[cfg(test)]
+mod dims_tests;
 mod open;
 #[cfg(test)]
 mod open_tests;
@@ -27,7 +33,7 @@ use super::OctantApp;
 use crate::app::layers::LayerId;
 use crate::plots::PlotType;
 pub use queue::CommandQueue;
-use resolve::{Resolution, Vocabulary};
+use resolve::Resolution;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
@@ -49,6 +55,27 @@ pub enum AppAction {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         plot_type: Option<String>,
     },
+    /// Moves dimension `dim` of the staged selection (its animated one: the
+    /// plot's step) to `value`: an ISO date, a number in the coordinate's
+    /// units, a coordinate label, or without coordinates a 1-based position.
+    /// Without `dim`, the time dimension.
+    SetDim {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dim: Option<String>,
+        value: String,
+    },
+    /// Dimension `dim` reads `from..=to`, values as in `SetDim`.
+    SetRange {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dim: Option<String>,
+        from: String,
+        to: String,
+    },
+    /// Dimension `dim`'s role, as its Dimensions panel selects set it.
+    SetRole {
+        dim: String,
+        role: DimRole,
+    },
     Play,
     Pause,
     /// Moves the plot `by` steps along its animated dimension.
@@ -62,12 +89,37 @@ pub enum AppAction {
     ResetView,
 }
 
+/// A dimension's role: a plot axis, animated, or neither.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DimRole {
+    X,
+    Y,
+    Z,
+    Animate,
+    None,
+}
+
 /// What an action did.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Done {
     Opening(String),
     CatalogOpened,
     Selected(String),
+    /// A dimension and the coordinate it moved to, as the hover writes it.
+    DimSet {
+        dim: String,
+        value: String,
+    },
+    RangeSet {
+        dim: String,
+        from: String,
+        to: String,
+    },
+    RoleSet {
+        dim: String,
+        role: DimRole,
+    },
     Plotted {
         variable: String,
         plot_type: PlotType,
@@ -83,6 +135,7 @@ pub enum Done {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameKind {
     Source,
+    Dimension,
     Variable,
     PlotType,
     Colormap,
@@ -111,6 +164,13 @@ pub enum Failure {
     NotUnderstood(String),
     /// The app refused and said why (a desktop-only catalog entry).
     Refused,
+    /// No coordinate of `dim` matches `value`.
+    NoValue {
+        dim: String,
+        value: String,
+    },
+    /// The coordinates are being read: the command waits for them.
+    CoordinatesPending,
 }
 
 pub type Outcome = Result<Done, Failure>;
@@ -134,16 +194,6 @@ fn resolved<T>(resolution: Resolution<T>, kind: NameKind, text: &str) -> Result<
 }
 
 impl OctantApp {
-    /// What the names of actions can find right now.
-    pub fn vocabulary(&self) -> Vocabulary {
-        let open: Vec<(String, String)> = self
-            .dataset_manager
-            .iter()
-            .filter_map(|d| Some((d.source.uri.clone(), d.metadata.as_ref()?.name.clone())))
-            .collect();
-        Vocabulary::new(self.selected.metadata.as_ref(), &open)
-    }
-
     /// Runs `action` against the app as it is now.
     pub fn dispatch(&mut self, action: AppAction) -> Outcome {
         match action {
@@ -154,6 +204,9 @@ impl OctantApp {
             }
             AppAction::SelectVariable { path } => self.select_by_name(&path),
             AppAction::Plot { plot_type } => self.plot_as(plot_type.as_deref()),
+            AppAction::SetDim { dim, value } => self.set_dim(dim.as_deref(), &value),
+            AppAction::SetRange { dim, from, to } => self.set_dim_range(dim.as_deref(), &from, &to),
+            AppAction::SetRole { dim, role } => self.set_dim_role(&dim, role),
             AppAction::Play | AppAction::Pause => {
                 let play = action == AppAction::Play;
                 self.base_animates()?;

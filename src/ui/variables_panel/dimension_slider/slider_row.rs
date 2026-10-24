@@ -115,23 +115,20 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     dim_size.saturating_sub(1),
                 );
 
-                app.selected.dim_ranges[i] = (start, end);
-                if is_animated {
+                let index = if is_animated {
                     let max_idx = dim_size.saturating_sub(1);
                     if app.playback.is_playing
                         || app.playback.current_timestep > end
                         || app.playback.current_timestep < start
                     {
-                        app.selected.dim_indices[i] = app.playback.current_timestep.min(max_idx);
+                        app.playback.current_timestep.min(max_idx)
                     } else {
-                        app.selected.dim_indices[i] =
-                            app.playback.current_timestep.clamp(start, end);
+                        app.playback.current_timestep.clamp(start, end)
                     }
                 } else {
-                    app.selected.dim_indices[i] = start;
-                }
-                app.selected.dim_config[i].range = (start, end);
-                app.selected.dim_config[i].index = app.selected.dim_indices[i];
+                    start
+                };
+                app.selected.set_range(i, (start, end), index);
                 show_coord_label(app, ui, var_info, i, (start, end));
             } else {
                 let max_index = dim_size.saturating_sub(1);
@@ -167,10 +164,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                 if changed && is_animated {
                     app.playback.current_timestep = app.selected.dim_indices[i];
                 }
-                app.selected.dim_ranges[i] =
-                    (app.selected.dim_indices[i], app.selected.dim_indices[i]);
-                app.selected.dim_config[i].range = app.selected.dim_ranges[i];
-                app.selected.dim_config[i].index = app.selected.dim_indices[i];
+                app.selected.set_index(i, app.selected.dim_indices[i]);
                 show_coord_label(app, ui, var_info, i, app.selected.dim_ranges[i]);
             }
         });
