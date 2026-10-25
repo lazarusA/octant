@@ -1,4 +1,4 @@
-# octant
+# <picture><source media="(prefers-color-scheme: dark)" srcset="assets/brand/svg/octant-logo-dark.svg"><img alt="" src="assets/brand/svg/octant-logo-light.svg" height="40" align="center"></picture> octant
 
 [<img alt="github" src="https://img.shields.io/badge/github-lazarusA/octant-8da0cb?logo=github" height="20">](https://github.com/lazarusA/octant)
 [![Live Demo](https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white)](https://lazarusa.github.io/octant/)
