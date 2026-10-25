@@ -15,6 +15,7 @@ exclude = [
     ".agents/",
     ".github/",
     "assets/octant_tas.png",
+    "assets/brand/",
     "assets/coastlines/coastline_50m.bin",
     "assets/coastlines/coastline_10m.bin",
     "AGENTS.md",
