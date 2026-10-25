@@ -16,16 +16,6 @@ pub const FINISH: &str = "finish";
 /// sent before this one would find no handler.
 pub const HELLO: &str = "hello";
 
-/// Names the speaker may say (`SpeechToText::set_prompt`).
-pub fn prompt(text: &str) -> String {
-    format!("prompt:{text}")
-}
-
-/// The text of a `prompt` command.
-pub fn prompted(command: &str) -> Option<&str> {
-    command.strip_prefix("prompt:")
-}
-
 /// The model a `load` command names.
 pub fn loaded(command: &str) -> Option<WhisperSize> {
     let name = command.strip_prefix("load:")?;
@@ -85,7 +75,5 @@ mod tests {
         }
         assert_eq!(loaded("load:huge"), None);
         assert_eq!(loaded(FINISH), None);
-        assert_eq!(prompted(&prompt("t2m, sst")), Some("t2m, sst"));
-        assert_eq!(prompted(FINISH), None);
     }
 }

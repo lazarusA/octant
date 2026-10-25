@@ -158,7 +158,7 @@ impl crate::app::OctantApp {
             .filter(|v| !v.is_coarser_level());
         let dimensions = meta
             .into_iter()
-            .flat_map(super::prompt::dimension_names)
+            .flat_map(dimension_names)
             .map(str::to_string)
             .collect();
         let names = Names {
@@ -188,4 +188,13 @@ impl crate::app::OctantApp {
             Err(why) => Err(super::Failure::NotUnderstood(why)),
         }
     }
+}
+
+/// Every dimension name of `meta`'s variables, each once, in order.
+fn dimension_names(meta: &crate::data::DatasetMetadata) -> impl Iterator<Item = &str> {
+    let mut seen = std::collections::HashSet::new();
+    meta.variables
+        .iter()
+        .flat_map(|v| v.dimension_names.iter().map(String::as_str))
+        .filter(move |name| seen.insert(*name))
 }

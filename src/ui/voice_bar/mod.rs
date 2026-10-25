@@ -4,9 +4,8 @@
 //! chosen speech to text provider (`voice::stt`), and a field to type
 //! commands in. It reads nothing from the app: each final utterance, said
 //! or typed, is handed out (`take_utterances`) for the app to run as
-//! commands (`app::actions`), what the last one did is shown beside the
-//! transcript (`set_last_action`), and the app gives it the names the
-//! speech model is prompted with (`follow_prompt`).
+//! commands (`app::actions`), and what the last one did is shown beside the
+//! transcript (`set_last_action`).
 
 mod commands;
 mod listening;
@@ -58,10 +57,6 @@ pub struct VoiceBar {
     utterances: Vec<String>,
     /// The typed command field's text.
     typed: String,
-    /// Names given to the speech model, and the metadata generation they
-    /// were listed for.
-    prompt: String,
-    prompt_key: Option<u64>,
 }
 
 impl VoiceBar {
@@ -107,7 +102,6 @@ impl VoiceBar {
     fn set_provider(&mut self, stt: Option<Box<dyn SpeechToText>>) {
         self.stt = stt;
         self.transcript.provider_dropped();
-        self.give_prompt();
     }
 
     fn listen(&mut self) {

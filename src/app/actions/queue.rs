@@ -140,9 +140,6 @@ impl OctantApp {
     /// detail as a toast, and the Variables panel opened for what the
     /// dataset holds), why one failed as a toast.
     pub(crate) fn run_voice_commands(&mut self, ctx: &egui::Context) {
-        let (voice, selected) = (&mut self.voice, &self.selected);
-        let names = || super::prompt::speech_prompt(selected.metadata.as_ref());
-        voice.follow_prompt(selected.metadata_generation, names);
         let mut outcomes = self.resume_commands();
         for utterance in self.voice.take_utterances() {
             outcomes.extend(self.run_utterance(&utterance));

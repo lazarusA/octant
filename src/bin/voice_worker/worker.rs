@@ -46,8 +46,6 @@ fn receive(data: &JsValue) {
             wasm_bindgen_futures::spawn_local(load(size));
         } else if command == wire::FINISH {
             take(Input::Finish);
-        } else if let Some(prompt) = wire::prompted(&command) {
-            take(Input::Prompt(prompt.to_string()));
         }
     } else if let Some(samples) = data.dyn_ref::<Float32Array>() {
         take(Input::Audio(samples.to_vec()));

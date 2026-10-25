@@ -42,8 +42,6 @@ pub enum SttEvent {
 /// by [`Windowed`] on the desktop and by the voice worker in the browser.
 pub trait WindowModel {
     fn transcribe(&mut self, audio: &[f32]) -> Result<String, String>;
-    /// Text said before what is transcribed: names to write as spelled.
-    fn set_prompt(&mut self, _prompt: &str) {}
 }
 
 pub trait SpeechToText {
@@ -51,9 +49,6 @@ pub trait SpeechToText {
     fn push(&mut self, samples: &[f32]);
     /// The speaker stopped: the utterance under way ends with a final text.
     fn finish(&mut self);
-    /// Names the speaker may say (the dataset's), so they are written as
-    /// spelled; replaces the last.
-    fn set_prompt(&mut self, _prompt: &str) {}
     /// The next event, without waiting.
     fn poll(&mut self) -> Option<SttEvent>;
 }

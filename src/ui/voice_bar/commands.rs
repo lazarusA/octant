@@ -1,6 +1,5 @@
 //! The voice bar's commands: the utterances it hands the app (spoken, or
-//! typed in its field), the last command's action, and the prompt of names
-//! it gives the speech model.
+//! typed in its field) and the last command's action.
 
 use super::VoiceBar;
 use crate::i18n::{PlaybackKey, tr};
@@ -28,23 +27,6 @@ impl VoiceBar {
     /// Opens the bar for typing, the microphone off.
     pub fn open_for_typing(&mut self) {
         self.open = true;
-    }
-
-    /// Gives the speech model the names `make` lists (the active dataset's)
-    /// whenever `key` (its metadata generation) changes.
-    pub fn follow_prompt(&mut self, key: u64, make: impl FnOnce() -> String) {
-        if self.prompt_key != Some(key) {
-            self.prompt_key = Some(key);
-            self.prompt = make();
-            self.give_prompt();
-        }
-    }
-
-    /// Gives the provider the prompt; an empty one clears the last.
-    pub(super) fn give_prompt(&mut self) {
-        if let Some(stt) = &mut self.stt {
-            stt.set_prompt(&self.prompt);
-        }
     }
 
     /// The typed command field: Enter runs its text as an utterance.

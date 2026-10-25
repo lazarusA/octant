@@ -4,7 +4,6 @@
 //! of its files (`models.rs`): on the desktop from its data folder, on the
 //! Apple GPU when there is one; in the browser's voice worker on the CPU.
 
-mod bpe;
 #[cfg(not(target_arch = "wasm32"))]
 mod download;
 mod mel;
@@ -22,9 +21,6 @@ use candle_nn::ops::log_softmax;
 use candle_transformers::models::whisper::{self as m, Config};
 use tokens::Tokens;
 
-/// The most prompt tokens kept before the text.
-const PROMPT_TOKENS: usize = 64;
-
 pub struct Whisper {
     model: network::Network,
     tokens: Tokens,
@@ -33,9 +29,6 @@ pub struct Whisper {
     /// token but the end of text.
     suppress: Tensor,
     device: Device,
-    /// The text before what is transcribed (`set_prompt`): names the
-    /// speaker may say, so they are written as spelled.
-    prompt: Vec<u32>,
 }
 
 /// Downloads `size` if needed and loads it; what [`crate::voice::stt`]
@@ -106,7 +99,6 @@ impl Whisper {
             mel,
             suppress,
             device,
-            prompt: Vec::new(),
         })
     }
 
@@ -144,23 +136,15 @@ impl Whisper {
             .encode(&self.mel.input(audio)?.to_device(&self.device)?)?;
         let language = self.detect_language(&features)?;
         let t = &self.tokens;
-        let mut ids = Vec::new();
-        if !self.prompt.is_empty() {
-            ids.push(t.start_of_prev);
-            ids.extend(&self.prompt);
-        }
-        let sot_at = ids.len();
-        ids.extend([t.sot, language, t.transcribe, t.no_timestamps]);
+        let mut ids = vec![t.sot, language, t.transcribe, t.no_timestamps];
         let (prompt, eot, no_speech_token) = (ids.len(), t.eot, t.no_speech);
         let (mut sum_logprob, mut no_speech) = (0.0f64, 0.0f64);
         let max_tokens = self.model.config().max_target_positions;
-        for i in 0..(max_tokens / 2).min(max_tokens - prompt) {
+        for i in 0..max_tokens / 2 {
             let (ys, logits) = self.next_logits(&ids, &features, i == 0)?;
             if i == 0 {
-                // The chance of no speech is read at the start of transcript.
-                // Only that row is projected onto the vocabulary, not the prompt's.
-                let row = ys.i((..1, sot_at..sot_at + 1))?;
-                let first = self.model.final_linear(&row)?.i(0)?.i(0)?;
+                // The chance of no speech is read where the text would start.
+                let first = self.model.final_linear(&ys.i(..1)?)?.i(0)?.i(0)?;
                 no_speech = candle_nn::ops::softmax(&first, 0)?
                     .i(no_speech_token as usize)?
                     .to_scalar::<f32>()? as f64;
@@ -186,24 +170,6 @@ impl Whisper {
 impl WindowModel for Whisper {
     fn transcribe(&mut self, audio: &[f32]) -> Result<String, String> {
         self.run(audio).map_err(|e| e.to_string())
-    }
-
-    /// Keeps the prompt's first tokens, at most `PROMPT_TOKENS`, cut after
-    /// the last whole comma-separated name (the prompt lists names, the
-    /// first the most wanted): candle's decoder caches no self-attention,
-    /// so every token written reads the whole prompt again (600 characters
-    /// of names made tiny 2.2x slower). An empty prompt clears it.
-    fn set_prompt(&mut self, prompt: &str) {
-        let prompt = prompt.trim();
-        if prompt.is_empty() {
-            self.prompt.clear();
-            return;
-        }
-        let mut tokens = self.tokens.encode(&format!(" {prompt}"));
-        let keep = PROMPT_TOKENS.min(self.model.config().max_target_positions / 2 - 1);
-        let comma = self.tokens.encode(",").first().copied();
-        tokens.truncate(tokens::whole_names(&tokens, keep, comma));
-        self.prompt = tokens;
     }
 }
 
