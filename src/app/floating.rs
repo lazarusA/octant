@@ -15,8 +15,13 @@ impl OctantApp {
         crate::ui::top_bar::show_top_bar(self, ui);
         if self.voice.is_open() {
             crate::ui::voice_bar::show_voice_bar(&mut self.voice, ui);
-        } else if plot_shown && self.has_animated_dimension() {
-            crate::ui::bottom_bar::show_bottom_bar(self, ui);
+            self.run_voice_commands(&ctx);
+        } else {
+            // What waited for the bar runs never: it would meet another state.
+            self.commands.clear();
+            if plot_shown && self.has_animated_dimension() {
+                crate::ui::bottom_bar::show_bottom_bar(self, ui);
+            }
         }
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);

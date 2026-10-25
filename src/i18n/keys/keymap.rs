@@ -41,6 +41,7 @@ crate::i18n::keys::define_keys! {
     LeaveHero,
     ScopeHero,
     PlotTypePicker,
+    TypeCommand,
     PlotStaged,
     GoToColorbar,
     }

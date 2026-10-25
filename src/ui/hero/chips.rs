@@ -8,7 +8,8 @@ use crate::ui::keyboard::focus as key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
-const SAMPLES: [(&str, &str, DatasetKey); 4] = [
+/// The landing samples: label, store (or the catalog) and hover text.
+pub(crate) const SAMPLES: [(&str, &str, DatasetKey); 4] = [
     (
         "/seasfire",
         "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
@@ -24,7 +25,11 @@ const SAMPLES: [(&str, &str, DatasetKey); 4] = [
         "procedural://volume4d",
         DatasetKey::HeroVolume4DHover,
     ),
-    ("/catalog", "catalog", DatasetKey::HeroCatalogHover),
+    (
+        "/catalog",
+        crate::app::sources::CATALOG_SAMPLE,
+        DatasetKey::HeroCatalogHover,
+    ),
 ];
 const COUNT: usize = SAMPLES.len();
 
@@ -79,12 +84,7 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let (label, uri, desc) = SAMPLES[item - 1];
                 let galley = Arc::clone(&chips[item - 1]);
                 if render_chip(ui, item - 1, label, galley, tr(desc)).clicked() {
-                    if uri == "catalog" {
-                        app.layout.show_catalog_window = true;
-                    } else {
-                        app.layout.hero_state.input = uri.to_string();
-                        app.submit_or_activate_source(uri, None);
-                    }
+                    app.open_sample(uri);
                 }
             }
         });

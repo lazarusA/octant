@@ -187,15 +187,19 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 /// Makes `id` the picked layer's colormap, leaving RGB composite mode if needed.
 pub fn select_colormap(app: &mut OctantApp, id: u32) {
-    let layer = app.picker_layer();
-    if let Some(l) = app.layers.get_mut(layer)
-        && l.composite.enabled
-    {
-        l.composite.enabled = false;
-        app.load_layer_block(layer);
-    }
-    if let Some(style) = app.picker_style_mut() {
-        style.colormap = id;
+    select_layer_colormap(app, app.picker_layer(), id);
+}
+
+/// Makes `id` layer `layer`'s colormap, leaving RGB composite mode if needed.
+pub fn select_layer_colormap(app: &mut OctantApp, layer: LayerId, id: u32) {
+    if let Some(l) = app.layers.get_mut(layer) {
+        if l.composite.enabled {
+            l.composite.enabled = false;
+            app.load_layer_block(layer);
+        }
+        if let Some(l) = app.layers.get_mut(layer) {
+            l.color.colormap = id;
+        }
     }
     app.preview_colormap = None;
 }

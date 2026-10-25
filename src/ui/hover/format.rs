@@ -2,8 +2,10 @@
 
 use crate::data::coordinates::naming::{contains_ascii_case_insensitive, is_animated_time_name};
 use crate::data::{CoordValue, CoordValues, DatasetMetadata, VariableInfo};
+use crate::i18n::date::Date;
 use crate::i18n::number::Num;
 use crate::ui::hover::field::HoverField;
+use crate::utils::units::dates::coordinate_date;
 use crate::utils::units::{
     format_axis_value, format_cardinal_degrees, format_scalar_coordinate, is_cf_time_unit,
 };
@@ -28,7 +30,7 @@ pub fn format_dimension_coord(
 }
 
 /// One dimension position plus the attributes every formatting branch needs.
-struct DimContext<'a> {
+pub(crate) struct DimContext<'a> {
     name: &'a str,
     units: Option<&'a str>,
     time_start: Option<&'a str>,
@@ -40,7 +42,7 @@ struct DimContext<'a> {
 }
 
 impl<'a> DimContext<'a> {
-    fn resolve(
+    pub(crate) fn resolve(
         meta: Option<&'a DatasetMetadata>,
         var: Option<&'a VariableInfo>,
         store_target: Option<&'a str>,
@@ -73,6 +75,16 @@ impl<'a> DimContext<'a> {
             idx,
             total_len,
         }
+    }
+
+    /// Whether this dimension is time, by its name or CF units.
+    pub(crate) fn is_time(&self) -> bool {
+        self.is_time
+    }
+
+    /// The date a coordinate value of this dimension stands for, if any.
+    pub(crate) fn date(&self, val: f64) -> Option<Date> {
+        coordinate_date(val, self.units, self.time_start, self.is_time)
     }
 
     fn scalar(&self, val: f64) -> String {

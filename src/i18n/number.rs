@@ -119,7 +119,7 @@ pub fn parse_in(lang: Language, text: &str) -> Option<f64> {
 
 /// The ASCII form of a full-width character (U+FF01..U+FF5E) or the
 /// ideographic space; any other character unchanged.
-fn halfwidth(c: char) -> char {
+pub(crate) fn halfwidth(c: char) -> char {
     match c {
         '\u{3000}' => ' ',
         '\u{FF01}'..='\u{FF5E}' => char::from_u32(u32::from(c) - 0xFEE0).unwrap_or(c),

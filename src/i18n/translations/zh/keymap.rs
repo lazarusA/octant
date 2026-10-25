@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "返回绘图",
         KeymapKey::ScopeHero => "在起始页",
         KeymapKey::PlotTypePicker => "选择绘图类型",
+        KeymapKey::TypeCommand => "输入语音命令",
         KeymapKey::PlotStaged => "绘制所选变量",
         KeymapKey::GoToColorbar => "转到下一个色标",
     })

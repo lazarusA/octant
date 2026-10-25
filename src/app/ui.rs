@@ -24,56 +24,7 @@ impl eframe::App for OctantApp {
         super::window_title::sync(&ctx);
 
         // 0. Poll completed background metadata inspection
-        let mut metadata_done = false;
-        if let Some(rx) = &self.metadata_rx {
-            if let Ok(result) = rx.try_recv() {
-                metadata_done = true;
-                self.is_loading = false;
-                match result {
-                    Ok((metadata, store_handle)) => {
-                        let is_plate = self.follow_plate(&metadata);
-                        if metadata.variables.is_empty() && !is_plate {
-                            self.status_message =
-                                format!("No variables discovered in '{}'", metadata.name);
-                            self.notify(Severity::Warning, tr(N::NoVariablesFound), &metadata.name);
-                        } else {
-                            self.status_message = format!(
-                                "Inspected '{}' (Found {} variables)",
-                                metadata.name,
-                                metadata.variables.len()
-                            );
-                        }
-                        self.layout.hero_state.loading = false;
-                        self.layout.hero_state.loaded = true;
-                        self.layout.hero_state.source_label = metadata.name.clone();
-                        self.layout.show_variables_overlay = !metadata.variables.is_empty();
-
-                        let source_id = self.selected_source_id();
-                        let mut dataset = crate::data::Dataset::new(
-                            &source_id,
-                            store_handle.source().clone(),
-                            store_handle,
-                        );
-                        dataset.metadata = Some(metadata.clone());
-                        self.dataset_manager.add(dataset);
-
-                        self.load_new_metadata(metadata);
-                    }
-                    Err(err) => {
-                        self.layout.hero_state.loading = false;
-                        self.layout.hero_state.loaded = false;
-                        self.clear_active_metadata();
-                        self.status_message = format!("Store inspect error: {}", err);
-                        self.notify(Severity::Error, tr(N::CouldntOpenDataset), &err);
-                    }
-                }
-            } else {
-                ctx.request_repaint_after(std::time::Duration::from_millis(50));
-            }
-        }
-        if metadata_done {
-            self.metadata_rx = None;
-        }
+        self.poll_inspection(&ctx);
         self.poll_plate(&ctx);
 
         // 1. Drain completed block-cache prefetch results and arrived coordinates.

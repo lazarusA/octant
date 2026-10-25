@@ -1,9 +1,8 @@
 //! Unified coordinate, datetime, and physical dimension formatting engine.
 
 use super::calendar::add_days_to_date;
-use super::cf::{
-    is_cf_time_unit, parse_iso_date, parse_reference_date, split_since, unit_to_milliseconds,
-};
+use super::cf::{is_cf_time_unit, parse_reference_date, unit_to_milliseconds};
+use super::dates::{cf_since_date, coordinate_date};
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 use crate::i18n::date::Date;
 use crate::i18n::number::Num;
@@ -19,35 +18,16 @@ pub fn format_scalar_coordinate(
 ) -> String {
     let clean = dim_name.trim();
 
-    // 1. CF Relative Date/Time or Duration formatting
+    // 1-3. A date: CF "unit since date", a start date or a Unix timestamp.
+    if let Some(date) = coordinate_date(val, units, time_start, is_time_dim) {
+        return date.to_string();
+    }
+    // A CF duration (e.g. "hours").
     if let Some(u) = units
         && is_cf_time_unit(u)
         && let Some(formatted) = parse_loc(Some(val), u)
     {
         return formatted;
-    }
-
-    // 2. ISO reference start date (e.g. from time_coverage_start attribute)
-    if is_time_dim
-        && let Some(start_str) = time_start
-        && let Some((y, m, d)) = parse_iso_date(start_str)
-    {
-        let (res_y, res_m, res_d) = add_days_to_date(y, m, d, val.round() as i64);
-        return Date::day(res_y, res_m, res_d).to_string();
-    }
-
-    // 3. Unix timestamps (> 100M seconds or > 100B ms)
-    if is_time_dim && val.abs() > 1e8 && val.abs() < 1e13 {
-        let total_secs = if val.abs() > 1e11 {
-            (val / 1000.0).round() as i64
-        } else {
-            val.round() as i64
-        };
-        let total_hours = total_secs.div_euclid(3600);
-        let days_added = total_hours.div_euclid(24);
-        let hour_of_day = total_hours.rem_euclid(24) as usize;
-        let (res_y, res_m, res_d) = add_days_to_date(1970, 1, 1, days_added);
-        return Date::at_hour(res_y, res_m, res_d, hour_of_day).to_string();
     }
 
     // 4. Step indices
@@ -116,16 +96,8 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
     let clean_units = units_str.trim();
 
     // 1. CF Absolute Datetime (e.g. "hours since 2024-01-01")
-    if let Some((unit_part, ref_date_str)) = split_since(clean_units) {
-        let (y, m, d) = parse_iso_date(ref_date_str).unwrap_or((1970, 1, 1));
-        let scale_ms = unit_to_milliseconds(unit_part).unwrap_or(1_000) as f64;
-        let total_ms = v * scale_ms;
-        let total_hours = (total_ms / 3_600_000.0).round() as i64;
-        let days_added = total_hours.div_euclid(24);
-        let hour_of_day = total_hours.rem_euclid(24) as usize;
-
-        let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
-        return Some(Date::at_hour(res_y, res_m, res_d, hour_of_day).to_string());
+    if let Some(date) = cf_since_date(v, clean_units) {
+        return Some(date.to_string());
     }
 
     // 2. Bare Time Duration (e.g. "hours", "seconds", "d")

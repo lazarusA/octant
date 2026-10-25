@@ -45,6 +45,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "Revenir au graphique",
         KeymapKey::ScopeHero => "Sur l'écran d'accueil",
         KeymapKey::PlotTypePicker => "Choisir le type de graphique",
+        KeymapKey::TypeCommand => "Taper une commande vocale",
         KeymapKey::PlotStaged => "Tracer la variable sélectionnée",
         KeymapKey::GoToColorbar => "Aller à la barre de couleurs suivante",
     })

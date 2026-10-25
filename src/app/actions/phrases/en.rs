@@ -1,0 +1,86 @@
+//! English phrasings of the verbs.
+
+use super::Phrases;
+use super::Verb::*;
+
+pub(super) static PHRASES: Phrases = Phrases {
+    verbs: &[
+        (Hide, &["hide"]),
+        (Reveal, &["unhide", "show again", "show layer"]),
+        (Remove, &["remove", "delete"]),
+        (Range, &["range", "color range", "colour range", "limits"]),
+        (
+            Export,
+            &["export", "save image", "save the image", "save as"],
+        ),
+        (
+            Describe,
+            &[
+                "describe",
+                "what is",
+                "what's",
+                "tell me about",
+                "info",
+                "information",
+            ],
+        ),
+        (Search, &["search", "search for", "find", "look for"]),
+        (List, &["list", "what variables", "which variables"]),
+        (Goto, &["go to", "jump to", "set"]),
+        (Open, &["open", "load", "switch to"]),
+        (Select, &["select", "choose", "pick"]),
+        (
+            Plot,
+            &["plot", "show", "draw", "display", "visualize", "visualise"],
+        ),
+        (Play, &["play", "start", "animate", "resume"]),
+        (Pause, &["pause", "stop"]),
+        (Next, &["next", "next step", "forward", "step forward"]),
+        (
+            Previous,
+            &["previous", "previous step", "back", "step back", "go back"],
+        ),
+        (
+            Colormap,
+            &[
+                "colormap",
+                "color map",
+                "colour map",
+                "colors",
+                "colours",
+                "palette",
+            ],
+        ),
+        (
+            ResetView,
+            &["reset view", "reset the view", "reset zoom", "reset camera"],
+        ),
+    ],
+    months: [
+        &["january", "jan"],
+        &["february", "feb"],
+        &["march"],
+        &["april", "apr"],
+        &["may"],
+        &["june", "jun"],
+        &["july", "jul"],
+        &["august", "aug"],
+        &["september", "sep", "sept"],
+        &["october", "oct"],
+        &["november", "nov"],
+        &["december", "dec"],
+    ],
+    axes: [
+        &["time", "date"],
+        &["latitude"],
+        &["longitude"],
+        &["level", "depth", "height"],
+    ],
+    dataset: &["dataset", "data set", "data"],
+    overlay: &["overlay", "as an overlay", "on top", "as a layer"],
+    well: &["well"],
+    field: &["field"],
+    catalog: &["catalog", "catalogue"],
+    then: &["then", "and then", "after that"],
+    until: &["to", "until", "till", "through", "and"],
+};

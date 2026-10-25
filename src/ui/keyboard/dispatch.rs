@@ -110,12 +110,8 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::ShowShortcuts => app.layout.show_shortcuts = true,
         Action::ToggleHero => app.toggle_hero(),
         Action::LeaveHero => app.layout.show_hero = false,
-        Action::PlotTypePicker => {
-            let shown = app
-                .selected_variable_info()
-                .or_else(|| app.plotted_variable_info());
-            app.layout.show_plot_picker = shown.is_some();
-        }
+        Action::TypeCommand => type_command(app, ctx),
+        Action::PlotTypePicker => open_plot_picker(app),
         Action::PlotStaged => {
             if app.selected.variable_info().is_some() {
                 app.plot_from_panel();
@@ -129,4 +125,18 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         // Left for the canvas (`app::canvas::keys`), never taken here.
         Action::Canvas(_) => {}
     }
+}
+
+/// Opens the voice bar with its command field focused, the microphone off.
+fn type_command(app: &mut OctantApp, ctx: &Context) {
+    app.voice.open_for_typing();
+    focus::request(ctx, crate::ui::voice_bar::field_id());
+}
+
+/// Opens the plot type picker when a variable is staged or plotted.
+fn open_plot_picker(app: &mut OctantApp) {
+    let shown = app
+        .selected_variable_info()
+        .or_else(|| app.plotted_variable_info());
+    app.layout.show_plot_picker = shown.is_some();
 }

@@ -19,6 +19,7 @@ mod stack_tests;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use body::apply_selection;
 pub use focus::focus_search;
 pub use search::SearchCache;
 

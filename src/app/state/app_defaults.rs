@@ -48,6 +48,7 @@ impl Default for OctantApp {
             export_flash_timer: None,
             toasts: crate::ui::toast::Toasts::default(),
             voice: crate::ui::voice_bar::VoiceBar::default(),
+            commands: Default::default(),
 
             show_coastlines: false,
             coastline_color: None,

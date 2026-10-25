@@ -5,23 +5,21 @@ use crate::app::OctantApp;
 impl OctantApp {
     /// Requests the previous step along the animated dimension.
     pub fn step_prev(&mut self) {
-        let max_steps = self.animated_dim_extent();
-        if max_steps > 0 {
-            let prev_step = if self.playback.current_timestep > 0 {
-                self.playback.current_timestep - 1
-            } else {
-                max_steps - 1
-            };
-            self.request_step_or_load(prev_step);
-        }
+        self.step_around(-1);
     }
 
     /// Requests the next step along the animated dimension.
     pub fn step_next(&mut self) {
-        let max_steps = self.animated_dim_extent();
-        if max_steps > 0 {
-            let next_step = (self.playback.current_timestep + 1) % max_steps;
-            self.request_step_or_load(next_step);
+        self.step_around(1);
+    }
+
+    /// Requests the step `by` steps away along the animated dimension,
+    /// around the series (after the last step comes the first).
+    pub fn step_around(&mut self, by: i64) {
+        let steps = self.animated_dim_extent() as i64;
+        if steps > 0 {
+            let at = self.playback.current_timestep as i64;
+            self.request_step_or_load((at + by).rem_euclid(steps) as usize);
         }
     }
 

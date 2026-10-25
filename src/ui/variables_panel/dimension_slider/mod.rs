@@ -26,5 +26,6 @@ pub use metrics::{
     calculate_selected_surface_elements, calculate_selected_volume_elements, is_volume_allowed,
     variable_bytes,
 };
+pub(crate) use role_row::{anim_name, spatial_name};
 pub use roles::apply_role_change;
 pub use slider_row::show_dimension_sliders;

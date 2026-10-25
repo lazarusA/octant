@@ -1,9 +1,13 @@
 //! The voice bar: drawn in the playback bar's place while open (the top
 //! bar's Voice button), with the microphone toggle, a disk pulsing with its
 //! frequencies and the live transcript (or the listening state) from the
-//! chosen speech to text provider (`voice::stt`). It reads nothing from the
-//! app; the action layer comes later (`VOICE_PLAN.md`).
+//! chosen speech to text provider (`voice::stt`), and a field to type
+//! commands in. It reads nothing from the app: each final utterance, said
+//! or typed, is handed out (`take_utterances`) for the app to run as
+//! commands (`app::actions`), and what the last one did is shown beside the
+//! transcript (`set_last_action`).
 
+mod commands;
 mod listening;
 mod model_menu;
 mod pulsar;
@@ -20,6 +24,7 @@ use crate::voice::Capture;
 use crate::voice::resample::Resampler;
 use crate::voice::spectrum::Spectrum;
 use crate::voice::stt::{self, Provider, SpeechToText};
+pub use commands::field_id;
 use listening::Listening;
 use model_menu::model_menu;
 use pulsar::Pulsar;
@@ -48,6 +53,10 @@ pub struct VoiceBar {
     transcript: Transcript,
     /// Until when (egui time) the provider is polled for a last final text.
     final_until: f64,
+    /// Utterances (said or typed) not yet run as commands.
+    utterances: Vec<String>,
+    /// The typed command field's text.
+    typed: String,
 }
 
 impl VoiceBar {
@@ -158,6 +167,9 @@ impl VoiceBar {
         let was_preparing = self.transcript.is_preparing();
         let mut gave_up = false;
         while let Some(event) = stt.poll() {
+            if let stt::SttEvent::Final(text) = &event {
+                self.utterances.push(text.clone());
+            }
             gave_up |= self.transcript.apply(event);
         }
         if gave_up {
@@ -209,6 +221,7 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     voice
         .pulsar
         .show(ui, ui.available_height() - 4.0, listening);
+    voice.command_field(ui);
 
     let state = tr(if listening {
         PlaybackKey::VoiceListening
@@ -222,6 +235,7 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
         }
         nav.push(&close, Stop::Button);
         nav.push(&model_menu(voice, ui), Stop::Button);
+        voice.transcript.show_action(ui);
         let rect = ui.available_rect_before_wrap();
         voice.transcript.show(ui, rect, state);
     });

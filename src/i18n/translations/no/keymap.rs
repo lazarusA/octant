@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "Tilbake til plottet",
         KeymapKey::ScopeHero => "På startskjermen",
         KeymapKey::PlotTypePicker => "Velg plottype",
+        KeymapKey::TypeCommand => "Skriv en talekommando",
         KeymapKey::PlotStaged => "Plott den valgte variabelen",
         KeymapKey::GoToColorbar => "Gå til neste fargeskala",
     })

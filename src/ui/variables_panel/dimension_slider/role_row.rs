@@ -63,7 +63,7 @@ pub(super) fn role_row(
     });
 }
 
-fn spatial_name(role: SpatialRole) -> &'static str {
+pub(crate) fn spatial_name(role: SpatialRole) -> &'static str {
     match role {
         SpatialRole::None => tr(K::RoleNone),
         SpatialRole::Grid => tr(K::RoleGrid),
@@ -73,7 +73,7 @@ fn spatial_name(role: SpatialRole) -> &'static str {
     }
 }
 
-fn anim_name(role: AnimationRole) -> &'static str {
+pub(crate) fn anim_name(role: AnimationRole) -> &'static str {
     match role {
         AnimationRole::None => tr(K::RoleNone),
         AnimationRole::Animated => tr(K::RoleAnimated),

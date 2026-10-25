@@ -87,6 +87,12 @@ impl PlateState {
         &self.wells[path]
     }
 
+    /// The fields of the well at `path`, as if read.
+    #[cfg(test)]
+    pub fn set_well_fields(&mut self, path: &str, fields: WellFields) {
+        self.wells.insert(path.to_string(), fields);
+    }
+
     /// Reads the fields of the well at `path` again after a failure.
     pub fn retry_well(&mut self, path: &str) {
         if self.wells.get(path) == Some(&WellFields::Failed) {

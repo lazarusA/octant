@@ -147,7 +147,7 @@ src/
 │   ├── layers/           # LayerStack, Layer, alignment, styles, sources
 │   ├── pipeline/         # GPU pipeline rebuilds, aspect ratio math, uniform assembly
 │   ├── state/            # Decomposed states: NavigationState, PlaybackState, PlotConfigs, UiLayoutState
-│   ├── actions.rs        # AppAction event-driven state mutation
+│   ├── actions/          # Action layer: AppAction, dispatch, spoken/typed command phrases
 │   ├── data_loading.rs   # Store inspection delegation
 │   ├── export_lifecycle.rs # In-flight figure export and screenshot processing
 │   ├── floating.rs       # Floating overlay panels and colorbars
@@ -228,7 +228,7 @@ Octant's architecture follows strict separation of concerns, high cohesion, and 
 
   4. Isolated Frame Lifecycle (src/app/export_lifecycle.rs & actions.rs)
      ├── export_lifecycle.rs: In-flight figure encoding and screenshot captures
-     └── actions.rs: Event-driven AppAction dispatching
+     └── actions/: AppAction dispatch for voice and typed commands
 ```
 
 ### Why Feature Additions Touch Only 1–3 Files
