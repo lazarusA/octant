@@ -32,6 +32,4 @@ jobs:
           rm "$RUNNER_TEMP/crate/Cargo.lock"
       - name: Build with the newest dependencies
         working-directory: ${{ runner.temp }}/crate
-        run: |
-          cargo generate-lockfile
-          cargo build
+        run: cargo build
