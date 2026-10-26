@@ -3009,7 +3009,7 @@ DEALINGS IN THE SOFTWARE.
 ## Boost Software License 1.0
 
 Used by:
-- clipboard-win 5.4.1 (https://github.com/DoumanAsh/clipboard-win)
+- clipboard-win 5.4.3 (https://github.com/DoumanAsh/clipboard-win)
 
 ```text
 Boost Software License - Version 1.0 - August 17th, 2003
