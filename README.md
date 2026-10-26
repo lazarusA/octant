@@ -22,6 +22,12 @@ cargo install octant
 octant                      # or: octant <url or path>
 ```
 
+If the build fails because a dependency released a breaking update, install with the exact versions Octant was tested with:
+
+```bash
+cargo install octant --locked
+```
+
 ## Data
 
 - [Zarr](https://zarr.dev/) v2 and v3 (including sharded arrays) and [Icechunk](https://icechunk.io/) repositories, from local disk, S3, Google Cloud Storage, Azure, or HTTP. Only the chunks needed for the current view are read.

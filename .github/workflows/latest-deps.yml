@@ -1,0 +1,37 @@
+name: Latest dependencies
+
+# `cargo install octant` ignores Cargo.lock and takes the newest semver-compatible
+# version of every dependency, so a dependency's breaking minor release breaks it.
+# This builds the published crate that way every week, before users hit it.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build as cargo install does
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnetcdf-dev libhdf5-dev libasound2-dev
+      # The packaged crate, as crates.io serves it: no [patch], no Cargo.lock.
+      - name: Package
+        run: |
+          cargo package --no-verify
+          mkdir "$RUNNER_TEMP/crate"
+          tar -xzf target/package/octant-*.crate -C "$RUNNER_TEMP/crate" --strip-components 1
+          rm "$RUNNER_TEMP/crate/Cargo.lock"
+      - name: Build with the newest dependencies
+        working-directory: ${{ runner.temp }}/crate
+        run: |
+          cargo generate-lockfile
+          cargo build
