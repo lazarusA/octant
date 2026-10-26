@@ -74,7 +74,13 @@ pub fn build_sync_icechunk_store(
                 (storage, Some(repo_config), auth_map)
             };
 
-            let repo = icechunk::Repository::open(repo_config, storage, auth_map)
+            let mut builder =
+                icechunk::Repository::open(storage).authorize_virtual_chunk_access(auth_map);
+            if let Some(config) = repo_config {
+                builder = builder.config(config);
+            }
+            let repo = builder
+                .execute()
                 .await
                 .map_err(|e| format!("Failed to open Icechunk repository: {e}"))?;
 

@@ -13,7 +13,7 @@ Libraries (Boost Software License 1.0).
 
 ## Overview
 
-- MIT License (657)
+- MIT License (655)
 - Apache License 2.0 (62)
 - ISC License (24)
 - BSD 3-Clause "New" or "Revised" License (20)
@@ -2232,7 +2232,7 @@ Used by:
 - aws-smithy-runtime-api 1.19.0 (https://github.com/smithy-lang/smithy-rs)
 - aws-smithy-runtime 1.16.0 (https://github.com/smithy-lang/smithy-rs)
 - aws-smithy-schema 0.2.1 (https://github.com/smithy-lang/smithy-rs)
-- aws-smithy-types-convert 0.60.14 (https://github.com/smithy-lang/smithy-rs)
+- aws-smithy-types-convert 0.61.1 (https://github.com/smithy-lang/smithy-rs)
 - aws-smithy-types 1.8.1 (https://github.com/smithy-lang/smithy-rs)
 - aws-smithy-xml 0.62.1 (https://github.com/smithy-lang/smithy-rs)
 - aws-types 1.6.0 (https://github.com/smithy-lang/smithy-rs)
@@ -2240,12 +2240,12 @@ Used by:
 - dtype_dispatch 0.2.1 (https://github.com/pcodec/pcodec)
 - flatbuffers 25.12.19 (https://github.com/google/flatbuffers)
 - flexbuffers 25.12.19 (https://github.com/google/flatbuffers)
-- icechunk-arrow-object-store 2.2.2 (https://github.com/earth-mover/icechunk)
-- icechunk-format 2.2.2 (https://github.com/earth-mover/icechunk)
-- icechunk-s3 2.2.2 (https://github.com/earth-mover/icechunk)
-- icechunk-storage 2.2.2 (https://github.com/earth-mover/icechunk)
-- icechunk-types 2.2.2 (https://github.com/earth-mover/icechunk)
-- icechunk 2.2.2 (https://github.com/earth-mover/icechunk)
+- icechunk-arrow-object-store 2.3.0 (https://github.com/earth-mover/icechunk)
+- icechunk-format 2.3.0 (https://github.com/earth-mover/icechunk)
+- icechunk-s3 2.3.0 (https://github.com/earth-mover/icechunk)
+- icechunk-storage 2.3.0 (https://github.com/earth-mover/icechunk)
+- icechunk-types 2.3.0 (https://github.com/earth-mover/icechunk)
+- icechunk 2.3.0 (https://github.com/earth-mover/icechunk)
 - owned_ttf_parser 0.25.1 (https://github.com/alexheretic/owned-ttf-parser)
 - pco 1.0.3 (https://github.com/pcodec/pcodec)
 - pep440_rs 0.7.3 (https://github.com/konstin/pep440-rs)
@@ -3009,7 +3009,7 @@ DEALINGS IN THE SOFTWARE.
 ## Boost Software License 1.0
 
 Used by:
-- clipboard-win 5.4.1 (https://github.com/DoumanAsh/clipboard-win)
+- clipboard-win 5.4.3 (https://github.com/DoumanAsh/clipboard-win)
 
 ```text
 Boost Software License - Version 1.0 - August 17th, 2003
@@ -10613,6 +10613,36 @@ SOFTWARE.
 ## MIT License
 
 Used by:
+- rlimit 0.11.0 (https://github.com/Nugine/rlimit/)
+
+```text
+MIT License
+
+Copyright (c) 2025 Nugine
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - naga-types 30.0.1 (https://github.com/gfx-rs/wgpu)
 - naga 30.0.1 (https://github.com/gfx-rs/wgpu)
 - wgpu-core-deps-apple 30.0.1 (https://github.com/gfx-rs/wgpu)
@@ -11086,7 +11116,7 @@ Used by:
 - zarrs_codec 0.2.1 (https://github.com/zarrs/zarrs/tree/main/zarrs_codec)
 - zarrs_data_type 0.9.0 (https://github.com/zarrs/zarrs/tree/main/zarrs_data_type)
 - zarrs_filesystem 0.3.12 (https://github.com/zarrs/zarrs/tree/main/zarrs_filesystem)
-- zarrs_icechunk 0.5.1 (https://github.com/zarrs/zarrs_icechunk)
+- zarrs_icechunk 0.6.0 (https://github.com/zarrs/zarrs_icechunk)
 - zarrs_metadata 0.7.5 (https://github.com/zarrs/zarrs/tree/main/zarrs_metadata)
 - zarrs_metadata_ext 0.4.4 (https://github.com/zarrs/zarrs/tree/main/zarrs_metadata_ext)
 - zarrs_object_store 0.7.0 (https://github.com/zarrs/zarrs/tree/main/zarrs_object_store)
@@ -12156,38 +12186,6 @@ Used by:
 The MIT License (MIT)
 
 Copyright (c) 2018 Reizner Evgeniy
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
-## MIT License
-
-Used by:
-- async-compression 0.4.50 (https://github.com/Nullus157/async-compression)
-- compression-codecs 0.4.45 (https://github.com/Nullus157/async-compression)
-- compression-core 0.4.33 (https://github.com/Nullus157/async-compression)
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2018 the rustasync developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
