@@ -125,6 +125,7 @@ winresource = "0.1.34"
 product-name = "Octant"
 identifier = "io.github.lazarusa.octant"
 publisher = "Lazaro Alonso"
+copyright = "Copyright © 2026 Lazaro Alonso. MIT or Apache-2.0."
 homepage = "https://github.com/lazarusA/octant"
 category = "Education"
 before-packaging-command = "cargo build --release --bin octant"
@@ -141,6 +142,8 @@ resources = [
     { src = "assets/licenses/THIRD_PARTY_LICENSES.md", target = "licenses/THIRD_PARTY_LICENSES.md" },
     { src = "assets/colormaps/LICENSES.md", target = "licenses/COLORMAP_LICENSES.md" },
     { src = "assets/fonts/LICENSE.md", target = "licenses/FONT_LICENSES.md" },
+    # Shown by the macOS About panel (Contents/Resources/Credits.rtf); a plain file elsewhere.
+    { src = "packaging/macos/Credits.rtf", target = "Credits.rtf" },
 ]
 
 [package.metadata.packager.macos]
