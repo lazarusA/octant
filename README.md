@@ -1,11 +1,19 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-dark.svg"><img alt="" src="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-light.svg" height="40" align="center"></picture> octant
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-dark.svg"><img alt="" src="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-light.svg" height="40" align="center"></picture> octant</h1>
 
-[<img alt="github" src="https://img.shields.io/badge/github-lazarusA/octant-8da0cb?logo=github" height="20">](https://github.com/lazarusA/octant)
-[![Live Demo](https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white)](https://lazarusa.github.io/octant/)
-[![Latest version](https://img.shields.io/crates/v/octant.svg)](https://crates.io/crates/octant)
-[![Build Status](https://github.com/lazarusA/octant/actions/workflows/rust.yml/badge.svg)](https://github.com/lazarusA/octant/actions/workflows/rust.yml)
-[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/lazarusA/octant/blob/main/LICENSE-MIT)
-[![Apache](https://img.shields.io/badge/license-Apache-blue.svg)](https://github.com/lazarusA/octant/blob/main/LICENSE-APACHE)
+<p align="center">
+  <a href="https://github.com/lazarusA/octant"><img alt="github" src="https://img.shields.io/badge/github-lazarusA/octant-8da0cb?logo=github"></a>
+  <a href="https://lazarusa.github.io/octant/"><img alt="Live Demo" src="https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white"></a>
+  <a href="https://crates.io/crates/octant"><img alt="Latest version" src="https://img.shields.io/crates/v/octant.svg"></a>
+  <a href="https://github.com/lazarusA/octant/actions/workflows/rust.yml"><img alt="Build Status" src="https://github.com/lazarusA/octant/actions/workflows/rust.yml/badge.svg"></a>
+  <a href="https://github.com/lazarusA/octant/blob/main/LICENSE-MIT"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="https://github.com/lazarusA/octant/blob/main/LICENSE-APACHE"><img alt="Apache" src="https://img.shields.io/badge/license-Apache-blue.svg"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-macOS-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/macOS-Apple%20silicon-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Windows-x64-setup.exe"><img alt="Download for Windows (x64)" src="https://img.shields.io/badge/Windows-x64-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Linux-x86_64.AppImage"><img alt="Download for Linux (x86_64 AppImage)" src="https://img.shields.io/badge/Linux-AppImage-3a3f44?style=for-the-badge&labelColor=121416"></a>
+</p>
 
 An interactive viewer for N-dimensional datasets, stored locally or in cloud object storage. Built in Rust with GPU rendering, available on desktop and in the browser.
 
@@ -15,20 +23,29 @@ https://github.com/user-attachments/assets/c749e1d1-9159-4928-9e05-9490fb466607
 
 ## Install
 
-Download the installer for your system from the [latest release](https://github.com/lazarusA/octant/releases/latest):
+<details>
+<summary>Every installer, and how to install it</summary>
+
+Each [release](https://github.com/lazarusA/octant/releases/latest) holds:
 
 | System | File | Install |
 |---|---|---|
-| macOS (Apple silicon) | `Octant_<version>_aarch64.dmg` | Open it and drag Octant to Applications |
-| Windows | `octant_<version>_x64_en-US.msi` (or `octant_<version>_x64-setup.exe`) | Run it |
-| Linux | `octant_<version>_x86_64.AppImage` | `chmod +x octant_*.AppImage`, then run it |
+| macOS (Apple silicon) | `Octant-macOS-arm64.dmg` | Open it and drag Octant to Applications |
+| macOS (Apple silicon) | `Octant_<version>_aarch64.app.zip` | Unzip it and move `Octant.app` to Applications |
+| Windows (x64) | `Octant-Windows-x64-setup.exe` | Run it |
+| Windows (x64) | `octant_<version>_x64_en-US.msi` | Run it, or `msiexec /i` it for managed installs |
+| Linux (x86_64) | `Octant-Linux-x86_64.AppImage` | `chmod +x Octant-Linux-x86_64.AppImage`, then run it |
 | Debian, Ubuntu | `octant_<version>_amd64.deb` | `sudo apt install ./octant_*.deb` |
 | Arch | `octant_<version>_x86_64.tar.gz` and `PKGBUILD` | `makepkg -si` in the folder holding both |
+
+The buttons at the top download the `.dmg`, the `-setup.exe` and the `.AppImage`, named without their version so the links always reach the latest release.
 
 The installers are not signed yet, so the first launch asks for confirmation:
 
 - **macOS** says Octant "cannot be opened because Apple cannot verify it". Right-click Octant in Applications and choose **Open**, or click **Open Anyway** in System Settings > Privacy & Security.
 - **Windows** SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**.
+
+</details>
 
 ### From source
 
