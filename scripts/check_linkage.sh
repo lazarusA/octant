@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fails when the release binary loads netCDF, HDF5 or (Windows) the Visual C++ runtime as
-# shared libraries: installers ship the binary alone, so these must be linked in.
+# Fails when the release binary loads netCDF or HDF5 as shared libraries: installers ship
+# the binary alone, so these must be linked in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,7 +16,7 @@ case "$(uname -s)" in
 esac
 
 echo "$libs"
-if grep -iE 'netcdf|hdf5|vcruntime|msvcp' <<<"$libs"; then
+if grep -iE 'netcdf|hdf5' <<<"$libs"; then
   echo "::error::the release binary links the libraries above dynamically" >&2
   exit 1
 fi

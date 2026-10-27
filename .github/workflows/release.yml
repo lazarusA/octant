@@ -82,15 +82,11 @@ jobs:
           tool: cargo-packager@0.11.8
 
       - name: Build installers
+        # Windows keeps the shared C runtime (vcruntime140.dll, present on nearly every system):
+        # with crt-static, netCDF's `#define fstat _fstat64` clashes with the static CRT's own.
         run: cargo packager --release --formats all
-        env:
-          # Windows: the C runtime linked into the .exe, so installs need no Visual C++
-          # redistributable. Release builds only, as the C libraries' CMake builds may not follow.
-          RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
-          # HDF5's CMake build picks its runtime from this (hdf5-metno-src), not from crt-static.
-          CMAKE_MSVC_RUNTIME_LIBRARY: ${{ runner.os == 'Windows' && 'MultiThreaded' || '' }}
 
-      - name: Check the binary links netCDF, HDF5 and the C runtime in
+      - name: Check the binary links netCDF and HDF5 in
         shell: bash
         run: scripts/check_linkage.sh
 
