@@ -9,7 +9,7 @@
 
 An interactive viewer for N-dimensional datasets, stored locally or in cloud object storage. Built in Rust with GPU rendering, available on desktop and in the browser.
 
-![Octant Screenshot](https://raw.githubusercontent.com/lazarusA/octant/1f9797486adcc7d2ea43409d2d248771d90a4d33/assets/octant_tas.png)
+https://github.com/user-attachments/assets/c749e1d1-9159-4928-9e05-9490fb466607
 
 **[Try it in your browser](https://lazarusa.github.io/octant/)**: nothing to install (WebGPU, with a WebGL2 fallback).
 
