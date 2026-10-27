@@ -15,7 +15,24 @@ An interactive viewer for N-dimensional datasets, stored locally or in cloud obj
 
 ## Install
 
-With [Rust installed](https://rust-lang.org/tools/install/):
+Download the installer for your system from the [latest release](https://github.com/lazarusA/octant/releases/latest):
+
+| System | File | Install |
+|---|---|---|
+| macOS (Apple silicon) | `Octant_<version>_aarch64.dmg` | Open it and drag Octant to Applications |
+| Windows | `octant_<version>_x64_en-US.msi` (or `octant_<version>_x64-setup.exe`) | Run it |
+| Linux | `octant_<version>_x86_64.AppImage` | `chmod +x octant_*.AppImage`, then run it |
+| Debian, Ubuntu | `octant_<version>_amd64.deb` | `sudo apt install ./octant_*.deb` |
+| Arch | `octant_<version>_x86_64.tar.gz` and `PKGBUILD` | `makepkg -si` in the folder holding both |
+
+The installers are not signed yet, so the first launch asks for confirmation:
+
+- **macOS** says Octant "cannot be opened because Apple cannot verify it". Right-click Octant in Applications and choose **Open**, or click **Open Anyway** in System Settings > Privacy & Security.
+- **Windows** SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**.
+
+### From source
+
+With [Rust installed](https://rust-lang.org/tools/install/) and [CMake](https://cmake.org/download/), which builds the bundled NetCDF and HDF5 libraries (macOS: `brew install cmake`, Debian/Ubuntu: `sudo apt install cmake`, Windows: included with the Visual Studio Build Tools' C++ workload):
 
 ```bash
 cargo install octant
