@@ -15,20 +15,35 @@ An interactive viewer for N-dimensional datasets, stored locally or in cloud obj
 
 ## Install
 
-Download the installer for your system from the [latest release](https://github.com/lazarusA/octant/releases/latest):
+<p align="center">
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-macOS-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/macOS-Apple%20silicon-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Windows-x64-setup.exe"><img alt="Download for Windows (x64)" src="https://img.shields.io/badge/Windows-x64-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Linux-x86_64.AppImage"><img alt="Download for Linux (x86_64 AppImage)" src="https://img.shields.io/badge/Linux-AppImage-3a3f44?style=for-the-badge&labelColor=121416"></a>
+</p>
+
+<details>
+<summary>Every installer, and how to install it</summary>
+
+Each [release](https://github.com/lazarusA/octant/releases/latest) holds:
 
 | System | File | Install |
 |---|---|---|
-| macOS (Apple silicon) | `Octant_<version>_aarch64.dmg` | Open it and drag Octant to Applications |
-| Windows | `octant_<version>_x64_en-US.msi` (or `octant_<version>_x64-setup.exe`) | Run it |
-| Linux | `octant_<version>_x86_64.AppImage` | `chmod +x octant_*.AppImage`, then run it |
+| macOS (Apple silicon) | `Octant-macOS-arm64.dmg` | Open it and drag Octant to Applications |
+| macOS (Apple silicon) | `Octant_<version>_aarch64.app.zip` | Unzip it and move `Octant.app` to Applications |
+| Windows (x64) | `Octant-Windows-x64-setup.exe` | Run it |
+| Windows (x64) | `octant_<version>_x64_en-US.msi` | Run it, or `msiexec /i` it for managed installs |
+| Linux (x86_64) | `Octant-Linux-x86_64.AppImage` | `chmod +x Octant-Linux-x86_64.AppImage`, then run it |
 | Debian, Ubuntu | `octant_<version>_amd64.deb` | `sudo apt install ./octant_*.deb` |
 | Arch | `octant_<version>_x86_64.tar.gz` and `PKGBUILD` | `makepkg -si` in the folder holding both |
+
+The buttons above download the `.dmg`, the `-setup.exe` and the `.AppImage`, named without their version so the links always reach the latest release.
 
 The installers are not signed yet, so the first launch asks for confirmation:
 
 - **macOS** says Octant "cannot be opened because Apple cannot verify it". Right-click Octant in Applications and choose **Open**, or click **Open Anyway** in System Settings > Privacy & Security.
 - **Windows** SmartScreen says "Windows protected your PC": click **More info**, then **Run anyway**.
+
+</details>
 
 ### From source
 

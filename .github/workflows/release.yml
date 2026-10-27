@@ -106,6 +106,15 @@ jobs:
           mkdir dist
           shopt -s nullglob
           cp target/release/{*.dmg,*.app.zip,*.msi,*-setup.exe,*.deb,*.AppImage,*.tar.gz,PKGBUIL[D]} dist/
+          # Each system's default installer without its version, so the README links
+          # releases/latest/download/<name> stay valid across releases.
+          for f in dist/*; do
+            case "$f" in
+              *.dmg) mv "$f" dist/Octant-macOS-arm64.dmg ;;
+              *-setup.exe) mv "$f" dist/Octant-Windows-x64-setup.exe ;;
+              *.AppImage) mv "$f" dist/Octant-Linux-x86_64.AppImage ;;
+            esac
+          done
           ls dist
 
       - name: Attach to the release
