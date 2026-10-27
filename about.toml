@@ -1,6 +1,7 @@
 # cargo-about configuration: third-party license notices for everything compiled
 # into Octant's native and web builds. Regenerate with:
-#   cargo about generate --fail -o assets/licenses/THIRD_PARTY_LICENSES.md about.hbs
+#   scripts/third_party_licenses.sh
+# (cargo about generate, then the crates' NOTICE files appended).
 # Only permissive licenses are accepted; a new dependency under anything else
 # makes generation fail until it is reviewed.
 

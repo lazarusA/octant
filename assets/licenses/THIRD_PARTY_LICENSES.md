@@ -13036,3 +13036,36 @@ the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
+## Notices
+
+NOTICE files of the components above, reproduced as their licenses ask.
+
+### moka 0.12.16
+
+```text
+Additional Notices for Moka
+
+The majority of the Moka library is dual-licensed under the MIT and Apache 2.0
+licenses.
+
+However, the following files are an exception and are licensed solely under
+the Apache License 2.0:
+
+- src/common/frequency_sketch.rs
+- src/common/timer_wheel.rs
+
+These files were ported from the Java Caffeine library and are not dual-licensed.
+
+Please refer to the LICENSE-APACHE file for more details on the Apache License 2.0.
+```
+
+### object_store 0.14.2
+
+```text
+Apache Arrow Object Store
+Copyright 2020-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+```
+

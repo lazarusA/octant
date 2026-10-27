@@ -95,9 +95,9 @@ jobs:
           tool: cargo-about@0.9.2
       - name: Check THIRD_PARTY_LICENSES.md is up to date
         run: |
-          cargo about generate --fail -o assets/licenses/THIRD_PARTY_LICENSES.md about.hbs
+          scripts/third_party_licenses.sh
           git diff --exit-code -- assets/licenses/THIRD_PARTY_LICENSES.md || {
-            echo "::error::Dependencies changed: run 'cargo about generate --fail -o assets/licenses/THIRD_PARTY_LICENSES.md about.hbs' and commit the result."
+            echo "::error::Dependencies changed: run 'scripts/third_party_licenses.sh' and commit the result."
             exit 1
           }
 
