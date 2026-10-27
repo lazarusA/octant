@@ -87,8 +87,9 @@ jobs:
           # Windows: the C runtime linked into the .exe, so installs need no Visual C++
           # redistributable. Release builds only, as the C libraries' CMake builds may not follow.
           RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
-          # HDF5's CMake build picks its runtime from this (hdf5-metno-src), not from crt-static.
-          CMAKE_MSVC_RUNTIME_LIBRARY: ${{ runner.os == 'Windows' && 'MultiThreaded' || '' }}
+          # The C libraries' CMake builds pick their runtime from this file, not from crt-static
+          # (read by the cmake crate for this target only).
+          CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc: ${{ github.workspace }}/packaging/windows/static-crt.cmake
 
       - name: Check the binary links netCDF, HDF5 and the C runtime in
         shell: bash
