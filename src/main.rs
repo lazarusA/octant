@@ -20,10 +20,24 @@ fn main() -> eframe::Result<()> {
     // )
     // .try_init();
 
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size([1150.0, 720.0])
+        .with_title(app::window_title::title_in(i18n::language()));
+    // macOS keeps the app bundle's .icns in the Dock: eframe leaves the Dock icon alone for an
+    // empty icon, and would otherwise put its own egui icon (no icon) or this edge-to-edge one there.
+    #[cfg(target_os = "macos")]
+    let viewport = viewport.with_icon(egui::IconData::default());
+    // The taskbar icon on Windows and Linux.
+    #[cfg(not(target_os = "macos"))]
+    let viewport = match eframe::icon_data::from_png_bytes(include_bytes!(
+        "../assets/brand/png/octant-app-icon-512.png"
+    )) {
+        Ok(icon) => viewport.with_icon(icon),
+        Err(_) => viewport,
+    };
+
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1150.0, 720.0])
-            .with_title(app::window_title::title_in(i18n::language())),
+        viewport,
         depth_buffer: 32,
         wgpu_options: plots::device::wgpu_configuration(),
         // Persistence stores colormap preferences only; keep window geometry unmanaged.

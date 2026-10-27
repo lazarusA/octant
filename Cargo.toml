@@ -15,7 +15,9 @@ exclude = [
     ".agents/",
     ".github/",
     "assets/octant_tas.png",
-    "assets/brand/",
+    "assets/brand/svg/",
+    "assets/brand/icns/",
+    "assets/brand/png/octant-app-icon-180.png",
     "assets/coastlines/coastline_50m.bin",
     "assets/coastlines/coastline_10m.bin",
     "AGENTS.md",
@@ -112,6 +114,54 @@ sys-locale = { version = "0.3", features = ["js"] }
 blusc = "0.0.6"
 getrandom = { version = "0.4", features = ["wasm_js"] }
 async-tiff = { version = "0.4.0", default-features = false }
+
+[target."cfg(windows)".build-dependencies]
+winresource = "0.1.34"
+
+# Desktop installers (`cargo packager --release --formats all`): .app and .dmg on macOS,
+# .msi and NSIS .exe on Windows, .deb, .AppImage and pacman on Linux. The license notices
+# ship beside the binary in every package.
+[package.metadata.packager]
+product-name = "Octant"
+identifier = "io.github.lazarusa.octant"
+publisher = "Lazaro Alonso"
+copyright = "Copyright © 2026 Lazaro Alonso. MIT or Apache-2.0."
+homepage = "https://github.com/lazarusA/octant"
+category = "Education"
+before-packaging-command = "cargo build --release --bin octant"
+out-dir = "target/release"
+binaries = [{ path = "octant", main = true }]
+icons = [
+    "assets/brand/icns/octant.icns",
+    "assets/brand/ico/octant.ico",
+    "assets/brand/png/octant-app-icon-512.png",
+]
+resources = [
+    { src = "LICENSE-MIT", target = "licenses/LICENSE-MIT" },
+    { src = "LICENSE-APACHE", target = "licenses/LICENSE-APACHE" },
+    { src = "assets/licenses/THIRD_PARTY_LICENSES.md", target = "licenses/THIRD_PARTY_LICENSES.md" },
+    { src = "assets/colormaps/LICENSES.md", target = "licenses/COLORMAP_LICENSES.md" },
+    { src = "assets/fonts/LICENSE.md", target = "licenses/FONT_LICENSES.md" },
+    # Shown by the macOS About panel (Contents/Resources/Credits.rtf); a plain file elsewhere.
+    { src = "packaging/macos/Credits.rtf", target = "Credits.rtf" },
+]
+
+[package.metadata.packager.macos]
+minimum-system-version = "11.0"
+info-plist-path = "packaging/macos/Info.plist"
+
+[package.metadata.packager.nsis]
+installer-icon = "assets/brand/ico/octant.ico"
+
+[package.metadata.packager.deb]
+depends = ["libasound2"]
+
+[package.metadata.packager.pacman]
+depends = ["alsa-lib"]
+
+# ALSA comes from the system (LGPL-2.1, and its plugins live there too).
+[package.metadata.packager.appimage]
+excluded-libraries = ["libasound*"]
 
 [features]
 # Build tools that regenerate bundled assets (never needed to build Octant).

@@ -8912,10 +8912,10 @@ Used by:
 - is_terminal_polyfill 1.70.2 (https://github.com/polyfill-rs/is_terminal_polyfill)
 - once_cell_polyfill 1.70.2 (https://github.com/polyfill-rs/once_cell_polyfill)
 - toml_datetime 0.6.11 (https://github.com/toml-rs/toml)
-- toml_datetime 1.1.1+spec-1.1.0 (https://github.com/toml-rs/toml)
+- toml_datetime 1.1.2+spec-1.1.0 (https://github.com/toml-rs/toml)
 - toml_edit 0.19.15 (https://github.com/toml-rs/toml)
 - toml_edit 0.25.15+spec-1.1.0 (https://github.com/toml-rs/toml)
-- toml_parser 1.1.3+spec-1.1.0 (https://github.com/toml-rs/toml)
+- toml_parser 1.1.5+spec-1.1.0 (https://github.com/toml-rs/toml)
 
 ```text
 Copyright (c) Individual contributors
@@ -13034,5 +13034,38 @@ the following restrictions:
     misrepresented as being the original software.
 
 3. This notice may not be removed or altered from any source distribution.
+```
+
+## Notices
+
+NOTICE files of the components above, reproduced as their licenses ask.
+
+### moka 0.12.16
+
+```text
+Additional Notices for Moka
+
+The majority of the Moka library is dual-licensed under the MIT and Apache 2.0
+licenses.
+
+However, the following files are an exception and are licensed solely under
+the Apache License 2.0:
+
+- src/common/frequency_sketch.rs
+- src/common/timer_wheel.rs
+
+These files were ported from the Java Caffeine library and are not dual-licensed.
+
+Please refer to the LICENSE-APACHE file for more details on the Apache License 2.0.
+```
+
+### object_store 0.14.2
+
+```text
+Apache Arrow Object Store
+Copyright 2020-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 ```
 

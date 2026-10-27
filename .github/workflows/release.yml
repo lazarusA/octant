@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+  # Builds the installers without releasing: they are kept as the run's artifacts.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,6 +13,7 @@ permissions:
 jobs:
   publish-crates-io:
     name: Publish to crates.io
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,62 +48,73 @@ jobs:
         with:
           generate_release_notes: true
 
-# FUTURE STEP: Pre-compiled App Bundles (.dmg for macOS, .zip for Windows, .tar.gz for Linux)
-# Uncomment the block below once cargo-bundle metadata is configured in Cargo.toml
-# Every asset ships Octant's licenses and the third-party / colormap / font notices next to
-# the executable (they are also embedded in the app under About).
-#
-#  build-bundles:
-#    name: Build Application Bundles (${{ matrix.target }})
-#    continue-on-error: true
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - os: ubuntu-latest
-#            target: x86_64-unknown-linux-gnu
-#            asset_name: octant-linux-x86_64.tar.gz
-#            build_cmd: cargo build --release --target x86_64-unknown-linux-gnu
-#            package_cmd: tar -czf octant-linux-x86_64.tar.gz -C target/x86_64-unknown-linux-gnu/release octant -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md assets/fonts/LICENSE.md
-#
-#          - os: macos-latest
-#            target: aarch64-apple-darwin
-#            asset_name: octant-macos-arm64-dmg.tar.gz
-#            build_cmd: cargo install cargo-bundle && cargo bundle --release --target aarch64-apple-darwin
-#            package_cmd: tar -czf octant-macos-arm64-dmg.tar.gz -C target/aarch64-apple-darwin/release/bundle/osx Octant.dmg -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md assets/fonts/LICENSE.md
-#
-#          - os: macos-13
-#            target: x86_64-apple-darwin
-#            asset_name: octant-macos-x86_64-dmg.tar.gz
-#            build_cmd: cargo install cargo-bundle && cargo bundle --release --target x86_64-apple-darwin
-#            package_cmd: tar -czf octant-macos-x86_64-dmg.tar.gz -C target/x86_64-apple-darwin/release/bundle/osx Octant.dmg -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md assets/fonts/LICENSE.md
-#
-#          - os: windows-latest
-#            target: x86_64-pc-windows-msvc
-#            asset_name: octant-windows-x86_64.zip
-#            build_cmd: cargo build --release --target x86_64-pc-windows-msvc
-#            package_cmd: 7z a octant-windows-x86_64.zip target/x86_64-pc-windows-msvc/release/octant.exe LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md assets/fonts/LICENSE.md
-#    runs-on: ${{ matrix.os }}
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v4
-#
-#      - name: Install Rust toolchain
-#        uses: dtolnay/rust-toolchain@stable
-#        with:
-#          targets: ${{ matrix.target }}
-#
-#      - name: Cache dependencies
-#        uses: Swatinem/rust-cache@v2
-#
-#      - name: Build bundle / executable
-#        run: ${{ matrix.build_cmd }}
-#
-#      - name: Package installer asset
-#        run: ${{ matrix.package_cmd }}
-#
-#      - name: Upload artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: ${{ matrix.asset_name }}
-#          path: ${{ matrix.asset_name }}
+  # Every installer cargo-packager makes on each OS (see [package.metadata.packager] in
+  # Cargo.toml), attached to the release; each carries the license notices.
+  installers:
+    name: Installers (${{ matrix.os }})
+    needs: [github-release]
+    if: always() && (needs.github-release.result == 'success' || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04: the AppImage needs a glibc no newer than the systems it runs on.
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnetcdf-dev libhdf5-dev libasound2-dev
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-packager@0.11.8
+
+      - name: Build installers
+        run: cargo packager --release --formats all
+        env:
+          # Windows: the C runtime linked into the .exe, so installs need no Visual C++
+          # redistributable. Release builds only, as the C libraries' CMake builds may not follow.
+          RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
+
+      - name: Check the binary links netCDF, HDF5 and the C runtime in
+        shell: bash
+        run: scripts/check_linkage.sh
+
+      - name: Zip the macOS app
+        if: runner.os == 'macOS'
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          ditto -c -k --keepParent target/release/Octant.app "target/release/Octant_${version}_aarch64.app.zip"
+
+      - name: Collect the installers
+        shell: bash
+        run: |
+          mkdir dist
+          shopt -s nullglob
+          cp target/release/{*.dmg,*.app.zip,*.msi,*-setup.exe,*.deb,*.AppImage,*.tar.gz,PKGBUIL[D]} dist/
+          ls dist
+
+      - name: Attach to the release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+
+      - name: Keep as run artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: dist/*
