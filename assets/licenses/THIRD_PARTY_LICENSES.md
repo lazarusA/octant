@@ -8912,10 +8912,10 @@ Used by:
 - is_terminal_polyfill 1.70.2 (https://github.com/polyfill-rs/is_terminal_polyfill)
 - once_cell_polyfill 1.70.2 (https://github.com/polyfill-rs/once_cell_polyfill)
 - toml_datetime 0.6.11 (https://github.com/toml-rs/toml)
-- toml_datetime 1.1.1+spec-1.1.0 (https://github.com/toml-rs/toml)
+- toml_datetime 1.1.2+spec-1.1.0 (https://github.com/toml-rs/toml)
 - toml_edit 0.19.15 (https://github.com/toml-rs/toml)
 - toml_edit 0.25.15+spec-1.1.0 (https://github.com/toml-rs/toml)
-- toml_parser 1.1.3+spec-1.1.0 (https://github.com/toml-rs/toml)
+- toml_parser 1.1.5+spec-1.1.0 (https://github.com/toml-rs/toml)
 
 ```text
 Copyright (c) Individual contributors
