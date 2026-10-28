@@ -27,26 +27,24 @@ impl TickMark {
         title: &str,
         units: Option<&str>,
     ) -> Self {
-        let mut mark = Self { val, ..Self::EMPTY };
-        mark.format_with_context(step, total_span, title, units);
-        mark
+        let time = is_time_axis(title, units);
+        Self::on_axis(val, step, total_span, title, units, time)
     }
 
-    fn format_with_context(
-        &mut self,
+    /// A tick on an axis already known to be a time axis or not ([`is_time_axis`]).
+    pub(super) fn on_axis(
+        val: f64,
         step: f64,
         total_span: f64,
         title: &str,
         units: Option<&str>,
-    ) {
-        let is_time = crate::data::coordinates::naming::is_animated_time_name(title)
-            || units.is_some_and(crate::utils::units::is_cf_time_unit);
-
-        if is_time && self.try_format_time(total_span, title, units) {
-            return;
+        time: bool,
+    ) -> Self {
+        let mut mark = Self { val, ..Self::EMPTY };
+        if !(time && mark.try_format_time(total_span, title, units)) {
+            mark.format(step);
         }
-
-        self.format(step);
+        mark
     }
 
     fn try_format_time(&mut self, total_span: f64, title: &str, units: Option<&str>) -> bool {
@@ -172,4 +170,10 @@ fn write_date_span(
     } else {
         write!(cursor, "{:02}:{:02}", hour, 0)
     };
+}
+
+/// Whether an axis holds times: its title names time, or its units are CF time units.
+pub(super) fn is_time_axis(title: &str, units: Option<&str>) -> bool {
+    crate::data::coordinates::naming::is_animated_time_name(title)
+        || units.is_some_and(crate::utils::units::is_cf_time_unit)
 }

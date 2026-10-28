@@ -21,24 +21,20 @@ impl DatasetMetadata {
     pub fn get_dim_coords(&self, var_name: Option<&str>, dim_name: &str) -> Option<&CoordValues> {
         let clean = dim_name.trim();
         let mut buf = [0u8; KEY_BUF];
-        if let Some(v) = var_name {
-            let scoped = match lower_key(&mut buf, &[v.trim(), "/", clean]) {
-                Some(key) => self.dimension_coordinates.get(key),
-                None => (self.dimension_coordinates).get(&format!(
-                    "{}/{}",
-                    v.trim().to_lowercase(),
-                    clean.to_lowercase()
-                )),
-            };
-            if scoped.is_some() {
-                return scoped;
-            }
-        }
-        let unscoped = match lower_key(&mut buf, &[clean]) {
+        (var_name.and_then(|v| self.coords_for(&mut buf, &[v.trim(), "/", clean])))
+            .or_else(|| self.coords_for(&mut buf, &[clean]))
+            .or_else(|| self.dimension_coordinates.get(dim_name))
+    }
+
+    /// The coordinates under `parts` joined and lowercased: ASCII in `buf`, other text
+    /// by Unicode rules on the heap.
+    fn coords_for(&self, buf: &mut [u8; KEY_BUF], parts: &[&str]) -> Option<&CoordValues> {
+        match lower_key(buf, parts) {
             Some(key) => self.dimension_coordinates.get(key),
-            None => self.dimension_coordinates.get(&clean.to_lowercase()),
-        };
-        unscoped.or_else(|| self.dimension_coordinates.get(dim_name))
+            None => self
+                .dimension_coordinates
+                .get(&parts.concat().to_lowercase()),
+        }
     }
 
     /// Returns numerical min/max coordinate bounds for a variable dimension name if available.

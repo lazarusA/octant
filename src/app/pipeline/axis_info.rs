@@ -54,14 +54,7 @@ impl OctantApp {
         let mut units = None;
         // An OME-Zarr axis unit, shown in the title ("y [µm]").
         let mut axis_unit = None;
-        let plotted = self.plotted();
-        if let Some(meta) = &plotted.metadata
-            && let Some(var) = meta.variables.get(plotted.variable_idx)
-            && let Some(&size) = var.shape.get(dim_idx)
-        {
-            let size = size as usize;
-            let range =
-                (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
+        if let Some((meta, var, size, range)) = self.plotted_window(dim_idx) {
             bounds = index_bounds(range.0, range.1);
             if let Some(dim) = var.dimension_names.get(dim_idx) {
                 name = dim;
@@ -86,6 +79,21 @@ impl OctantApp {
             }
         };
         (bounds, title, units)
+    }
+
+    /// The plotted variable along dimension `dim_idx`: its metadata, the variable, the
+    /// dimension's size and its selected index range (the whole dimension when unset).
+    pub(crate) fn plotted_window(
+        &self,
+        dim_idx: usize,
+    ) -> Option<(&DatasetMetadata, &VariableInfo, usize, (usize, usize))> {
+        let plotted = self.plotted();
+        let meta = plotted.metadata.as_ref()?;
+        let var = meta.variables.get(plotted.variable_idx)?;
+        let size = *var.shape.get(dim_idx)? as usize;
+        let range =
+            (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
+        Some((meta, var, size, range))
     }
 
     /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").

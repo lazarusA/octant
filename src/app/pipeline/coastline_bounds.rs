@@ -58,12 +58,7 @@ impl OctantApp {
 
     /// The outer cell edges of the plotted window along dimension `dim_idx`.
     fn plotted_cell_edges(&self, dim_idx: usize) -> Option<(f64, f64)> {
-        let plotted = self.plotted();
-        let meta = plotted.metadata.as_ref()?;
-        let var = meta.variables.get(plotted.variable_idx)?;
-        let size = *var.shape.get(dim_idx)? as usize;
-        let range =
-            (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
+        let (meta, var, size, range) = self.plotted_window(dim_idx)?;
         let dim = var.dimension_names.get(dim_idx)?;
         meta.get_cell_edges_for_var_range(Some(&var.name), dim, size, range)
     }
