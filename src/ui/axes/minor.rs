@@ -167,8 +167,8 @@ fn push_lattice(
 /// than `MIN_GAP_PX`.
 // shortcut: assumes `values` sorted (ascending or descending); unsorted ones
 // (a wrapped longitude) give a wrong visible range and ticks past the axis.
-// Upgrade when such a grid turns up: see AXES_PLAN.md "Unsorted irregular
-// coordinates".
+// Upgrade: once data/coordinates/detection.rs detect_grid keeps Irregular1D
+// arrays sorted, drop this note.
 fn fill_values(ticks: &mut AxisTicks, axis: &Axis, values: &[f32]) -> bool {
     let (Some(&a), Some(&b)) = (values.first(), values.last()) else {
         return false;
@@ -184,10 +184,13 @@ fn fill_values(ticks: &mut AxisTicks, axis: &Axis, values: &[f32]) -> bool {
     let Some(shown) = values.get(visible) else {
         return false;
     };
+    if shown.len() > MAX_MINOR {
+        return false;
+    }
     let tight = shown
         .windows(2)
         .any(|w| (f64::from(w[1]) - f64::from(w[0])).abs() * axis.px_per_unit < MIN_GAP_PX);
-    shown.len() <= MAX_MINOR && !tight && shown.iter().all(|&c| axis.push_cell(ticks, f64::from(c)))
+    !tight && shown.iter().all(|&c| axis.push_cell(ticks, f64::from(c)))
 }
 
 /// Round subdivisions of the major step, where they stay `MIN_GAP_PX` apart.

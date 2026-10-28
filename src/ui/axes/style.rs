@@ -1,13 +1,12 @@
 //! Which ticks and grid lines the axes draw (Settings > View).
 
 /// Where minor ticks go between the labelled ones.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MinorPlacement {
     /// Round subdivisions of the labelled step.
     Round,
     /// Each data cell's center, where the hover snaps, while cells are wide
     /// enough; round subdivisions otherwise.
-    #[default]
     Cells,
 }
 
