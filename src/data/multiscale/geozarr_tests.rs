@@ -225,3 +225,20 @@ fn eopf_bands_stack_from_their_finest_level() {
     assert_eq!(offsets, &[0.0, 0.0], "the affines share their corner");
     assert!(vars[9].multiscale.is_none(), "scalars form no stack");
 }
+
+#[test]
+fn levels_take_their_entries_affines() {
+    let mut vars = pyramid_vars();
+    link(
+        root((0..3).map(|l| entry(l, (1u64 << l) as f64, 0.0)).collect()),
+        &mut vars,
+    );
+    // Level 2's cells are 4 wide from -0.5 (x) and 31.5 (y): centres 1.5, 29.5.
+    let coords = vars[4].metadata_coordinates().expect("placed");
+    let [("x", x), ("y", y)] = coords.as_slice() else {
+        panic!("x then y: {coords:?}");
+    };
+    assert_eq!((x.first_number(), x.len()), (Some(1.5), 8));
+    assert_eq!((y.first_number(), y.len()), (Some(29.5), 8));
+    assert_eq!(vars[0].affine.expect("level 0").transform[0], 1.0);
+}

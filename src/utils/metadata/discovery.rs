@@ -229,6 +229,7 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                         ome: None,
                         multiscale: None,
                         crs: None,
+                        affine: None,
                         shard_shape: None,
                     });
                 }

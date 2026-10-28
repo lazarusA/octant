@@ -47,6 +47,7 @@ fn test_colorbar_default_and_custom_label() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
     let meta = DatasetMetadata {

@@ -195,5 +195,6 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
     })
 }

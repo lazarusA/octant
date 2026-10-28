@@ -27,6 +27,7 @@ fn era5_like(time_chunk: u64) -> OctantApp {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
     let mut app = OctantApp::default();

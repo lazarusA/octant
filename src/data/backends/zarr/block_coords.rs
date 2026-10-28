@@ -89,12 +89,14 @@ impl BlockCoords {
 
 /// Reads the window coordinates of the range-selected dimensions of a block of array
 /// `variable`, from its group up, falling back to the store's spatial coordinates for generic (`dim_N`)
-/// dimension names.
+/// dimension names. Dimensions in `placed` (the coordinates the array's metadata
+/// places) take those instead, and then no fallback is searched for.
 pub(super) fn block_coordinates(
     store: &ReadableWritableListableStorage,
     store_url: &str,
     variable: &str,
     window: &BlockWindow<'_>,
+    placed: &[(&str, CoordValues)],
 ) -> BlockCoords {
     let group_path = variable.rfind('/').map(|idx| &variable[..idx]);
     let total_dims = window.dim_names.len();
@@ -114,7 +116,12 @@ pub(super) fn block_coordinates(
         if !window.ranged(i) {
             continue;
         }
-        let Some(coords) = coord_values(name, i) else {
+        // Dimensions the metadata places are never searched for in the store.
+        let own = placed.iter().find(|(d, _)| *d == name.as_str());
+        let Some(coords) = own
+            .map(|(_, c)| c.clone())
+            .or_else(|| coord_values(name, i))
+        else {
             continue;
         };
         out.note_extent(name, &coords);
@@ -125,7 +132,8 @@ pub(super) fn block_coordinates(
     let ranged = |i: &usize| window.ranged(*i);
     let ranged_dims = || (0..window.dim_names.len()).filter(ranged);
     let generic = ranged_dims().any(|i| window.dim_names[i].starts_with("dim_"));
-    if generic || (out.coordinates.is_empty() && ranged_dims().next().is_some()) {
+    let fallback = generic || (out.coordinates.is_empty() && ranged_dims().next().is_some());
+    if fallback && placed.is_empty() {
         add_spatial_fallback(&mut out, window, |name| coord_values(name, usize::MAX));
     }
     out

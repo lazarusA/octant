@@ -32,6 +32,11 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
             link_layout(&group, &layout, variables);
         }
     }
+    // As blocks place them; attributes hold their groups' too (geoemb `utm_zones`).
+    for v in variables.iter_mut() {
+        let shape = (v.dimension_names.as_slice(), v.shape.as_slice());
+        v.affine = super::geozarr_layout::array_placement(reader, &v.name, shape, &v.attributes);
+    }
 }
 
 /// [`link_pyramids`] over `storage`, the groups' attributes read
@@ -110,7 +115,7 @@ pub fn link_layout(group: &str, layout: &Layout, variables: &mut [VariableInfo])
 
 /// `name` within level `asset_path`: `""` when the asset is the array
 /// itself, the array's name when it is a direct child of the asset group.
-fn relative_name<'a>(name: &'a str, asset_path: &str) -> Option<&'a str> {
+pub(super) fn relative_name<'a>(name: &'a str, asset_path: &str) -> Option<&'a str> {
     let name = name.trim_matches('/');
     if name == asset_path {
         return Some("");

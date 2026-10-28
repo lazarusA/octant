@@ -55,6 +55,7 @@ fn consolidated_variable(
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     })
 }

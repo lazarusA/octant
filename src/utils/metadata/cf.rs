@@ -117,9 +117,20 @@ pub fn merge_parent_attributes(
     target: &mut HashMap<String, String>,
     parent: &HashMap<String, String>,
 ) {
-    for (k, v) in parent {
+    let own_affine = target.contains_key("spatial:transform");
+    for (k, v) in parent
+        .iter()
+        .filter(|(k, _)| !(own_affine && is_spatial_key(k)))
+    {
         target.entry(k.clone()).or_insert_with(|| v.clone());
     }
+}
+
+/// Whether `key` is a zarr-conventions `spatial:` key. They describe one grid
+/// together: a target with its own `spatial:transform` takes none of its
+/// parents', so an affine never meets another level's shape or registration.
+pub fn is_spatial_key(key: &str) -> bool {
+    key.starts_with("spatial:")
 }
 
 /// Resolves inherited attributes by walking up all ancestor group paths.

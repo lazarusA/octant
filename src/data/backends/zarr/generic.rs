@@ -146,6 +146,13 @@ impl GenericZarrBlockStore {
             raw_array.shape().len(),
             raw_array.data_type(),
         );
+        let dims = crate::utils::resolve_array_dimension_names(&raw_array);
+        let affine = crate::data::multiscale::geozarr_layout::array_placement(
+            &reader,
+            name,
+            (&dims, raw_array.shape()),
+            &attributes,
+        );
         let array = Arc::new(raw_array);
         let reader = if sharded {
             ArrayReader::Sharded(ArrayShardedReadableExtCache::new(&array))
@@ -159,6 +166,7 @@ impl GenericZarrBlockStore {
             attributes: Arc::new(attributes),
             ome,
             quantization,
+            affine,
         };
         Ok((Arc::new(cached), cache_bytes))
     }

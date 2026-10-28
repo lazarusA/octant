@@ -30,6 +30,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -48,6 +49,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -66,6 +68,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -84,6 +87,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -102,6 +106,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         },
     ];

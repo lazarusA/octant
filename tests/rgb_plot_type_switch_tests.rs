@@ -65,6 +65,7 @@ fn setup_rgb_app() -> OctantApp {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     });
 

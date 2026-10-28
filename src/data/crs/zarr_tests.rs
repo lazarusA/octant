@@ -88,7 +88,7 @@ fn group_crs_keys_are_inherited_nearest_first() {
     };
     let mut vars = vec![var("r10m/b02"), var("b03")];
     let reader = crate::data::ome::MetaReader::direct(store);
-    super::inherit_zarr_group_crs(&reader, &mut vars);
+    super::inherit_zarr_group_keys(&reader, &mut vars);
     let crs = |v: &VariableInfo| discover(&v.attributes, &v.dimension_names);
     assert_eq!(crs(&vars[0]), Some(CrsRef::Epsg(32636)), "its group's");
     assert_eq!(crs(&vars[1]), Some(CrsRef::Epsg(4326)), "the root's");

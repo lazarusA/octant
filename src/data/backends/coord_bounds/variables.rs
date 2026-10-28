@@ -20,16 +20,19 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     let url_hint = store_url_hint.unwrap_or("local");
     let group_prefixes = group_prefixes(variables);
     for var in variables {
-        if let Some(ome) = &var.ome {
-            // OME-Zarr images have no coordinate arrays: their metadata places
-            // them. Each level has its own scale, so its keys are always scoped.
+        let mut placed = Vec::new();
+        if let Some(coords) = var.metadata_coordinates() {
+            // Their metadata places them, with no coordinate arrays. Each level
+            // has its own step, so its keys are always scoped.
             let level = var.name.trim().to_lowercase();
-            let coords =
-                crate::data::ome::coords::level_coordinates(ome, &var.dimension_names, &var.shape);
             for (name, values) in coords {
                 coords_map.insert(format!("{level}/{}", name.trim().to_lowercase()), values);
+                placed.push(name);
             }
-            continue;
+            // An affine places only x and y: other dimensions read their arrays.
+            if var.ome.is_some() {
+                continue;
+            }
         }
         let total_dims = var.dimension_names.len();
         for (i, name) in var.dimension_names.iter().enumerate() {
@@ -38,7 +41,8 @@ pub fn fetch_all_dimension_coordinates_for_variables(
                 Some(scoped) => coords_map.contains_key(scoped),
                 None => coords_map.contains_key(&keys.clean),
             };
-            if resolved {
+            // Placed dimensions of root variables have no unscoped key to find.
+            if resolved || placed.contains(&name.as_str()) {
                 continue;
             }
             let group = keys.scoped.as_ref().and(var.group_path());
