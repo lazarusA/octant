@@ -64,8 +64,7 @@ impl OctantApp {
                     || meta.get_coord_bounds_for_var_range(Some(&var.name), dim, size, range);
                 let coords = match cell_edges {
                     // A dimension of one index has no spacing: one unit around its value.
-                    true => meta
-                        .get_cell_edges_for_var_range(Some(&var.name), dim, size, range)
+                    true => (self.plotted_cell_edges(dim_idx))
                         .or_else(|| values().map(|(lo, hi)| (lo - 0.5, hi + 0.5))),
                     false => values(),
                 };
@@ -94,6 +93,14 @@ impl OctantApp {
         let range =
             (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
         Some((meta, var, size, range))
+    }
+
+    /// The outer cell edges of the plotted window along dimension `dim_idx`, where the
+    /// axes and coastlines of plots drawing whole cells end.
+    pub(crate) fn plotted_cell_edges(&self, dim_idx: usize) -> Option<(f64, f64)> {
+        let (meta, var, size, range) = self.plotted_window(dim_idx)?;
+        let dim = var.dimension_names.get(dim_idx)?;
+        meta.get_cell_edges_for_var_range(Some(&var.name), dim, size, range)
     }
 
     /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").

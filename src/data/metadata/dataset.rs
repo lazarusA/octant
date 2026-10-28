@@ -61,8 +61,7 @@ impl DatasetMetadata {
         dim_size: usize,
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
-        let coords = self.get_dim_coords(var_name, dim_name)?;
-        let dim_len = coords.len().max(dim_size).max(1);
+        let (coords, dim_len) = self.coords_with_len(var_name, dim_name, dim_size)?;
         coords.range_bounds(range.0.min(range.1), range.0.max(range.1), dim_len)
     }
 
@@ -75,9 +74,20 @@ impl DatasetMetadata {
         dim_size: usize,
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
-        let coords = self.get_dim_coords(var_name, dim_name)?;
-        let dim_len = coords.len().max(dim_size).max(1);
+        let (coords, dim_len) = self.coords_with_len(var_name, dim_name, dim_size)?;
         coords.cell_edges(range.0, range.1, dim_len)
+    }
+
+    /// The coordinates of `dim_name` of `var_name` and the length they are read over: the
+    /// dimension's `dim_size`, or their own when longer.
+    fn coords_with_len(
+        &self,
+        var_name: Option<&str>,
+        dim_name: &str,
+        dim_size: usize,
+    ) -> Option<(&CoordValues, usize)> {
+        let coords = self.get_dim_coords(var_name, dim_name)?;
+        Some((coords, coords.len().max(dim_size).max(1)))
     }
 
     /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.

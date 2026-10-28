@@ -55,13 +55,6 @@ impl OctantApp {
         }
         Some([lon_min, lon_max, lat_min, lat_max].map(|v| v as f32))
     }
-
-    /// The outer cell edges of the plotted window along dimension `dim_idx`.
-    fn plotted_cell_edges(&self, dim_idx: usize) -> Option<(f64, f64)> {
-        let (meta, var, size, range) = self.plotted_window(dim_idx)?;
-        let dim = var.dimension_names.get(dim_idx)?;
-        meta.get_cell_edges_for_var_range(Some(&var.name), dim, size, range)
-    }
 }
 
 #[cfg(test)]
