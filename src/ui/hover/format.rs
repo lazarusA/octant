@@ -7,8 +7,8 @@ use crate::i18n::number::Num;
 use crate::ui::hover::field::HoverField;
 use crate::utils::units::dates::coordinate_date;
 use crate::utils::units::{
-    COORD_DECIMALS, format_axis_value, format_cardinal_degrees, format_scalar_coordinate,
-    is_cf_time_unit, step_decimals,
+    COORD_DECIMALS, exact_decimals, format_axis_value, format_cardinal_degrees,
+    format_scalar_coordinate, is_cf_time_unit, step_decimals,
 };
 
 /// Most decimals a hovered coordinate shows, however fine its grid.
@@ -141,18 +141,16 @@ fn from_metadata(
 /// are only trusted for their endpoints (a start date or a numeric range), never for a
 /// label by index.
 fn from_coords(coords: &CoordValues, ctx: &DimContext) -> Option<String> {
-    let decimals = (spacing(coords, ctx.idx, ctx.total_len)).map_or(COORD_DECIMALS, |step| {
-        step_decimals(step).clamp(COORD_DECIMALS, MAX_COORD_DECIMALS)
-    });
+    let number = |v| ctx.scalar(v, decimals(coords, ctx, v));
     if coords.matches(ctx.total_len) {
         match coords.get(ctx.idx)? {
-            CoordValue::Number(v) => return Some(ctx.scalar(v, decimals)),
+            CoordValue::Number(v) => return Some(number(v)),
             CoordValue::Label(l) if !l.trim().is_empty() => return Some(l.trim().to_string()),
             CoordValue::Label(_) => {}
         }
     }
     if let Some(v) = coords.number_for(ctx.idx, ctx.total_len) {
-        return Some(ctx.scalar(v, decimals));
+        return Some(number(v));
     }
     let first = coords.label(0).map(str::trim);
     let first_is_date =
@@ -161,6 +159,30 @@ fn from_coords(coords: &CoordValues, ctx: &DimContext) -> Option<String> {
         return Some(ctx.time(first));
     }
     ctx.is_time.then(|| ctx.time(ctx.time_start))
+}
+
+/// Decimals for `v`, the coordinate at `ctx.idx`: those writing both the spacing and the
+/// grid's start exactly, so centered grids keep their offset (SeasFire's 74.875 in 0.25°
+/// steps) and every cell of an even grid shows as many; uneven grids (`Values`) take the
+/// value's own. Spacing that no decimals write exactly (1/120°) only keeps neighbors apart.
+fn decimals(coords: &CoordValues, ctx: &DimContext, v: f64) -> usize {
+    let Some(step) = spacing(coords, ctx.idx, ctx.total_len) else {
+        return COORD_DECIMALS;
+    };
+    let anchor = match coords {
+        CoordValues::Values(_) => Some(v),
+        _ => coords.number_for(0, ctx.total_len),
+    };
+    // `f32` coordinates (74.885 read as 74.88500213) and their differences are exact
+    // within twice their rounding.
+    let magnitude = anchor.map_or(0.0, f64::abs).max(v.abs()).max(1.0);
+    let tol = 2.0 * magnitude * f64::from(f32::EPSILON);
+    let exact = |x| exact_decimals(x, tol, MAX_COORD_DECIMALS);
+    let d = match (exact(step), anchor.and_then(exact)) {
+        (Some(step_d), Some(anchor_d)) => step_d.max(anchor_d),
+        _ => step_decimals(step),
+    };
+    d.clamp(COORD_DECIMALS, MAX_COORD_DECIMALS)
 }
 
 /// The distance from index `idx` to its next neighbor (its previous one at the end) of a

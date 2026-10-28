@@ -3,22 +3,10 @@
 use super::calendar::add_days_to_date;
 use super::cf::{is_cf_time_unit, parse_reference_date, unit_to_milliseconds};
 use super::dates::{cf_since_date, coordinate_date};
+use super::decimals::COORD_DECIMALS;
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 use crate::i18n::date::Date;
 use crate::i18n::number::Num;
-
-/// Decimals of a coordinate when its spacing is unknown.
-pub const COORD_DECIMALS: usize = 2;
-
-/// Fewest decimals that tell values `step` apart (0.5 -> 1, 0.05 -> 2, 2 -> 0); 0 for
-/// a zero or non-finite step.
-pub fn step_decimals(step: f64) -> usize {
-    let step = step.abs();
-    if !(step.is_finite() && step > 0.0) {
-        return 0;
-    }
-    (-step.log10() - 1e-9).ceil().max(0.0) as usize
-}
 
 /// Formats a coordinate scalar value (without the dimension name) with units, datetime
 /// conversion, or cardinal degrees.

@@ -4,6 +4,7 @@ pub mod bytes;
 pub mod calendar;
 pub mod cf;
 pub mod dates;
+pub mod decimals;
 pub mod format;
 #[cfg(test)]
 mod tests;
@@ -16,8 +17,8 @@ pub use cf::{
     is_cf_time_unit, parse_iso_date, parse_reference_date, parse_time_unit, split_since,
     unit_to_milliseconds,
 };
+pub use decimals::{COORD_DECIMALS, exact_decimals, step_decimals};
 pub use format::{
-    COORD_DECIMALS, format_axis_value, format_cardinal_degrees, format_coord_scalar,
-    format_num_with_unit, format_scalar_coordinate, is_dimensionless_unit, parse_loc,
-    step_decimals,
+    format_axis_value, format_cardinal_degrees, format_coord_scalar, format_num_with_unit,
+    format_scalar_coordinate, is_dimensionless_unit, parse_loc,
 };

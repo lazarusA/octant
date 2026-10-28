@@ -62,6 +62,38 @@ fn coordinates_show_their_grid_spacing() {
 }
 
 #[test]
+fn centered_grids_show_their_offset() {
+    // SeasFire: 0.25° cells centered from -179.875.
+    let seasfire = CoordValues::Regular {
+        start: -179.875,
+        step: 0.25,
+        len: 1440,
+    };
+    let at = |i| from_coords(&seasfire, &ctx("lat", i, 1440));
+    assert_eq!(at(1019).as_deref(), Some("74.875°N"));
+    assert_eq!(at(1020).as_deref(), Some("75.125°N"));
+    // Centers stored as f32 keep three decimals, not their rounding noise.
+    let stored = numbers(&[
+        f64::from(74.885f32),
+        f64::from(75.135f32),
+        f64::from(75.385f32),
+    ]);
+    let at = |i| from_coords(&stored, &ctx("lat", i, 3));
+    assert_eq!(at(0).as_deref(), Some("74.885°N"));
+    assert_eq!(at(1).as_deref(), Some("75.135°N"));
+    // ERA5: 0.25° from 0 keeps two.
+    let era5 = CoordValues::Regular {
+        start: 0.0,
+        step: 0.25,
+        len: 1440,
+    };
+    assert_eq!(
+        from_coords(&era5, &ctx("lon", 1, 1440)).as_deref(),
+        Some("0.25°E")
+    );
+}
+
+#[test]
 fn labels_and_dates_are_shown_as_stored() {
     let regions = labels(&["Europe", "Africa"]);
     assert_eq!(
