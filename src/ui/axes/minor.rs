@@ -65,10 +65,9 @@ impl Lattice {
 }
 
 /// The data cells along an axis, for cell ticks.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub enum CellTicks<'a> {
     /// No cells along the axis (data values, curvilinear and HEALPix grids).
-    #[default]
     None,
     /// Evenly spaced cells: the plotted level's, and a detail tile's finer
     /// ones, which replace them over the tile's extent.

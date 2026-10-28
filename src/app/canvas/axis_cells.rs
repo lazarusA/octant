@@ -57,19 +57,28 @@ fn detail_cells(
     else {
         return (None, None);
     };
-    let [u0, v0, u1, v1] = tile.uv;
+    tile_cells(tile.uv, (m.width, m.height), (x_dom, y_dom), y_down)
+}
+
+/// The cells of a `w` x `h` tile at `uv` on the quad, on the axes' domains.
+pub(super) fn tile_cells(
+    [u0, v0, u1, v1]: [f32; 4],
+    (w, h): (usize, usize),
+    (x_dom, y_dom): ((f64, f64), (f64, f64)),
+    y_down: bool,
+) -> (Option<Lattice>, Option<Lattice>) {
     let at = |dom: (f64, f64), t: f32| dom.0.min(dom.1) + f64::from(t) * (dom.1 - dom.0).abs();
     // y grows up the quad unless the image's rows run down.
     let up = |v: f32| if y_down { v } else { 1.0 - v };
     (
-        Lattice::cells(at(x_dom, u0), at(x_dom, u1), m.width),
-        Lattice::cells(at(y_dom, up(v0)), at(y_dom, up(v1)), m.height),
+        Lattice::cells(at(x_dom, u0), at(x_dom, u1), w),
+        Lattice::cells(at(y_dom, up(v0)), at(y_dom, up(v1)), h),
     )
 }
 
 /// An irregular axis's cell centers, when they run from one end of the
 /// axis's domain to the other (the axis then places them by value).
-fn values(coords: &[f32], dom: (f64, f64)) -> CellTicks<'_> {
+pub(super) fn values(coords: &[f32], dom: (f64, f64)) -> CellTicks<'_> {
     let (Some(&a), Some(&b)) = (coords.first(), coords.last()) else {
         return CellTicks::None;
     };

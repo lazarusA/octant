@@ -2,6 +2,8 @@
 
 mod axes;
 mod axis_cells;
+#[cfg(test)]
+mod axis_cells_tests;
 mod interactions;
 #[cfg(test)]
 mod interactions_tests;
