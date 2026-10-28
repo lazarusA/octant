@@ -7,6 +7,19 @@ use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 use crate::i18n::date::Date;
 use crate::i18n::number::Num;
 
+/// Decimals of a coordinate when its spacing is unknown.
+pub const COORD_DECIMALS: usize = 2;
+
+/// Fewest decimals that tell values `step` apart (0.5 -> 1, 0.05 -> 2, 2 -> 0); 0 for
+/// a zero or non-finite step.
+pub fn step_decimals(step: f64) -> usize {
+    let step = step.abs();
+    if !(step.is_finite() && step > 0.0) {
+        return 0;
+    }
+    (-step.log10() - 1e-9).ceil().max(0.0) as usize
+}
+
 /// Formats a coordinate scalar value (without the dimension name) with units, datetime
 /// conversion, or cardinal degrees.
 pub fn format_scalar_coordinate(
@@ -15,6 +28,7 @@ pub fn format_scalar_coordinate(
     units: Option<&str>,
     time_start: Option<&str>,
     is_time_dim: bool,
+    decimals: usize,
 ) -> String {
     let clean = dim_name.trim();
 
@@ -37,7 +51,7 @@ pub fn format_scalar_coordinate(
     }
 
     // 5. Physical & spatial coordinate scalar formatting
-    format_coord_scalar(clean, val, units)
+    format_coord_scalar(clean, val, units, decimals)
 }
 
 /// True for missing or dimensionless units (`""`, `"1"`, `"none"`, `"dimensionless"`,
@@ -51,35 +65,35 @@ pub fn is_dimensionless_unit(units: &str) -> bool {
 }
 
 /// Formats a spatial or physical scalar with standard symbol suffixes (cardinal degrees, hPa, m).
-pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>) -> String {
+pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>, decimals: usize) -> String {
     if contains_ascii_case_insensitive(clean, "lon") {
-        format_cardinal_degrees(val, true)
+        format_cardinal_degrees(val, true, decimals)
     } else if contains_ascii_case_insensitive(clean, "lat") {
-        format_cardinal_degrees(val, false)
+        format_cardinal_degrees(val, false, decimals)
     } else if let Some(u) = units
         && !is_dimensionless_unit(u)
     {
-        format!("{} {}", Num(format_args!("{val:.2}")), u.trim())
+        format!("{} {}", Num(format_args!("{val:.decimals$}")), u.trim())
     } else if contains_ascii_case_insensitive(clean, "depth")
         || contains_ascii_case_insensitive(clean, "height")
         || contains_ascii_case_insensitive(clean, "alt")
     {
-        format!("{} m", Num(format_args!("{val:.2}")))
+        format!("{} m", Num(format_args!("{val:.decimals$}")))
     } else if contains_ascii_case_insensitive(clean, "level")
         || contains_ascii_case_insensitive(clean, "lev")
         || contains_ascii_case_insensitive(clean, "plev")
         || contains_ascii_case_insensitive(clean, "pressure")
         || contains_ascii_case_insensitive(clean, "pres")
     {
-        format!("{} hPa", Num(format_args!("{val:.2}")))
+        format!("{} hPa", Num(format_args!("{val:.decimals$}")))
     } else {
-        format!("{}", Num(format_args!("{val:.2}")))
+        format!("{}", Num(format_args!("{val:.decimals$}")))
     }
 }
 
 /// Formats latitude or longitude into cardinal degree string (e.g. `122.40°W`, `37.70°N`).
 #[inline]
-pub fn format_cardinal_degrees(val: f64, is_longitude: bool) -> String {
+pub fn format_cardinal_degrees(val: f64, is_longitude: bool, decimals: usize) -> String {
     let suffix = if is_longitude {
         if val >= 0.0 { "°E" } else { "°W" }
     } else if val >= 0.0 {
@@ -87,7 +101,10 @@ pub fn format_cardinal_degrees(val: f64, is_longitude: bool) -> String {
     } else {
         "°S"
     };
-    format!("{}{suffix}", Num(format_args!("{:.2}", val.abs())))
+    format!(
+        "{}{suffix}",
+        Num(format_args!("{:.*}", decimals, val.abs()))
+    )
 }
 
 /// Formats a numerical value with CF units or bare units into a human-readable location/duration/date string.
@@ -221,7 +238,7 @@ pub fn format_axis_value(
         || contains_ascii_case_insensitive(units, "degrees_north")
     {
         let lat = -90.0 + (timestep as f64 * 2.5);
-        return format_cardinal_degrees(lat, false);
+        return format_cardinal_degrees(lat, false, COORD_DECIMALS);
     }
 
     if contains_ascii_case_insensitive(dim, "lon")
@@ -229,7 +246,7 @@ pub fn format_axis_value(
         || contains_ascii_case_insensitive(units, "degrees_east")
     {
         let lon = -180.0 + (timestep as f64 * 2.5);
-        return format_cardinal_degrees(lon, true);
+        return format_cardinal_degrees(lon, true, COORD_DECIMALS);
     }
 
     // Fallback default

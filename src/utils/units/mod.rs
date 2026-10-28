@@ -17,6 +17,7 @@ pub use cf::{
     unit_to_milliseconds,
 };
 pub use format::{
-    format_axis_value, format_cardinal_degrees, format_coord_scalar, format_num_with_unit,
-    format_scalar_coordinate, is_dimensionless_unit, parse_loc,
+    COORD_DECIMALS, format_axis_value, format_cardinal_degrees, format_coord_scalar,
+    format_num_with_unit, format_scalar_coordinate, is_dimensionless_unit, parse_loc,
+    step_decimals,
 };

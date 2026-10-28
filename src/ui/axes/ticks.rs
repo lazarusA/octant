@@ -125,7 +125,7 @@ impl TickMark {
             write!(cursor, "{:.2e}", self.val)
         } else if step.abs() < 1.0 {
             // Enough decimals to tell steps apart: 0.5 -> 1, 0.05 -> 2.
-            let decimals = ((-step.abs().log10() - 1e-9).ceil().max(0.0) as usize).min(6);
+            let decimals = crate::utils::units::step_decimals(step).min(6);
             write!(cursor, "{:.*}", decimals, self.val)
         } else if self.val.fract().abs() < 1e-6 {
             write!(cursor, "{:.0}", self.val)
