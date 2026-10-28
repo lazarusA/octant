@@ -55,12 +55,22 @@ impl DatasetMetadata {
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
         let coords = self.get_dim_coords(var_name, dim_name)?;
-        let dim_len = if coords.len() > dim_size {
-            coords.len()
-        } else {
-            dim_size.max(1)
-        };
+        let dim_len = coords.len().max(dim_size).max(1);
         coords.range_bounds(range.0.min(range.1), range.0.max(range.1), dim_len)
+    }
+
+    /// The outer cell edges of indices `range` of `dim_name` of `var_name`
+    /// ([`CoordValues::cell_edges`]): where the cells drawn for those indices end.
+    pub fn get_cell_edges_for_var_range(
+        &self,
+        var_name: Option<&str>,
+        dim_name: &str,
+        dim_size: usize,
+        range: (usize, usize),
+    ) -> Option<(f64, f64)> {
+        let coords = self.get_dim_coords(var_name, dim_name)?;
+        let dim_len = coords.len().max(dim_size).max(1);
+        coords.cell_edges(range.0, range.1, dim_len)
     }
 
     /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.

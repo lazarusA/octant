@@ -137,6 +137,21 @@ impl CoordValues {
         let b = self.number_for(end, dim_len)?;
         Some((a.min(b), a.max(b)))
     }
+
+    /// `(min, max)` of the outer cell edges of indices `start..=end` of a `dim_len`
+    /// dimension: halfway from each end value to its outer neighbor, or at the
+    /// dimension's ends half the inner spacing out. Values are taken as cell centers,
+    /// never clamped. `None` for labels and single-index dimensions.
+    pub fn cell_edges(&self, start: usize, end: usize, dim_len: usize) -> Option<(f64, f64)> {
+        let last = dim_len.checked_sub(1).filter(|&l| l > 0)?;
+        let (lo, hi) = (start.min(end).min(last), start.max(end).min(last));
+        let at = |i| self.number_for(i, dim_len);
+        // Signed spacing between indices `i` and `i + 1`.
+        let gap = |i: usize| Some(at(i + 1)? - at(i)?);
+        let first = at(lo)? - gap(lo.saturating_sub(1))? / 2.0;
+        let end = at(hi)? + gap(hi.min(last - 1))? / 2.0;
+        Some((first.min(end), first.max(end)))
+    }
 }
 
 fn interpolate(first: f64, last: f64, i: usize, len: usize) -> f64 {

@@ -34,13 +34,20 @@ fn dimension_units(
 
 impl OctantApp {
     /// Resolves coordinate bounds, formatted title, and units/time context for a given dimension index.
+    /// With `cell_edges` the bounds are where the first and last cells end, for plots drawing
+    /// whole cells edge to edge; otherwise the first and last values.
     pub fn resolve_axis_bounds_and_title(
         &self,
         dim_idx: usize,
         fallback_name: &str,
         fallback_len: usize,
+        cell_edges: bool,
     ) -> ((f64, f64), String, Option<String>) {
-        let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
+        let index_bounds = |first: usize, last: usize| match cell_edges {
+            true => (first as f64 - 0.5, last as f64 + 0.5),
+            false => (first as f64, last as f64),
+        };
+        let mut bounds = index_bounds(0, fallback_len.saturating_sub(1).max(1));
         let mut name = fallback_name;
         let mut units = None;
         // An OME-Zarr axis unit, shown in the title ("y [µm]").
@@ -53,14 +60,16 @@ impl OctantApp {
             let size = size as usize;
             let range =
                 (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
-            bounds = (range.0 as f64, range.1 as f64);
+            bounds = index_bounds(range.0, range.1);
             if let Some(dim) = var.dimension_names.get(dim_idx) {
                 name = dim;
                 axis_unit = var.dimension_unit(dim);
                 units = dimension_units(meta, var, dim, axis_unit);
-                bounds = meta
-                    .get_coord_bounds_for_var_range(Some(&var.name), dim, size, range)
-                    .unwrap_or(bounds);
+                let coords = match cell_edges {
+                    true => meta.get_cell_edges_for_var_range(Some(&var.name), dim, size, range),
+                    false => meta.get_coord_bounds_for_var_range(Some(&var.name), dim, size, range),
+                };
+                bounds = coords.unwrap_or(bounds);
             }
         }
         let title = match axis_unit {
