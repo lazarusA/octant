@@ -194,16 +194,13 @@ pub fn cell_center_lon_lat_rad(
             lon_bounds,
             lat_bounds,
         } => {
-            let (u_c, v_c) = cell_center_norm(grid, px, py, width, height);
-            let [lon_min, lon_max] = [lon_bounds.0.to_radians(), lon_bounds.1.to_radians()];
-            let [lat_min, lat_max] = [
-                lat_bounds.0.clamp(-90.0, 90.0).to_radians(),
-                lat_bounds.1.clamp(-90.0, 90.0).to_radians(),
-            ];
-            (
-                lon_min + u_c * (lon_max - lon_min),
-                lat_max - v_c * (lat_max - lat_min),
-            )
+            // The bounds are the first and last cell centers, as the sphere draws them
+            // and `lon_lat_to_cell` inverts them.
+            CartesianTopology::Regional {
+                lon_bounds: *lon_bounds,
+                lat_bounds: *lat_bounds,
+            }
+            .cell_center_lon_lat_rad(px, py, width, height)
         }
         CoordinateGrid::Irregular1D {
             coords_x, coords_y, ..
