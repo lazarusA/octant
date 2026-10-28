@@ -7,7 +7,7 @@ use crate::ui::hover::enrich::{
 };
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
-use crate::utils::units::format_cardinal_degrees;
+use crate::utils::units::{COORD_DECIMALS, format_cardinal_degrees};
 use std::collections::HashSet;
 
 #[allow(clippy::too_many_arguments)]
@@ -193,8 +193,14 @@ fn resolve_healpix_dim_entries(
     } else {
         lon_norm - 360.0
     };
-    let lat_str = HoverField::new("lat", format_cardinal_degrees(lat_deg as f64, false));
-    let lon_str = HoverField::new("lon", format_cardinal_degrees(lon_signed as f64, true));
+    let lat_str = HoverField::new(
+        "lat",
+        format_cardinal_degrees(lat_deg as f64, false, COORD_DECIMALS),
+    );
+    let lon_str = HoverField::new(
+        "lon",
+        format_cardinal_degrees(lon_signed as f64, true, COORD_DECIMALS),
+    );
     let healpix_str = HoverField::new("cell", format!("#{} (ring #{}, nside {})", px, ring, nside));
 
     let mut list = vec![healpix_str, lat_str, lon_str];

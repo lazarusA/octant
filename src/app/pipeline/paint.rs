@@ -247,14 +247,7 @@ impl OctantApp {
 
                 // Extract dataset geographic bounds from the active grid so the
                 // shader can project coastline lon/lat into the dataset's domain.
-                let (lon_min, lon_max, lat_min, lat_max) = self
-                    .layers
-                    .base
-                    .data
-                    .matrix
-                    .as_ref()
-                    .map(|m| crate::plots::dataset_geo_bounds(&m.grid))
-                    .unwrap_or((-180.0, 180.0, 90.0, -90.0));
+                let (lon_min, lon_max, lat_min, lat_max) = self.coastline_bounds_2d();
 
                 if canvas_plot_type == PlotType::Heatmap {
                     let cb = eframe::egui_wgpu::Callback::new_paint_callback(
@@ -288,6 +281,7 @@ impl OctantApp {
                     sphere,
                     crate::plots::common::compute_aspect_ratio(&plot_rect),
                 );
+                let (lon_bounds, lat_bounds) = self.coastline_bounds_3d(sphere, &mesh_params);
                 let line_color = self.coastline_color.unwrap_or_else(|| {
                     if ui.visuals().dark_mode {
                         [1.0, 1.0, 1.0, 0.75]
@@ -311,8 +305,8 @@ impl OctantApp {
                             } else {
                                 0
                             },
-                            lon_bounds: mesh_params.lon_bounds,
-                            lat_bounds: mesh_params.lat_bounds,
+                            lon_bounds,
+                            lat_bounds,
                             color: line_color,
                             color_range: [mesh_params.color.cmin, mesh_params.color.cmax],
                             flip_height: mesh_params.flip_height,

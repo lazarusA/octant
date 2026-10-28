@@ -6,52 +6,34 @@ use std::io::Write;
 #[derive(Clone, Copy)]
 pub struct TickMark {
     pub val: f64,
+    /// Position along the visible axis: 0 at its start, 1 at its end.
+    pub fract: f32,
     len: u8,
     buf: [u8; 32],
 }
 
 impl TickMark {
-    pub fn new(val: f64, step: f64) -> Self {
-        let mut mark = Self {
-            val,
-            len: 0,
-            buf: [0u8; 32],
-        };
-        mark.format(step);
-        mark
-    }
+    pub const EMPTY: Self = Self {
+        val: 0.0,
+        fract: 0.0,
+        len: 0,
+        buf: [0u8; 32],
+    };
 
-    pub fn new_with_context(
+    /// A tick on an axis already known to be a time axis or not ([`is_time_axis`]).
+    pub(super) fn on_axis(
         val: f64,
         step: f64,
         total_span: f64,
         title: &str,
         units: Option<&str>,
+        time: bool,
     ) -> Self {
-        let mut mark = Self {
-            val,
-            len: 0,
-            buf: [0u8; 32],
-        };
-        mark.format_with_context(step, total_span, title, units);
-        mark
-    }
-
-    fn format_with_context(
-        &mut self,
-        step: f64,
-        total_span: f64,
-        title: &str,
-        units: Option<&str>,
-    ) {
-        let is_time = crate::data::coordinates::naming::is_animated_time_name(title)
-            || units.is_some_and(crate::utils::units::is_cf_time_unit);
-
-        if is_time && self.try_format_time(total_span, title, units) {
-            return;
+        let mut mark = Self { val, ..Self::EMPTY };
+        if !(time && mark.try_format_time(total_span, title, units)) {
+            mark.format(step);
         }
-
-        self.format(step);
+        mark
     }
 
     fn try_format_time(&mut self, total_span: f64, title: &str, units: Option<&str>) -> bool {
@@ -142,7 +124,8 @@ impl TickMark {
         let _ = if abs_val > 0.0 && !(1e-3..1e5).contains(&abs_val) {
             write!(cursor, "{:.2e}", self.val)
         } else if step.abs() < 1.0 {
-            let decimals = ((-step.abs().log10()).ceil().max(0.0) as usize + 1).min(4);
+            // Enough decimals to tell steps apart: 0.5 -> 1, 0.05 -> 2.
+            let decimals = crate::utils::units::step_decimals(step).min(6);
             write!(cursor, "{:.*}", decimals, self.val)
         } else if self.val.fract().abs() < 1e-6 {
             write!(cursor, "{:.0}", self.val)
@@ -178,22 +161,8 @@ fn write_date_span(
     };
 }
 
-pub fn generate_constant_count_ticks(
-    min_val: f64,
-    max_val: f64,
-    title: &str,
-    units: Option<&str>,
-) -> [TickMark; 7] {
-    let range = max_val - min_val;
-    let step = range / 6.0;
-    let mut ticks = [TickMark {
-        val: 0.0,
-        len: 0,
-        buf: [0u8; 32],
-    }; 7];
-    for (i, tick) in ticks.iter_mut().enumerate() {
-        let val = min_val + i as f64 * step;
-        *tick = TickMark::new_with_context(val, step, range, title, units);
-    }
-    ticks
+/// Whether an axis holds times: its title names time, or its units are CF time units.
+pub(super) fn is_time_axis(title: &str, units: Option<&str>) -> bool {
+    crate::data::coordinates::naming::is_animated_time_name(title)
+        || units.is_some_and(crate::utils::units::is_cf_time_unit)
 }

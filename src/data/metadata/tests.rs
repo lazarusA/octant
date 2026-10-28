@@ -201,3 +201,23 @@ fn ome_series_names_label_their_folders_and_match_searches() {
     assert_eq!(found.subgroups[0].label.as_deref(), Some("slide A"));
     assert_eq!(found.subgroups[0].variable_indices, [0, 1]);
 }
+
+#[test]
+fn dimension_coordinates_are_found_case_insensitively() {
+    let mut meta = crate::data::DatasetMetadata::default();
+    let coords = |start| crate::data::CoordValues::Regular {
+        start,
+        step: 1.0,
+        len: 3,
+    };
+    meta.dimension_coordinates.insert("lat".into(), coords(0.0));
+    meta.dimension_coordinates
+        .insert("t2m/lat".into(), coords(10.0));
+    meta.dimension_coordinates
+        .insert("höhe".into(), coords(20.0));
+    let first = |var, dim| meta.get_dim_coords(var, dim).and_then(|c| c.first_number());
+    assert_eq!(first(Some("T2M"), " LAT "), Some(10.0));
+    assert_eq!(first(Some("sst"), "Lat"), Some(0.0));
+    assert_eq!(first(None, "HÖHE"), Some(20.0));
+    assert_eq!(first(None, "lon"), None);
+}

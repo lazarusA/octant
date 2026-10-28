@@ -17,17 +17,24 @@ pub struct DatasetMetadata {
 impl DatasetMetadata {
     /// Look up the dimension coordinates for a given variable and dimension name,
     /// checking scoped `{var_name}/{dim_name}` first before falling back to `{dim_name}`.
+    /// Keys are lowercased into a stack buffer, so per-frame lookups do not allocate.
     pub fn get_dim_coords(&self, var_name: Option<&str>, dim_name: &str) -> Option<&CoordValues> {
-        let clean = dim_name.trim().to_lowercase();
-        if let Some(v) = var_name {
-            let scoped = format!("{}/{}", v.trim().to_lowercase(), clean);
-            if let Some(coords) = self.dimension_coordinates.get(&scoped) {
-                return Some(coords);
-            }
-        }
-        self.dimension_coordinates
-            .get(&clean)
+        let clean = dim_name.trim();
+        let mut buf = [0u8; KEY_BUF];
+        (var_name.and_then(|v| self.coords_for(&mut buf, &[v.trim(), "/", clean])))
+            .or_else(|| self.coords_for(&mut buf, &[clean]))
             .or_else(|| self.dimension_coordinates.get(dim_name))
+    }
+
+    /// The coordinates under `parts` joined and lowercased: ASCII in `buf`, other text
+    /// by Unicode rules on the heap.
+    fn coords_for(&self, buf: &mut [u8; KEY_BUF], parts: &[&str]) -> Option<&CoordValues> {
+        match lower_key(buf, parts) {
+            Some(key) => self.dimension_coordinates.get(key),
+            None => self
+                .dimension_coordinates
+                .get(&parts.concat().to_lowercase()),
+        }
     }
 
     /// Returns numerical min/max coordinate bounds for a variable dimension name if available.
@@ -54,13 +61,33 @@ impl DatasetMetadata {
         dim_size: usize,
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
-        let coords = self.get_dim_coords(var_name, dim_name)?;
-        let dim_len = if coords.len() > dim_size {
-            coords.len()
-        } else {
-            dim_size.max(1)
-        };
+        let (coords, dim_len) = self.coords_with_len(var_name, dim_name, dim_size)?;
         coords.range_bounds(range.0.min(range.1), range.0.max(range.1), dim_len)
+    }
+
+    /// The outer cell edges of indices `range` of `dim_name` of `var_name`
+    /// ([`CoordValues::cell_edges`]): where the cells drawn for those indices end.
+    pub fn get_cell_edges_for_var_range(
+        &self,
+        var_name: Option<&str>,
+        dim_name: &str,
+        dim_size: usize,
+        range: (usize, usize),
+    ) -> Option<(f64, f64)> {
+        let (coords, dim_len) = self.coords_with_len(var_name, dim_name, dim_size)?;
+        coords.cell_edges(range.0, range.1, dim_len)
+    }
+
+    /// The coordinates of `dim_name` of `var_name` and the length they are read over: the
+    /// dimension's `dim_size`, or their own when longer.
+    fn coords_with_len(
+        &self,
+        var_name: Option<&str>,
+        dim_name: &str,
+        dim_size: usize,
+    ) -> Option<(&CoordValues, usize)> {
+        let coords = self.get_dim_coords(var_name, dim_name)?;
+        Some((coords, coords.len().max(dim_size).max(1)))
     }
 
     /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.
@@ -88,4 +115,23 @@ impl DatasetMetadata {
     pub fn build_tree_from_variables(variables: &[VariableInfo]) -> VariableTreeGroup {
         VariableTreeGroup::build_tree_from_variables(variables)
     }
+}
+
+/// Longest coordinate key looked up without allocating.
+const KEY_BUF: usize = 128;
+
+/// `parts` joined and ASCII-lowercased in `buf`; `None` when they hold non-ASCII text
+/// (lowercased by Unicode rules instead) or do not fit.
+fn lower_key<'b>(buf: &'b mut [u8; KEY_BUF], parts: &[&str]) -> Option<&'b str> {
+    let mut len = 0;
+    for part in parts {
+        let end = len + part.len();
+        if !part.is_ascii() || end > KEY_BUF {
+            return None;
+        }
+        buf[len..end].copy_from_slice(part.as_bytes());
+        len = end;
+    }
+    buf[..len].make_ascii_lowercase();
+    std::str::from_utf8(&buf[..len]).ok()
 }

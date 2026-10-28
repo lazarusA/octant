@@ -144,8 +144,8 @@ fn ome_images_become_stacks() {
     }
     let top = set.level(2).expect("level 2");
     assert!((top.factor[3] - 4.0).abs() < 1e-6 && top.factor[1] == 1.0);
-    // Unshifted translations: each level's first cell starts before level 0's.
-    assert!((top.offset[3] + 1.5).abs() < 1e-6);
+    // No translations: levels computed from blocks from pixel 0 start with level 0.
+    assert_eq!(top.offset[3], 0.0);
     assert_eq!(set.to_level(1, 3, 0..64), Some(0..32));
 }
 
@@ -205,4 +205,24 @@ fn geotiff_without_overviews_links_nothing() {
     let mut vars = vec![var("band_1", &[10, 10], &["y", "x"])];
     link_overviews(&mut vars, &[]);
     assert!(vars[0].multiscale.is_none());
+}
+
+#[test]
+fn coarse_ome_levels_start_half_a_block_in_unless_translated() {
+    use crate::data::ome::model::OmeLevel;
+    let at = |scale: f64, translation: Option<f64>| OmeLevel {
+        path: String::new(),
+        scale: vec![scale],
+        translation: translation.into_iter().collect(),
+    };
+    let base = at(4.0, None);
+    // Level 0 itself, and a factor-32 level written without a translation:
+    // its first 128 nm pixel covers level 0's pixels 0..32, centered at 62 nm.
+    assert_eq!(base.origin(&base, 0), 0.0);
+    assert_eq!(at(128.0, None).origin(&base, 0), 62.0);
+    // The same with level 0's translation repeated (idr0101).
+    let shifted = at(4.0, Some(10.0));
+    assert_eq!(at(128.0, Some(10.0)).origin(&shifted, 0), 72.0);
+    // A translation of its own is kept: the half-block shift written out (Janelia).
+    assert_eq!(at(128.0, Some(62.0)).origin(&base, 0), 62.0);
 }

@@ -2,6 +2,7 @@
 
 pub mod aspect;
 pub mod axis_info;
+mod coastline_bounds;
 pub mod color;
 pub(crate) mod greyscale;
 pub mod paint;

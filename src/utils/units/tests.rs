@@ -119,3 +119,24 @@ fn test_days_civil_roundtrip() {
         assert_eq!(res, (y, m, d));
     }
 }
+
+#[test]
+fn step_decimals_tell_steps_apart() {
+    assert_eq!(step_decimals(0.5), 1);
+    assert_eq!(step_decimals(0.05), 2);
+    assert_eq!(step_decimals(0.001), 3);
+    assert_eq!(step_decimals(1.0 / 120.0), 3);
+    assert_eq!(step_decimals(-0.25), 1);
+    assert_eq!(step_decimals(2.0), 0);
+    assert_eq!(step_decimals(0.0), 0);
+    assert_eq!(step_decimals(f64::NAN), 0);
+}
+
+#[test]
+fn exact_decimals_write_values_exactly() {
+    assert_eq!(exact_decimals(-179.875, 1e-9, 6), Some(3));
+    assert_eq!(exact_decimals(0.25, 1e-9, 6), Some(2));
+    assert_eq!(exact_decimals(2.0, 1e-9, 6), Some(0));
+    assert_eq!(exact_decimals(1.0 / 120.0, 1e-9, 6), None);
+    assert_eq!(exact_decimals(f64::NAN, 1e-9, 6), None);
+}

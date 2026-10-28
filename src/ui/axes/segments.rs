@@ -8,7 +8,7 @@ use super::ticks::TickMark;
 pub fn draw_x_ticks(
     painter: &egui::Painter,
     visuals: &egui::Visuals,
-    x_ticks: &[TickMark; 7],
+    x_ticks: &[TickMark],
     visible_left: f32,
     vis_w: f32,
     bottom_y: f32,
@@ -22,9 +22,8 @@ pub fn draw_x_ticks(
     font_id: &FontId,
     text_color: Color32,
 ) {
-    for (i, tick) in x_ticks.iter().enumerate() {
-        let fract = i as f32 / 6.0;
-        let tick_x = (visible_left + fract * vis_w).round();
+    for tick in x_ticks {
+        let tick_x = (visible_left + tick.fract * vis_w).round();
 
         // Bottom tick
         painter.line_segment(
@@ -90,7 +89,7 @@ pub fn draw_x_ticks(
 pub fn draw_y_ticks(
     painter: &egui::Painter,
     visuals: &egui::Visuals,
-    y_ticks: &[TickMark; 7],
+    y_ticks: &[TickMark],
     visible_bottom: f32,
     vis_h: f32,
     right_x: f32,
@@ -104,9 +103,8 @@ pub fn draw_y_ticks(
     font_id: &FontId,
     text_color: Color32,
 ) {
-    for (j, tick) in y_ticks.iter().enumerate() {
-        let fract = j as f32 / 6.0;
-        let tick_y = (visible_bottom - fract * vis_h).round();
+    for tick in y_ticks {
+        let tick_y = (visible_bottom - tick.fract * vis_h).round();
 
         // Right tick
         painter.line_segment(

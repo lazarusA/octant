@@ -135,3 +135,40 @@ fn partly_read_values_keep_their_ends() {
     let labels = CoordValues::from_labels(vec!["a".into()]).expect("labels");
     assert_eq!(labels.to_endpoints(), None);
 }
+
+#[test]
+fn cell_edges_move_the_end_values_half_a_step_out() {
+    // Cell centers: a 1° global grid ends on whole degrees.
+    let lon = CoordValues::Regular {
+        start: -179.5,
+        step: 1.0,
+        len: 360,
+    };
+    assert_eq!(lon.cell_edges(0, 359, 360), Some((-180.0, 180.0)));
+    // Points on the poles, stored north to south (ERA5): never clamped.
+    let lat = CoordValues::Regular {
+        start: 90.0,
+        step: -0.25,
+        len: 721,
+    };
+    assert_eq!(lat.cell_edges(0, 720, 721), Some((-90.125, 90.125)));
+    // A window's own edges, either order.
+    assert_eq!(lon.cell_edges(190, 180, 360), Some((0.0, 11.0)));
+    // One index of a longer dimension takes its neighbor's spacing.
+    assert_eq!(lon.cell_edges(359, 359, 360), Some((179.0, 180.0)));
+    assert_eq!(lon.cell_edges(0, 0, 360), Some((-180.0, -179.0)));
+}
+
+#[test]
+fn cell_edges_of_uneven_values_use_each_end_spacing() {
+    let depth = numbers(&[0.0, 10.0, 30.0, 70.0], false);
+    assert_eq!(depth.cell_edges(0, 3, 4), Some((-5.0, 90.0)));
+    assert_eq!(depth.cell_edges(1, 2, 4), Some((5.0, 50.0)));
+}
+
+#[test]
+fn cell_edges_need_numbers_and_two_indices() {
+    let labels = CoordValues::from_labels(vec!["a".into(), "b".into()]).expect("labels");
+    assert_eq!(labels.cell_edges(0, 1, 2), None);
+    assert_eq!(numbers(&[7.0], false).cell_edges(0, 0, 1), None);
+}

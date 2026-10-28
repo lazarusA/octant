@@ -1,7 +1,9 @@
 //! 2D and 1D plot axis lines, tick marks, and coordinate labels.
 
+use std::borrow::Cow;
+
 use crate::app::OctantApp;
-use crate::data::MatrixData;
+use crate::data::{CoordinateGrid, MatrixData};
 use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
 use crate::ui::axes::{PlotAxisOptions, draw_plot_axes};
@@ -11,8 +13,8 @@ type AxisTuple = (
     (f64, f64),
     String,
     String,
-    Option<String>,
-    Option<String>,
+    Option<Cow<'static, str>>,
+    Option<Cow<'static, str>>,
 );
 
 /// Draws dynamic axis lines, tick marks, and titles on 2D and 1D plots.
@@ -87,9 +89,16 @@ fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTupl
     };
 
     let (x_bounds, x_title, x_units) =
-        app.resolve_axis_bounds_and_title(target_dim_idx, fallback_dim_name, profile_len);
+        app.resolve_axis_bounds_and_title(target_dim_idx, fallback_dim_name, profile_len, false);
 
-    (x_bounds, (y_min, y_max), x_title, y_name, x_units, None)
+    (
+        x_bounds,
+        (y_min, y_max),
+        x_title,
+        y_name,
+        x_units.map(Cow::Owned),
+        None,
+    )
 }
 
 fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple {
@@ -98,15 +107,23 @@ fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple 
         let y_bounds = (-90.0, 90.0);
         let x_title = tr(HoverKey::LongitudeDegrees).to_string();
         let y_title = tr(HoverKey::LatitudeDegrees).to_string();
-        (x_bounds, y_bounds, x_title, y_title, None, None)
+        // Units mark the axes as degrees, for degree tick steps in any language.
+        let (x_units, y_units) = (Some("degrees_east".into()), Some("degrees_north".into()));
+        (x_bounds, y_bounds, x_title, y_title, x_units, y_units)
     } else {
         let (orig_w, orig_h) = app.active_data_dimensions_2d();
         let x_dim = app.get_spatial_dim_index(0);
         let y_dim = app.get_spatial_dim_index(1);
 
-        let (x_bounds, x_title, x_units) = app.resolve_axis_bounds_and_title(x_dim, "X", orig_w);
-        let (y_bounds, y_title, y_units) = app.resolve_axis_bounds_and_title(y_dim, "Y", orig_h);
+        // Regular grids draw whole cells edge to edge; irregular ones (coord mode 2) run
+        // from the first to the last value.
+        let edges = !matches!(matrix.grid, CoordinateGrid::Irregular1D { .. });
+        let (x_bounds, x_title, x_units) =
+            app.resolve_axis_bounds_and_title(x_dim, "X", orig_w, edges);
+        let (y_bounds, y_title, y_units) =
+            app.resolve_axis_bounds_and_title(y_dim, "Y", orig_h, edges);
 
+        let (x_units, y_units) = (x_units.map(Cow::Owned), y_units.map(Cow::Owned));
         (x_bounds, y_bounds, x_title, y_title, x_units, y_units)
     }
 }
