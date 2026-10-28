@@ -146,14 +146,14 @@ impl Layout {
     }
 }
 
-/// The affine placing array `name` of dimensions `dims`, as
-/// [`link_pyramids`](super::geozarr::link_pyramids) gives it: its layout entry at its group or that group's
-/// parent, else its own attributes `own`.
+/// The affine placing array `name` of dimensions `dims` and shape `shape`,
+/// as [`link_pyramids`](super::geozarr::link_pyramids) gives it: its layout
+/// entry at its group or that group's parent, else its attributes `attrs`.
 pub fn array_placement(
     reader: &MetaReader<'_>,
     name: &str,
-    dims: &[String],
-    own: &HashMap<String, String>,
+    (dims, shape): (&[String], &[u64]),
+    attrs: &HashMap<String, String>,
 ) -> Option<GridAffine> {
     let name = name.trim_matches('/');
     let group = name.rsplit_once('/').map_or("", |(g, _)| g);
@@ -175,13 +175,19 @@ pub fn array_placement(
             return Some(affine);
         }
     }
-    array_affine(own, dims)
+    array_affine(attrs, dims, shape)
 }
 
-/// The affine an array's own attributes give it (`spatial:transform`,
-/// `spatial:dimensions`, `spatial:registration`, as read into
-/// `VariableInfo::attributes`), over dimensions `dims`.
-pub fn array_affine(attrs: &HashMap<String, String>, dims: &[String]) -> Option<GridAffine> {
+/// The affine an array's attributes give it (`spatial:transform`,
+/// `spatial:dimensions`, `spatial:registration`, its own else its nearest
+/// group's, as read into `VariableInfo::attributes`), over dimensions `dims`
+/// of lengths `shape`. A `spatial:shape` (`[y, x]`) must match the array's,
+/// so a group's affine reaches only the arrays on its grid.
+pub fn array_affine(
+    attrs: &HashMap<String, String>,
+    dims: &[String],
+    shape: &[u64],
+) -> Option<GridAffine> {
     let json = |key: &str| serde_json::from_str::<Value>(attrs.get(key)?).ok();
     let entry = Entry {
         asset: String::new(),
@@ -198,7 +204,11 @@ pub fn array_affine(attrs: &HashMap<String, String>, dims: &[String]) -> Option<
             .get("spatial:registration")
             .is_some_and(|r| r.eq_ignore_ascii_case("node")),
     };
-    layout.grid_affine(&entry, dims)
+    let grid = layout.grid_affine(&entry, dims)?;
+    let len = |i: usize| shape.get(i).map(|&n| n as f64);
+    let fits = (json("spatial:shape").as_ref().and_then(floats))
+        .is_none_or(|s| s.len() == 2 && Some(s[0]) == len(grid.y) && Some(s[1]) == len(grid.x));
+    fits.then_some(grid)
 }
 
 fn entry(value: &Value) -> Option<Entry> {

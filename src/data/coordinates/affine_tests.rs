@@ -106,9 +106,65 @@ fn array_attributes_give_an_affine() {
             r#"["lat","lon"]"#.to_string(),
         ),
     ]);
-    let a = array_affine(&attrs, &dims(&["band", "lat", "lon"])).expect("affine");
+    let names = dims(&["band", "lat", "lon"]);
+    let a = array_affine(&attrs, &names, &[4, 10, 20]).expect("affine");
     assert_eq!((a.x, a.y, a.node), (2, 1, false));
-    assert_eq!(array_affine(&HashMap::new(), &dims(&["y", "x"])), None);
+    assert_eq!(
+        array_affine(&HashMap::new(), &dims(&["y", "x"]), &[2, 2]),
+        None
+    );
+}
+
+#[test]
+fn a_groups_affine_reaches_only_arrays_on_its_grid() {
+    let mut attrs = HashMap::from([
+        ("spatial:transform".to_string(), format!("{GLOBAL:?}")),
+        ("spatial:dimensions".to_string(), r#"["y","x"]"#.to_string()),
+        ("spatial:shape".to_string(), "[10, 20]".to_string()),
+    ]);
+    let names = dims(&["time", "y", "x"]);
+    assert!(array_affine(&attrs, &names, &[3, 10, 20]).is_some());
+    assert_eq!(
+        array_affine(&attrs, &names, &[3, 5, 10]),
+        None,
+        "a coarser array"
+    );
+    attrs.insert("spatial:shape".to_string(), "[20, 10]".to_string());
+    assert_eq!(
+        array_affine(&attrs, &names, &[3, 10, 20]),
+        None,
+        "y before x"
+    );
+}
+
+#[test]
+fn root_variables_read_no_array_for_placed_dimensions() {
+    let store = Arc::new(MemoryStore::new());
+    // A `lon` array the search would find, were it asked.
+    let dt =
+        DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("float64")).expect("float64");
+    let lon = ArrayBuilder::new(vec![16], vec![16], dt, FillValue::from(f64::NAN))
+        .build(store.clone(), "/lon")
+        .expect("lon");
+    lon.store_metadata().expect("lon metadata");
+    lon.store_array_subset(&ArraySubset::new_with_shape(vec![16]), &[0.0f64; 16])
+        .expect("lon values");
+    let variables = vec![VariableInfo {
+        name: "embeddings".into(),
+        shape: vec![8, 16],
+        dimension_names: dims(&["lat", "lon"]),
+        affine: Some(GridAffine {
+            transform: [22.5, 0.0, -180.0, 0.0, -22.5, 90.0],
+            x: 1,
+            y: 0,
+            node: false,
+        }),
+        ..Default::default()
+    }];
+    let coords =
+        fetch_all_dimension_coordinates_for_variables(store, &variables, Some("root_affine"));
+    assert!(coords.contains_key("embeddings/lon"));
+    assert!(!coords.contains_key("lon"), "no array searched for");
 }
 
 #[test]

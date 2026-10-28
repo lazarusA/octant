@@ -18,6 +18,7 @@ use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid::check_and_orient_block_grid;
 use crate::utils::grid_flips::OrientHints;
 use crate::utils::metadata::attr_string;
+use crate::utils::metadata::cf::is_spatial_key;
 use zarrs::array::ArrayShardedReadableExtCache;
 
 /// The clamped `(origin, shape)` window of every dimension selected by `request`.
@@ -84,10 +85,10 @@ pub(super) fn inherited_attributes(
         let Ok(Some(group_attrs)) = reader.group_attributes(ancestor) else {
             continue;
         };
-        for (k, v) in group_attrs
-            .iter()
-            .filter(|(k, _)| !OME_GROUP_KEYS.contains(&k.as_str()))
-        {
+        let own_affine = attributes.contains_key("spatial:transform");
+        for (k, v) in group_attrs.iter().filter(|(k, _)| {
+            !OME_GROUP_KEYS.contains(&k.as_str()) && !(own_affine && is_spatial_key(k))
+        }) {
             attributes
                 .entry(k.clone())
                 .or_insert_with(|| attr_string(v));

@@ -32,9 +32,27 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
             link_layout(&group, &layout, variables);
         }
     }
-    // shortcut: a non-pyramid group's `spatial:transform` (geoemb `utm_zones`) is not read, add it once a zone ships without x/y arrays.
+    // Its attributes hold its groups' too: a zone group's affine (geoemb `utm_zones`).
     for v in variables.iter_mut().filter(|v| v.affine.is_none()) {
-        v.affine = super::geozarr_layout::array_affine(&v.attributes, &v.dimension_names);
+        v.affine = super::geozarr_layout::array_affine(&v.attributes, &v.dimension_names, &v.shape);
+    }
+}
+
+/// Gives `variables` their ancestor groups' `spatial:` keys, nearest first,
+/// for stores whose variables come from their arrays alone (web Icechunk);
+/// run before [`link_pyramids`], whose affines read them.
+pub fn inherit_group_spatial(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
+    use crate::utils::metadata::cf::{attr_string, is_spatial_key, merge_parent_attributes};
+    for var in variables {
+        for group in crate::utils::path::ancestor_paths(&var.name) {
+            let Ok(Some(attrs)) = reader.group_attributes(group) else {
+                continue;
+            };
+            let spatial = (attrs.iter().filter(|(k, _)| is_spatial_key(k)))
+                .map(|(k, v)| (k.clone(), attr_string(v)))
+                .collect();
+            merge_parent_attributes(&mut var.attributes, &spatial);
+        }
     }
 }
 
