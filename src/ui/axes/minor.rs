@@ -1,9 +1,8 @@
 //! Minor ticks between the labelled ones: round subdivisions of the major
 //! step, or the centers of the data cells, where the hover snaps.
 
-use super::steps::{AxisSpec, AxisTicks, is_degree_axis};
+use super::steps::{AxisSpec, AxisTicks, min_max};
 use super::style::MinorPlacement;
-use super::ticks::is_time_axis;
 
 /// Most minor ticks an axis holds: a 4K-wide axis at `MIN_GAP_PX` per cell.
 pub const MAX_MINOR: usize = 1024;
@@ -25,7 +24,7 @@ pub struct Lattice {
 impl Lattice {
     /// `count` cells laid edge to edge over `a..b` (a heatmap's regular grid).
     pub fn cells(a: f64, b: f64, count: usize) -> Option<Self> {
-        let (lo, hi) = (a.min(b), a.max(b));
+        let (lo, hi) = min_max(a, b);
         let step = (hi - lo) / count as f64;
         (count > 0 && step > 0.0 && step.is_finite()).then_some(Self {
             first: lo + step / 2.0,
@@ -36,7 +35,7 @@ impl Lattice {
 
     /// `count` samples from `a` to `b`, both included (a line plot's points).
     pub fn samples(a: f64, b: f64, count: usize) -> Option<Self> {
-        let (lo, hi) = (a.min(b), a.max(b));
+        let (lo, hi) = min_max(a, b);
         let step = (hi - lo) / count.saturating_sub(1) as f64;
         (count > 1 && step > 0.0 && step.is_finite()).then_some(Self {
             first: lo,
@@ -79,6 +78,16 @@ pub enum CellTicks<'a> {
     Values(&'a [f32]),
 }
 
+impl CellTicks<'_> {
+    /// Evenly spaced cells, when the plotted ones are known.
+    pub fn even(plotted: Option<Lattice>, detail: Option<Lattice>) -> CellTicks<'static> {
+        plotted.map_or(CellTicks::None, |plotted| CellTicks::Even {
+            plotted,
+            detail,
+        })
+    }
+}
+
 /// The visible axis minor ticks are placed on.
 struct Axis {
     start: f64,
@@ -115,11 +124,12 @@ pub(super) fn fill_minor(ticks: &mut AxisTicks, spec: &AxisSpec<'_>) {
     if !span.is_finite() || span == 0.0 || spec.px <= 0.0 {
         return;
     }
+    let (lo, hi) = min_max(spec.start, spec.end);
     let axis = Axis {
         start: spec.start,
         span,
-        lo: spec.start.min(spec.end),
-        hi: spec.start.max(spec.end),
+        lo,
+        hi,
         px_per_unit: f64::from(spec.px) / span.abs(),
         majors: spec.majors,
     };
@@ -127,8 +137,8 @@ pub(super) fn fill_minor(ticks: &mut AxisTicks, spec: &AxisSpec<'_>) {
         return;
     }
     ticks.clear_minor();
-    if !is_time_axis(spec.title, spec.units) {
-        fill_round(ticks, is_degree_axis(spec.title, spec.units), &axis);
+    if !ticks.time {
+        fill_round(ticks, &axis);
     }
 }
 
@@ -194,8 +204,8 @@ fn fill_values(ticks: &mut AxisTicks, axis: &Axis, values: &[f32]) -> bool {
 }
 
 /// Round subdivisions of the major step, where they stay `MIN_GAP_PX` apart.
-fn fill_round(ticks: &mut AxisTicks, degrees: bool, axis: &Axis) {
-    let n = subdivisions(ticks.step, degrees);
+fn fill_round(ticks: &mut AxisTicks, axis: &Axis) {
+    let n = subdivisions(ticks.step, ticks.degrees);
     let minor = ticks.step / f64::from(n);
     if minor.is_nan() || minor * axis.px_per_unit < MIN_GAP_PX {
         return;

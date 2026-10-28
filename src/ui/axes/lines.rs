@@ -17,13 +17,14 @@ pub fn draw_grid(
     let (top, left) = ((visible.top(), 1.0), (visible.left(), 1.0));
     let (h, w) = (visible.height(), visible.width());
     if style.minor_grid {
-        x_marks(painter, x.minor().iter().copied(), visible, top, h, minor);
-        y_marks(painter, y.minor().iter().copied(), visible, left, w, minor);
+        let (xs, ys) = (x.minor().iter().copied(), y.minor().iter().copied());
+        marks(painter, xs, visible, true, top, h, minor);
+        marks(painter, ys, visible, false, left, w, minor);
     }
     if style.major_grid {
         let (xs, ys) = (x.as_slice().iter(), y.as_slice().iter());
-        x_marks(painter, xs.map(|m| m.fract), visible, top, h, major);
-        y_marks(painter, ys.map(|m| m.fract), visible, left, w, major);
+        marks(painter, xs.map(|m| m.fract), visible, true, top, h, major);
+        marks(painter, ys.map(|m| m.fract), visible, false, left, w, major);
     }
 }
 
@@ -39,42 +40,30 @@ pub fn draw_minor_ticks(
 ) {
     for (side, s) in [(main, stroke), (other, faint)] {
         let fracts = ticks.minor().iter().copied();
-        if x_axis {
-            x_marks(painter, fracts, visible, side, len, s);
+        marks(painter, fracts, visible, x_axis, side, len, s);
+    }
+}
+
+/// A mark at each of `fracts` along `visible` (x: 0 at its left, 1 at its
+/// right; y: 0 at its bottom, 1 at its top), across the axis from `at`
+/// toward `dir` over `len`.
+fn marks(
+    painter: &Painter,
+    fracts: impl Iterator<Item = f32>,
+    visible: Rect,
+    x_axis: bool,
+    (at, dir): (f32, f32),
+    len: f32,
+    stroke: Stroke,
+) {
+    for f in fracts {
+        let points = if x_axis {
+            let x = (visible.left() + f * visible.width()).round();
+            [Pos2::new(x, at), Pos2::new(x, at + dir * len)]
         } else {
-            y_marks(painter, fracts, visible, side, len, s);
-        }
-    }
-}
-
-/// A vertical mark at each of `fracts` (0 at `visible`'s left, 1 at its
-/// right), from `y` toward `dir` over `len`.
-fn x_marks(
-    painter: &Painter,
-    fracts: impl Iterator<Item = f32>,
-    visible: Rect,
-    (y, dir): (f32, f32),
-    len: f32,
-    stroke: Stroke,
-) {
-    for f in fracts {
-        let x = (visible.left() + f * visible.width()).round();
-        painter.line_segment([Pos2::new(x, y), Pos2::new(x, y + dir * len)], stroke);
-    }
-}
-
-/// A horizontal mark at each of `fracts` (0 at `visible`'s bottom, 1 at its
-/// top), from `x` toward `dir` over `len`.
-fn y_marks(
-    painter: &Painter,
-    fracts: impl Iterator<Item = f32>,
-    visible: Rect,
-    (x, dir): (f32, f32),
-    len: f32,
-    stroke: Stroke,
-) {
-    for f in fracts {
-        let y = (visible.bottom() - f * visible.height()).round();
-        painter.line_segment([Pos2::new(x, y), Pos2::new(x + dir * len, y)], stroke);
+            let y = (visible.bottom() - f * visible.height()).round();
+            [Pos2::new(at, y), Pos2::new(at + dir * len, y)]
+        };
+        painter.line_segment(points, stroke);
     }
 }

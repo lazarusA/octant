@@ -7,7 +7,7 @@ use super::ticks::{TickMark, is_time_axis};
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 
 /// Most ticks an axis can get (the step aims at about six intervals).
-pub(super) const MAX_TICKS: usize = 12;
+const MAX_TICKS: usize = 12;
 
 /// Intervals the step aims for over the visible axis.
 const TARGET_INTERVALS: f64 = 6.0;
@@ -23,6 +23,9 @@ pub struct AxisTicks {
     len: usize,
     /// The labelled ticks' step (0 without ticks).
     pub(super) step: f64,
+    /// Whether the axis is in degrees or in time (`is_degree_axis`, `is_time_axis`).
+    pub(super) degrees: bool,
+    pub(super) time: bool,
     minor: [f32; MAX_MINOR],
     minor_len: usize,
 }
@@ -32,6 +35,8 @@ impl AxisTicks {
         marks: [TickMark::EMPTY; MAX_TICKS],
         len: 0,
         step: 0.0,
+        degrees: false,
+        time: false,
         minor: [0.0; MAX_MINOR],
         minor_len: 0,
     };
@@ -91,15 +96,19 @@ pub fn axis_ticks(spec: &AxisSpec<'_>) -> AxisTicks {
 /// The ticks between `start` (the axis's start, fract 0) and `end` (fract 1),
 /// in either order.
 pub fn generate_ticks(start: f64, end: f64, title: &str, units: Option<&str>) -> AxisTicks {
-    let mut ticks = AxisTicks::EMPTY;
+    let (degrees, time) = (is_degree_axis(title, units), is_time_axis(title, units));
+    let mut ticks = AxisTicks {
+        degrees,
+        time,
+        ..AxisTicks::EMPTY
+    };
     let span = end - start;
     if !start.is_finite() || !end.is_finite() || span == 0.0 {
         return ticks;
     }
-    let step = nice_step(span.abs(), is_degree_axis(title, units));
+    let step = nice_step(span.abs(), degrees);
     ticks.step = step;
-    let time = is_time_axis(title, units);
-    let (lo, hi) = (start.min(end), start.max(end));
+    let (lo, hi) = min_max(start, end);
     // A small tolerance keeps a tick that sits on an end within float noise.
     let first = (lo / step - 1e-9).ceil() as i64;
     let last = (hi / step + 1e-9).floor() as i64;
@@ -136,6 +145,12 @@ fn nice_step(span: f64, degrees: bool) -> f64 {
 
 /// Whether an axis is in degrees: its units say so, or its title carries `°`
 /// (`format_dimension_axis_title` gives lon/lat names one).
-pub(super) fn is_degree_axis(title: &str, units: Option<&str>) -> bool {
+fn is_degree_axis(title: &str, units: Option<&str>) -> bool {
     units.is_some_and(|u| contains_ascii_case_insensitive(u, "degree")) || title.contains('°')
+}
+
+/// `a` and `b` in ascending order.
+#[inline]
+pub(super) fn min_max(a: f64, b: f64) -> (f64, f64) {
+    (a.min(b), a.max(b))
 }

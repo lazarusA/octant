@@ -3,7 +3,7 @@
 use egui::Rect;
 
 use super::draw::PlotAxisOptions;
-use super::steps::{AxisSpec, AxisTicks, axis_ticks};
+use super::steps::{AxisSpec, AxisTicks, axis_ticks, min_max};
 
 /// The ticks of the data's visible part: x left to right, y bottom to top.
 pub(super) fn visible_ticks(
@@ -44,12 +44,12 @@ fn visible_values(
     visible: Rect,
     options: &PlotAxisOptions<'_>,
 ) -> ((f64, f64), (f64, f64)) {
-    let (x_min, x_max) = min_max(options.x_domain);
+    let (x_min, x_max) = min_max(options.x_domain.0, options.x_domain.1);
     let full_x = (x_max - x_min).max(1e-9);
     let pw = plot_rect.width().max(1.0) as f64;
     let x_at = |screen_x: f32| x_min + ((screen_x - plot_rect.left()) as f64 / pw) * full_x;
 
-    let (y_min, y_max) = min_max(options.y_domain);
+    let (y_min, y_max) = min_max(options.y_domain.0, options.y_domain.1);
     let full_y = (y_max - y_min).max(1e-9);
     let ph = plot_rect.height().max(1.0) as f64;
     // The y value at a screen height: growing upward, or downward for `y_down`.
@@ -66,9 +66,4 @@ fn visible_values(
         (x_at(visible.left()), x_at(visible.right())),
         (y_at(visible.bottom()), y_at(visible.top())),
     )
-}
-
-#[inline]
-fn min_max(domain: (f64, f64)) -> (f64, f64) {
-    (domain.0.min(domain.1), domain.0.max(domain.1))
 }

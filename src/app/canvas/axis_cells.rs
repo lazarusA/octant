@@ -19,8 +19,8 @@ pub(super) fn heatmap_cells<'a>(
             let (w, h) = app.active_data_dimensions_2d();
             let (tile_x, tile_y) = detail_cells(app, (x_dom, y_dom), y_down);
             (
-                even(Lattice::cells(x_dom.0, x_dom.1, w), tile_x),
-                even(Lattice::cells(y_dom.0, y_dom.1, h), tile_y),
+                CellTicks::even(Lattice::cells(x_dom.0, x_dom.1, w), tile_x),
+                CellTicks::even(Lattice::cells(y_dom.0, y_dom.1, h), tile_y),
             )
         }
         CoordinateGrid::Irregular1D {
@@ -32,14 +32,7 @@ pub(super) fn heatmap_cells<'a>(
 
 /// A line plot's samples along x, `count` of them from the first to the last.
 pub(super) fn line_cells(x_dom: (f64, f64), count: usize) -> CellTicks<'static> {
-    even(Lattice::samples(x_dom.0, x_dom.1, count), None)
-}
-
-fn even(plotted: Option<Lattice>, detail: Option<Lattice>) -> CellTicks<'static> {
-    plotted.map_or(CellTicks::None, |plotted| CellTicks::Even {
-        plotted,
-        detail,
-    })
+    CellTicks::even(Lattice::samples(x_dom.0, x_dom.1, count), None)
 }
 
 /// The cells of the base layer's shown detail tile along x and y, placed

@@ -104,16 +104,9 @@ fn no_minors_unless_asked() {
     assert!(axis_ticks(&none).minor().is_empty());
 }
 
-fn even(plotted: Option<Lattice>, detail: Option<Lattice>) -> CellTicks<'static> {
-    plotted.map_or(CellTicks::None, |plotted| CellTicks::Even {
-        plotted,
-        detail,
-    })
-}
-
 #[test]
 fn heatmap_cells_tick_at_their_centers() {
-    let cells = even(Lattice::cells(0.0, 10.0, 10), None);
+    let cells = CellTicks::even(Lattice::cells(0.0, 10.0, 10), None);
     let expected: Vec<f64> = (0..10).map(|i| i as f64 + 0.5).collect();
     assert_eq!(minor_values(&spec(0.0, 10.0, 1000.0, cells)), expected);
     // Only the visible ones, on a descending (y_down) axis too.
@@ -125,7 +118,7 @@ fn heatmap_cells_tick_at_their_centers() {
 
 #[test]
 fn line_samples_tick_except_under_majors() {
-    let cells = even(Lattice::samples(0.0, 10.0, 11), None);
+    let cells = CellTicks::even(Lattice::samples(0.0, 10.0, 11), None);
     // Majors every 2 cover the even samples.
     assert_eq!(
         minor_values(&spec(0.0, 10.0, 1000.0, cells)),
@@ -135,7 +128,7 @@ fn line_samples_tick_except_under_majors() {
 
 #[test]
 fn narrow_cells_fall_back_to_round_minors() {
-    let cells = even(Lattice::cells(0.0, 10.0, 1000), None);
+    let cells = CellTicks::even(Lattice::cells(0.0, 10.0, 1000), None);
     let cell_ticks = minor_values(&spec(0.0, 10.0, 1000.0, cells));
     assert_eq!(cell_ticks, minor_values(&round(0.0, 10.0, 1000.0)));
     assert!(!cell_ticks.is_empty());
@@ -143,7 +136,7 @@ fn narrow_cells_fall_back_to_round_minors() {
 
 #[test]
 fn a_detail_tile_replaces_the_coarse_cells_it_covers() {
-    let cells = even(Lattice::cells(0.0, 10.0, 10), Lattice::cells(2.0, 4.0, 8));
+    let cells = CellTicks::even(Lattice::cells(0.0, 10.0, 10), Lattice::cells(2.0, 4.0, 8));
     let v = minor_values(&spec(0.0, 10.0, 1000.0, cells));
     let fine: Vec<f64> = (0..8).map(|i| 2.125 + 0.25 * i as f64).collect();
     let coarse = [0.5, 1.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
@@ -179,7 +172,7 @@ fn crowded_irregular_cells_fall_back_to_round_minors() {
 #[test]
 fn the_hover_picks_the_cell_of_each_regular_cell_tick() {
     let (lo, hi, w) = (-180.0, 180.0, 36);
-    let cells = even(Lattice::cells(lo, hi, w), None);
+    let cells = CellTicks::even(Lattice::cells(lo, hi, w), None);
     for v in minor_values(&spec(lo, hi, 1000.0, cells)) {
         let norm = ((v - lo) / (hi - lo)) as f32;
         let (px, _) = CoordinateGrid::GlobalRegular.find_cell_from_norm(norm, 0.5, w, 18);
