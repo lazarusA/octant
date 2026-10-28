@@ -171,6 +171,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Målestokk",
         SettingsKey::ShowScaleBarHover => "Vis målestokken",
         SettingsKey::HideScaleBarHover => "Skjul målestokken",
+        SettingsKey::AxisMajor => "Hovedinndeling",
+        SettingsKey::AxisMinor => "Underinndeling",
+        SettingsKey::AxisTicks => "Streker",
+        SettingsKey::AxisTicksHover => "Skalastreker på aksene",
+        SettingsKey::AxisGrid => "Rutenett",
+        SettingsKey::AxisGridHover => "Rutenettlinjer over plottet",
+        SettingsKey::MinorRound => "Runde verdier",
+        SettingsKey::MinorRoundHover => "Ved runde verdier mellom de merkede strekene",
+        SettingsKey::MinorCells => "Celler",
+        SettingsKey::MinorCellsHover => {
+            "Midt i hver datacelle, der pekeren fester seg; ved runde verdier der cellene er for smale"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Tilpass hver kanals visningsområde til de viste dataene (0,1 til 99,9 prosent av verdiene)"

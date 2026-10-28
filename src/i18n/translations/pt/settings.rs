@@ -179,6 +179,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barra de escala",
         SettingsKey::ShowScaleBarHover => "Mostrar a barra de escala",
         SettingsKey::HideScaleBarHover => "Ocultar a barra de escala",
+        SettingsKey::AxisMajor => "Principais",
+        SettingsKey::AxisMinor => "Secundárias",
+        SettingsKey::AxisTicks => "Marcas",
+        SettingsKey::AxisTicksHover => "Marcas nos eixos",
+        SettingsKey::AxisGrid => "Grade",
+        SettingsKey::AxisGridHover => "Linhas de grade sobre o gráfico",
+        SettingsKey::MinorRound => "Valores redondos",
+        SettingsKey::MinorRoundHover => "Em valores redondos entre as marcas rotuladas",
+        SettingsKey::MinorCells => "Células",
+        SettingsKey::MinorCellsHover => {
+            "No centro de cada célula de dados, onde o cursor se encaixa; em valores redondos onde as células são estreitas demais"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Ajustar a faixa de exibição de cada canal aos dados mostrados (de 0,1 a 99,9 por cento dos seus valores)"

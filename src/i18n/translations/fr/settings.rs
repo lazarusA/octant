@@ -185,6 +185,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barre d'échelle",
         SettingsKey::ShowScaleBarHover => "Afficher la barre d'échelle",
         SettingsKey::HideScaleBarHover => "Masquer la barre d'échelle",
+        SettingsKey::AxisMajor => "Principales",
+        SettingsKey::AxisMinor => "Secondaires",
+        SettingsKey::AxisTicks => "Graduations",
+        SettingsKey::AxisTicksHover => "Graduations sur les axes",
+        SettingsKey::AxisGrid => "Grille",
+        SettingsKey::AxisGridHover => "Lignes de grille sur le graphique",
+        SettingsKey::MinorRound => "Valeurs rondes",
+        SettingsKey::MinorRoundHover => "Aux valeurs rondes entre les graduations étiquetées",
+        SettingsKey::MinorCells => "Cellules",
+        SettingsKey::MinorCellsHover => {
+            "Au centre de chaque cellule de données, là où se place le survol ; aux valeurs rondes quand les cellules sont trop étroites"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Ajuster la plage d'affichage de chaque canal aux données affichées (de 0,1 à 99,9 pour cent de ses valeurs)"

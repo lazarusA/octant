@@ -160,6 +160,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Bilah skala",
         SettingsKey::ShowScaleBarHover => "Tampilkan bilah skala",
         SettingsKey::HideScaleBarHover => "Sembunyikan bilah skala",
+        SettingsKey::AxisMajor => "Utama",
+        SettingsKey::AxisMinor => "Sekunder",
+        SettingsKey::AxisTicks => "Tanda",
+        SettingsKey::AxisTicksHover => "Tanda skala pada sumbu",
+        SettingsKey::AxisGrid => "Kisi",
+        SettingsKey::AxisGridHover => "Garis kisi di atas plot",
+        SettingsKey::MinorRound => "Nilai bulat",
+        SettingsKey::MinorRoundHover => "Pada nilai bulat di antara tanda berlabel",
+        SettingsKey::MinorCells => "Sel",
+        SettingsKey::MinorCellsHover => {
+            "Di tengah setiap sel data, tempat penunjuk berhenti; pada nilai bulat bila sel terlalu sempit"
+        }
         SettingsKey::ChannelsAuto => "Otomatis",
         SettingsKey::ChannelsAutoHover => {
             "Sesuaikan rentang tampilan setiap kanal dengan data yang ditampilkan (0,1 hingga 99,9 persen nilainya)"

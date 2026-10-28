@@ -173,6 +173,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Maßstabsleiste",
         SettingsKey::ShowScaleBarHover => "Maßstabsleiste einblenden",
         SettingsKey::HideScaleBarHover => "Maßstabsleiste ausblenden",
+        SettingsKey::AxisMajor => "Haupteinteilung",
+        SettingsKey::AxisMinor => "Nebeneinteilung",
+        SettingsKey::AxisTicks => "Striche",
+        SettingsKey::AxisTicksHover => "Teilstriche an den Achsen",
+        SettingsKey::AxisGrid => "Gitter",
+        SettingsKey::AxisGridHover => "Gitterlinien über dem Diagramm",
+        SettingsKey::MinorRound => "Runde Werte",
+        SettingsKey::MinorRoundHover => "Bei runden Werten zwischen den beschrifteten Strichen",
+        SettingsKey::MinorCells => "Zellen",
+        SettingsKey::MinorCellsHover => {
+            "In der Mitte jeder Datenzelle, wo der Hover einrastet; bei runden Werten, wo die Zellen zu schmal sind"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Anzeigebereich jedes Kanals an die angezeigten Daten anpassen (0,1 bis 99,9 Prozent seiner Werte)"

@@ -129,8 +129,9 @@ impl OctantApp {
     }
 }
 
-/// Screen pixels a level-0 cell spans at the deepest zoom.
-const PIXELS_PER_CELL: f64 = 4.0;
+/// Screen pixels a level-0 cell spans at the deepest zoom: wide enough for
+/// the axes' cell ticks (`ui/axes/minor.rs` `MIN_GAP_PX`).
+const PIXELS_PER_CELL: f64 = 6.0;
 
 /// How far the heatmap may zoom in over a level `factor` times coarser than
 /// level 0 (f32 keeps the pan within a pixel up to about 10^4).

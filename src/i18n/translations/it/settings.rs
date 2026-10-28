@@ -183,6 +183,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barra di scala",
         SettingsKey::ShowScaleBarHover => "Mostra la barra di scala",
         SettingsKey::HideScaleBarHover => "Nascondi la barra di scala",
+        SettingsKey::AxisMajor => "Principali",
+        SettingsKey::AxisMinor => "Secondarie",
+        SettingsKey::AxisTicks => "Tacche",
+        SettingsKey::AxisTicksHover => "Tacche sugli assi",
+        SettingsKey::AxisGrid => "Griglia",
+        SettingsKey::AxisGridHover => "Linee della griglia sul grafico",
+        SettingsKey::MinorRound => "Valori tondi",
+        SettingsKey::MinorRoundHover => "A valori tondi tra le tacche etichettate",
+        SettingsKey::MinorCells => "Celle",
+        SettingsKey::MinorCellsHover => {
+            "Al centro di ogni cella di dati, dove si posiziona il puntatore; a valori tondi dove le celle sono troppo strette"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Adatta l'intervallo di visualizzazione di ogni canale ai dati mostrati (dallo 0,1 al 99,9 per cento dei suoi valori)"

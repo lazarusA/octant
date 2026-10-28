@@ -163,6 +163,18 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::ScaleBar => "Scale Bar",
         SettingsKey::ShowScaleBarHover => "Show the scale bar",
         SettingsKey::HideScaleBarHover => "Hide the scale bar",
+        SettingsKey::AxisMajor => "Major",
+        SettingsKey::AxisMinor => "Minor",
+        SettingsKey::AxisTicks => "Ticks",
+        SettingsKey::AxisTicksHover => "Tick marks on the axes",
+        SettingsKey::AxisGrid => "Grid",
+        SettingsKey::AxisGridHover => "Grid lines across the plot",
+        SettingsKey::MinorRound => "Round values",
+        SettingsKey::MinorRoundHover => "At round values between the labelled ticks",
+        SettingsKey::MinorCells => "Cells",
+        SettingsKey::MinorCellsHover => {
+            "At each data cell's center, where the hover lands; at round values where cells are too narrow"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Fit every channel's display range to the shown data (0.1 to 99.9 percent of its values)"

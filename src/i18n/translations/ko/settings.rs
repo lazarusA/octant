@@ -157,6 +157,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "스케일 바",
         SettingsKey::ShowScaleBarHover => "스케일 바 표시",
         SettingsKey::HideScaleBarHover => "스케일 바 숨기기",
+        SettingsKey::AxisMajor => "주 눈금",
+        SettingsKey::AxisMinor => "보조 눈금",
+        SettingsKey::AxisTicks => "눈금",
+        SettingsKey::AxisTicksHover => "축의 눈금",
+        SettingsKey::AxisGrid => "격자",
+        SettingsKey::AxisGridHover => "플롯 위의 격자선",
+        SettingsKey::MinorRound => "어림값",
+        SettingsKey::MinorRoundHover => "레이블이 붙은 눈금 사이의 어림값",
+        SettingsKey::MinorCells => "셀",
+        SettingsKey::MinorCellsHover => {
+            "각 데이터 셀의 중심, 호버가 맞춰지는 위치. 셀이 너무 좁으면 어림값"
+        }
         SettingsKey::ChannelsAuto => "자동",
         SettingsKey::ChannelsAutoHover => {
             "각 채널의 표시 범위를 표시된 데이터에 맞춤(값의 0.1%에서 99.9%)"

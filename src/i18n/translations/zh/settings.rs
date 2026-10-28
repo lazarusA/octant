@@ -136,6 +136,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "比例尺",
         SettingsKey::ShowScaleBarHover => "显示比例尺",
         SettingsKey::HideScaleBarHover => "隐藏比例尺",
+        SettingsKey::AxisMajor => "主刻度",
+        SettingsKey::AxisMinor => "次刻度",
+        SettingsKey::AxisTicks => "刻度",
+        SettingsKey::AxisTicksHover => "坐标轴上的刻度线",
+        SettingsKey::AxisGrid => "网格",
+        SettingsKey::AxisGridHover => "图上的网格线",
+        SettingsKey::MinorRound => "整值",
+        SettingsKey::MinorRoundHover => "位于带标签刻度之间的整值处",
+        SettingsKey::MinorCells => "单元格",
+        SettingsKey::MinorCellsHover => {
+            "位于每个数据单元格的中心，即悬停对齐的位置；单元格过窄时位于整值处"
+        }
         SettingsKey::ChannelsAuto => "自动",
         SettingsKey::ChannelsAutoHover => {
             "将每个通道的显示范围适配到所显示的数据（其数值的 0.1% 到 99.9%）"
