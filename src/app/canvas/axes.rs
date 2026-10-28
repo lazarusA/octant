@@ -98,7 +98,9 @@ fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple 
         let y_bounds = (-90.0, 90.0);
         let x_title = tr(HoverKey::LongitudeDegrees).to_string();
         let y_title = tr(HoverKey::LatitudeDegrees).to_string();
-        (x_bounds, y_bounds, x_title, y_title, None, None)
+        // Units mark the axes as degrees, for degree tick steps in any language.
+        let (x_units, y_units) = (Some("degrees_east".into()), Some("degrees_north".into()));
+        (x_bounds, y_bounds, x_title, y_title, x_units, y_units)
     } else {
         let (orig_w, orig_h) = app.active_data_dimensions_2d();
         let x_dim = app.get_spatial_dim_index(0);

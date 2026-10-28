@@ -2,6 +2,7 @@
 
 mod draw;
 mod segments;
+mod steps;
 #[cfg(test)]
 mod tests;
 mod ticks;

@@ -3,7 +3,8 @@
 use egui::{Color32, FontId, Painter, Pos2, Rect, Stroke, Visuals};
 
 use super::segments::{draw_x_ticks, draw_y_ticks};
-use super::ticks::{TickMark, generate_constant_count_ticks};
+use super::steps::{AxisTicks, generate_ticks};
+use super::ticks::TickMark;
 use super::title::draw_x_title;
 
 pub struct PlotAxisOptions<'a> {
@@ -31,8 +32,8 @@ pub fn draw_plot_axes(
     }
     let (x_ticks, y_ticks) = visible_ticks(plot_rect, visible, options);
     let axes = Axes::new(ui.painter(), ui.visuals(), canvas_rect, plot_rect, visible);
-    axes.draw_x(&x_ticks, options.x_title);
-    axes.draw_y(&y_ticks);
+    axes.draw_x(x_ticks.as_slice(), options.x_title);
+    axes.draw_y(y_ticks.as_slice());
 }
 
 /// The ticks of the data's visible part: x left to right, y bottom to top.
@@ -40,7 +41,7 @@ fn visible_ticks(
     plot_rect: Rect,
     visible: Rect,
     options: &PlotAxisOptions<'_>,
-) -> ([TickMark; 7], [TickMark; 7]) {
+) -> (AxisTicks, AxisTicks) {
     let (x_min, x_max) = min_max(options.x_domain);
     let full_x = (x_max - x_min).max(1e-9);
     let pw = plot_rect.width().max(1.0) as f64;
@@ -61,13 +62,13 @@ fn visible_ticks(
     };
     let (x_title, y_title) = (options.x_title, options.y_title);
     (
-        generate_constant_count_ticks(
+        generate_ticks(
             x_at(visible.left()),
             x_at(visible.right()),
             x_title,
             options.x_units,
         ),
-        generate_constant_count_ticks(
+        generate_ticks(
             y_at(visible.bottom()),
             y_at(visible.top()),
             y_title,
@@ -151,7 +152,7 @@ impl<'a> Axes<'a> {
     }
 
     /// The bottom and top x axes, their ticks and the x title.
-    fn draw_x(&self, ticks: &[TickMark; 7], title: &str) {
+    fn draw_x(&self, ticks: &[TickMark], title: &str) {
         let (canvas, visible) = (self.canvas, self.visible);
         let ((bottom_y, b_dir), (top_y, t_dir)) = self.x_axes();
         self.line(
@@ -201,7 +202,7 @@ impl<'a> Axes<'a> {
     }
 
     /// The right and left y axes and their ticks.
-    fn draw_y(&self, ticks: &[TickMark; 7]) {
+    fn draw_y(&self, ticks: &[TickMark]) {
         let (canvas, plot, visible) = (self.canvas, self.plot, self.visible);
         let right_inside = plot.right() >= canvas.left() && plot.right() <= canvas.right() - 20.0;
         let (right_x, r_dir) = if right_inside {
