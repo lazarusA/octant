@@ -6,8 +6,9 @@ use std::sync::Arc;
 use serde_json::json;
 use zarrs::storage::ReadableStorageTraits;
 
-use super::geozarr::{inherit_group_spatial, link_pyramids};
+use super::geozarr::link_pyramids;
 use super::tests::var;
+use crate::data::crs::inherit_zarr_group_keys;
 use crate::data::ome::MetaReader;
 use crate::data::ome::test_support::Fixture;
 use crate::utils::metadata::merge_parent_attributes;
@@ -56,7 +57,7 @@ fn zone_arrays_take_their_groups_affine() {
         var("utm31/embeddings", &[3, 10, 20], &["time", "y", "x"]),
         var("utm31/preview", &[3, 5, 10], &["time", "y", "x"]),
     ];
-    inherit_group_spatial(&reader, &mut vars);
+    inherit_zarr_group_keys(&reader, &mut vars);
     link_pyramids(&reader, &mut vars);
     let x = vars[0].metadata_coordinates().expect("placed");
     assert_eq!(x[0].1.first_number(), Some(5.0));

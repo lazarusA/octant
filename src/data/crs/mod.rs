@@ -167,20 +167,25 @@ pub fn attach_zarr_grid_mappings(
     });
 }
 
-/// Copies the CRS keys of each variable's ancestor groups (nearest first)
-/// onto the variable where it has none of its own, for paths that build
-/// variables from their arrays alone (the web's Icechunk).
-pub fn inherit_zarr_group_crs(
+/// Copies the CRS and `spatial:` keys of each variable's ancestor groups
+/// (nearest first) onto the variable where it has none of its own, for
+/// paths that build variables from their arrays alone (the web's Icechunk);
+/// run before pyramids link, whose affines read the `spatial:` keys.
+pub fn inherit_zarr_group_keys(
     reader: &crate::data::ome::MetaReader<'_>,
     variables: &mut [VariableInfo],
 ) {
-    use crate::utils::metadata::cf::attr_string;
+    use crate::utils::metadata::cf::{attr_string, is_spatial_key, merge_parent_attributes};
     for var in variables {
         for group in crate::utils::path::ancestor_paths(&var.name) {
             let Ok(Some(attrs)) = reader.group_attributes(group) else {
                 continue;
             };
             fill_crs_keys(&mut var.attributes, |k| attrs.get(k).map(attr_string));
+            let spatial = (attrs.iter().filter(|(k, _)| is_spatial_key(k)))
+                .map(|(k, v)| (k.clone(), attr_string(v)))
+                .collect();
+            merge_parent_attributes(&mut var.attributes, &spatial);
         }
     }
 }

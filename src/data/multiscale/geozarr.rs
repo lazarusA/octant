@@ -38,24 +38,6 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
     }
 }
 
-/// Gives `variables` their ancestor groups' `spatial:` keys, nearest first,
-/// for stores whose variables come from their arrays alone (web Icechunk);
-/// run before [`link_pyramids`], whose affines read them.
-pub fn inherit_group_spatial(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
-    use crate::utils::metadata::cf::{attr_string, is_spatial_key, merge_parent_attributes};
-    for var in variables {
-        for group in crate::utils::path::ancestor_paths(&var.name) {
-            let Ok(Some(attrs)) = reader.group_attributes(group) else {
-                continue;
-            };
-            let spatial = (attrs.iter().filter(|(k, _)| is_spatial_key(k)))
-                .map(|(k, v)| (k.clone(), attr_string(v)))
-                .collect();
-            merge_parent_attributes(&mut var.attributes, &spatial);
-        }
-    }
-}
-
 /// [`link_pyramids`] over `storage`, the groups' attributes read
 /// concurrently on the desktop (a `zarr.json`, then a `.zattrs`, per group).
 pub fn link_pyramids_in(
