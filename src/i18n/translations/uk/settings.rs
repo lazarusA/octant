@@ -175,6 +175,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Шкала масштабу",
         SettingsKey::ShowScaleBarHover => "Показати шкалу масштабу",
         SettingsKey::HideScaleBarHover => "Сховати шкалу масштабу",
+        SettingsKey::AxisMajor => "Основні",
+        SettingsKey::AxisMinor => "Додаткові",
+        SettingsKey::AxisTicks => "Поділки",
+        SettingsKey::AxisTicksHover => "Поділки на осях",
+        SettingsKey::AxisGrid => "Сітка",
+        SettingsKey::AxisGridHover => "Лінії сітки поверх графіка",
+        SettingsKey::MinorRound => "Круглі значення",
+        SettingsKey::MinorRoundHover => "На круглих значеннях між підписаними поділками",
+        SettingsKey::MinorCells => "Комірки",
+        SettingsKey::MinorCellsHover => {
+            "У центрі кожної комірки даних, куди прив'язується курсор; на круглих значеннях, якщо комірки завузькі"
+        }
         SettingsKey::ChannelsAuto => "Авто",
         SettingsKey::ChannelsAutoHover => {
             "Підігнати діапазон відображення кожного каналу до показаних даних (від 0,1 до 99,9 відсотка його значень)"

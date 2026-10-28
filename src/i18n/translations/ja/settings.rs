@@ -158,6 +158,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "スケールバー",
         SettingsKey::ShowScaleBarHover => "スケールバーを表示",
         SettingsKey::HideScaleBarHover => "スケールバーを隠す",
+        SettingsKey::AxisMajor => "主目盛",
+        SettingsKey::AxisMinor => "副目盛",
+        SettingsKey::AxisTicks => "目盛",
+        SettingsKey::AxisTicksHover => "軸上の目盛",
+        SettingsKey::AxisGrid => "グリッド",
+        SettingsKey::AxisGridHover => "プロット上のグリッド線",
+        SettingsKey::MinorRound => "切りのよい値",
+        SettingsKey::MinorRoundHover => "ラベル付き目盛の間の切りのよい値",
+        SettingsKey::MinorCells => "セル",
+        SettingsKey::MinorCellsHover => {
+            "各データセルの中心、ホバーが合う位置。セルが狭すぎるときは切りのよい値"
+        }
         SettingsKey::ChannelsAuto => "自動",
         SettingsKey::ChannelsAutoHover => {
             "各チャンネルの表示範囲を表示中のデータに合わせる（値の 0.1% から 99.9%）"

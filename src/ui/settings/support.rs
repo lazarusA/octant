@@ -76,6 +76,8 @@ pub(crate) struct OptionSupport {
     pub camera: Support,
     /// The scale bar of 2D images with a physical pixel size.
     pub scale_bar: Support,
+    /// Ticks and grid lines of the axes 2D plots draw.
+    pub axes: Support,
 }
 
 impl PlotState {
@@ -131,6 +133,7 @@ impl PlotState {
             aggregation: support_if(self.plot_type == PlotType::Heatmap),
             camera: support_if(self.plot_type.is_3d()),
             scale_bar: support_if(self.physical && self.plot_type == PlotType::Heatmap),
+            axes: support_if(!self.plot_type.is_3d()),
         }
     }
 

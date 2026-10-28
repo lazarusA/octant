@@ -139,6 +139,17 @@ crate::i18n::keys::define_keys! {
     ScaleBar,
     ShowScaleBarHover,
     HideScaleBarHover,
+    // Axis ticks and grid lines
+    AxisMajor,
+    AxisMinor,
+    AxisTicks,
+    AxisTicksHover,
+    AxisGrid,
+    AxisGridHover,
+    MinorRound,
+    MinorRoundHover,
+    MinorCells,
+    MinorCellsHover,
     // Channel display (OMERO window, curve, inversion)
     ChannelsAuto,
     ChannelsAutoHover,

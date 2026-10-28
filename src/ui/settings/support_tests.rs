@@ -256,3 +256,14 @@ fn scale_bar_needs_a_physical_heatmap() {
     assert_eq!(state(PlotType::Heatmap).support().scale_bar, Support::No);
     assert_eq!(physical(PlotType::Volume).support().scale_bar, Support::No);
 }
+
+#[test]
+fn axis_ticks_and_grid_lines_are_for_2d_plots() {
+    for plot_type in ALL_TYPES {
+        assert_eq!(
+            state(plot_type).support().axes.is_yes(),
+            !plot_type.is_3d(),
+            "{plot_type:?}"
+        );
+    }
+}

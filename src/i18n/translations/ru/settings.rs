@@ -175,6 +175,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Масштабная линейка",
         SettingsKey::ShowScaleBarHover => "Показать масштабную линейку",
         SettingsKey::HideScaleBarHover => "Скрыть масштабную линейку",
+        SettingsKey::AxisMajor => "Основные",
+        SettingsKey::AxisMinor => "Дополнительные",
+        SettingsKey::AxisTicks => "Деления",
+        SettingsKey::AxisTicksHover => "Деления на осях",
+        SettingsKey::AxisGrid => "Сетка",
+        SettingsKey::AxisGridHover => "Линии сетки поверх графика",
+        SettingsKey::MinorRound => "Круглые значения",
+        SettingsKey::MinorRoundHover => "На круглых значениях между подписанными делениями",
+        SettingsKey::MinorCells => "Ячейки",
+        SettingsKey::MinorCellsHover => {
+            "В центре каждой ячейки данных, куда привязывается курсор; на круглых значениях, если ячейки слишком узкие"
+        }
         SettingsKey::ChannelsAuto => "Авто",
         SettingsKey::ChannelsAutoHover => {
             "Подогнать диапазон отображения каждого канала под показанные данные (от 0,1 до 99,9 процента его значений)"

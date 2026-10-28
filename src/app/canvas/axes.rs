@@ -6,7 +6,9 @@ use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, MatrixData};
 use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
-use crate::ui::axes::{PlotAxisOptions, draw_plot_axes};
+use crate::ui::axes::{CellTicks, PlotAxisOptions, draw_plot_axes};
+
+use super::axis_cells::{heatmap_cells, line_cells};
 
 type AxisTuple = (
     (f64, f64),
@@ -39,6 +41,16 @@ pub fn draw_canvas_axes(
         resolve_2d_plot_axis_info(app, matrix)
     };
 
+    // OME-Zarr images are rasters: row 0 (the smallest y) at the top.
+    let y_down = canvas_plot_type != PlotType::Line && app.is_ome_dataset();
+    let (x_cells, y_cells) = if canvas_plot_type == PlotType::Line {
+        (
+            line_cells(x_dom, line_profile_len(app, matrix)),
+            CellTicks::None,
+        )
+    } else {
+        heatmap_cells(app, matrix, (x_dom, y_dom), y_down)
+    };
     let options = PlotAxisOptions {
         x_domain: x_dom,
         y_domain: y_dom,
@@ -46,8 +58,10 @@ pub fn draw_canvas_axes(
         y_title: &y_label,
         x_units: x_units.as_deref(),
         y_units: y_units.as_deref(),
-        // OME-Zarr images are rasters: row 0 (the smallest y) at the top.
-        y_down: canvas_plot_type != PlotType::Line && app.is_ome_dataset(),
+        y_down,
+        x_cells,
+        y_cells,
+        style: app.layout.axis_style,
     };
 
     draw_plot_axes(ui, canvas_rect, plot_rect, &options);
@@ -56,17 +70,7 @@ pub fn draw_canvas_axes(
 fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple {
     let y_min = app.layers.base.color.range_min as f64;
     let y_max = app.layers.base.color.range_max as f64;
-    let profile_len = match app.plot_configs.line.profile_dim_idx {
-        2 => app
-            .layers
-            .base
-            .data
-            .volume
-            .as_ref()
-            .map_or(matrix.width, |v| v.depth),
-        1 => matrix.height,
-        _ => matrix.width,
-    };
+    let profile_len = line_profile_len(app, matrix);
 
     let y_name = app
         .plotted_variable_info()
@@ -99,6 +103,21 @@ fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTupl
         x_units.map(Cow::Owned),
         None,
     )
+}
+
+/// The number of samples along a line plot's x axis.
+fn line_profile_len(app: &OctantApp, matrix: &MatrixData) -> usize {
+    match app.plot_configs.line.profile_dim_idx {
+        2 => app
+            .layers
+            .base
+            .data
+            .volume
+            .as_ref()
+            .map_or(matrix.width, |v| v.depth),
+        1 => matrix.height,
+        _ => matrix.width,
+    }
 }
 
 fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple {

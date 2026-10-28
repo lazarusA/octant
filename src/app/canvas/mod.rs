@@ -1,6 +1,7 @@
 //! Canvas rendering engine: viewport projection, user interaction, axis rendering, and overlays.
 
 mod axes;
+mod axis_cells;
 mod interactions;
 #[cfg(test)]
 mod interactions_tests;

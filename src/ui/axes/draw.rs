@@ -2,9 +2,13 @@
 
 use egui::{Color32, FontId, Painter, Pos2, Rect, Stroke, Visuals};
 
+use super::lines::{draw_grid, draw_minor_ticks};
+use super::minor::CellTicks;
 use super::segments::{draw_x_ticks, draw_y_ticks};
-use super::steps::{AxisTicks, generate_ticks};
+use super::steps::AxisTicks;
+use super::style::AxisStyle;
 use super::title::draw_x_title;
+use super::visible::visible_ticks;
 
 pub struct PlotAxisOptions<'a> {
     pub x_domain: (f64, f64),
@@ -15,6 +19,10 @@ pub struct PlotAxisOptions<'a> {
     pub y_units: Option<&'a str>,
     /// Whether y grows downward (raster rows, row 0 at the top) instead of upward.
     pub y_down: bool,
+    /// The data cells along x and y, for cell ticks.
+    pub x_cells: CellTicks<'a>,
+    pub y_cells: CellTicks<'a>,
+    pub style: AxisStyle,
 }
 
 /// Dynamic plot axis renderer with auto-attaching canvas borders, inward/outward ticks,
@@ -31,54 +39,10 @@ pub fn draw_plot_axes(
     }
     let (x_ticks, y_ticks) = visible_ticks(plot_rect, visible, options);
     let axes = Axes::new(ui.painter(), ui.visuals(), canvas_rect, plot_rect, visible);
-    axes.draw_x(&x_ticks, options.x_title);
-    axes.draw_y(&y_ticks);
-}
-
-/// The ticks of the data's visible part: x left to right, y bottom to top.
-fn visible_ticks(
-    plot_rect: Rect,
-    visible: Rect,
-    options: &PlotAxisOptions<'_>,
-) -> (AxisTicks, AxisTicks) {
-    let (x_min, x_max) = min_max(options.x_domain);
-    let full_x = (x_max - x_min).max(1e-9);
-    let pw = plot_rect.width().max(1.0) as f64;
-    let x_at = |screen_x: f32| x_min + ((screen_x - plot_rect.left()) as f64 / pw) * full_x;
-
-    let (y_min, y_max) = min_max(options.y_domain);
-    let full_y = (y_max - y_min).max(1e-9);
-    let ph = plot_rect.height().max(1.0) as f64;
-    // The y value at a screen height: growing upward, or downward for `y_down`.
-    let y_at = |screen_y: f32| {
-        let from_top = (screen_y - plot_rect.top()) as f64 / ph;
-        y_min
-            + if options.y_down {
-                from_top
-            } else {
-                1.0 - from_top
-            } * full_y
-    };
-    let (x_title, y_title) = (options.x_title, options.y_title);
-    (
-        generate_ticks(
-            x_at(visible.left()),
-            x_at(visible.right()),
-            x_title,
-            options.x_units,
-        ),
-        generate_ticks(
-            y_at(visible.bottom()),
-            y_at(visible.top()),
-            y_title,
-            options.y_units,
-        ),
-    )
-}
-
-#[inline]
-fn min_max(domain: (f64, f64)) -> (f64, f64) {
-    (domain.0.min(domain.1), domain.0.max(domain.1))
+    let (ticks, grid) = ((&x_ticks, &y_ticks), (axes.grid, axes.minor_grid));
+    draw_grid(axes.painter, visible, ticks, options.style, grid);
+    axes.draw_x(&x_ticks, options.x_title, options.style);
+    axes.draw_y(&y_ticks, options.style);
 }
 
 /// The four axes of a plot on its canvas, with their theme-aware style.
@@ -91,6 +55,10 @@ struct Axes<'a> {
     visible: Rect,
     stroke: Stroke,
     secondary: Stroke,
+    /// Minor ticks on the axes opposite the main ones.
+    faint: Stroke,
+    grid: Stroke,
+    minor_grid: Stroke,
     font: FontId,
     title_font: FontId,
     text: Color32,
@@ -119,6 +87,9 @@ impl<'a> Axes<'a> {
             visible,
             stroke: Stroke::new(1.5, line),
             secondary: Stroke::new(1.0, line.linear_multiply(0.5)),
+            faint: Stroke::new(1.0, line.linear_multiply(0.3)),
+            grid: Stroke::new(1.0, line.linear_multiply(0.25)),
+            minor_grid: Stroke::new(1.0, line.linear_multiply(0.1)),
             font: FontId::proportional(11.0),
             title_font: FontId::proportional(12.0),
             text: visuals.text_color(),
@@ -150,8 +121,15 @@ impl<'a> Axes<'a> {
         (bottom, top)
     }
 
+    /// Minor ticks on an axis's two sides.
+    fn draw_minor(&self, ticks: &AxisTicks, x_axis: bool, main: (f32, f32), other: (f32, f32)) {
+        let strokes = (self.secondary, self.faint);
+        let (p, v, len) = (self.painter, self.visible, self.tick_len / 2.0);
+        draw_minor_ticks(p, v, (ticks, x_axis), (main, other), len, strokes);
+    }
+
     /// The bottom and top x axes, their ticks and the x title.
-    fn draw_x(&self, ticks: &AxisTicks, title: &str) {
+    fn draw_x(&self, ticks: &AxisTicks, title: &str, style: AxisStyle) {
         let (canvas, visible) = (self.canvas, self.visible);
         let ((bottom_y, b_dir), (top_y, t_dir)) = self.x_axes();
         self.line(
@@ -168,10 +146,13 @@ impl<'a> Axes<'a> {
             top_y,
             self.secondary,
         );
+        if style.minor_ticks {
+            self.draw_minor(ticks, true, (bottom_y, b_dir), (top_y, t_dir));
+        }
         draw_x_ticks(
             self.painter,
             self.visuals,
-            ticks.as_slice(),
+            ticks.labelled(style.major_ticks),
             visible.left(),
             visible.width(),
             bottom_y,
@@ -201,7 +182,7 @@ impl<'a> Axes<'a> {
     }
 
     /// The right and left y axes and their ticks.
-    fn draw_y(&self, ticks: &AxisTicks) {
+    fn draw_y(&self, ticks: &AxisTicks, style: AxisStyle) {
         let (canvas, plot, visible) = (self.canvas, self.plot, self.visible);
         let right_inside = plot.right() >= canvas.left() && plot.right() <= canvas.right() - 20.0;
         let (right_x, r_dir) = if right_inside {
@@ -229,10 +210,13 @@ impl<'a> Axes<'a> {
             visible.bottom(),
             self.secondary,
         );
+        if style.minor_ticks {
+            self.draw_minor(ticks, false, (right_x, r_dir), (left_x, l_dir));
+        }
         draw_y_ticks(
             self.painter,
             self.visuals,
-            ticks.as_slice(),
+            ticks.labelled(style.major_ticks),
             visible.bottom(),
             visible.height(),
             right_x,

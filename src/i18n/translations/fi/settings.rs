@@ -179,6 +179,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Mittakaavajana",
         SettingsKey::ShowScaleBarHover => "Näytä mittakaavajana",
         SettingsKey::HideScaleBarHover => "Piilota mittakaavajana",
+        SettingsKey::AxisMajor => "Pääjako",
+        SettingsKey::AxisMinor => "Apujako",
+        SettingsKey::AxisTicks => "Merkit",
+        SettingsKey::AxisTicksHover => "Jakoviivat akseleilla",
+        SettingsKey::AxisGrid => "Ruudukko",
+        SettingsKey::AxisGridHover => "Ruudukkoviivat kuvaajan yli",
+        SettingsKey::MinorRound => "Pyöreät arvot",
+        SettingsKey::MinorRoundHover => "Pyöreissä arvoissa nimettyjen merkkien välissä",
+        SettingsKey::MinorCells => "Solut",
+        SettingsKey::MinorCellsHover => {
+            "Kunkin datasolun keskellä, johon osoitin kohdistuu; pyöreissä arvoissa, kun solut ovat liian kapeita"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Sovita jokaisen kanavan näyttöalue näytettyyn dataan (0,1-99,9 prosenttia sen arvoista)"

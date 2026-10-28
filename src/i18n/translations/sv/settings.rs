@@ -169,6 +169,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Skalstreck",
         SettingsKey::ShowScaleBarHover => "Visa skalstrecket",
         SettingsKey::HideScaleBarHover => "Dölj skalstrecket",
+        SettingsKey::AxisMajor => "Huvudindelning",
+        SettingsKey::AxisMinor => "Delindelning",
+        SettingsKey::AxisTicks => "Streck",
+        SettingsKey::AxisTicksHover => "Skalstreck på axlarna",
+        SettingsKey::AxisGrid => "Rutnät",
+        SettingsKey::AxisGridHover => "Rutnätslinjer över diagrammet",
+        SettingsKey::MinorRound => "Jämna värden",
+        SettingsKey::MinorRoundHover => "Vid jämna värden mellan de märkta strecken",
+        SettingsKey::MinorCells => "Celler",
+        SettingsKey::MinorCellsHover => {
+            "I mitten av varje datacell, där pekaren fastnar; vid jämna värden där cellerna är för smala"
+        }
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
             "Anpassa varje kanals visningsintervall till visade data (0,1 till 99,9 procent av dess värden)"
