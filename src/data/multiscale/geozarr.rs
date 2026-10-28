@@ -32,9 +32,10 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
             link_layout(&group, &layout, variables);
         }
     }
-    // Its attributes hold its groups' too: a zone group's affine (geoemb `utm_zones`).
-    for v in variables.iter_mut().filter(|v| v.affine.is_none()) {
-        v.affine = super::geozarr_layout::array_affine(&v.attributes, &v.dimension_names, &v.shape);
+    // As blocks place them; attributes hold their groups' too (geoemb `utm_zones`).
+    for v in variables.iter_mut() {
+        let shape = (v.dimension_names.as_slice(), v.shape.as_slice());
+        v.affine = super::geozarr_layout::array_placement(reader, &v.name, shape, &v.attributes);
     }
 }
 
@@ -83,15 +84,11 @@ pub fn link_layout(group: &str, layout: &Layout, variables: &mut [VariableInfo])
     let mut names: Vec<String> = Vec::new();
     for entry in &layout.entries {
         let path = join(group, &entry.asset);
-        for v in variables.iter_mut() {
-            let Some(name) = relative_name(&v.name, &path) else {
-                continue;
-            };
-            if !names.iter().any(|n| n == name) {
+        for v in variables.iter() {
+            if let Some(name) = relative_name(&v.name, &path)
+                && !names.iter().any(|n| n == name)
+            {
                 names.push(name.to_string());
-            }
-            if v.shape.len() >= 2 {
-                v.affine = layout.grid_affine(entry, &v.dimension_names).or(v.affine);
             }
         }
     }

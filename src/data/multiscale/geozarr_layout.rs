@@ -171,8 +171,10 @@ pub fn array_placement(
             .entries
             .iter()
             .find(|e| super::geozarr::relative_name(name, &join(g, &e.asset)).is_some());
-        if let Some(affine) = entry.and_then(|e| layout.grid_affine(e, dims)) {
-            return Some(affine);
+        // A level takes its entry's affine or none: the group's own
+        // `spatial:transform`, inherited, is the base level's.
+        if let Some(e) = entry {
+            return layout.grid_affine(e, dims);
         }
     }
     array_affine(attrs, dims, shape)
