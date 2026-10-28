@@ -1,5 +1,7 @@
 //! 2D and 1D plot axis lines, tick marks, and coordinate labels.
 
+use std::borrow::Cow;
+
 use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, MatrixData};
 use crate::i18n::{HoverKey, tr};
@@ -11,8 +13,8 @@ type AxisTuple = (
     (f64, f64),
     String,
     String,
-    Option<String>,
-    Option<String>,
+    Option<Cow<'static, str>>,
+    Option<Cow<'static, str>>,
 );
 
 /// Draws dynamic axis lines, tick marks, and titles on 2D and 1D plots.
@@ -89,7 +91,14 @@ fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTupl
     let (x_bounds, x_title, x_units) =
         app.resolve_axis_bounds_and_title(target_dim_idx, fallback_dim_name, profile_len, false);
 
-    (x_bounds, (y_min, y_max), x_title, y_name, x_units, None)
+    (
+        x_bounds,
+        (y_min, y_max),
+        x_title,
+        y_name,
+        x_units.map(Cow::Owned),
+        None,
+    )
 }
 
 fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple {
@@ -114,6 +123,7 @@ fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple 
         let (y_bounds, y_title, y_units) =
             app.resolve_axis_bounds_and_title(y_dim, "Y", orig_h, edges);
 
+        let (x_units, y_units) = (x_units.map(Cow::Owned), y_units.map(Cow::Owned));
         (x_bounds, y_bounds, x_title, y_title, x_units, y_units)
     }
 }

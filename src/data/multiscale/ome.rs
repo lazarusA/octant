@@ -3,7 +3,8 @@
 //! OME-Zarr gives each level an absolute scale and translation per axis:
 //! the physical position of index `i` (a pixel center) is
 //! `origin + i * scale` ([`OmeLevel::origin`]: the translation, or half a
-//! block in for coarser levels written with level 0's). A level's factor is
+//! block in for coarser levels written with level 0's, whose pixels cover
+//! blocks of level 0 from pixel 0). A level's factor is
 //! its scale over level 0's, and its offset puts its first cell's lower edge
 //! on level 0's index grid.
 

@@ -144,7 +144,7 @@ fn ome_images_become_stacks() {
     }
     let top = set.level(2).expect("level 2");
     assert!((top.factor[3] - 4.0).abs() < 1e-6 && top.factor[1] == 1.0);
-    // No translations: blocks averaged from pixel 0, so every level starts with level 0.
+    // No translations: levels computed from blocks from pixel 0 start with level 0.
     assert_eq!(top.offset[3], 0.0);
     assert_eq!(set.to_level(1, 3, 0..64), Some(0..32));
 }
@@ -217,7 +217,7 @@ fn coarse_ome_levels_start_half_a_block_in_unless_translated() {
     };
     let base = at(4.0, None);
     // Level 0 itself, and a factor-32 level written without a translation:
-    // its first 128 nm pixel averages level 0's pixels 0..32, centered at 62 nm.
+    // its first 128 nm pixel covers level 0's pixels 0..32, centered at 62 nm.
     assert_eq!(base.origin(&base, 0), 0.0);
     assert_eq!(at(128.0, None).origin(&base, 0), 62.0);
     // The same with level 0's translation repeated (idr0101).

@@ -17,17 +17,28 @@ pub struct DatasetMetadata {
 impl DatasetMetadata {
     /// Look up the dimension coordinates for a given variable and dimension name,
     /// checking scoped `{var_name}/{dim_name}` first before falling back to `{dim_name}`.
+    /// Keys are lowercased into a stack buffer, so per-frame lookups do not allocate.
     pub fn get_dim_coords(&self, var_name: Option<&str>, dim_name: &str) -> Option<&CoordValues> {
-        let clean = dim_name.trim().to_lowercase();
+        let clean = dim_name.trim();
+        let mut buf = [0u8; KEY_BUF];
         if let Some(v) = var_name {
-            let scoped = format!("{}/{}", v.trim().to_lowercase(), clean);
-            if let Some(coords) = self.dimension_coordinates.get(&scoped) {
-                return Some(coords);
+            let scoped = match lower_key(&mut buf, &[v.trim(), "/", clean]) {
+                Some(key) => self.dimension_coordinates.get(key),
+                None => (self.dimension_coordinates).get(&format!(
+                    "{}/{}",
+                    v.trim().to_lowercase(),
+                    clean.to_lowercase()
+                )),
+            };
+            if scoped.is_some() {
+                return scoped;
             }
         }
-        self.dimension_coordinates
-            .get(&clean)
-            .or_else(|| self.dimension_coordinates.get(dim_name))
+        let unscoped = match lower_key(&mut buf, &[clean]) {
+            Some(key) => self.dimension_coordinates.get(key),
+            None => self.dimension_coordinates.get(&clean.to_lowercase()),
+        };
+        unscoped.or_else(|| self.dimension_coordinates.get(dim_name))
     }
 
     /// Returns numerical min/max coordinate bounds for a variable dimension name if available.
@@ -98,4 +109,23 @@ impl DatasetMetadata {
     pub fn build_tree_from_variables(variables: &[VariableInfo]) -> VariableTreeGroup {
         VariableTreeGroup::build_tree_from_variables(variables)
     }
+}
+
+/// Longest coordinate key looked up without allocating.
+const KEY_BUF: usize = 128;
+
+/// `parts` joined and ASCII-lowercased in `buf`; `None` when they hold non-ASCII text
+/// (lowercased by Unicode rules instead) or do not fit.
+fn lower_key<'b>(buf: &'b mut [u8; KEY_BUF], parts: &[&str]) -> Option<&'b str> {
+    let mut len = 0;
+    for part in parts {
+        let end = len + part.len();
+        if !part.is_ascii() || end > KEY_BUF {
+            return None;
+        }
+        buf[len..end].copy_from_slice(part.as_bytes());
+        len = end;
+    }
+    buf[..len].make_ascii_lowercase();
+    std::str::from_utf8(&buf[..len]).ok()
 }

@@ -47,7 +47,9 @@ impl OctantApp {
             true => (first as f64 - 0.5, last as f64 + 0.5),
             false => (first as f64, last as f64),
         };
-        let mut bounds = index_bounds(0, fallback_len.saturating_sub(1).max(1));
+        // Values need a span; edges have one even for a single index.
+        let last = fallback_len.saturating_sub(1);
+        let mut bounds = index_bounds(0, if cell_edges { last } else { last.max(1) });
         let mut name = fallback_name;
         let mut units = None;
         // An OME-Zarr axis unit, shown in the title ("y [µm]").
@@ -65,9 +67,14 @@ impl OctantApp {
                 name = dim;
                 axis_unit = var.dimension_unit(dim);
                 units = dimension_units(meta, var, dim, axis_unit);
+                let values =
+                    || meta.get_coord_bounds_for_var_range(Some(&var.name), dim, size, range);
                 let coords = match cell_edges {
-                    true => meta.get_cell_edges_for_var_range(Some(&var.name), dim, size, range),
-                    false => meta.get_coord_bounds_for_var_range(Some(&var.name), dim, size, range),
+                    // A dimension of one index has no spacing: one unit around its value.
+                    true => meta
+                        .get_cell_edges_for_var_range(Some(&var.name), dim, size, range)
+                        .or_else(|| values().map(|(lo, hi)| (lo - 0.5, hi + 0.5))),
+                    false => values(),
                 };
                 bounds = coords.unwrap_or(bounds);
             }
@@ -99,5 +106,35 @@ impl OctantApp {
         } else {
             filled(tr(HoverKey::AlongAxis), &[&tr(fallback)])
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::app::test_support::{memory_app, selection_of};
+    use crate::data::CoordValues;
+
+    #[test]
+    fn a_one_index_dimension_keeps_its_coordinate() {
+        let (mut app, mut meta) = memory_app();
+        // `elev(lat, lon)`'s lat window is one index; its coordinate stands alone.
+        let one = CoordValues::Regular {
+            start: 45.0,
+            step: 0.0,
+            len: 1,
+        };
+        meta.dimension_coordinates.insert("lat".into(), one);
+        let mut selection = selection_of(&mut app, &meta, "elev");
+        let var = &mut selection.metadata.as_mut().expect("metadata").variables;
+        let idx = selection.variable_idx;
+        var[idx].shape[0] = 1;
+        selection.dim_ranges[0] = (0, 0);
+        *app.layers.base.selection_mut() = selection;
+        let (bounds, _, _) = app.resolve_axis_bounds_and_title(0, "Y", 1, true);
+        assert_eq!(bounds, (44.5, 45.5));
+        // Without metadata, one index spans one cell.
+        let (empty, _) = memory_app();
+        let (bounds, _, _) = empty.resolve_axis_bounds_and_title(0, "Y", 1, true);
+        assert_eq!(bounds, (-0.5, 0.5));
     }
 }

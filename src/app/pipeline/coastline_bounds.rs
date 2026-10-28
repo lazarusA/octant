@@ -47,9 +47,10 @@ impl OctantApp {
         let (lon_min, mut lon_max) = self.plotted_cell_edges(self.get_spatial_dim_index(0))?;
         let (lat_min, lat_max) = self.plotted_cell_edges(self.get_spatial_dim_index(1))?;
         // shortcut: the coastline shaders take lon_max > 180 for a 0..360 grid, so edges
-        // just past 180 from a negative start (MUR SST to 180.005) stop at 180, misplacing
+        // of a -180..180 grid just past 180 (MUR SST to 180.005) stop at 180, misplacing
         // the last cell's coastline by its overshoot; teach the shaders the wrap to upgrade.
-        if lon_min < 0.0 && lon_max > 180.0 {
+        // Grids from 0 (edges from -0.125 on ERA5) are 0..360 grids and keep theirs.
+        if lon_min < -90.0 && lon_max > 180.0 {
             lon_max = 180.0;
         }
         Some([lon_min, lon_max, lat_min, lat_max].map(|v| v as f32))
@@ -111,12 +112,18 @@ mod tests {
     }
 
     #[test]
-    fn edges_past_180_from_a_negative_start_stop_at_180() {
+    fn edges_past_180_stop_at_180_only_on_minus_180_grids() {
         // Cells from -179° to 181°: the shaders would read 181 as a 0..360 grid.
         let app = plotted_from(-134.0, CoordinateGrid::GlobalRegular);
         assert_eq!(
             app.coastline_cell_edges(false),
             Some([-179.0, 180.0, -90.0, 90.0])
+        );
+        // Cells from 0° (edges from -45°) are a 0..360 grid: no cap.
+        let app = plotted_from(0.0, CoordinateGrid::GlobalRegular);
+        assert_eq!(
+            app.coastline_cell_edges(false),
+            Some([-45.0, 315.0, -90.0, 90.0])
         );
     }
 }
