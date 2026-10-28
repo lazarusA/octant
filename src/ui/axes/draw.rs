@@ -121,6 +121,16 @@ impl<'a> Axes<'a> {
         (bottom, top)
     }
 
+    /// The labelled ticks' mark length: none while major ticks are off, which
+    /// keeps their values.
+    fn major_len(&self, style: AxisStyle) -> f32 {
+        if style.major_ticks {
+            self.tick_len
+        } else {
+            0.0
+        }
+    }
+
     /// Minor ticks on an axis's two sides.
     fn draw_minor(&self, ticks: &AxisTicks, x_axis: bool, main: (f32, f32), other: (f32, f32)) {
         let strokes = (self.secondary, self.faint);
@@ -152,14 +162,14 @@ impl<'a> Axes<'a> {
         draw_x_ticks(
             self.painter,
             self.visuals,
-            ticks.labelled(style.major_ticks),
+            ticks.as_slice(),
             visible.left(),
             visible.width(),
             bottom_y,
             top_y,
             b_dir,
             t_dir,
-            self.tick_len,
+            self.major_len(style),
             canvas,
             self.stroke,
             self.secondary,
@@ -216,14 +226,14 @@ impl<'a> Axes<'a> {
         draw_y_ticks(
             self.painter,
             self.visuals,
-            ticks.labelled(style.major_ticks),
+            ticks.as_slice(),
             visible.bottom(),
             visible.height(),
             right_x,
             left_x,
             r_dir,
             l_dir,
-            self.tick_len,
+            self.major_len(style),
             canvas,
             self.stroke,
             self.secondary,

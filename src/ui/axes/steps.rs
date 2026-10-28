@@ -45,11 +45,6 @@ impl AxisTicks {
         &self.marks[..self.len]
     }
 
-    /// The labelled ticks to draw: none while `shown` is off.
-    pub(super) fn labelled(&self, shown: bool) -> &[TickMark] {
-        if shown { self.as_slice() } else { &[] }
-    }
-
     /// The minor ticks' positions: 0 at the axis's start, 1 at its end.
     pub fn minor(&self) -> &[f32] {
         &self.minor[..self.minor_len]

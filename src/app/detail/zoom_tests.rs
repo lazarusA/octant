@@ -13,14 +13,14 @@ fn coarse_levels_zoom_until_level_0_cells_span_pixels() {
     assert_eq!(max_zoom_over(1.0), MAX_ZOOM);
     assert_eq!(max_zoom_over(4.0), MAX_ZOOM, "never below the default");
     // GLC_FCS30D's 1.3 million columns plotted from a level 1024 times coarser.
-    assert_eq!(max_zoom_over(1024.0), 4096.0);
+    assert_eq!(max_zoom_over(1024.0), 6144.0);
     assert_eq!(max_zoom_over(1e6), 1e4, "within f32's reach");
 }
 
 #[test]
 fn the_plotted_level_sets_the_heatmap_zoom_limit() {
     let mut app = plotted();
-    // Level 2 is 4 times coarser: 16 pixels per level-0 cell is under 50.
+    // Level 2 is 4 times coarser: 24 pixels per level-0 cell is under 50.
     assert_eq!(app.heatmap_max_zoom(), MAX_ZOOM);
     app.layers.base.selection_mut().level = LevelChoice::Pinned(2);
     assert_eq!(app.heatmap_max_zoom(), MAX_ZOOM, "pinned: no finer tiles");
