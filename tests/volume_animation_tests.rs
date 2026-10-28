@@ -22,6 +22,7 @@ fn test_init_dimension_defaults_2d_dataset() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 
@@ -59,6 +60,7 @@ fn test_init_dimension_defaults_3d_dataset() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 
@@ -104,6 +106,7 @@ fn test_init_dimension_defaults_4d_dataset() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 
@@ -344,6 +347,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 
@@ -398,6 +402,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
     let large_ranges = vec![(0, 499), (0, 2047), (0, 2047)];
@@ -444,6 +449,7 @@ fn test_format_byte_size_and_calculate_download_sizes() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 
@@ -501,6 +507,7 @@ fn test_selected_volume_elements_and_limit() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
     app.selected.metadata = Some(DatasetMetadata {
@@ -986,6 +993,7 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 

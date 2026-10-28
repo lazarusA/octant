@@ -129,6 +129,7 @@ fn test_dimension_slider_defaults_with_dggs_custom_dim_name() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     };
 

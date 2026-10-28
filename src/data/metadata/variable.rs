@@ -30,6 +30,8 @@ pub struct VariableInfo {
     pub multiscale: Option<crate::data::multiscale::LevelRef>,
     /// The CRS of its x/y coordinates (`data::crs::assign`).
     pub crs: Option<crate::data::crs::CrsRef>,
+    /// The affine placing its x/y cells, for grids without coordinate arrays.
+    pub affine: Option<crate::data::coordinates::affine::GridAffine>,
 }
 
 impl VariableInfo {
@@ -83,6 +85,21 @@ impl VariableInfo {
         self.dimension_names
             .iter()
             .position(|d| d.eq_ignore_ascii_case(dim))
+    }
+
+    /// The dimension coordinates its metadata places, read from no
+    /// coordinate array: an OME-Zarr level's, else its grid affine's.
+    pub fn metadata_coordinates(&self) -> Option<Vec<(&str, crate::data::CoordValues)>> {
+        if let Some(ome) = &self.ome {
+            let coords = crate::data::ome::coords::level_coordinates(
+                ome,
+                &self.dimension_names,
+                &self.shape,
+            );
+            return Some(coords);
+        }
+        let affine = self.affine.as_ref()?;
+        Some(affine.coordinates(&self.dimension_names, &self.shape))
     }
 
     /// The physical unit symbol (`µm`, `s`) of dimension `dim`, for OME-Zarr images.

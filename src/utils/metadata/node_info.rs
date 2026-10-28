@@ -118,6 +118,7 @@ pub fn variable_info_from_node_metadata_with_parent_attributes(
                 ome: None,
                 multiscale: None,
                 crs: None,
+                affine: None,
             })
         }
         _ => None,

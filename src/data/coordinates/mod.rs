@@ -1,5 +1,8 @@
 //! Geographic and Cartesian coordinate mapping system.
 
+pub mod affine;
+#[cfg(test)]
+mod affine_tests;
 pub mod detection;
 pub mod dggs;
 pub mod healpix;

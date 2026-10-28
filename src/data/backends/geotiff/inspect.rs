@@ -146,6 +146,7 @@ fn add_raster_variable(
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     });
 }
@@ -184,6 +185,7 @@ fn add_band_variables(
             ome: None,
             multiscale: None,
             crs: None,
+            affine: None,
             shard_shape: None,
         });
     }

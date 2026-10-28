@@ -1,7 +1,13 @@
 //! The zarr-conventions `multiscales` v0.1 `layout`, with the `spatial:`
 //! keys of its entries and group.
 
+use std::collections::HashMap;
+
 use serde_json::{Map, Value};
+
+use crate::data::coordinates::affine::GridAffine;
+use crate::data::ome::MetaReader;
+use crate::data::ome::reader::join;
 
 /// One `layout` entry.
 #[derive(Debug, Clone, PartialEq)]
@@ -111,6 +117,20 @@ impl Layout {
         }
     }
 
+    /// `entry`'s affine over an array of dimensions `dims`, when it has one
+    /// and both spatial dimensions are found.
+    pub fn grid_affine(&self, entry: &Entry, dims: &[String]) -> Option<GridAffine> {
+        let (Some(x), Some(y)) = self.spatial_dims(entry, dims) else {
+            return None;
+        };
+        Some(GridAffine {
+            transform: entry.affine?,
+            x,
+            y,
+            node: self.node,
+        })
+    }
+
     /// Factor and offset along x (`axis` 0) or y (`axis` 1) of a level with
     /// affine `a` on the grid of the base's affine `a0`.
     pub fn affine_placement(&self, axis: usize, a0: &[f64; 6], a: &[f64; 6]) -> (f64, f64) {
@@ -124,6 +144,61 @@ impl Layout {
         let edge = a[origin] - half * s;
         ((s / s0).abs(), (edge - edge0) / s0)
     }
+}
+
+/// The affine placing array `name` of dimensions `dims`, as
+/// [`link_pyramids`](super::geozarr::link_pyramids) gives it: its layout entry at its group or that group's
+/// parent, else its own attributes `own`.
+pub fn array_placement(
+    reader: &MetaReader<'_>,
+    name: &str,
+    dims: &[String],
+    own: &HashMap<String, String>,
+) -> Option<GridAffine> {
+    let name = name.trim_matches('/');
+    let group = name.rsplit_once('/').map_or("", |(g, _)| g);
+    let parent = group.rsplit_once('/').map_or("", |(p, _)| p);
+    for g in [group, parent] {
+        let Some(layout) = reader
+            .group_attributes(g)
+            .ok()
+            .flatten()
+            .and_then(|attrs| Layout::parse(&attrs))
+        else {
+            continue;
+        };
+        let entry = layout
+            .entries
+            .iter()
+            .find(|e| super::geozarr::relative_name(name, &join(g, &e.asset)).is_some());
+        if let Some(affine) = entry.and_then(|e| layout.grid_affine(e, dims)) {
+            return Some(affine);
+        }
+    }
+    array_affine(own, dims)
+}
+
+/// The affine an array's own attributes give it (`spatial:transform`,
+/// `spatial:dimensions`, `spatial:registration`, as read into
+/// `VariableInfo::attributes`), over dimensions `dims`.
+pub fn array_affine(attrs: &HashMap<String, String>, dims: &[String]) -> Option<GridAffine> {
+    let json = |key: &str| serde_json::from_str::<Value>(attrs.get(key)?).ok();
+    let entry = Entry {
+        asset: String::new(),
+        derived_from: None,
+        scale: None,
+        translation: None,
+        affine: affine(&json("spatial:transform")?),
+        spatial_dims: json("spatial:dimensions").as_ref().and_then(names),
+    };
+    let layout = Layout {
+        entries: Vec::new(),
+        spatial_dims: None,
+        node: attrs
+            .get("spatial:registration")
+            .is_some_and(|r| r.eq_ignore_ascii_case("node")),
+    };
+    layout.grid_affine(&entry, dims)
 }
 
 fn entry(value: &Value) -> Option<Entry> {

@@ -122,6 +122,7 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
         ome: None,
         multiscale: None,
         crs: None,
+        affine: None,
         shard_shape: None,
     });
     app.load_new_metadata(meta);

@@ -1,5 +1,7 @@
 //! Zarr backend implementations and storage abstractions.
 
+#[cfg(test)]
+mod affine_block_tests;
 mod block;
 mod block_coords;
 #[cfg(test)]

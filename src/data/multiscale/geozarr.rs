@@ -32,6 +32,10 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
             link_layout(&group, &layout, variables);
         }
     }
+    // shortcut: a non-pyramid group's `spatial:transform` (geoemb `utm_zones`) is not read, add it once a zone ships without x/y arrays.
+    for v in variables.iter_mut().filter(|v| v.affine.is_none()) {
+        v.affine = super::geozarr_layout::array_affine(&v.attributes, &v.dimension_names);
+    }
 }
 
 /// [`link_pyramids`] over `storage`, the groups' attributes read
@@ -79,11 +83,15 @@ pub fn link_layout(group: &str, layout: &Layout, variables: &mut [VariableInfo])
     let mut names: Vec<String> = Vec::new();
     for entry in &layout.entries {
         let path = join(group, &entry.asset);
-        for v in variables.iter() {
-            if let Some(name) = relative_name(&v.name, &path)
-                && !names.iter().any(|n| n == name)
-            {
+        for v in variables.iter_mut() {
+            let Some(name) = relative_name(&v.name, &path) else {
+                continue;
+            };
+            if !names.iter().any(|n| n == name) {
                 names.push(name.to_string());
+            }
+            if v.shape.len() >= 2 {
+                v.affine = layout.grid_affine(entry, &v.dimension_names).or(v.affine);
             }
         }
     }
@@ -110,7 +118,7 @@ pub fn link_layout(group: &str, layout: &Layout, variables: &mut [VariableInfo])
 
 /// `name` within level `asset_path`: `""` when the asset is the array
 /// itself, the array's name when it is a direct child of the asset group.
-fn relative_name<'a>(name: &'a str, asset_path: &str) -> Option<&'a str> {
+pub(super) fn relative_name<'a>(name: &'a str, asset_path: &str) -> Option<&'a str> {
     let name = name.trim_matches('/');
     if name == asset_path {
         return Some("");

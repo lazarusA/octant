@@ -10,6 +10,7 @@ use super::quantization::Quantization;
 use super::slice::{ChunkReader, retrieve_array_subset_as_f32, window_subset};
 use super::storage::ZarrArrayHandle;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
+use crate::data::coordinates::affine::GridAffine;
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::MetaReader;
 use crate::data::ome::level::LevelArray;
@@ -153,6 +154,9 @@ pub(super) struct ArrayCachedState {
     pub ome: Option<LevelArray>,
     /// Set for quantised embedding arrays, whose codes become values.
     pub quantization: Option<Quantization>,
+    /// Set for arrays a `spatial:transform` places, whose x/y coordinates
+    /// come from it rather than from coordinate arrays.
+    pub affine: Option<GridAffine>,
 }
 
 /// Fetches a hyperslab of an opened array through its chunk cache, scaled by `scales` when quantised.
@@ -216,7 +220,11 @@ fn orient_and_build_block(
         block_shape: &block_shape,
         selections: &request.selections,
     };
-    let mut coords = block_coordinates(store, store_url, &request.variable, &window);
+    let placed = cached
+        .affine
+        .map(|a| a.coordinates(&dim_names, full_shape))
+        .unwrap_or_default();
+    let mut coords = block_coordinates(store, store_url, &request.variable, &window, &placed);
     let hints = OrientHints {
         attributes: cached.array.attributes(),
         lat_extent: coords.lat_extent,
