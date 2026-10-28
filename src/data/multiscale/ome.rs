@@ -2,8 +2,10 @@
 //!
 //! OME-Zarr gives each level an absolute scale and translation per axis:
 //! the physical position of index `i` (a pixel center) is
-//! `translation + i * scale`. A level's factor is its scale over level 0's,
-//! and its offset puts its first cell's lower edge on level 0's index grid.
+//! `origin + i * scale` ([`OmeLevel::origin`]: the translation, or half a
+//! block in for coarser levels written with level 0's). A level's factor is
+//! its scale over level 0's, and its offset puts its first cell's lower edge
+//! on level 0's index grid.
 
 use crate::data::metadata::VariableInfo;
 use crate::data::ome::model::{OmeImage, OmeLevel};
@@ -62,8 +64,8 @@ fn stack_name(image: &OmeImage) -> String {
     group.rsplit('/').next().unwrap_or(group).to_string()
 }
 
-/// Factor and offset per axis of `level` relative to `base`. A missing
-/// translation is 0; a missing, zero or non-finite scale gives `None`.
+/// Factor and offset per axis of `level` relative to `base`, from each one's
+/// [`OmeLevel::origin`]; a missing, zero or non-finite scale gives `None`.
 fn placement(base: &OmeLevel, level: &OmeLevel, rank: usize) -> Option<(Vec<f64>, Vec<f64>)> {
     let mut factor = Vec::with_capacity(rank);
     let mut offset = Vec::with_capacity(rank);
@@ -72,8 +74,7 @@ fn placement(base: &OmeLevel, level: &OmeLevel, rank: usize) -> Option<(Vec<f64>
         if !s0.is_finite() || !s.is_finite() || s0 == 0.0 || s == 0.0 {
             return None;
         }
-        let t0 = base.translation.get(d).copied().unwrap_or(0.0);
-        let t = level.translation.get(d).copied().unwrap_or(0.0);
+        let (t0, t) = (base.origin(base, d), level.origin(base, d));
         let f = (s / s0).abs();
         factor.push(f);
         // Lower edge of the level's cell 0, in level-0 cells from level 0's

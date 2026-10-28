@@ -14,6 +14,21 @@ pub struct OmeLevel {
     pub translation: Vec<f64>,
 }
 
+impl OmeLevel {
+    /// Where this level's index 0 sits along `axis` (a pixel center). A coarser level
+    /// written with `base`'s translation, or none, was averaged in blocks from pixel 0,
+    /// so its first pixel's center lies half a block in, `(scale - base scale) / 2`
+    /// past `base`'s; a translation of its own is taken as written.
+    pub fn origin(&self, base: &OmeLevel, axis: usize) -> f64 {
+        let t = self.translation.get(axis).copied().unwrap_or(0.0);
+        let t0 = base.translation.get(axis).copied().unwrap_or(0.0);
+        match (self.scale.get(axis), base.scale.get(axis)) {
+            (Some(&s), Some(&s0)) if t == t0 && (s - s0).is_finite() => t0 + (s - s0) / 2.0,
+            _ => t,
+        }
+    }
+}
+
 /// How a channel maps intensities onto its color (OMERO `family`).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
