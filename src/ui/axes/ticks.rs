@@ -20,17 +20,6 @@ impl TickMark {
         buf: [0u8; 32],
     };
 
-    pub fn new_with_context(
-        val: f64,
-        step: f64,
-        total_span: f64,
-        title: &str,
-        units: Option<&str>,
-    ) -> Self {
-        let time = is_time_axis(title, units);
-        Self::on_axis(val, step, total_span, title, units, time)
-    }
-
     /// A tick on an axis already known to be a time axis or not ([`is_time_axis`]).
     pub(super) fn on_axis(
         val: f64,
