@@ -84,11 +84,19 @@ pub fn open_local_storage(
 
 pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;
 
-/// The root group's consolidated metadata, if it has any.
+/// The root group's consolidated metadata, if it has any; its attributes
+/// and Zarr format go into `meta`, so its readers do not read it again.
 pub fn root_consolidated(
     storage: &ReadableWritableListableStorage,
+    meta: &crate::data::ome::MetaCache,
 ) -> Option<ConsolidatedMetadataMetadata> {
+    use zarrs::metadata::GroupMetadata;
     let group = zarrs::group::Group::open(storage.clone(), "/").ok()?;
+    let format = match group.metadata() {
+        GroupMetadata::V3(_) => 3,
+        GroupMetadata::V2(_) => 2,
+    };
+    meta.keep_found_group("", group.attributes().clone(), format);
     group.consolidated_metadata().map(|c| c.metadata)
 }
 

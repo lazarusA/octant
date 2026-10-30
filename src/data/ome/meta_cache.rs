@@ -70,6 +70,13 @@ impl MetaCache {
         }
     }
 
+    /// Records the attributes of group `path`, read in Zarr `format` by
+    /// someone else (zarrs opening the root group), so no reader reads it.
+    pub fn keep_found_group(&self, path: &str, attrs: Map<String, Value>, format: u8) {
+        self.keep_group(path.trim_matches('/'), &Some(Arc::new(attrs)));
+        self.set_format(format);
+    }
+
     pub(super) fn format(&self) -> Option<u8> {
         match self.format.load(Ordering::Relaxed) {
             0 => None,

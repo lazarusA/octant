@@ -53,15 +53,18 @@ pub use model::{ChannelFamily, ChannelWindow, OmeChannel, OmeLabelInfo, OmeRef};
 pub use plate::{OmeDataset, OmePlate, OmeWell};
 pub use reader::{MetaReader, Prefetch};
 
-/// Walks a store that answers every key directly (desktop); `None` when its
-/// root is not an OME-Zarr group.
-pub fn discover_direct(storage: Arc<dyn ReadableStorageTraits>) -> Option<Discovery> {
+/// Walks a store that answers every key directly (desktop), through the
+/// store's `cache`; `None` when its root is not an OME-Zarr group.
+pub fn discover_direct(
+    storage: Arc<dyn ReadableStorageTraits>,
+    cache: &MetaCache,
+) -> Option<Discovery> {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        direct::discover_concurrent(storage)
+        direct::discover_concurrent(storage, cache)
     }
     #[cfg(target_arch = "wasm32")]
-    match discover(&MetaReader::direct(storage), "") {
+    match discover(&MetaReader::direct(storage).with_cache(cache), "") {
         Outcome::Found(found) => Some(found),
         Outcome::NotOme | Outcome::Pending => None,
     }

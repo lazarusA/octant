@@ -3,8 +3,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use zarrs::array::Array;
-use zarrs::group::Group;
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::node::{NodeMetadata, NodePath, get_child_nodes};
 use zarrs::storage::ReadableWritableListableStorage;
 
@@ -23,17 +22,17 @@ use crate::utils::units::calculate_variable_size_bytes;
 
 /// Format-agnostic store variable metadata extractor (plain Zarr: OME-Zarr
 /// stores are discovered by `crate::data::ome` first).
+/// `consolidated` and `root_attrs` are the root group's consolidated metadata
+/// and attributes, as the store read them.
 pub fn extract_store_variables(
     store: ReadableWritableListableStorage,
     base_url: &str,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
+    root_attrs: Option<&serde_json::Map<String, serde_json::Value>>,
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
-    let root = Group::open(store.clone(), "/").ok();
-
     // 1. Consolidated metadata
-    if let Some(ConsolidatedMetadata { metadata, .. }) =
-        root.as_ref().and_then(Group::consolidated_metadata)
-    {
-        let variables = extract_store_variables_from_consolidated_metadata(&metadata);
+    if let Some(metadata) = consolidated {
+        let variables = extract_store_variables_from_consolidated_metadata(metadata);
         if !variables.is_empty() {
             return Ok(variables);
         }
@@ -41,9 +40,9 @@ pub fn extract_store_variables(
 
     // 2. Hierarchical recursive child node discovery via get_child_nodes (fast, zero-chunk listing)
     let mut variables = Vec::new();
-    let root_attrs: HashMap<String, String> = root
-        .map(|g| {
-            g.attributes()
+    let root_attrs: HashMap<String, String> = root_attrs
+        .map(|attrs| {
+            attrs
                 .iter()
                 .map(|(k, v)| (k.clone(), super::cf::attr_string(v)))
                 .collect()

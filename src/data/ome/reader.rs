@@ -66,13 +66,13 @@ impl<'a> MetaReader<'a> {
         Self::new(storage, None)
     }
 
-    /// A reader answering from `storage` through `cache`, shared by every
-    /// reader of the store, so a document one of them parsed is not read
-    /// again (desktop array opens).
-    pub fn with_cache(storage: Arc<dyn ReadableStorageTraits>, cache: &'a MetaCache) -> Self {
+    /// This reader answering through `cache`, shared by every reader of the
+    /// store (its inspection and array opens), so a document one of them
+    /// parsed is not read again.
+    pub fn with_cache(self, cache: &'a MetaCache) -> Self {
         Self {
             shared: Some(cache),
-            ..Self::new(storage, None)
+            ..self
         }
     }
 

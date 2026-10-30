@@ -37,7 +37,8 @@ fn ome_catalog_entries_open() {
                 );
                 if let Ok(storage) =
                     crate::data::backends::zarr::storage::build_sync_store(entry.store)
-                    && let Some(found) = super::discover_direct(storage)
+                    && let Some(found) =
+                        super::discover_direct(storage, &super::MetaCache::shared())
                 {
                     for w in &found.warnings {
                         eprintln!("  warning: {w}");

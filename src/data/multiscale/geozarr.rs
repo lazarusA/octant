@@ -39,16 +39,18 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
     }
 }
 
-/// [`link_pyramids`] over `storage`, the groups' attributes read
-/// concurrently on the desktop (a `zarr.json`, then a `.zattrs`, per group).
+/// [`link_pyramids`] over `storage` through its `cache`, the groups'
+/// attributes read concurrently on the desktop (a `zarr.json`, then a
+/// `.zattrs`, per group).
 pub fn link_pyramids_in(
     storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    cache: &crate::data::ome::MetaCache,
     variables: &mut [VariableInfo],
 ) {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let groups = pyramid_groups(variables);
-        crate::data::ome::direct::walk_concurrent(storage, 3, |reader| {
+        crate::data::ome::direct::walk_concurrent(storage, cache, 3, |reader| {
             // Every group asked, so one walk names all the keys it needs.
             let pending = groups
                 .iter()
@@ -59,7 +61,7 @@ pub fn link_pyramids_in(
         });
     }
     #[cfg(target_arch = "wasm32")]
-    link_pyramids(&MetaReader::direct(storage), variables);
+    link_pyramids(&MetaReader::direct(storage).with_cache(cache), variables);
 }
 
 /// The groups a pyramid of `variables` may be described at: each

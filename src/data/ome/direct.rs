@@ -11,12 +11,15 @@ pub const MAX_PASSES: usize = 96;
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn discover_concurrent(
     storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    cache: &super::MetaCache,
 ) -> Option<super::Discovery> {
     use super::discover::{Outcome, discover};
-    let found = walk_concurrent(storage, MAX_PASSES, |reader| match discover(reader, "") {
-        Outcome::Found(found) => Some(Some(found)),
-        Outcome::NotOme => Some(None),
-        Outcome::Pending => None,
+    let found = walk_concurrent(storage, cache, MAX_PASSES, |reader| {
+        match discover(reader, "") {
+            Outcome::Found(found) => Some(Some(found)),
+            Outcome::NotOme => Some(None),
+            Outcome::Pending => None,
+        }
     });
     if found.is_none() {
         log::warn!("OME-Zarr discovery did not settle");
@@ -27,10 +30,12 @@ pub(super) fn discover_concurrent(
 /// Runs `walk` over the keys of `storage` read so far until it settles
 /// (`Some`), reading the keys each walk still needs concurrently before the
 /// next; `None` when it has not settled after `passes` walks or needs no
-/// more keys.
+/// more keys. Documents already in the store's `cache` are not read; a key
+/// is cached missing only once read and not found.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn walk_concurrent<T>(
     storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    cache: &super::MetaCache,
     passes: usize,
     mut walk: impl FnMut(&super::reader::MetaReader<'_>) -> Option<T>,
 ) -> Option<T> {
@@ -42,7 +47,7 @@ pub(crate) fn walk_concurrent<T>(
     let memory = Arc::new(MemoryStore::new());
     let prefetch = Prefetch::default();
     // One reader for every walk: keys read in one are not read again.
-    let reader = MetaReader::prefetched(memory.clone(), &prefetch);
+    let reader = MetaReader::prefetched(memory.clone(), &prefetch).with_cache(cache);
     for _ in 0..passes {
         let settled = walk(&reader);
         let wanted = prefetch.take_pending();

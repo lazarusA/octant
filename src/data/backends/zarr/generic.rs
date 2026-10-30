@@ -9,7 +9,7 @@ use super::block::{
 };
 use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::quantization::{self, PixelScale, Quantization};
-use super::storage::{open_raw_array, root_consolidated};
+use super::storage::open_raw_array;
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
@@ -20,6 +20,8 @@ use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::array::{ArrayShardedReadableExtCache, ArraySubset};
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
+
+mod metadata;
 
 /// What a sharded array's open state counts against the open arrays'
 /// budget: its shard indexes, not decoded chunks.
@@ -32,6 +34,8 @@ pub struct GenericZarrBlockStore {
     store_type_label: &'static str,
     open_arrays: OpenArrays,
     consolidated: OnceLock<Option<ConsolidatedMetadataMetadata>>,
+    /// Group and array metadata read by inspection and array opens, once
+    /// per store.
     meta: MetaCache,
 }
 
@@ -65,42 +69,6 @@ impl GenericZarrBlockStore {
     fn get_or_open_array(&self, var_name: &str) -> Result<Arc<ArrayCachedState>, BlockStoreError> {
         self.open_arrays
             .get_or_open(var_name.trim_matches('/'), |name| self.open(name))
-    }
-
-    /// The root's consolidated metadata, read once on the desktop; a browser
-    /// store fills in later, so there only a found one is kept.
-    fn consolidated(&self) -> Option<&ConsolidatedMetadataMetadata> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.consolidated
-                .get_or_init(|| root_consolidated(&self.storage))
-                .as_ref()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(found) = self.consolidated.get().and_then(Option::as_ref) {
-                return Some(found);
-            }
-            let found = root_consolidated(&self.storage)?;
-            self.consolidated.get_or_init(|| Some(found)).as_ref()
-        }
-    }
-
-    /// The store's OME-Zarr variables with their discovery, else its plain
-    /// Zarr variables.
-    fn store_variables(
-        &self,
-    ) -> Result<(Vec<VariableInfo>, Option<crate::data::ome::Discovery>), BlockStoreError> {
-        if let Some(mut found) = crate::data::ome::discover_direct(self.storage.clone()) {
-            return Ok((std::mem::take(&mut found.variables), Some(found)));
-        }
-        let url = self.source_url.trim_end_matches('/');
-        let mut vars =
-            crate::utils::extract_store_variables_consolidated(self.storage.clone(), url)
-                .map_err(|e| e.to_string())?;
-        crate::data::multiscale::geozarr::link_pyramids_in(self.storage.clone(), &mut vars);
-        crate::data::crs::attach_zarr_grid_mappings_in(self.storage.clone(), &mut vars);
-        Ok((vars, None))
     }
 
     /// The per-pixel scale of embedding array `name` (of `shape`), opened.
@@ -137,7 +105,7 @@ impl GenericZarrBlockStore {
         } else {
             chunk_cache_bytes(&raw_array)
         };
-        let reader = MetaReader::with_cache(self.storage.clone(), &self.meta);
+        let reader = MetaReader::direct(self.storage.clone()).with_cache(&self.meta);
         let attributes = inherited_attributes(&raw_array, &reader, name);
         let quantization = self
             .pixel_scale(name, raw_array.shape(), &attributes)
