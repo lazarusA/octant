@@ -13,6 +13,7 @@ use super::storage::{open_raw_array, root_consolidated};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
+use crate::data::ome::{MetaCache, MetaReader};
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
@@ -31,6 +32,7 @@ pub struct GenericZarrBlockStore {
     store_type_label: &'static str,
     open_arrays: OpenArrays,
     consolidated: OnceLock<Option<ConsolidatedMetadataMetadata>>,
+    meta: MetaCache,
 }
 
 impl GenericZarrBlockStore {
@@ -47,6 +49,7 @@ impl GenericZarrBlockStore {
             store_type_label,
             open_arrays: OpenArrays::default(),
             consolidated: OnceLock::new(),
+            meta: MetaCache::shared(),
         }
     }
 
@@ -134,7 +137,7 @@ impl GenericZarrBlockStore {
         } else {
             chunk_cache_bytes(&raw_array)
         };
-        let reader = crate::data::ome::MetaReader::direct(self.storage.clone());
+        let reader = MetaReader::with_cache(self.storage.clone(), &self.meta);
         let attributes = inherited_attributes(&raw_array, &reader, name);
         let quantization = self
             .pixel_scale(name, raw_array.shape(), &attributes)

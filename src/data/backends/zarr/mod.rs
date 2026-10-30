@@ -12,6 +12,10 @@ mod coords_numeric_tests;
 #[cfg(test)]
 mod coords_tests;
 pub mod generic;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod metadata_network_tests;
+#[cfg(test)]
+mod metadata_tests;
 mod open_arrays;
 mod quantization;
 #[cfg(all(test, not(target_arch = "wasm32")))]

@@ -16,6 +16,7 @@ mod discover;
 mod image;
 mod legacy;
 pub mod level;
+mod meta_cache;
 pub mod model;
 mod ome_xml;
 mod omero;
@@ -47,6 +48,7 @@ use zarrs::storage::ReadableStorageTraits;
 
 pub use axes::AxisKind;
 pub use discover::{Discovery, Outcome, discover};
+pub use meta_cache::MetaCache;
 pub use model::{ChannelFamily, ChannelWindow, OmeChannel, OmeLabelInfo, OmeRef};
 pub use plate::{OmeDataset, OmePlate, OmeWell};
 pub use reader::{MetaReader, Prefetch};
