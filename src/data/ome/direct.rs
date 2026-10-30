@@ -58,15 +58,19 @@ pub(crate) fn walk_concurrent<T>(
             .into_par_iter()
             .map(|key| {
                 let store_key = StoreKey::new(key.as_str()).ok();
-                let bytes = store_key
-                    .as_ref()
-                    .and_then(|k| storage.get(k).ok().flatten());
-                (key, store_key, bytes)
+                let read = store_key.as_ref().map(|k| storage.get(k));
+                (key, store_key, read)
             })
             .collect();
-        for (key, store_key, bytes) in read {
-            let stored = match (store_key, bytes) {
-                (Some(k), Some(bytes)) => memory.set(&k, bytes).is_ok(),
+        for (key, store_key, read) in read {
+            let stored = match (store_key, read) {
+                (Some(k), Some(Ok(Some(bytes)))) => memory.set(&k, bytes).is_ok(),
+                // A read that failed is not a missing key: the store's cache
+                // must not remember it.
+                (_, Some(Err(_))) => {
+                    prefetch.mark_failed(key);
+                    continue;
+                }
                 _ => false,
             };
             if !stored {

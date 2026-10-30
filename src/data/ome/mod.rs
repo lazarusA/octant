@@ -16,6 +16,7 @@ mod discover;
 mod image;
 mod legacy;
 pub mod level;
+mod lookup;
 mod meta_cache;
 pub mod model;
 mod ome_xml;
@@ -31,6 +32,8 @@ mod variables;
 mod block_tests;
 #[cfg(test)]
 mod container_tests;
+#[cfg(test)]
+mod failed_read_tests;
 #[cfg(test)]
 mod legacy_tests;
 #[cfg(test)]

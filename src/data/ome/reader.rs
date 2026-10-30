@@ -6,45 +6,15 @@
 //! and is run again once they have been fetched (`zarr/wasm/ome.rs`).
 
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
 use zarrs::storage::{ReadableStorageTraits, StoreKey};
 
+pub(super) use super::lookup::Lookup;
+pub use super::lookup::Prefetch;
 use super::meta_cache::{ArrayMeta, GroupAttrs, MetaCache};
-
-/// The answer for one key.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum Lookup {
-    /// The key's bytes, shared (cache hits copy nothing).
-    Found(zarrs::storage::Bytes),
-    /// The store has no such key.
-    Absent,
-    /// Not fetched yet (web only).
-    Pending,
-}
-
-/// Keys already fetched without success, and keys still needed (web only).
-#[derive(Debug, Default)]
-pub struct Prefetch {
-    absent: RefCell<HashSet<String>>,
-    pending: RefCell<BTreeSet<String>>,
-}
-
-impl Prefetch {
-    /// The keys needed since the last call, emptying the list.
-    pub fn take_pending(&self) -> Vec<String> {
-        std::mem::take(&mut *self.pending.borrow_mut())
-            .into_iter()
-            .collect()
-    }
-
-    /// Records that the store has no `key` (or it could not be fetched).
-    pub fn mark_absent(&self, key: String) {
-        self.absent.borrow_mut().insert(key);
-    }
-}
 
 /// Reads metadata keys from a store, optionally behind a web prefetch. Each
 /// key is read and parsed once per reader (the web keeps one across its
@@ -120,36 +90,35 @@ impl<'a> MetaReader<'a> {
     }
 
     fn read(&self, key: &str) -> Lookup {
-        if let Ok(store_key) = StoreKey::new(key)
-            && let Ok(Some(bytes)) = self.storage.get(&store_key)
-        {
-            return Lookup::Found(bytes);
-        }
-        let Some(prefetch) = self.prefetch else {
+        let Ok(store_key) = StoreKey::new(key) else {
             return Lookup::Absent;
         };
-        if prefetch.absent.borrow().contains(key) {
-            return Lookup::Absent;
+        let read = self.storage.get(&store_key);
+        match (read, self.prefetch) {
+            (Ok(Some(bytes)), _) => Lookup::Found(bytes),
+            (Ok(None), None) => Lookup::Absent,
+            (Err(_), None) => Lookup::Failed,
+            (_, Some(prefetch)) => prefetch.answer(key),
         }
-        prefetch.pending.borrow_mut().insert(key.to_string());
-        Lookup::Pending
     }
 
     /// The first of `keys` the store has. Once one is pending, the rest are
-    /// asked too, so the web fetches them together rather than one per pass.
+    /// asked too, so the web fetches them together rather than one per pass;
+    /// one that failed makes the answer `Failed` rather than `Absent`.
     fn first_of(&self, keys: &[String]) -> Lookup {
-        let mut pending = false;
+        let (mut pending, mut failed) = (false, false);
         for key in keys {
             match self.get(key) {
                 Lookup::Found(bytes) if !pending => return Lookup::Found(bytes),
                 Lookup::Pending => pending = true,
+                Lookup::Failed => failed = true,
                 _ => {}
             }
         }
-        if pending {
-            Lookup::Pending
-        } else {
-            Lookup::Absent
+        match (pending, failed) {
+            (true, _) => Lookup::Pending,
+            (false, true) => Lookup::Failed,
+            (false, false) => Lookup::Absent,
         }
     }
 
@@ -159,7 +128,7 @@ impl<'a> MetaReader<'a> {
         let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
         match self.first_of(&keys) {
             Lookup::Found(_) => Ok(true),
-            Lookup::Absent => Ok(false),
+            Lookup::Absent | Lookup::Failed => Ok(false),
             Lookup::Pending => Err(Pending),
         }
     }
@@ -178,6 +147,8 @@ impl<'a> MetaReader<'a> {
                 Arc::new(attrs)
             }),
             Lookup::Absent => None,
+            // Not remembered: the next reader asks again.
+            Lookup::Failed => return Ok(None),
             Lookup::Pending => return Err(Pending),
         };
         self.cache().keep_group(path, &attrs);
@@ -194,6 +165,7 @@ impl<'a> MetaReader<'a> {
         let meta = match self.first_of(&keys) {
             Lookup::Found(bytes) => serde_json::from_slice::<Value>(&bytes).ok().map(Arc::new),
             Lookup::Absent => None,
+            Lookup::Failed => return Ok(None),
             Lookup::Pending => return Err(Pending),
         };
         self.cache().keep_array(path, &meta);
