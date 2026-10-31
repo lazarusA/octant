@@ -164,6 +164,37 @@ fn a_missing_coordinate_reads_each_key_once() {
 }
 
 #[test]
+fn a_v2_coordinate_is_found_where_missing_keys_fail() {
+    use crate::data::backends::coord_bounds::discover::discover_coord_array;
+    // Plain metadata, and metadata zarrs rejects until it is normalized.
+    for (filters, fill) in [("null", "0"), ("[]", r#""0""#)] {
+        let memory = Arc::new(MemoryStore::new());
+        let set = |key: &str, bytes: Vec<u8>| {
+            let key = StoreKey::new(key).expect("key");
+            memory.set(&key, bytes.into()).expect("set");
+        };
+        let zarray = format!(
+            r#"{{"zarr_format":2,"shape":[3],"chunks":[3],"dtype":"<f4",
+            "compressor":null,"fill_value":{fill},"order":"C","filters":{filters}}}"#
+        );
+        set("lat/.zarray", zarray.into_bytes());
+        let values = [1f32, 2.0, 3.0];
+        set(
+            "lat/0",
+            values.iter().flat_map(|v| v.to_le_bytes()).collect(),
+        );
+        let storage = FailingRoot::over(memory.clone(), false, true);
+        let lat = discover_coord_array(storage, Some(None), &["lat".to_string()], true)
+            .unwrap_or_else(|| panic!("lat, from its .zarray with filters {filters}"));
+        let values = super::read_coordinate(&lat).expect("values");
+        assert_eq!(
+            (values.first_number(), values.last_number()),
+            (Some(1.0), Some(3.0))
+        );
+    }
+}
+
+#[test]
 fn a_root_array_is_no_coordinate() {
     use crate::data::backends::coord_bounds::discover::discover_coord_array;
     let memory = Arc::new(MemoryStore::new());
@@ -200,27 +231,38 @@ fn root_variables_find_coordinates_in_a_child_group() {
 }
 
 /// A store whose root `zarr.json` cannot be read while `failing`, counting
-/// the reads of it.
+/// the reads of it; with `forbids_missing`, a missing `zarr.json` anywhere
+/// is an error too, as S3 answers 403 where it may not list.
 struct FailingRoot {
     inner: Arc<MemoryStore>,
     failing: AtomicBool,
+    forbids_missing: bool,
     root_reads: AtomicUsize,
 }
 
 impl FailingRoot {
     fn new() -> Arc<Self> {
+        Self::over(consolidated_store(), true, false)
+    }
+
+    fn over(inner: Arc<MemoryStore>, failing: bool, forbids_missing: bool) -> Arc<Self> {
         Arc::new(Self {
-            inner: consolidated_store(),
-            failing: AtomicBool::new(true),
+            inner,
+            failing: AtomicBool::new(failing),
+            forbids_missing,
             root_reads: AtomicUsize::new(0),
         })
     }
 
     fn check(&self, key: &StoreKey) -> Result<(), StorageError> {
-        if key.as_str() == "zarr.json" {
+        let root = key.as_str() == "zarr.json";
+        if root {
             self.root_reads.fetch_add(1, Ordering::SeqCst);
         }
-        match self.failing.load(Ordering::SeqCst) && key.as_str() == "zarr.json" {
+        let forbidden = self.forbids_missing
+            && key.as_str().ends_with("zarr.json")
+            && matches!(self.inner.get(key), Ok(None));
+        match (self.failing.load(Ordering::SeqCst) && root) || forbidden {
             true => Err(StorageError::Other("timed out".into())),
             false => Ok(()),
         }

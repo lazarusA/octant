@@ -63,22 +63,28 @@ pub fn discover_coord_array(
     listed_array(&readable_store, &metadata, candidates)
 }
 
-/// The array at `key`, its metadata read once: a missing array or an
-/// unreadable store costs no more requests. Only metadata zarrs rejects is
-/// opened again, normalized, and never in place of another array (that open
-/// falls back to the root's).
+/// The array at `key`, its metadata read once: a missing array costs no
+/// more requests, a failed v3 read one more for the v2 metadata. Only
+/// metadata zarrs rejects is opened again, normalized, and never in place of
+/// another array (that open falls back to the root's).
 fn probe(store: &ReadableStorage, key: &str) -> Option<CoordArray> {
     use zarrs::array::ArrayCreateError;
     use zarrs::storage::StorageError;
     let path = format!("/{key}");
-    match Array::open(store.clone(), &path) {
+    let unreadable = |e: &StorageError| !matches!(e, StorageError::InvalidMetadata(..));
+    let opened = match Array::open(store.clone(), &path) {
+        // The v3 read failed (S3 answers 403 for a missing key where it may
+        // not list): the v2 metadata may still be there.
+        Err(ArrayCreateError::StorageError(e)) if unreadable(&e) => {
+            let v2 = zarrs::config::MetadataRetrieveVersion::V2;
+            Array::open_opt(store.clone(), &path, &v2)
+        }
+        opened => opened,
+    };
+    match opened {
         Ok(array) => Some(array),
         Err(ArrayCreateError::MissingMetadata) => None,
-        Err(ArrayCreateError::StorageError(e))
-            if !matches!(e, StorageError::InvalidMetadata(..)) =>
-        {
-            None
-        }
+        Err(ArrayCreateError::StorageError(e)) if unreadable(&e) => None,
         Err(_) => {
             let array =
                 crate::utils::metadata::open_or_instantiate_array_normalized(store.clone(), &path)
