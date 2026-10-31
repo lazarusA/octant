@@ -6,18 +6,18 @@ use std::collections::HashMap;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use crate::data::CoordValues;
+use crate::data::backends::coord_bounds::discover::RootListing;
 use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name};
 use crate::data::slice_request::DimensionSelection;
 use crate::utils::grid_flips::{is_lat_name, is_lon_name};
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Where a block's coordinates are searched: the store, its URL (the
-/// coordinate cache's key) and its consolidated metadata, if any.
+/// coordinate cache's key) and what is known of its consolidated metadata.
 pub(super) type StoreSource<'a> = (
     &'a ReadableWritableListableStorage,
     &'a str,
-    Option<&'a ConsolidatedMetadataMetadata>,
+    RootListing<'a>,
 );
 
 /// A block's window along every dimension of its array.

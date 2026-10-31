@@ -3,6 +3,7 @@
 
 use super::GenericZarrBlockStore;
 use crate::data::VariableInfo;
+use crate::data::backends::coord_bounds::discover::RootListing;
 use crate::data::backends::zarr::storage::root_consolidated;
 use crate::data::blocks::BlockStoreError;
 use crate::data::ome::MetaReader;
@@ -23,6 +24,13 @@ impl GenericZarrBlockStore {
             return None;
         }
         self.consolidated.get_or_init(|| found).as_ref()
+    }
+
+    /// [`Self::consolidated`] as the coordinate search takes it: `None`
+    /// while the root is unread (a failed read), so the search reads it.
+    pub(super) fn root_listing(&self) -> RootListing<'_> {
+        self.consolidated();
+        self.consolidated.get().map(Option::as_ref)
     }
 
     /// The store's OME-Zarr variables with their discovery, else its plain

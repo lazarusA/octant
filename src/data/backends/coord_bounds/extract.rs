@@ -2,16 +2,15 @@
 
 use zarrs::storage::ReadableWritableListableStorage;
 
-use super::discover::discover_coord_array;
+use super::discover::{RootListing, discover_coord_array};
 use crate::data::CoordValues;
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 pub fn read_coord_values_scoped(
     store: ReadableWritableListableStorage,
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    consolidated: Option<&ConsolidatedMetadataMetadata>,
+    consolidated: RootListing<'_>,
 ) -> Option<CoordValues> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = Vec::new();

@@ -6,20 +6,25 @@ use zarrs::storage::{ReadableStorage, ReadableWritableListableStorage};
 
 type CoordArray = Array<dyn zarrs::storage::ReadableStorageTraits>;
 
+/// What the caller knows of the root's consolidated metadata: `None` not
+/// read yet, `Some(None)` read and absent, `Some(Some(_))` its listing.
+pub type RootListing<'a> = Option<Option<&'a ConsolidatedMetadataMetadata>>;
+
 /// Finds and opens an array matching any candidate path across root, group
 /// children, and consolidated metadata. With the store's `consolidated`
 /// metadata only candidates it lists are opened: it lists every node, so
 /// the store is asked nothing (each probe a request on a remote store), and
 /// the root's child groups are searched only for a root variable (`root`),
 /// so a sibling group's coordinate is never taken for a grouped variable's.
+/// A root known to have none is not read again.
 pub fn discover_coord_array(
     store: ReadableWritableListableStorage,
-    consolidated: Option<&ConsolidatedMetadataMetadata>,
+    consolidated: RootListing<'_>,
     candidates: &[String],
     root: bool,
 ) -> Option<CoordArray> {
     let readable_store: ReadableStorage = store.clone();
-    if let Some(metadata) = consolidated {
+    if let Some(Some(metadata)) = consolidated {
         let found = listed_array(&readable_store, metadata, candidates);
         return found.or_else(|| {
             let in_children = root.then(|| child_candidates(metadata, candidates))?;
@@ -56,6 +61,9 @@ pub fn discover_coord_array(
         }
     }
 
+    if consolidated.is_some() {
+        return None;
+    }
     let group = zarrs::group::Group::open(readable_store.clone(), "/").ok()?;
     let metadata = group.consolidated_metadata()?.metadata;
     listed_array(&readable_store, &metadata, candidates)

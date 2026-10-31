@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
 
+use super::discover::RootListing;
 use super::extract::read_coord_values_scoped;
 use crate::data::CoordValues;
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Cache key: store URL (see [`cache_url`]), group scope (empty at the root), lowercase
 /// dimension name.
@@ -55,7 +55,7 @@ pub fn get_cached_coord_values_scoped(
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    consolidated: Option<&ConsolidatedMetadataMetadata>,
+    consolidated: RootListing<'_>,
 ) -> Option<CoordValues> {
     let cache_lock = COORD_VALUES_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let scope = clean_scope(group_scope);

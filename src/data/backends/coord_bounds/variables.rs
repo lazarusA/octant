@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::cache::get_cached_coord_values_scoped;
+use super::discover::RootListing;
 use crate::data::{CoordValues, VariableInfo};
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Fetches all dimension coordinate values aware of variable group paths and hierarchy.
 ///
@@ -16,7 +16,7 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     store: ReadableWritableListableStorage,
     variables: &[VariableInfo],
     store_url_hint: Option<&str>,
-    consolidated: Option<&ConsolidatedMetadataMetadata>,
+    consolidated: RootListing<'_>,
 ) -> HashMap<String, CoordValues> {
     let mut coords_map = HashMap::new();
     let url_hint = store_url_hint.unwrap_or("local");

@@ -114,6 +114,30 @@ fn coordinates_are_found_in_the_consolidated_metadata() {
 }
 
 #[test]
+fn a_root_known_unconsolidated_is_not_read_for_coordinates() {
+    use crate::data::backends::coord_bounds::discover::discover_coord_array;
+    let memory = Arc::new(MemoryStore::new());
+    for path in ["/", "/g"] {
+        let group = zarrs::group::GroupBuilder::new()
+            .build(memory.clone(), path)
+            .expect("group");
+        group.store_metadata().expect("group metadata");
+    }
+    let root_reads = |known| {
+        let log = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let logged = UsageLogStorageAdapter::new(memory.clone(), log.clone(), String::new);
+        assert!(discover_coord_array(Arc::new(logged), known, &[], true).is_none());
+        (documents_read(&log).iter())
+            .filter(|k| *k == "zarr.json")
+            .count()
+    };
+    // Unread, the root is read for its consolidated metadata; known to have
+    // none, it is not.
+    assert_eq!(root_reads(None), 1);
+    assert_eq!(root_reads(Some(None)), 0);
+}
+
+#[test]
 fn root_variables_find_coordinates_in_a_child_group() {
     let store = Arc::new(MemoryStore::new());
     for path in ["/", "/coords"] {
@@ -131,7 +155,7 @@ fn root_variables_find_coordinates_in_a_child_group() {
         "time",
         None,
         &[],
-        Some(&metadata),
+        Some(Some(&metadata)),
     )
     .expect("time");
     assert_eq!(
