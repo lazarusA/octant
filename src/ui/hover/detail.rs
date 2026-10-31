@@ -3,7 +3,7 @@
 //! of the coarse plot's beneath it.
 
 use crate::app::OctantApp;
-use crate::app::detail::DetailTile;
+use crate::app::layers::Layer;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::i18n::{HoverKey, fill, tr};
 use crate::ui::hover::enrich::{flipped_offset, is_flipped};
@@ -32,7 +32,7 @@ pub fn detail_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCe
         value,
         cell: (px, py),
         size: (w, h),
-    } = tile_reading(tile, norm_x, norm_y)?;
+    } = tile_reading(&app.layers.base, norm_x, norm_y)?;
     let [u0, v0, u1, v1] = tile.uv;
     let center = (
         u0 + (px as f32 + 0.5) / w as f32 * (u1 - u0),
@@ -74,7 +74,7 @@ pub fn tile_probe(
 ) -> Option<(&crate::data::slicing::CompositeProbe, (usize, usize))> {
     let tile = app.layers.base.data.detail.tile.as_ref()?;
     let probe = tile.probe.as_ref()?;
-    Some((probe, tile_reading(tile, norm_x, norm_y)?.cell))
+    Some((probe, tile_reading(&app.layers.base, norm_x, norm_y)?.cell))
 }
 
 /// A detail tile's reading under a point.
@@ -86,9 +86,10 @@ pub struct TileReading {
     pub size: (usize, usize),
 }
 
-/// The reading of `tile` at `(norm_x, norm_y)` on the plotted quad; `None`
-/// outside the tile.
-pub fn tile_reading(tile: &DetailTile, norm_x: f32, norm_y: f32) -> Option<TileReading> {
+/// The reading of `layer`'s tile at `(norm_x, norm_y)` on the plotted quad,
+/// the composite's color where the GPU blends it; `None` outside the tile.
+pub fn tile_reading(layer: &Layer, norm_x: f32, norm_y: f32) -> Option<TileReading> {
+    let tile = layer.data.detail.tile.as_ref()?;
     let matrix = tile.matrix.as_ref()?;
     let [u0, v0, u1, v1] = tile.uv;
     let inside = |t: f32, lo: f32, hi: f32| hi > lo && t >= lo && t <= hi;
@@ -100,7 +101,17 @@ pub fn tile_reading(tile: &DetailTile, norm_x: f32, norm_y: f32) -> Option<TileR
     let lx = (norm_x - u0) / (u1 - u0);
     let ly = (norm_y - v0) / (v1 - v0);
     let (px, py) = matrix.grid.find_cell_from_norm(lx, ly, w, h);
-    let value = matrix.values.get(py * w + px).copied().unwrap_or(f32::NAN);
+    let value = match (
+        layer.blends_on_gpu(),
+        &tile.probe,
+        &layer.data.composite_stretch,
+    ) {
+        (true, Some(probe), Some(stretch)) => {
+            let configs = &layer.composite.channel_configs;
+            crate::data::slicing::blend_pixel(probe, configs, stretch, (px, py))
+        }
+        _ => matrix.values.get(py * w + px).copied().unwrap_or(f32::NAN),
+    };
     Some(TileReading {
         value,
         cell: (px, py),

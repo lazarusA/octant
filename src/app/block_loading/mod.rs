@@ -24,7 +24,7 @@ mod prefetch_tests;
 pub mod projection;
 pub mod projection_2d;
 pub mod projection_3d;
-mod projection_channels;
+pub(crate) mod projection_channels;
 pub mod projection_hash;
 #[cfg(test)]
 mod slow_store;

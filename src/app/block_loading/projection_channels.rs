@@ -8,6 +8,7 @@ use std::sync::Arc;
 use super::projection_2d::PlaneWindow;
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::{CompositeProbe, CompositeStretch};
 use crate::plots::{ChannelRenderer, PlotType};
@@ -71,11 +72,7 @@ impl OctantApp {
         block: &OctantBlock,
         c_dim: usize,
         window: &PlaneWindow,
-    ) -> Option<(
-        Arc<ChannelRenderer>,
-        crate::data::MatrixData,
-        CompositeStretch,
-    )> {
+    ) -> Option<(Arc<ChannelRenderer>, MatrixData, CompositeStretch)> {
         let heatmap = self
             .layer_selections(id)
             .is_some_and(|(_, staged)| staged.plot_type == PlotType::Heatmap);
@@ -96,33 +93,73 @@ impl OctantApp {
             return None;
         }
         let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
-        let mut fixed = window.fixed.to_vec();
-        fixed.resize(fixed.len().max(block.shape.len()), 0);
         let slot = &mut self.layers.get_mut(id)?.renderers.channels;
         let renderer = ChannelRenderer::sync(slot, &rs.device, rs.target_format, count, plane_len);
         let (mut first, mut stretch) = (None, CompositeStretch::default());
-        for local in 0..count {
-            fixed[c_dim] = local;
-            let plane = block.slice_2d_with_ranges(
-                window.x_dim,
-                window.y_dim,
-                window.x_range,
-                window.y_range,
-                &fixed,
-                1,
-                &block.variable_name,
-                local == 0,
-            )?;
-            // HEALPix cells are not laid out on the quad's grid.
-            if plane.grid.is_healpix() || plane.values.len() != plane_len {
-                return None;
-            }
+        each_plane(block, c_dim, window, |local, plane| {
             stretch.channel(c_start + local, &plane.values, None, 1.0);
             renderer.write_plane(&rs.queue, local, &plane.values);
             first.get_or_insert(plane);
-        }
+        })?;
         Some((renderer, first?, stretch))
     }
+
+    /// Uploads a detail tile's channel `planes` to layer `id`'s tile channel
+    /// renderer, dropping it when they are not given or do not fit.
+    pub(crate) fn upload_tile_planes(&mut self, id: LayerId, planes: Option<&[MatrixData]>) {
+        let rs = self.wgpu_render_state.clone();
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let slot = &mut layer.renderers.detail_channels;
+        let (Some(rs), Some(planes)) = (rs, planes) else {
+            *slot = None;
+            return;
+        };
+        let plane_len = planes.first().map_or(0, |p| p.values.len());
+        if !ChannelRenderer::fits(&rs.device, planes.len(), plane_len) {
+            *slot = None;
+            return;
+        }
+        let renderer =
+            ChannelRenderer::sync(slot, &rs.device, rs.target_format, planes.len(), plane_len);
+        for (i, plane) in planes.iter().enumerate() {
+            renderer.write_plane(&rs.queue, i, &plane.values);
+        }
+    }
+}
+
+/// Calls `each` with every channel plane of `window` of `block` (along
+/// `c_dim`) in order, the first with its bounds; `None` when one cannot be
+/// sliced or lies on a HEALPix grid, whose cells are not laid out on the
+/// quad's grid.
+pub(crate) fn each_plane(
+    block: &OctantBlock,
+    c_dim: usize,
+    window: &PlaneWindow,
+    mut each: impl FnMut(usize, MatrixData),
+) -> Option<()> {
+    let count = block.shape.get(c_dim).copied()?;
+    let mut fixed = window.fixed.to_vec();
+    fixed.resize(fixed.len().max(block.shape.len()), 0);
+    for local in 0..count {
+        fixed[c_dim] = local;
+        let plane = block.slice_2d_with_ranges(
+            window.x_dim,
+            window.y_dim,
+            window.x_range,
+            window.y_range,
+            &fixed,
+            1,
+            &block.variable_name,
+            local == 0,
+        )?;
+        if plane.grid.is_healpix() {
+            return None;
+        }
+        each(local, plane);
+    }
+    Some(())
 }
 
 impl Layer {

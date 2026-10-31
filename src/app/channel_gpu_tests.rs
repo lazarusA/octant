@@ -8,14 +8,15 @@ use crate::app::state::AnimationRole;
 use crate::app::test_support::{poll_until, pyramid_app, render_state, selection_of};
 use crate::data::slicing::ChannelColorConfig;
 
-/// `t2m` level 2 plotted as a three-channel composite, with a GPU when
-/// `gpu` (`None` without one).
-fn plotted(gpu: bool) -> Option<OctantApp> {
+/// `t2m` plotted as a three-channel composite on a 20 px canvas (level 2
+/// by Auto), with a GPU when `gpu` (`None` without one).
+pub(super) fn plotted(gpu: bool) -> Option<OctantApp> {
     let (mut app, meta) = pyramid_app();
     if gpu {
         app.wgpu_render_state = Some(render_state()?);
     }
-    let mut sel = selection_of(&mut app, &meta, "2/t2m");
+    app.layout.canvas_px = [20, 20];
+    let mut sel = selection_of(&mut app, &meta, "0/t2m");
     sel.dim_config[0].animation = AnimationRole::None;
     sel.dim_config[0].range = (0, 2);
     sel.dim_ranges[0] = (0, 2);

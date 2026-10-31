@@ -8,6 +8,7 @@ use super::{DetailTile, MARGIN, PendingDetail, TilePlan, Want};
 use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
 use crate::app::block_loading::projection_2d::PlaneWindow;
+use crate::app::block_loading::projection_channels::each_plane;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
 use crate::data::slicing::CompositeProbe;
@@ -85,10 +86,11 @@ impl OctantApp {
     /// Slices `block` into `pending`'s tile and draws it; nothing when the
     /// block runs in another orientation than the plot.
     pub(super) fn show_detail(&mut self, pending: PendingDetail, block: &OctantBlock) {
-        let Some((matrix, probe)) = self.slice_tile(&pending, block) else {
+        let Some((matrix, probe, planes)) = self.slice_tile(&pending, block) else {
             log::debug!("Detail tile of '{}' skipped", block.variable_name);
             return;
         };
+        self.upload_tile_planes(pending.layer, planes.as_deref());
         if pending.layer == LayerId::BASE {
             self.request_detail_coordinates(pending.tile.var_idx);
         }
@@ -119,13 +121,14 @@ impl OctantApp {
     }
 
     /// `block` sliced into `pending`'s tile like a plotted block (a composite
-    /// with its plot's stretch, and the window behind it); `None` when it runs
-    /// in another orientation than its layer's plot.
+    /// with its plot's stretch, and the window behind it, or where the GPU
+    /// blends its layer the first channel and every channel's plane); `None`
+    /// when it runs in another orientation than its layer's plot.
     fn slice_tile(
         &self,
         pending: &PendingDetail,
         block: &OctantBlock,
-    ) -> Option<(MatrixData, Option<CompositeProbe>)> {
+    ) -> Option<(MatrixData, Option<CompositeProbe>, Option<Vec<MatrixData>>)> {
         let layer = self.layers.get(pending.layer)?;
         let flips = &layer.data.flipped_dims;
         let same_flips = flips.len() == block.flipped_dims.len()
@@ -153,10 +156,17 @@ impl OctantApp {
             fixed: &fixed,
         };
         if layer.composite.enabled {
-            let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
             let c_dim = self.layer_channel_dim(pending.layer).unwrap_or(0);
+            if layer.blends_on_gpu() {
+                let mut planes = Vec::new();
+                each_plane(block, c_dim, &window, |_, plane| planes.push(plane))?;
+                let (x_range, y_range) = (window.x_range, window.y_range);
+                let probe = CompositeProbe::new(block, c_dim, bx, by, x_range, y_range, &fixed);
+                return Some((planes.first()?.clone(), Some(probe), Some(planes)));
+            }
+            let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
             if let Some(c) = self.slice_composite(pending.layer, block, c_dim, &window, stretch) {
-                return Some((c.matrix, Some(c.probe)));
+                return Some((c.matrix, Some(c.probe), None));
             }
         }
         let matrix = block.slice_2d_with_ranges(
@@ -169,7 +179,7 @@ impl OctantApp {
             &block.variable_name,
             false,
         )?;
-        Some((matrix, None))
+        Some((matrix, None, None))
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the

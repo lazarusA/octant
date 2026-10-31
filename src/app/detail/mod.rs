@@ -25,6 +25,8 @@
 //! whose stack has no such level gets none. The hover's overlay rows read
 //! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod channel_tests;
 #[cfg(test)]
 mod composite_tests;
 mod fetch;
