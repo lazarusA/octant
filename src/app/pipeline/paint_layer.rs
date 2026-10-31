@@ -162,29 +162,61 @@ impl OctantApp {
             return;
         };
         let color_params = self.get_color_params(layer);
-        let callback =
-            |renderer: &std::sync::Arc<crate::plots::HeatmapRenderer>, coord_mode, labels| {
-                eframe::egui_wgpu::Callback::new_paint_callback(
-                    view.canvas_rect,
-                    crate::plots::HeatmapCallback {
-                        renderer: renderer.clone(),
-                        color_params,
-                        rect: view.canvas_rect,
-                        pan: view.pan,
-                        zoom: view.zoom,
-                        aspect_scale: view.aspect_scale,
+        let nan = (color_params.use_nan_color == 1).then_some(color_params.nan_color);
+        let channels = |renderer: &Option<_>, probe| channel_draw(layer, renderer, probe, nan);
+        let callback = |renderer: &std::sync::Arc<crate::plots::HeatmapRenderer>,
                         coord_mode,
                         labels,
-                        channels: None,
-                    },
-                )
-            };
-        ui.painter().add(callback(renderer, coord_mode, label_draw));
+                        channels| {
+            eframe::egui_wgpu::Callback::new_paint_callback(
+                view.canvas_rect,
+                crate::plots::HeatmapCallback {
+                    renderer: renderer.clone(),
+                    color_params,
+                    rect: view.canvas_rect,
+                    pan: view.pan,
+                    zoom: view.zoom,
+                    aspect_scale: view.aspect_scale,
+                    coord_mode,
+                    labels,
+                    channels,
+                },
+            )
+        };
+        let probe = layer.data.composite_probe.as_ref();
+        let base_channels = channels(&layer.renderers.channels, probe);
+        ui.painter()
+            .add(callback(renderer, coord_mode, label_draw, base_channels));
         // A multiscale heatmap's finer tile, over its coarse plot.
-        if let (Some(_), Some(detail)) = (&layer.data.detail.tile, &layer.renderers.detail) {
-            ui.painter().add(callback(detail, 0, labels().flatten()));
+        if let (Some(tile), Some(detail)) = (&layer.data.detail.tile, &layer.renderers.detail) {
+            let tile_channels = channels(&layer.renderers.detail_channels, tile.probe.as_ref());
+            ui.painter()
+                .add(callback(detail, 0, labels().flatten(), tile_channels));
         }
     }
+}
+
+/// `layer`'s composite blended by `renderer` from the planes of `probe`'s
+/// window, in its style this frame; `None` when the CPU blended it.
+fn channel_draw(
+    layer: &Layer,
+    renderer: &Option<std::sync::Arc<crate::plots::ChannelRenderer>>,
+    probe: Option<&crate::data::slicing::CompositeProbe>,
+    nan_color: Option<[f32; 4]>,
+) -> Option<crate::plots::ChannelDraw> {
+    let renderer = renderer.as_ref().filter(|_| layer.composite.enabled)?;
+    let (c_start, _) = probe?.channel_span();
+    let params = crate::plots::ChannelParams::of(
+        &layer.composite.channel_configs,
+        layer.data.composite_stretch.as_ref()?,
+        (c_start, renderer.planes),
+        u32::try_from(renderer.plane_len).ok()?,
+        nan_color,
+    );
+    Some(crate::plots::ChannelDraw {
+        renderer: renderer.clone(),
+        params,
+    })
 }
 
 /// Resamples `layer`'s pyramid, when it has one, to the visible window.

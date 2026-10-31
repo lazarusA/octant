@@ -49,6 +49,12 @@ impl OctantApp {
         let composite = self.layers.get(id).is_some_and(|l| l.composite.enabled)
             && block.shape.len() >= 2
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1;
+        if composite && self.project_channel_planes(id, block, c_dim, &window) {
+            return;
+        }
+        if let Some(layer) = self.layers.get_mut(id) {
+            layer.renderers.channels = None;
+        }
         let sliced = composite
             .then(|| self.slice_composite(id, block, c_dim, &window, CompositeStretch::default()))
             .flatten();

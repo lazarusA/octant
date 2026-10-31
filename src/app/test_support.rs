@@ -241,3 +241,20 @@ fn pyramid_of(size: u64, values: bool) -> (OctantApp, DatasetMetadata) {
     let meta = register_store(&mut app, store, TARGET);
     (app, meta)
 }
+
+/// A headless wgpu render state, as eframe gives the app; `None` without a
+/// GPU (tests then skip).
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn render_state() -> Option<eframe::egui_wgpu::RenderState> {
+    use eframe::egui_wgpu::{RenderState, RendererOptions, WgpuConfiguration};
+    let rt = tokio::runtime::Runtime::new().ok()?;
+    let instance = wgpu::Instance::default();
+    let config = WgpuConfiguration::default();
+    rt.block_on(RenderState::create(
+        &config,
+        &instance,
+        None,
+        RendererOptions::default(),
+    ))
+    .ok()
+}

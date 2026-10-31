@@ -87,6 +87,9 @@ fn composite_kind(app: &OctantApp, layer: &Layer) -> Option<CompositeKind> {
 /// `layer`'s value at cell `(px, py)` of its full-resolution grid, NaN when
 /// it has no data there.
 fn cell_value(layer: &Layer, (px, py): (usize, usize)) -> f32 {
+    if let Some(color) = layer.gpu_blended_cell(px, py) {
+        return color;
+    }
     // The matrix is the full-resolution data, also under a pyramid.
     let value = match &layer.data.matrix {
         Some(matrix) if px < matrix.width => matrix.values.get(py * matrix.width + px),
