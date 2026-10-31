@@ -31,13 +31,8 @@ pub fn discover_coord_array(
             listed_array(&readable_store, metadata, &in_children)
         });
     }
-    for clean_key in candidates {
-        if let Ok(arr) = crate::utils::metadata::open_or_instantiate_array_normalized(
-            readable_store.clone(),
-            &format!("/{clean_key}"),
-        ) {
-            return Some(arr);
-        }
+    if let Some(found) = (candidates.iter()).find_map(|key| probe(&readable_store, key)) {
+        return Some(found);
     }
 
     // Discover child group nodes from root if still not found
@@ -49,14 +44,13 @@ pub fn discover_coord_array(
             if child_group.is_empty() {
                 continue;
             }
-            let child_target = format!("/{}", child_group);
-            for clean_key in candidates {
-                if let Ok(arr) = Array::open(
-                    readable_store.clone(),
-                    &format!("{}/{}", child_target, clean_key),
-                ) {
-                    return Some(arr);
-                }
+            // Paths among the candidates were probed already.
+            let in_child = |key: &String| {
+                let path = format!("{child_group}/{key}");
+                (!candidates.contains(&path)).then(|| probe(&readable_store, &path))?
+            };
+            if let Some(found) = candidates.iter().find_map(in_child) {
+                return Some(found);
             }
         }
     }
@@ -67,6 +61,31 @@ pub fn discover_coord_array(
     let group = zarrs::group::Group::open(readable_store.clone(), "/").ok()?;
     let metadata = group.consolidated_metadata()?.metadata;
     listed_array(&readable_store, &metadata, candidates)
+}
+
+/// The array at `key`, its metadata read once: a missing array or an
+/// unreadable store costs no more requests. Only metadata zarrs rejects is
+/// opened again, normalized, and never in place of another array (that open
+/// falls back to the root's).
+fn probe(store: &ReadableStorage, key: &str) -> Option<CoordArray> {
+    use zarrs::array::ArrayCreateError;
+    use zarrs::storage::StorageError;
+    let path = format!("/{key}");
+    match Array::open(store.clone(), &path) {
+        Ok(array) => Some(array),
+        Err(ArrayCreateError::MissingMetadata) => None,
+        Err(ArrayCreateError::StorageError(e))
+            if !matches!(e, StorageError::InvalidMetadata(..)) =>
+        {
+            None
+        }
+        Err(_) => {
+            let array =
+                crate::utils::metadata::open_or_instantiate_array_normalized(store.clone(), &path)
+                    .ok()?;
+            (array.path().as_str() == path).then_some(array)
+        }
+    }
 }
 
 /// `candidates` (aliases among them) within each group at the root that

@@ -138,6 +138,41 @@ fn a_root_known_unconsolidated_is_not_read_for_coordinates() {
 }
 
 #[test]
+fn a_missing_coordinate_reads_each_key_once() {
+    use crate::data::backends::coord_bounds::discover::discover_coord_array;
+    let memory = Arc::new(MemoryStore::new());
+    for path in ["/", "/g"] {
+        let group = zarrs::group::GroupBuilder::new()
+            .build(memory.clone(), path)
+            .expect("group");
+        group.store_metadata().expect("group metadata");
+    }
+    let log = Arc::new(Mutex::new(Vec::<u8>::new()));
+    let logged = UsageLogStorageAdapter::new(memory, log.clone(), String::new);
+    let candidates = ["g/row".to_string(), "row".to_string()];
+    assert!(discover_coord_array(Arc::new(logged), Some(None), &candidates, false).is_none());
+    let log = log.lock().unwrap_or_else(|p| p.into_inner());
+    let text = String::from_utf8_lossy(&log);
+    let mut keys: Vec<&str> = (text.lines())
+        .filter_map(|l| l.split_once("get(")?.1.split(')').next())
+        .collect();
+    assert!(!keys.contains(&"zarr.json"), "the root was read: {keys:?}");
+    let read = keys.len();
+    keys.sort_unstable();
+    keys.dedup();
+    assert_eq!(keys.len(), read, "a key was read twice");
+}
+
+#[test]
+fn a_root_array_is_no_coordinate() {
+    use crate::data::backends::coord_bounds::discover::discover_coord_array;
+    let memory = Arc::new(MemoryStore::new());
+    array(&memory, "/", &[2, 2], &["row", "col"], &[0.0; 4]);
+    let candidates = ["row".to_string()];
+    assert!(discover_coord_array(memory, Some(None), &candidates, true).is_none());
+}
+
+#[test]
 fn root_variables_find_coordinates_in_a_child_group() {
     let store = Arc::new(MemoryStore::new());
     for path in ["/", "/coords"] {
