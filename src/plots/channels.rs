@@ -1,4 +1,4 @@
-//! Multi-channel composites blended on the GPU (desktop heatmaps): a block's
+//! Multi-channel composites blended on the GPU (heatmaps): a block's
 //! channel planes are uploaded once, and its channels' tints, windows and
 //! curves are uniforms, so a display change costs no CPU blend and no upload.
 //! Drawn over a heatmap renderer's quad, as label images are
@@ -39,14 +39,11 @@ pub struct ChannelDraw {
 
 impl ChannelRenderer {
     /// Whether `planes` planes of `plane_len` cells fit in one storage
-    /// binding of `device`.
-    pub fn fits(device: &wgpu::Device, planes: usize, plane_len: usize) -> bool {
-        let bytes = (planes as u64)
-            .saturating_mul(plane_len as u64)
-            .saturating_mul(4);
-        (1..=MAX_CHANNELS).contains(&planes)
-            && bytes <= device.limits().max_storage_buffer_binding_size
-            && bytes <= device.limits().max_buffer_size
+    /// buffer (`limits::max_storage_bytes`: the device's, within the
+    /// browser's budget there).
+    pub fn fits(planes: usize, plane_len: usize) -> bool {
+        let bytes = planes.saturating_mul(plane_len).saturating_mul(4);
+        (1..=MAX_CHANNELS).contains(&planes) && bytes <= super::limits::max_storage_bytes()
     }
 
     pub fn new(

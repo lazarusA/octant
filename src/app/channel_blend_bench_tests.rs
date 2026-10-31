@@ -108,6 +108,8 @@ fn channel_blend_timed() {
         eprintln!("SKIPPED channel_blend_timed: no GPU device");
         return;
     };
+    // As `OctantApp::new` records them.
+    crate::plots::limits::set_from_device(&device.limits());
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let block = block();
     let mut configs: Vec<_> = (0..CHANNELS)
@@ -135,7 +137,7 @@ fn channel_blend_timed() {
         let _ = device.poll(wgpu::PollType::wait_indefinitely());
     };
     assert!(
-        crate::plots::ChannelRenderer::fits(&device, CHANNELS, W * H),
+        crate::plots::ChannelRenderer::fits(CHANNELS, W * H),
         "planes fit"
     );
     let renderer = crate::plots::ChannelRenderer::new(&device, format, CHANNELS, W * H);

@@ -1,4 +1,4 @@
-//! Multi-channel composites blended on the GPU: on the desktop a heatmap
+//! Multi-channel composites blended on the GPU: a heatmap
 //! layer's composite uploads its block's raw channel planes once
 //! (`plots::ChannelRenderer`), and its tints, windows and curves are drawn
 //! from the layer's style every frame, so changing them reloads nothing.
@@ -23,7 +23,7 @@ impl OctantApp {
     }
 
     /// Projects `window` of `block` as layer `id`'s channel planes, when its
-    /// multi-channel composite is drawn as a desktop heatmap and they fit one
+    /// multi-channel composite is drawn as a heatmap and they fit one
     /// GPU buffer; `false` (planes dropped) when the CPU blends it instead.
     pub(crate) fn project_channel_planes(
         &mut self,
@@ -85,10 +85,7 @@ impl OctantApp {
             window.y_range.1.saturating_sub(window.y_range.0),
         );
         let plane_len = w.checked_mul(h)?;
-        let gpu = cfg!(not(target_arch = "wasm32"))
-            && heatmap
-            && multichannel
-            && ChannelRenderer::fits(&rs.device, count, plane_len);
+        let gpu = heatmap && multichannel && ChannelRenderer::fits(count, plane_len);
         if !gpu {
             return None;
         }
@@ -117,7 +114,7 @@ impl OctantApp {
             return;
         };
         let plane_len = planes.first().map_or(0, |p| p.values.len());
-        if !ChannelRenderer::fits(&rs.device, planes.len(), plane_len) {
+        if !ChannelRenderer::fits(planes.len(), plane_len) {
             *slot = None;
             return;
         }
