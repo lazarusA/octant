@@ -78,6 +78,12 @@ impl CompositeProbe {
 
     /// Raw value of global channel `channel` at composite pixel `(px, py)`, or `None` when
     /// either lies outside the window.
+    /// The global index of the window's first channel and its channel count.
+    pub fn channel_span(&self) -> (usize, usize) {
+        let count = self.shape.get(self.c_dim).copied().unwrap_or(0);
+        (self.channel_start, count)
+    }
+
     pub fn sample(&self, channel: usize, px: usize, py: usize) -> Option<f32> {
         let width = self.x_range.1.saturating_sub(self.x_range.0);
         let height = self.y_range.1.saturating_sub(self.y_range.0);

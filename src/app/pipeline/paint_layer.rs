@@ -175,6 +175,7 @@ impl OctantApp {
                         aspect_scale: view.aspect_scale,
                         coord_mode,
                         labels,
+                        channels: None,
                     },
                 )
             };

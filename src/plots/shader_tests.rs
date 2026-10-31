@@ -33,7 +33,7 @@ fn mesh_and_point_cloud_pipelines_validate() {
 }
 
 /// Every plot shader, by name.
-const SHADERS: [(&str, &str); 12] = [
+const SHADERS: [(&str, &str); 13] = [
     (
         "sphere",
         crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl")),
@@ -44,6 +44,7 @@ const SHADERS: [(&str, &str); 12] = [
     ),
     ("heatmap", super::heatmap::HEATMAP_WGSL),
     ("labels", super::labels::LABELS_WGSL),
+    ("channels", super::channels::CHANNELS_WGSL),
     (
         "volume_hardware_filter",
         crate::plots::volume::pipeline::SHADER_HARDWARE_FILTER,
@@ -152,6 +153,16 @@ fn uniform_layouts_match_wgsl() {
             "coastline_3d",
             "Coastline3DUniforms",
             size_of::<super::coastline::types::Coastline3DUniforms>(),
+        ),
+        (
+            "channels",
+            "Channel",
+            size_of::<super::channel_params::ChannelGpu>(),
+        ),
+        (
+            "channels",
+            "ChannelParams",
+            size_of::<super::ChannelParams>(),
         ),
     ];
     for (shader, name, size) in blocks {
