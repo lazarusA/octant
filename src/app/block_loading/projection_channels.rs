@@ -170,17 +170,19 @@ impl Layer {
     /// when the GPU blends it (its matrix then holds the first channel's raw
     /// values); `None` when the matrix holds the colors.
     pub fn gpu_blended_cell(&self, px: usize, py: usize) -> Option<f32> {
+        self.blended_cell(self.data.composite_probe.as_ref()?, (px, py))
+    }
+
+    /// The packed composite color of `cell` of `probe`'s window (the plot's
+    /// or a detail tile's) when the GPU blends this layer, in its style.
+    pub fn blended_cell(&self, probe: &CompositeProbe, cell: (usize, usize)) -> Option<f32> {
         if !self.blends_on_gpu() {
             return None;
         }
-        let probe = self.data.composite_probe.as_ref()?;
         let stretch = self.data.composite_stretch.as_ref()?;
         let configs = &self.composite.channel_configs;
         Some(crate::data::slicing::blend_pixel(
-            probe,
-            configs,
-            stretch,
-            (px, py),
+            probe, configs, stretch, cell,
         ))
     }
 }

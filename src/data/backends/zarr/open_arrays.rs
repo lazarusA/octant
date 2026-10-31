@@ -118,7 +118,10 @@ pub(super) fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
     // within its own budget, so it re-decodes rather than re-downloads.
     let window = match cfg!(target_arch = "wasm32") {
         true => 0,
-        false => window_chunks(shape, &chunk).saturating_mul(one_chunk),
+        false => {
+            let names = crate::utils::resolve_array_dimension_names(array);
+            window_chunks(shape, &chunk, &names).saturating_mul(one_chunk)
+        }
     };
     one_chunk
         .saturating_mul(8)
@@ -128,18 +131,23 @@ pub(super) fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
 }
 
 /// The chunks a window of `MAX_GPU_STORAGE_BUFFER_ELEMENTS` cells (the
-/// largest a 2D plot reads) touches over the array's two longest dimensions:
-/// a square unaligned with the chunk grid, longer along the long dimension
-/// when the short one is narrower.
-fn window_chunks(shape: &[u64], chunk: &[u64]) -> u64 {
+/// largest a 2D plot reads) touches over the array's x and y dimensions (by
+/// `names`, else its last two): a square unaligned with the chunk grid,
+/// longer along the long dimension when the short one is narrower. Other
+/// dimensions (time, band) count one chunk, as a plot reads one step.
+fn window_chunks(shape: &[u64], chunk: &[u64], names: &[String]) -> u64 {
+    use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name};
     let cells = crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64;
-    let mut dims: Vec<usize> = (0..shape.len()).collect();
-    dims.sort_by_key(|&d| shape[d]);
-    let (short, long) = match dims[..] {
-        [.., short, long] => (short, long),
-        [long] => (long, long),
-        [] => return 1,
+    let named = |is: fn(&str) -> bool| names.iter().position(|n| is(n));
+    let (a, b) = match (named(is_spatial_y_name), named(is_spatial_x_name)) {
+        (Some(y), Some(x)) if y != x && x.max(y) < shape.len() => (y, x),
+        _ => match shape.len() {
+            0 => return 1,
+            1 => (0, 0),
+            n => (n - 2, n - 1),
+        },
     };
+    let (short, long) = if shape[a] <= shape[b] { (a, b) } else { (b, a) };
     let short_cells = shape[short].min(cells.isqrt()).max(1);
     let long_cells = shape[long].min(cells / short_cells);
     let crossed = |d: usize, n: u64| {
@@ -156,14 +164,31 @@ fn window_chunks(shape: &[u64], chunk: &[u64]) -> u64 {
 mod tests {
     use super::window_chunks;
 
+    fn names(n: &[&str]) -> Vec<String> {
+        n.iter().map(|s| s.to_string()).collect()
+    }
+
     #[test]
     fn a_window_holds_every_chunk_a_plot_reads() {
+        let rgb = names(&["lat", "lon", "band"]);
         // TESSERA dclimate's coarsest RGB level, read whole: all 7 x 14 chunks.
-        assert_eq!(window_chunks(&[3515, 7031, 4], &[512, 512, 4]), 98);
+        assert_eq!(window_chunks(&[3515, 7031, 4], &[512, 512, 4], &rgb), 98);
         // Its finest level: a 5792-cell square crosses at most 13 chunks a side.
+        let finest = [1_800_000, 3_600_000, 4];
+        assert_eq!(window_chunks(&finest, &[512, 512, 4], &rgb), 169);
+        // Unnamed dimensions: the last two.
+        let unnamed = names(&["dim_0", "dim_1", "dim_2"]);
         assert_eq!(
-            window_chunks(&[1_800_000, 3_600_000, 4], &[512, 512, 4]),
-            169
+            window_chunks(&[4, 3515, 7031], &[4, 512, 512], &unnamed),
+            98
         );
+    }
+
+    #[test]
+    fn a_long_time_axis_is_no_window() {
+        // Hourly maps, one step per chunk: a map reads one chunk, however
+        // many steps the series has.
+        let era5 = names(&["time", "latitude", "longitude"]);
+        assert_eq!(window_chunks(&[744, 721, 1440], &[1, 721, 1440], &era5), 1);
     }
 }

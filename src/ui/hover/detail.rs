@@ -101,17 +101,9 @@ pub fn tile_reading(layer: &Layer, norm_x: f32, norm_y: f32) -> Option<TileReadi
     let lx = (norm_x - u0) / (u1 - u0);
     let ly = (norm_y - v0) / (v1 - v0);
     let (px, py) = matrix.grid.find_cell_from_norm(lx, ly, w, h);
-    let value = match (
-        layer.blends_on_gpu(),
-        &tile.probe,
-        &layer.data.composite_stretch,
-    ) {
-        (true, Some(probe), Some(stretch)) => {
-            let configs = &layer.composite.channel_configs;
-            crate::data::slicing::blend_pixel(probe, configs, stretch, (px, py))
-        }
-        _ => matrix.values.get(py * w + px).copied().unwrap_or(f32::NAN),
-    };
+    let blended = (tile.probe.as_ref()).and_then(|p| layer.blended_cell(p, (px, py)));
+    let value =
+        blended.unwrap_or_else(|| matrix.values.get(py * w + px).copied().unwrap_or(f32::NAN));
     Some(TileReading {
         value,
         cell: (px, py),

@@ -13,7 +13,7 @@ use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
-use crate::plots::HeatmapRenderer;
+use crate::plots::{ChannelRenderer, HeatmapRenderer};
 
 impl OctantApp {
     /// `want`'s tile: the request reading its cells (the current step of an
@@ -157,7 +157,11 @@ impl OctantApp {
         };
         if layer.composite.enabled {
             let c_dim = self.layer_channel_dim(pending.layer).unwrap_or(0);
-            if layer.blends_on_gpu() {
+            let cells = window.x_range.1.saturating_sub(window.x_range.0)
+                * window.y_range.1.saturating_sub(window.y_range.0);
+            let count = block.shape.get(c_dim).copied().unwrap_or(0);
+            // Planes past the GPU's buffer are blended on the CPU instead.
+            if layer.blends_on_gpu() && ChannelRenderer::fits(count, cells) {
                 let mut planes = Vec::new();
                 each_plane(block, c_dim, &window, |_, plane| planes.push(plane))?;
                 let (x_range, y_range) = (window.x_range, window.y_range);
