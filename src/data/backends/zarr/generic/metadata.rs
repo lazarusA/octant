@@ -9,23 +9,20 @@ use crate::data::ome::MetaReader;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 impl GenericZarrBlockStore {
-    /// The root's consolidated metadata, read once on the desktop; a browser
-    /// store fills in later, so there only a found one is kept.
-    pub(super) fn consolidated(&self) -> Option<&ConsolidatedMetadataMetadata> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.consolidated
-                .get_or_init(|| root_consolidated(&self.storage, &self.meta))
-                .as_ref()
+    /// The root's consolidated metadata, read once. A failed read is asked
+    /// again next time, and a browser store fills in later, so there only a
+    /// found one is kept.
+    pub(in crate::data::backends::zarr) fn consolidated(
+        &self,
+    ) -> Option<&ConsolidatedMetadataMetadata> {
+        if let Some(known) = self.consolidated.get() {
+            return known.as_ref();
         }
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(found) = self.consolidated.get().and_then(Option::as_ref) {
-                return Some(found);
-            }
-            let found = root_consolidated(&self.storage, &self.meta)?;
-            self.consolidated.get_or_init(|| Some(found)).as_ref()
+        let found = root_consolidated(&self.storage, &self.meta).ok()?;
+        if found.is_none() && cfg!(target_arch = "wasm32") {
+            return None;
         }
+        self.consolidated.get_or_init(|| found).as_ref()
     }
 
     /// The store's OME-Zarr variables with their discovery, else its plain

@@ -182,6 +182,7 @@ impl BlockStore for GenericZarrBlockStore {
             self.storage.clone(),
             std::slice::from_ref(variable),
             url,
+            self.consolidated(),
         ))
     }
 
@@ -204,8 +205,7 @@ impl BlockStore for GenericZarrBlockStore {
         fetch_block_from_cached_array(
             &cached,
             scales.as_deref(),
-            &self.storage,
-            &self.source_url,
+            (&self.storage, &self.source_url, self.consolidated()),
             request,
             on_progress,
         )

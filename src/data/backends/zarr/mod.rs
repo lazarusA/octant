@@ -6,6 +6,8 @@ mod block;
 mod block_coords;
 #[cfg(test)]
 mod block_coords_tests;
+#[cfg(test)]
+mod consolidated_tests;
 pub mod coords;
 #[cfg(test)]
 mod coords_numeric_tests;

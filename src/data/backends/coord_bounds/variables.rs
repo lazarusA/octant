@@ -5,6 +5,7 @@ use zarrs::storage::ReadableWritableListableStorage;
 
 use super::cache::get_cached_coord_values_scoped;
 use crate::data::{CoordValues, VariableInfo};
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Fetches all dimension coordinate values aware of variable group paths and hierarchy.
 ///
@@ -15,6 +16,7 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     store: ReadableWritableListableStorage,
     variables: &[VariableInfo],
     store_url_hint: Option<&str>,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
 ) -> HashMap<String, CoordValues> {
     let mut coords_map = HashMap::new();
     let url_hint = store_url_hint.unwrap_or("local");
@@ -34,8 +36,7 @@ pub fn fetch_all_dimension_coordinates_for_variables(
                 continue;
             }
         }
-        let total_dims = var.dimension_names.len();
-        for (i, name) in var.dimension_names.iter().enumerate() {
+        for name in &var.dimension_names {
             let keys = DimKeys::new(var, name);
             let resolved = match &keys.scoped {
                 Some(scoped) => coords_map.contains_key(scoped),
@@ -53,8 +54,7 @@ pub fn fetch_all_dimension_coordinates_for_variables(
                     name,
                     scope,
                     &group_prefixes,
-                    i,
-                    total_dims,
+                    consolidated,
                 )
             };
             // Grouped variables fall back to the root when their group has no coordinate.

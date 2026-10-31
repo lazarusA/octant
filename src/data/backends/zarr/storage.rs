@@ -84,20 +84,38 @@ pub fn open_local_storage(
 
 pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;
 
-/// The root group's consolidated metadata, if it has any; its attributes
-/// and Zarr format go into `meta`, so its readers do not read it again.
+/// The root group's consolidated metadata, if it has any; the attributes
+/// and Zarr format of the root and of every group it lists go into `meta`,
+/// so its readers do not read them again. `Err` when the store could not be
+/// read (a timeout, a server error), which is worth asking again, unlike a
+/// store without a root group.
 pub fn root_consolidated(
     storage: &ReadableWritableListableStorage,
     meta: &crate::data::ome::MetaCache,
-) -> Option<ConsolidatedMetadataMetadata> {
+) -> Result<Option<ConsolidatedMetadataMetadata>, zarrs::storage::StorageError> {
+    use zarrs::group::GroupCreateError;
     use zarrs::metadata::GroupMetadata;
-    let group = zarrs::group::Group::open(storage.clone(), "/").ok()?;
-    let format = match group.metadata() {
-        GroupMetadata::V3(_) => 3,
-        GroupMetadata::V2(_) => 2,
+    use zarrs::node::NodeMetadata;
+    let group = match zarrs::group::Group::open(storage.clone(), "/") {
+        Ok(group) => group,
+        Err(GroupCreateError::StorageError(e)) => return Err(e),
+        Err(_) => return Ok(None),
     };
-    meta.keep_found_group("", group.attributes().clone(), format);
-    group.consolidated_metadata().map(|c| c.metadata)
+    let keep = |path: &str, metadata: &GroupMetadata| {
+        let (attrs, format) = match metadata {
+            GroupMetadata::V3(m) => (&m.attributes, 3),
+            GroupMetadata::V2(m) => (&m.attributes, 2),
+        };
+        meta.keep_found_group(path, attrs.clone(), format);
+    };
+    keep("", group.metadata());
+    let consolidated = group.consolidated_metadata().map(|c| c.metadata);
+    for (path, node) in consolidated.iter().flatten() {
+        if let NodeMetadata::Group(metadata) = node {
+            keep(path, metadata);
+        }
+    }
+    Ok(consolidated)
 }
 
 /// Opens a normalized array from `storage`, from the root's `consolidated`

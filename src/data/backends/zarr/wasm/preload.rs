@@ -60,6 +60,7 @@ impl WasmZarrBlockStore {
             self.memory_store.clone(),
             std::slice::from_ref(variable),
             Some(&self.base_url),
+            None,
         );
         settle_preloaded_coordinates(&mut coords, &incomplete);
         coords

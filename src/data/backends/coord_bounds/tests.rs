@@ -127,6 +127,7 @@ fn grouped_variables_read_their_own_groups_coordinates() {
             store,
             &variables,
             Some("grouped_store"),
+            None,
         ),
         variables,
         ..Default::default()
@@ -147,7 +148,7 @@ fn scoped_lookups_read_their_group_before_any_cached_one() {
     axis(&store, "/a/lat", &[1.0, 2.0]);
     axis(&store, "/b/lat", &[5.0, 6.0, 7.0]);
     let read = |scope: Option<&str>| {
-        get_cached_coord_values_scoped(store.clone(), "scoped_store", "lat", scope, &[], 0, 1)
+        get_cached_coord_values_scoped(store.clone(), "scoped_store", "lat", scope, &[], None)
             .and_then(|c| c.last_number())
     };
     assert_eq!(read(Some("a")), Some(2.0));

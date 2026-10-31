@@ -3,9 +3,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
-use zarrs::storage::ReadableWritableListableStorage;
 
-use super::block_coords::{BlockWindow, block_coordinates};
+use super::block_coords::{BlockWindow, StoreSource, block_coordinates};
 use super::quantization::Quantization;
 use super::slice::{ChunkReader, retrieve_array_subset_as_f32, window_subset};
 use super::storage::ZarrArrayHandle;
@@ -164,8 +163,7 @@ pub(super) struct ArrayCachedState {
 pub(super) fn fetch_block_from_cached_array(
     cached: &ArrayCachedState,
     scales: Option<&ArrayCachedState>,
-    store: &ReadableWritableListableStorage,
-    store_url: &str,
+    source: StoreSource<'_>,
     request: &SliceRequest,
     mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
@@ -194,20 +192,14 @@ pub(super) fn fetch_block_from_cached_array(
             cached.attributes.clone(),
         ));
     }
-    orient_and_build_block(
-        cached,
-        (store, store_url),
-        request,
-        (origin, block_shape),
-        raw_values,
-    )
+    orient_and_build_block(cached, source, request, (origin, block_shape), raw_values)
 }
 
 /// The block of `raw_values` at the window `(origin, shape)`, with its
-/// coordinates read from `store`, oriented north-up and west-left.
+/// coordinates read from `source`, oriented north-up and west-left.
 fn orient_and_build_block(
     cached: &ArrayCachedState,
-    (store, store_url): (&ReadableWritableListableStorage, &str),
+    source: StoreSource<'_>,
     request: &SliceRequest,
     (mut origin, mut block_shape): (Vec<usize>, Vec<usize>),
     raw_values: Vec<f32>,
@@ -225,7 +217,7 @@ fn orient_and_build_block(
         .affine
         .map(|a| a.coordinates(&dim_names, full_shape))
         .unwrap_or_default();
-    let mut coords = block_coordinates(store, store_url, &request.variable, &window, &placed);
+    let mut coords = block_coordinates(source, &request.variable, &window, &placed);
     let hints = OrientHints {
         attributes: cached.array.attributes(),
         lat_extent: coords.lat_extent,

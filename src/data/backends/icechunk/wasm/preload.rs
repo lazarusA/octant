@@ -115,6 +115,7 @@ impl WasmIcechunkBlockStore {
             self.inner.memory_store.clone(),
             std::slice::from_ref(variable),
             Some(&self.base_url),
+            None,
         );
         cb::settle_preloaded_coordinates(&mut coords, &incomplete);
         coords

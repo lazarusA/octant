@@ -10,6 +10,15 @@ use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name};
 use crate::data::slice_request::DimensionSelection;
 use crate::utils::grid_flips::{is_lat_name, is_lon_name};
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
+
+/// Where a block's coordinates are searched: the store, its URL (the
+/// coordinate cache's key) and its consolidated metadata, if any.
+pub(super) type StoreSource<'a> = (
+    &'a ReadableWritableListableStorage,
+    &'a str,
+    Option<&'a ConsolidatedMetadataMetadata>,
+);
 
 /// A block's window along every dimension of its array.
 pub(super) struct BlockWindow<'a> {
@@ -92,23 +101,20 @@ impl BlockCoords {
 /// dimension names. Dimensions in `placed` (the coordinates the array's metadata
 /// places) take those instead, and then no fallback is searched for.
 pub(super) fn block_coordinates(
-    store: &ReadableWritableListableStorage,
-    store_url: &str,
+    (store, store_url, consolidated): StoreSource<'_>,
     variable: &str,
     window: &BlockWindow<'_>,
     placed: &[(&str, CoordValues)],
 ) -> BlockCoords {
     let group_path = variable.rfind('/').map(|idx| &variable[..idx]);
-    let total_dims = window.dim_names.len();
-    let coord_values = |name: &str, dim_idx: usize| {
+    let coord_values = |name: &str| {
         get_cached_coord_values_scoped(
             store.clone(),
             store_url,
             name,
             group_path,
             &[],
-            dim_idx,
-            total_dims,
+            consolidated,
         )
     };
     let mut out = BlockCoords::default();
@@ -118,10 +124,7 @@ pub(super) fn block_coordinates(
         }
         // Dimensions the metadata places are never searched for in the store.
         let own = placed.iter().find(|(d, _)| *d == name.as_str());
-        let Some(coords) = own
-            .map(|(_, c)| c.clone())
-            .or_else(|| coord_values(name, i))
-        else {
+        let Some(coords) = own.map(|(_, c)| c.clone()).or_else(|| coord_values(name)) else {
             continue;
         };
         out.note_extent(name, &coords);
@@ -134,7 +137,7 @@ pub(super) fn block_coordinates(
     let generic = ranged_dims().any(|i| window.dim_names[i].starts_with("dim_"));
     let fallback = generic || (out.coordinates.is_empty() && ranged_dims().next().is_some());
     if fallback && placed.is_empty() {
-        add_spatial_fallback(&mut out, window, |name| coord_values(name, usize::MAX));
+        add_spatial_fallback(&mut out, window, coord_values);
     }
     out
 }

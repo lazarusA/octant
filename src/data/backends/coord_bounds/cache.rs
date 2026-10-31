@@ -6,6 +6,7 @@ use zarrs::storage::ReadableWritableListableStorage;
 
 use super::extract::read_coord_values_scoped;
 use crate::data::CoordValues;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Cache key: store URL (see [`cache_url`]), group scope (empty at the root), lowercase
 /// dimension name.
@@ -81,8 +82,8 @@ pub fn get_cached_coord_bounds_scoped(
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    dim_idx: usize,
-    total_dims: usize,
+    _dim_idx: usize,
+    _total_dims: usize,
 ) -> Option<(f64, f64)> {
     let values = get_cached_coord_values_scoped(
         store,
@@ -90,8 +91,7 @@ pub fn get_cached_coord_bounds_scoped(
         dim_name,
         group_scope,
         known_groups,
-        dim_idx,
-        total_dims,
+        None,
     )?;
     parse_bounds_from_values(&values)
 }
@@ -101,10 +101,10 @@ pub fn get_cached_coord_values_with_rank(
     store: ReadableWritableListableStorage,
     store_url: &str,
     dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
+    _dim_idx: usize,
+    _total_dims: usize,
 ) -> Option<CoordValues> {
-    get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
+    get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], None)
 }
 
 #[allow(clippy::single_range_in_vec_init)]
@@ -114,8 +114,7 @@ pub fn get_cached_coord_values_scoped(
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    dim_idx: usize,
-    total_dims: usize,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
 ) -> Option<CoordValues> {
     let cache_lock = COORD_VALUES_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let scope = clean_scope(group_scope);
@@ -141,8 +140,7 @@ pub fn get_cached_coord_values_scoped(
         }
     }
 
-    let values =
-        read_coord_values_scoped(store, dim_name, scope, known_groups, dim_idx, total_dims);
+    let values = read_coord_values_scoped(store, dim_name, scope, known_groups, consolidated);
     let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());
     cache.insert(key, values.clone());
     values

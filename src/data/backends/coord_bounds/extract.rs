@@ -6,6 +6,7 @@ use zarrs::storage::ReadableWritableListableStorage;
 use super::cache::{get_cached_coord_values_with_rank, parse_bounds_from_values};
 use super::discover::discover_coord_array;
 use crate::data::CoordValues;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
 /// Fetches all dimension coordinate values for the specified dimension names across the store.
 pub fn fetch_all_dimension_coordinates(
@@ -60,17 +61,10 @@ pub fn read_coord_bounds_scoped(
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    dim_idx: usize,
-    total_dims: usize,
+    _dim_idx: usize,
+    _total_dims: usize,
 ) -> Option<(f64, f64)> {
-    let values = read_coord_values_scoped(
-        store,
-        dim_name,
-        group_scope,
-        known_groups,
-        dim_idx,
-        total_dims,
-    )?;
+    let values = read_coord_values_scoped(store, dim_name, group_scope, known_groups, None)?;
     parse_bounds_from_values(&values)
 }
 
@@ -80,8 +74,7 @@ pub fn read_coord_values_scoped(
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    _dim_idx: usize,
-    _total_dims: usize,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
 ) -> Option<CoordValues> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = Vec::new();
@@ -128,6 +121,6 @@ pub fn read_coord_values_scoped(
         }
     }
 
-    let array = discover_coord_array(store, &candidates, aliases)?;
+    let array = discover_coord_array(store, consolidated, &candidates, aliases)?;
     crate::data::backends::zarr::read_coordinate(&array)
 }
