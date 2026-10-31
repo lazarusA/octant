@@ -194,10 +194,21 @@ fn channel_row(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> 
     .size(egui::vec2(14.0, 14.0))
     .tooltip(tr(K::ChannelTintHover))
     .show(ui);
-    if color != initial {
+    let tinted = color != initial;
+    if tinted {
         let to_u8 = |c: f32| (c * 255.0).round().clamp(0.0, 255.0) as u8;
         cfg.color_rgb = [to_u8(color[0]), to_u8(color[1]), to_u8(color[2])];
-        changed = true;
+    }
+    // A dragged tint reloads once, when the button is let go: a reload of a
+    // large composite takes longer than a frame.
+    let pending_id = egui::Id::unique(("mc_tint_pending", id, cfg.index));
+    let held = ui.input(|i| i.pointer.primary_down());
+    let mut pending = ui
+        .data_mut(|d| d.remove_temp::<bool>(pending_id))
+        .unwrap_or(false);
+    changed |= reload_tint(tinted, held, &mut pending);
+    if pending {
+        ui.data_mut(|d| d.insert_temp(pending_id, true));
     }
     let mut buf = [0u8; 96];
     let number = cfg.index + 1;
@@ -207,4 +218,35 @@ fn channel_row(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> 
     };
     ui.label(egui::RichText::new(label).small());
     changed
+}
+
+/// Whether a tint change reloads now: at once when made without holding the
+/// pointer (a click, the keyboard), else once the pointer is let go,
+/// `pending` meanwhile.
+fn reload_tint(tinted: bool, held: bool, pending: &mut bool) -> bool {
+    *pending |= tinted;
+    if held {
+        return false;
+    }
+    std::mem::take(pending)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reload_tint;
+
+    #[test]
+    fn a_dragged_tint_reloads_once_when_let_go() {
+        let mut pending = false;
+        // Dragged over three frames: nothing reloads.
+        for _ in 0..3 {
+            assert!(!reload_tint(true, true, &mut pending));
+        }
+        assert!(reload_tint(false, false, &mut pending), "let go");
+        assert!(!reload_tint(false, false, &mut pending), "only once");
+        assert!(
+            reload_tint(true, false, &mut pending),
+            "a click reloads at once"
+        );
+    }
 }
