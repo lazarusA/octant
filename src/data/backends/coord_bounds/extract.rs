@@ -1,40 +1,11 @@
 //! Coordinate range extraction and subset retrieval from storage arrays.
 
-use std::collections::HashMap;
 use zarrs::storage::ReadableWritableListableStorage;
 
-use super::cache::get_cached_coord_values;
 use super::discover::discover_coord_array;
 use crate::data::CoordValues;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 
-/// Fetches all dimension coordinate values for the specified dimension names across the store.
-pub fn fetch_all_dimension_coordinates(
-    store: ReadableWritableListableStorage,
-    dim_names: &[String],
-    store_url_hint: Option<&str>,
-) -> HashMap<String, CoordValues> {
-    let mut coords_map = HashMap::new();
-    let url_hint = store_url_hint.unwrap_or("local");
-
-    for name in dim_names {
-        let clean = name.trim().to_lowercase();
-        if coords_map.contains_key(&clean) {
-            continue;
-        }
-
-        if let Some(values) = get_cached_coord_values(store.clone(), url_hint, name) {
-            coords_map.insert(clean.clone(), values.clone());
-            if clean != *name {
-                coords_map.insert(name.clone(), values);
-            }
-        }
-    }
-
-    coords_map
-}
-
-#[allow(clippy::single_range_in_vec_init)]
 pub fn read_coord_values_scoped(
     store: ReadableWritableListableStorage,
     dim_name: &str,
@@ -87,6 +58,6 @@ pub fn read_coord_values_scoped(
         }
     }
 
-    let array = discover_coord_array(store, consolidated, &candidates, aliases)?;
+    let array = discover_coord_array(store, consolidated, &candidates, group_scope.is_none())?;
     crate::data::backends::zarr::read_coordinate(&array)
 }

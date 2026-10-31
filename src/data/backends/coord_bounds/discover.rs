@@ -10,16 +10,21 @@ type CoordArray = Array<dyn zarrs::storage::ReadableStorageTraits>;
 /// children, and consolidated metadata. With the store's `consolidated`
 /// metadata only candidates it lists are opened: it lists every node, so
 /// the store is asked nothing (each probe a request on a remote store), and
-/// a sibling group's coordinate is never taken for the variable's.
+/// the root's child groups are searched only for a root variable (`root`),
+/// so a sibling group's coordinate is never taken for a grouped variable's.
 pub fn discover_coord_array(
     store: ReadableWritableListableStorage,
     consolidated: Option<&ConsolidatedMetadataMetadata>,
     candidates: &[String],
-    aliases: &[&str],
+    root: bool,
 ) -> Option<CoordArray> {
     let readable_store: ReadableStorage = store.clone();
     if let Some(metadata) = consolidated {
-        return listed_array(&readable_store, metadata, candidates);
+        let found = listed_array(&readable_store, metadata, candidates);
+        return found.or_else(|| {
+            let in_children = root.then(|| child_candidates(metadata, candidates))?;
+            listed_array(&readable_store, metadata, &in_children)
+        });
     }
     for clean_key in candidates {
         if let Ok(arr) = crate::utils::metadata::open_or_instantiate_array_normalized(
@@ -48,20 +53,27 @@ pub fn discover_coord_array(
                     return Some(arr);
                 }
             }
-            for alias in aliases {
-                if let Ok(arr) = Array::open(
-                    readable_store.clone(),
-                    &format!("{}/{}", child_target, alias),
-                ) {
-                    return Some(arr);
-                }
-            }
         }
     }
 
     let group = zarrs::group::Group::open(readable_store.clone(), "/").ok()?;
     let metadata = group.consolidated_metadata()?.metadata;
     listed_array(&readable_store, &metadata, candidates)
+}
+
+/// `candidates` (aliases among them) within each group at the root that
+/// `metadata` lists, in path order, as the probe looks in the root's child
+/// groups.
+fn child_candidates(metadata: &ConsolidatedMetadataMetadata, candidates: &[String]) -> Vec<String> {
+    let mut children: Vec<&str> = (metadata.iter())
+        .filter(|(_, node)| matches!(node, zarrs::node::NodeMetadata::Group(_)))
+        .map(|(path, _)| path.trim_matches('/'))
+        .filter(|path| !path.is_empty() && !path.contains('/'))
+        .collect();
+    children.sort_unstable();
+    (children.iter())
+        .flat_map(|child| candidates.iter().map(move |name| format!("{child}/{name}")))
+        .collect()
 }
 
 /// The first of `candidates` that `metadata` lists, opened from it.

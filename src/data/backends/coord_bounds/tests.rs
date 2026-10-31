@@ -1,8 +1,7 @@
 //! Unit tests for coordinate bounds and cache.
 
-use crate::data::backends::coord_bounds::{
-    fetch_all_dimension_coordinates, get_cached_coord_values,
-};
+use crate::data::CoordValues;
+use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use std::sync::Arc;
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::storage::store::MemoryStore;
@@ -48,31 +47,22 @@ fn test_fetch_and_cache_dimension_coordinates() {
         )
         .expect("Failed storing lon data");
 
-    let dim_names = vec!["lat".to_string(), "lon".to_string()];
-    let coords = fetch_all_dimension_coordinates(store.clone(), &dim_names, Some("test_store"));
-
-    let ends = |dim: &str| {
-        let c = coords.get(dim)?;
+    let ends = |dim| {
+        let c = coords_of(&store, "test_store", dim)?;
         Some((c.len(), c.first_number()?, c.last_number()?))
     };
     assert_eq!(ends("lat"), Some((3, -90.0, 90.0)));
     assert_eq!(ends("lon"), Some((3, 0.0, 360.0)));
+}
 
-    // Test bounds
-    let bounds = |dim| {
-        let values = get_cached_coord_values(store.clone(), "test_store", dim)?;
-        Some((values.first_number()?, values.last_number()?))
-    };
-    let lat_bounds = bounds("lat");
-    assert_eq!(lat_bounds, Some((-90.0, 90.0)));
-
-    let lon_bounds = bounds("lon");
-    assert_eq!(lon_bounds, Some((0.0, 360.0)));
+/// The store's coordinate `dim` from any of its groups, through the cache.
+fn coords_of(store: &Arc<MemoryStore>, url: &str, dim: &str) -> Option<CoordValues> {
+    get_cached_coord_values_scoped(store.clone(), url, dim, None, &[], None)
 }
 
 #[test]
 fn evicted_stores_read_their_coordinates_again() {
-    use crate::data::backends::coord_bounds::{evict_coord_values, get_cached_coord_values};
+    use crate::data::backends::coord_bounds::evict_coord_values;
     let store = Arc::new(MemoryStore::new());
     let dt =
         DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("float64")).expect("float64");
@@ -83,9 +73,7 @@ fn evicted_stores_read_their_coordinates_again() {
     let all = ArraySubset::new_with_shape(vec![2]);
     lat.store_array_subset(&all, &[0.0f64, 1.0])
         .expect("lat values");
-    let read = || {
-        get_cached_coord_values(store.clone(), " evict_store/", "lat").and_then(|c| c.last_number())
-    };
+    let read = || coords_of(&store, " evict_store/", "lat").and_then(|c| c.last_number());
     assert_eq!(read(), Some(1.0));
 
     lat.store_array_subset(&all, &[0.0f64, 5.0])

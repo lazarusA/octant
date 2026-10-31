@@ -49,16 +49,6 @@ fn clean_scope(group_scope: Option<&str>) -> Option<&str> {
         .filter(|g| !g.is_empty())
 }
 
-/// The store's coordinate `dim_name`, from any of its groups, cached.
-pub fn get_cached_coord_values(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-) -> Option<CoordValues> {
-    get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], None)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
 pub fn get_cached_coord_values_scoped(
     store: ReadableWritableListableStorage,
     store_url: &str,

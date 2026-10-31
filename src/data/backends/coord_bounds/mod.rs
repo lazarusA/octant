@@ -9,10 +9,10 @@ pub mod preload;
 mod tests;
 pub mod variables;
 
-pub use cache::{evict_coord_values, get_cached_coord_values, get_cached_coord_values_scoped};
+pub use cache::{evict_coord_values, get_cached_coord_values_scoped};
 pub use candidates::{
     block_coordinate_candidates, collect_coordinate_candidates, variable_coordinate_candidates,
 };
-pub use extract::{fetch_all_dimension_coordinates, read_coord_values_scoped};
+pub use extract::read_coord_values_scoped;
 pub use preload::{CoordPreload, settle_preloaded_coordinates};
 pub use variables::fetch_all_dimension_coordinates_for_variables;

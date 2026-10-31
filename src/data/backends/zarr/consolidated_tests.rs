@@ -31,11 +31,17 @@ fn array(store: &Arc<MemoryStore>, path: &str, shape: &[u64], dims: &[&str], val
     a.store_array_subset(&subset, values).expect("values");
 }
 
-/// Groups `g` and `g/h` with attributes, array `g/data` (`lat`, `x`), its
-/// latitude `g/lat` and another `lat` at the root, consolidated at the root.
+/// Groups `g`, `g/h` and `other` with attributes, array `g/data` (`lat`,
+/// `x`), its latitude `g/lat`, another `lat` at the root and an `x` only in
+/// `other`, consolidated at the root.
 fn consolidated_store() -> Arc<MemoryStore> {
     let store = Arc::new(MemoryStore::new());
-    for (path, source) in [("/", "root"), ("/g", "g"), ("/g/h", "h")] {
+    for (path, source) in [
+        ("/", "root"),
+        ("/g", "g"),
+        ("/g/h", "h"),
+        ("/other", "other"),
+    ] {
         let mut attrs = serde_json::Map::new();
         attrs.insert("source".into(), source.into());
         let mut builder = zarrs::group::GroupBuilder::new();
@@ -46,6 +52,7 @@ fn consolidated_store() -> Arc<MemoryStore> {
     array(&store, "/g/data", &[4, 4], &["lat", "x"], &[0.0; 16]);
     array(&store, "/g/lat", &[4], &["lat"], &[1.0, 2.0, 3.0, 4.0]);
     array(&store, "/lat", &[4], &["lat"], &[10.0, 20.0, 30.0, 40.0]);
+    array(&store, "/other/x", &[4], &["x"], &[5.0, 6.0, 7.0, 8.0]);
     let node = zarrs::node::Node::open(&store, "/").expect("node");
     let metadata = node.consolidate_metadata().expect("consolidated");
     let mut root = zarrs::group::Group::open(store.clone(), "/").expect("root");
@@ -94,11 +101,43 @@ fn coordinates_are_found_in_the_consolidated_metadata() {
         ],
     };
     let block = store.fetch_block(&request).expect("block");
-    // The variable's own group's latitude, not the root's; `x` has none,
-    // and no key was asked for to learn that.
+    // The variable's own group's latitude, not the root's; `x` has none
+    // (`other/x` is a sibling group's), and no key was asked for to learn that.
     let lat = block.coordinates.get("lat").expect("lat");
     assert!(lat.contains(&1.0) && lat.contains(&4.0), "{lat:?}");
+    assert!(
+        !block.coordinates.contains_key("x"),
+        "{:?}",
+        block.coordinates.keys()
+    );
     assert_eq!(documents_read(&log), ["zarr.json"]);
+}
+
+#[test]
+fn root_variables_find_coordinates_in_a_child_group() {
+    let store = Arc::new(MemoryStore::new());
+    for path in ["/", "/coords"] {
+        let group = zarrs::group::GroupBuilder::new()
+            .build(store.clone(), path)
+            .expect("group");
+        group.store_metadata().expect("group metadata");
+    }
+    array(&store, "/t2m", &[3], &["time"], &[0.0; 3]);
+    array(&store, "/coords/time", &[3], &["time"], &[5.0, 6.0, 7.0]);
+    let node = zarrs::node::Node::open(&store, "/").expect("node");
+    let metadata = node.consolidate_metadata().expect("consolidated");
+    let time = crate::data::backends::coord_bounds::read_coord_values_scoped(
+        store,
+        "time",
+        None,
+        &[],
+        Some(&metadata),
+    )
+    .expect("time");
+    assert_eq!(
+        (time.first_number(), time.last_number()),
+        (Some(5.0), Some(7.0))
+    );
 }
 
 /// A store whose root `zarr.json` cannot be read while `failing`, counting

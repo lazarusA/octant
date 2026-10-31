@@ -6,9 +6,7 @@ pub mod netcdf;
 pub mod procedural;
 pub mod zarr;
 
-pub use coord_bounds::{
-    fetch_all_dimension_coordinates, fetch_all_dimension_coordinates_for_variables,
-};
+pub use coord_bounds::fetch_all_dimension_coordinates_for_variables;
 pub use geotiff::GeoTiffBlockStore;
 pub use icechunk::IcechunkBlockStore;
 pub use netcdf::NetCdfBlockStore;
