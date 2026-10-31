@@ -17,6 +17,8 @@ mod actions;
 mod block_loading;
 pub mod canvas;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod channel_blend_bench_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod channel_gpu_tests;
 #[cfg(test)]
 mod composite_defaults_tests;
