@@ -35,14 +35,11 @@ impl WasmZarrBlockStore {
             while let Some((key, res)) = fetches.next().await {
                 match res {
                     Ok(bytes) if self.insert_key_bytes(&key, &bytes).is_ok() => {}
-                    res => {
-                        if let Err(e) = res
-                            && !is_missing(&e)
-                        {
-                            log::warn!("[WASM Zarr] OME-Zarr metadata '{key}' unreadable: {e}");
-                        }
-                        prefetch.mark_absent(key);
+                    Err(e) if !is_missing(&e) => {
+                        log::warn!("[WASM Zarr] OME-Zarr metadata '{key}' unreadable: {e}");
+                        prefetch.mark_failed(key);
                     }
+                    _ => prefetch.mark_absent(key),
                 }
             }
         }

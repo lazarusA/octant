@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
 
+use super::discover::RootListing;
 use super::extract::read_coord_values_scoped;
 use crate::data::CoordValues;
 
@@ -48,74 +49,13 @@ fn clean_scope(group_scope: Option<&str>) -> Option<&str> {
         .filter(|g| !g.is_empty())
 }
 
-/// The first and last coordinate values, in storage order; `None` for labels.
-#[inline]
-pub(crate) fn parse_bounds_from_values(values: &CoordValues) -> Option<(f64, f64)> {
-    Some((values.first_number()?, values.last_number()?))
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-) -> Option<(f64, f64)> {
-    get_cached_coord_bounds_with_rank(store, store_url, dim_name, usize::MAX, 0)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds_with_rank(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
-) -> Option<(f64, f64)> {
-    get_cached_coord_bounds_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds_scoped(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    group_scope: Option<&str>,
-    known_groups: &[String],
-    dim_idx: usize,
-    total_dims: usize,
-) -> Option<(f64, f64)> {
-    let values = get_cached_coord_values_scoped(
-        store,
-        store_url,
-        dim_name,
-        group_scope,
-        known_groups,
-        dim_idx,
-        total_dims,
-    )?;
-    parse_bounds_from_values(&values)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_values_with_rank(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
-) -> Option<CoordValues> {
-    get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
 pub fn get_cached_coord_values_scoped(
     store: ReadableWritableListableStorage,
     store_url: &str,
     dim_name: &str,
     group_scope: Option<&str>,
     known_groups: &[String],
-    dim_idx: usize,
-    total_dims: usize,
+    consolidated: RootListing<'_>,
 ) -> Option<CoordValues> {
     let cache_lock = COORD_VALUES_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let scope = clean_scope(group_scope);
@@ -141,8 +81,7 @@ pub fn get_cached_coord_values_scoped(
         }
     }
 
-    let values =
-        read_coord_values_scoped(store, dim_name, scope, known_groups, dim_idx, total_dims);
+    let values = read_coord_values_scoped(store, dim_name, scope, known_groups, consolidated);
     let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());
     cache.insert(key, values.clone());
     values

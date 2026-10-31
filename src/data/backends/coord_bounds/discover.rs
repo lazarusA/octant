@@ -1,24 +1,39 @@
 //! Array discovery heuristics across group hierarchies and consolidated metadata.
 
 use zarrs::array::Array;
-use zarrs::storage::ReadableWritableListableStorage;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
+use zarrs::storage::{ReadableStorage, ReadableWritableListableStorage};
 
-/// Finds and opens an array matching any candidate path across root, group children, and consolidated metadata.
+type CoordArray = Array<dyn zarrs::storage::ReadableStorageTraits>;
+
+/// What the caller knows of the root's consolidated metadata: `None` not
+/// read yet, `Some(None)` read and absent, `Some(Some(_))` its listing.
+pub type RootListing<'a> = Option<Option<&'a ConsolidatedMetadataMetadata>>;
+
+/// Finds and opens an array matching any candidate path across root, group
+/// children, and consolidated metadata. With the store's `consolidated`
+/// metadata only candidates it lists are opened: it lists every node, so
+/// the store is asked nothing (each probe a request on a remote store), and
+/// the root's child groups are searched only for a root variable (`root`),
+/// so a sibling group's coordinate is never taken for a grouped variable's.
+/// Without it, a listable store's child groups are probed for any variable,
+/// as before. A root known to have none is not read again.
 pub fn discover_coord_array(
     store: ReadableWritableListableStorage,
+    consolidated: RootListing<'_>,
     candidates: &[String],
-    aliases: &[&str],
-) -> Option<Array<dyn zarrs::storage::ReadableStorageTraits>> {
-    let readable_store: zarrs::storage::ReadableStorage = store.clone();
-    for clean_key in candidates {
-        let clean_path = format!("/{}", clean_key);
-
-        if let Ok(arr) = crate::utils::metadata::open_or_instantiate_array_normalized(
-            readable_store.clone(),
-            &clean_path,
-        ) {
-            return Some(arr);
-        }
+    root: bool,
+) -> Option<CoordArray> {
+    let readable_store: ReadableStorage = store.clone();
+    if let Some(Some(metadata)) = consolidated {
+        let found = listed_array(&readable_store, metadata, candidates);
+        return found.or_else(|| {
+            let in_children = root.then(|| child_candidates(metadata, candidates))?;
+            listed_array(&readable_store, metadata, &in_children)
+        });
+    }
+    if let Some(found) = (candidates.iter()).find_map(|key| probe(&readable_store, key)) {
+        return Some(found);
     }
 
     // Discover child group nodes from root if still not found
@@ -30,45 +45,80 @@ pub fn discover_coord_array(
             if child_group.is_empty() {
                 continue;
             }
-            let child_target = format!("/{}", child_group);
-            for clean_key in candidates {
-                if let Ok(arr) = Array::open(
-                    readable_store.clone(),
-                    &format!("{}/{}", child_target, clean_key),
-                ) {
-                    return Some(arr);
-                }
-            }
-            for alias in aliases {
-                if let Ok(arr) = Array::open(
-                    readable_store.clone(),
-                    &format!("{}/{}", child_target, alias),
-                ) {
-                    return Some(arr);
-                }
+            // Paths among the candidates were probed already.
+            let in_child = |key: &String| {
+                let path = format!("{child_group}/{key}");
+                (!candidates.contains(&path)).then(|| probe(&readable_store, &path))?
+            };
+            if let Some(found) = candidates.iter().find_map(in_child) {
+                return Some(found);
             }
         }
     }
 
-    if let Ok(group) = zarrs::group::Group::open(readable_store.clone(), "/")
-        && let Some(zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata {
-            metadata,
-            ..
-        }) = group.consolidated_metadata()
-    {
-        for path in candidates {
-            let key = path.trim_start_matches('/');
-            if let Some(node_meta) = metadata.get(key).or_else(|| metadata.get(path))
-                && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
-                    readable_store.clone(),
-                    path,
-                    node_meta,
-                )
-            {
-                return Some(arr);
-            }
+    if consolidated.is_some() {
+        return None;
+    }
+    let group = zarrs::group::Group::open(readable_store.clone(), "/").ok()?;
+    let metadata = group.consolidated_metadata()?.metadata;
+    listed_array(&readable_store, &metadata, candidates)
+}
+
+/// The array at `key`, its metadata read once: a missing array costs no
+/// more requests, a failed v3 read one more for the v2 metadata. Only
+/// metadata zarrs rejects is opened again, normalized, and never in place of
+/// another array (that open falls back to the root's).
+fn probe(store: &ReadableStorage, key: &str) -> Option<CoordArray> {
+    use zarrs::array::ArrayCreateError;
+    use zarrs::storage::StorageError;
+    let path = format!("/{key}");
+    let unreadable = |e: &StorageError| !matches!(e, StorageError::InvalidMetadata(..));
+    let opened = match Array::open(store.clone(), &path) {
+        // The v3 read failed (S3 answers 403 for a missing key where it may
+        // not list): the v2 metadata may still be there.
+        Err(ArrayCreateError::StorageError(e)) if unreadable(&e) => {
+            let v2 = zarrs::config::MetadataRetrieveVersion::V2;
+            Array::open_opt(store.clone(), &path, &v2)
+        }
+        opened => opened,
+    };
+    match opened {
+        Ok(array) => Some(array),
+        Err(ArrayCreateError::MissingMetadata) => None,
+        Err(ArrayCreateError::StorageError(e)) if unreadable(&e) => None,
+        Err(_) => {
+            let array =
+                crate::utils::metadata::open_or_instantiate_array_normalized(store.clone(), &path)
+                    .ok()?;
+            (array.path().as_str() == path).then_some(array)
         }
     }
+}
 
-    None
+/// `candidates` (aliases among them) within each group at the root that
+/// `metadata` lists, in path order, as the probe looks in the root's child
+/// groups.
+fn child_candidates(metadata: &ConsolidatedMetadataMetadata, candidates: &[String]) -> Vec<String> {
+    let mut children: Vec<&str> = (metadata.iter())
+        .filter(|(_, node)| matches!(node, zarrs::node::NodeMetadata::Group(_)))
+        .map(|(path, _)| path.trim_matches('/'))
+        .filter(|path| !path.is_empty() && !path.contains('/'))
+        .collect();
+    children.sort_unstable();
+    (children.iter())
+        .flat_map(|child| candidates.iter().map(move |name| format!("{child}/{name}")))
+        .collect()
+}
+
+/// The first of `candidates` that `metadata` lists, opened from it.
+fn listed_array(
+    store: &ReadableStorage,
+    metadata: &ConsolidatedMetadataMetadata,
+    candidates: &[String],
+) -> Option<CoordArray> {
+    candidates.iter().find_map(|path| {
+        let key = path.trim_start_matches('/');
+        let node_meta = metadata.get(key).or_else(|| metadata.get(path))?;
+        crate::utils::metadata::instantiate_array_from_node_metadata(store.clone(), path, node_meta)
+    })
 }

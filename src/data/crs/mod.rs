@@ -190,21 +190,25 @@ pub fn inherit_zarr_group_keys(
     }
 }
 
-/// [`attach_zarr_grid_mappings`] over `storage`, every mapping read
-/// concurrently on the desktop.
+/// [`attach_zarr_grid_mappings`] over `storage` through its `cache`, every
+/// mapping read concurrently on the desktop.
 pub fn attach_zarr_grid_mappings_in(
     storage: Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    cache: &crate::data::ome::MetaCache,
     variables: &mut [VariableInfo],
 ) {
     #[cfg(not(target_arch = "wasm32"))]
-    crate::data::ome::direct::walk_concurrent(storage, 3, |reader| {
+    crate::data::ome::direct::walk_concurrent(storage, cache, 3, |reader| {
         let pending = (variables.iter())
             .flat_map(mapping_paths)
             .any(|p| reader.group_attributes(&p).is_err());
         (!pending).then(|| attach_zarr_grid_mappings(reader, variables))
     });
     #[cfg(target_arch = "wasm32")]
-    attach_zarr_grid_mappings(&crate::data::ome::MetaReader::direct(storage), variables);
+    attach_zarr_grid_mappings(
+        &crate::data::ome::MetaReader::direct(storage).with_cache(cache),
+        variables,
+    );
 }
 
 /// Sets every variable's CRS from its attributes; levels of a multiscale

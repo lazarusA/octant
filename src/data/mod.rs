@@ -16,6 +16,8 @@ pub mod procedural;
 pub mod render;
 pub mod slice_request;
 pub mod slicing;
+#[cfg(test)]
+pub(crate) mod test_stores;
 
 pub use blocks::{
     BlockBatchOutcome, BlockCache, BlockCacheKey, BlockLoadOutcome, BlockLoader, BlockPrefetcher,

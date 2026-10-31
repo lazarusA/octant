@@ -8,7 +8,7 @@ use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{StoreKey, WritableStorageTraits};
 
 use super::coords::retrieve_array_as_strings;
-use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates;
+use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 
 fn labels(values: &[&str]) -> Option<Vec<String>> {
@@ -135,10 +135,10 @@ fn dimension_coordinates_keep_every_label() {
     let stations: Vec<&str> = stations.iter().map(String::as_str).collect();
     v3_strings(&store, "/station", &stations, 1024);
 
-    let dims = ["region", "station"].map(String::from);
-    let coords = fetch_all_dimension_coordinates(store.clone(), &dims, Some("labels_store"));
-    let label = |dim: &str, i: usize| coords.get(dim).and_then(|c| c.label(i));
-    assert_eq!(label("region", 1), Some("Africa"));
-    assert_eq!(coords.get("station").map(|c| c.len()), Some(5000));
-    assert_eq!(label("station", 4999), Some("s4999"));
+    let coords =
+        |dim| get_cached_coord_values_scoped(store.clone(), "labels_store", dim, None, &[], None);
+    let label = |dim, i| coords(dim).and_then(|c| c.label(i).map(str::to_string));
+    assert_eq!(label("region", 1).as_deref(), Some("Africa"));
+    assert_eq!(coords("station").map(|c| c.len()), Some(5000));
+    assert_eq!(label("station", 4999).as_deref(), Some("s4999"));
 }

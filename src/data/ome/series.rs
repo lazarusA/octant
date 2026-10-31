@@ -78,7 +78,7 @@ impl Walk<'_, '_> {
                 self.pending = true;
                 HashMap::new()
             }
-            Lookup::Absent => HashMap::new(),
+            Lookup::Absent | Lookup::Failed => HashMap::new(),
         }
     }
 

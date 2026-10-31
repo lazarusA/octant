@@ -88,7 +88,7 @@ impl Fixture {
     /// Discovery over the store answering every key (desktop).
     pub fn discover(&self) -> Option<Discovery> {
         let storage: Arc<dyn ReadableStorageTraits> = self.memory();
-        super::discover_direct(storage)
+        super::discover_direct(storage, &super::MetaCache::shared())
     }
 
     /// Discovery in web passes: each pass fetches the keys the previous one

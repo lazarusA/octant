@@ -5,68 +5,45 @@
 //! what is already there, notes the keys it still needs (`Lookup::Pending`),
 //! and is run again once they have been fetched (`zarr/wasm/ome.rs`).
 
-use std::cell::{Cell, RefCell};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
 use zarrs::storage::{ReadableStorageTraits, StoreKey};
 
-/// The answer for one key.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum Lookup {
-    /// The key's bytes, shared (cache hits copy nothing).
-    Found(zarrs::storage::Bytes),
-    /// The store has no such key.
-    Absent,
-    /// Not fetched yet (web only).
-    Pending,
-}
-
-/// Keys already fetched without success, and keys still needed (web only).
-#[derive(Debug, Default)]
-pub struct Prefetch {
-    absent: RefCell<HashSet<String>>,
-    pending: RefCell<BTreeSet<String>>,
-}
-
-impl Prefetch {
-    /// The keys needed since the last call, emptying the list.
-    pub fn take_pending(&self) -> Vec<String> {
-        std::mem::take(&mut *self.pending.borrow_mut())
-            .into_iter()
-            .collect()
-    }
-
-    /// Records that the store has no `key` (or it could not be fetched).
-    pub fn mark_absent(&self, key: String) {
-        self.absent.borrow_mut().insert(key);
-    }
-}
-
-/// Group attributes by group path, parsed once per reader.
-type Groups = RefCell<HashMap<String, Option<Arc<Map<String, Value>>>>>;
-/// Array metadata documents by array path, parsed once per reader.
-type Arrays = RefCell<HashMap<String, Option<Arc<Value>>>>;
+pub(super) use super::lookup::Lookup;
+pub use super::lookup::Prefetch;
+use super::meta_cache::{ArrayMeta, GroupAttrs, MetaCache};
 
 /// Reads metadata keys from a store, optionally behind a web prefetch. Each
 /// key is read and parsed once per reader (the web keeps one across its
-/// walks), and once a group answers in one Zarr format only that format's
-/// keys are asked: a remote store is spared requests that would fail.
+/// walks; a store's array opens share one `MetaCache`), and once a group
+/// answers in one Zarr format only that format's keys are asked: a remote
+/// store is spared requests that would fail.
 pub struct MetaReader<'a> {
     storage: Arc<dyn ReadableStorageTraits>,
     prefetch: Option<&'a Prefetch>,
     seen: RefCell<HashMap<String, Lookup>>,
-    groups: Groups,
-    arrays: Arrays,
-    /// The store's Zarr format, once a group answered (`2` or `3`).
-    format: Cell<Option<u8>>,
+    /// Parsed documents and the store's format, unless `shared` holds them.
+    own: MetaCache,
+    shared: Option<&'a MetaCache>,
 }
 
 impl<'a> MetaReader<'a> {
     /// A reader answering every key from `storage` (desktop).
     pub fn direct(storage: Arc<dyn ReadableStorageTraits>) -> Self {
         Self::new(storage, None)
+    }
+
+    /// This reader answering through `cache`, shared by every reader of the
+    /// store (its inspection and array opens), so a document one of them
+    /// parsed is not read again.
+    pub fn with_cache(self, cache: &'a MetaCache) -> Self {
+        Self {
+            shared: Some(cache),
+            ..self
+        }
     }
 
     /// A reader over keys prefetched into `storage` (web).
@@ -79,15 +56,18 @@ impl<'a> MetaReader<'a> {
             storage,
             prefetch,
             seen: RefCell::default(),
-            groups: RefCell::default(),
-            arrays: RefCell::default(),
-            format: Cell::new(None),
+            own: MetaCache::own(),
+            shared: None,
         }
+    }
+
+    fn cache(&self) -> &MetaCache {
+        self.shared.unwrap_or(&self.own)
     }
 
     /// Asks only Zarr `format`'s keys (`2` or `3`), as once a group answered.
     pub fn assume_format(&self, format: u8) {
-        self.format.set(Some(format));
+        self.cache().set_format(format);
     }
 
     /// The storage arrays are opened from.
@@ -110,36 +90,35 @@ impl<'a> MetaReader<'a> {
     }
 
     fn read(&self, key: &str) -> Lookup {
-        if let Ok(store_key) = StoreKey::new(key)
-            && let Ok(Some(bytes)) = self.storage.get(&store_key)
-        {
-            return Lookup::Found(bytes);
-        }
-        let Some(prefetch) = self.prefetch else {
+        let Ok(store_key) = StoreKey::new(key) else {
             return Lookup::Absent;
         };
-        if prefetch.absent.borrow().contains(key) {
-            return Lookup::Absent;
+        let read = self.storage.get(&store_key);
+        match (read, self.prefetch) {
+            (Ok(Some(bytes)), _) => Lookup::Found(bytes),
+            (Ok(None), None) => Lookup::Absent,
+            (Err(_), None) => Lookup::Failed,
+            (_, Some(prefetch)) => prefetch.answer(key),
         }
-        prefetch.pending.borrow_mut().insert(key.to_string());
-        Lookup::Pending
     }
 
     /// The first of `keys` the store has. Once one is pending, the rest are
-    /// asked too, so the web fetches them together rather than one per pass.
+    /// asked too, so the web fetches them together rather than one per pass;
+    /// one that failed makes the answer `Failed` rather than `Absent`.
     fn first_of(&self, keys: &[String]) -> Lookup {
-        let mut pending = false;
+        let (mut pending, mut failed) = (false, false);
         for key in keys {
             match self.get(key) {
                 Lookup::Found(bytes) if !pending => return Lookup::Found(bytes),
                 Lookup::Pending => pending = true,
+                Lookup::Failed => failed = true,
                 _ => {}
             }
         }
-        if pending {
-            Lookup::Pending
-        } else {
-            Lookup::Absent
+        match (pending, failed) {
+            (true, _) => Lookup::Pending,
+            (false, true) => Lookup::Failed,
+            (false, false) => Lookup::Absent,
         }
     }
 
@@ -149,48 +128,47 @@ impl<'a> MetaReader<'a> {
         let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
         match self.first_of(&keys) {
             Lookup::Found(_) => Ok(true),
-            Lookup::Absent => Ok(false),
+            Lookup::Absent | Lookup::Failed => Ok(false),
             Lookup::Pending => Err(Pending),
         }
     }
 
     /// A group's attributes: `zarr.json` `attributes` (Zarr v3) or `.zattrs`
     /// (Zarr v2). `Ok(None)` when the group has neither.
-    pub fn group_attributes(&self, path: &str) -> Result<Option<Arc<Map<String, Value>>>, Pending> {
+    pub fn group_attributes(&self, path: &str) -> Result<GroupAttrs, Pending> {
         let path = path.trim_matches('/');
-        if let Some(known) = self.groups.borrow().get(path) {
-            return Ok(known.clone());
+        if let Some(known) = self.cache().group(path) {
+            return Ok(known);
         }
         let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
         let attrs = match self.first_of(&keys) {
             Lookup::Found(bytes) => attributes_of(&bytes).map(|(attrs, format)| {
-                self.format.set(Some(format));
+                self.cache().set_format(format);
                 Arc::new(attrs)
             }),
             Lookup::Absent => None,
+            // Not remembered: the next reader asks again.
+            Lookup::Failed => return Ok(None),
             Lookup::Pending => return Err(Pending),
         };
-        self.groups
-            .borrow_mut()
-            .insert(path.to_string(), attrs.clone());
+        self.cache().keep_group(path, &attrs);
         Ok(attrs)
     }
 
     /// An array's metadata document (`zarr.json` or `.zarray`).
-    pub fn array_metadata(&self, path: &str) -> Result<Option<Arc<Value>>, Pending> {
+    pub fn array_metadata(&self, path: &str) -> Result<ArrayMeta, Pending> {
         let path = path.trim_matches('/');
-        if let Some(known) = self.arrays.borrow().get(path) {
-            return Ok(known.clone());
+        if let Some(known) = self.cache().array(path) {
+            return Ok(known);
         }
         let keys = self.keys(join(path, "zarr.json"), join(path, ".zarray"));
         let meta = match self.first_of(&keys) {
             Lookup::Found(bytes) => serde_json::from_slice::<Value>(&bytes).ok().map(Arc::new),
             Lookup::Absent => None,
+            Lookup::Failed => return Ok(None),
             Lookup::Pending => return Err(Pending),
         };
-        self.arrays
-            .borrow_mut()
-            .insert(path.to_string(), meta.clone());
+        self.cache().keep_array(path, &meta);
         Ok(meta)
     }
 
@@ -204,7 +182,7 @@ impl<'a> MetaReader<'a> {
 
     /// The keys to try: the store's format's alone once known, else both.
     fn keys(&self, v3: String, v2: String) -> Vec<String> {
-        match self.format.get() {
+        match self.cache().format() {
             Some(2) => vec![v2],
             Some(_) => vec![v3],
             None => vec![v3, v2],

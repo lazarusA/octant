@@ -162,7 +162,7 @@ fn root_variables_read_no_array_for_placed_dimensions() {
         ..Default::default()
     }];
     let coords =
-        fetch_all_dimension_coordinates_for_variables(store, &variables, Some("root_affine"));
+        fetch_all_dimension_coordinates_for_variables(store, &variables, Some("root_affine"), None);
     assert!(coords.contains_key("embeddings/lon"));
     assert!(!coords.contains_key("lon"), "no array searched for");
 }
@@ -195,6 +195,7 @@ fn affine_variables_still_read_other_coordinate_arrays() {
             store,
             &variables,
             Some("affine_store"),
+            None,
         ),
         variables,
         ..Default::default()

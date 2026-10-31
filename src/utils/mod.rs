@@ -18,9 +18,7 @@ pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
 pub use stack_str::stack_str;
 
 // Format-agnostic & domain re-exports
-pub use crate::data::backends::coord_bounds::{
-    fetch_all_dimension_coordinates, fetch_all_dimension_coordinates_for_variables,
-};
+pub use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::data::backends::icechunk::build_sync_icechunk_store;
 pub use crate::data::backends::zarr::build_sync_store;
