@@ -93,7 +93,10 @@ impl OpenArrays {
     }
 }
 
-/// The chunk cache size of `array`: eight chunks within 64-512 MB, at most all its chunks.
+/// The chunk cache size of `array`: the chunks of one window as large as a
+/// plot holds, else eight chunks, within 64-512 MB, at most all its chunks.
+/// A window reading one band (or step) decodes chunks holding the others
+/// too, so with them cached the next band reads nothing again.
 pub(super) fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
     let elem_size = match array.data_type().size() {
         zarrs::array::DataTypeSize::Fixed(s) => (s as u64).max(1),
@@ -103,16 +106,64 @@ pub(super) fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
     let Ok(chunk) = array.chunk_shape(&vec![0; shape.len()]) else {
         return 64 * 1024 * 1024;
     };
+    let chunk: Vec<u64> = chunk.iter().map(|c| c.get()).collect();
     // Every chunk decodes whole, so the array's size rounds up to chunks.
     let (mut one_chunk, mut whole) = (Some(elem_size), Some(elem_size));
-    for (&d, c) in shape.iter().zip(chunk.iter()) {
-        let c = c.get();
+    for (&d, &c) in shape.iter().zip(&chunk) {
         one_chunk = one_chunk.and_then(|v| v.checked_mul(c));
         whole = whole.and_then(|v| v.checked_mul(d.div_ceil(c).checked_mul(c)?));
     }
     let (one_chunk, whole) = (one_chunk.unwrap_or(u64::MAX), whole.unwrap_or(u64::MAX));
+    // The browser keeps the downloaded chunks themselves (`PartialStore`),
+    // within its own budget, so it re-decodes rather than re-downloads.
+    let window = match cfg!(target_arch = "wasm32") {
+        true => 0,
+        false => window_chunks(shape, &chunk).saturating_mul(one_chunk),
+    };
     one_chunk
         .saturating_mul(8)
+        .max(window)
         .clamp(64 * 1024 * 1024, 512 * 1024 * 1024)
         .min(whole)
+}
+
+/// The chunks a window of `MAX_GPU_STORAGE_BUFFER_ELEMENTS` cells (the
+/// largest a 2D plot reads) touches over the array's two longest dimensions:
+/// a square unaligned with the chunk grid, longer along the long dimension
+/// when the short one is narrower.
+fn window_chunks(shape: &[u64], chunk: &[u64]) -> u64 {
+    let cells = crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64;
+    let mut dims: Vec<usize> = (0..shape.len()).collect();
+    dims.sort_by_key(|&d| shape[d]);
+    let (short, long) = match dims[..] {
+        [.., short, long] => (short, long),
+        [long] => (long, long),
+        [] => return 1,
+    };
+    let short_cells = shape[short].min(cells.isqrt()).max(1);
+    let long_cells = shape[long].min(cells / short_cells);
+    let crossed = |d: usize, n: u64| {
+        let c = chunk[d].max(1);
+        (n.div_ceil(c) + 1).min(shape[d].div_ceil(c))
+    };
+    match short == long {
+        true => crossed(long, long_cells),
+        false => crossed(short, short_cells) * crossed(long, long_cells),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_chunks;
+
+    #[test]
+    fn a_window_holds_every_chunk_a_plot_reads() {
+        // TESSERA dclimate's coarsest RGB level, read whole: all 7 x 14 chunks.
+        assert_eq!(window_chunks(&[3515, 7031, 4], &[512, 512, 4]), 98);
+        // Its finest level: a 5792-cell square crosses at most 13 chunks a side.
+        assert_eq!(
+            window_chunks(&[1_800_000, 3_600_000, 4], &[512, 512, 4]),
+            169
+        );
+    }
 }

@@ -2,6 +2,8 @@
 
 #[cfg(test)]
 mod affine_block_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod band_network_tests;
 mod block;
 mod block_coords;
 #[cfg(test)]
