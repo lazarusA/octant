@@ -2,22 +2,20 @@
 //! lists: inspection reads no group, the coordinate search probes no key,
 //! and a failed read of the root is asked again.
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::metadata::v3::MetadataV3;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
-use zarrs::storage::byte_range::ByteRangeIterator;
 use zarrs::storage::storage_adapter::usage_log::UsageLogStorageAdapter;
 use zarrs::storage::store::MemoryStore;
-use zarrs::storage::{
-    ListableStorageTraits, MaybeBytes, MaybeBytesIterator, ReadableStorageTraits, StorageError,
-    StoreKey, StoreKeys, StoreKeysPrefixes, StorePrefix, WritableStorageTraits,
-};
+use zarrs::storage::{StoreKey, WritableStorageTraits};
 
 use super::generic::GenericZarrBlockStore;
+use super::metadata_tests::logged;
 use crate::data::blocks::BlockStore;
+use crate::data::test_stores::FailingStore;
 use crate::data::{DimensionSelection, SliceRequest};
 
 /// A float array at `path` of `shape` with dimensions `dims`, holding `values`.
@@ -64,14 +62,6 @@ fn consolidated_store() -> Arc<MemoryStore> {
     store
 }
 
-/// `memory` behind a log of its reads, as a block store.
-fn logged(memory: Arc<MemoryStore>) -> (GenericZarrBlockStore, Arc<Mutex<Vec<u8>>>) {
-    let log = Arc::new(Mutex::new(Vec::<u8>::new()));
-    let logged = UsageLogStorageAdapter::new(memory, log.clone(), String::new);
-    let store = GenericZarrBlockStore::new(Arc::new(logged), "memory://cons", "zarr", "Zarr");
-    (store, log)
-}
-
 /// The metadata documents read so far, by key.
 fn documents_read(log: &Mutex<Vec<u8>>) -> Vec<String> {
     let log = log.lock().unwrap_or_else(|p| p.into_inner());
@@ -85,14 +75,14 @@ fn documents_read(log: &Mutex<Vec<u8>>) -> Vec<String> {
 
 #[test]
 fn inspection_reads_only_the_consolidated_root() {
-    let (store, log) = logged(consolidated_store());
+    let (store, log) = logged(consolidated_store(), "memory://cons");
     store.inspect().expect("inspect");
     assert_eq!(documents_read(&log), ["zarr.json"]);
 }
 
 #[test]
 fn coordinates_are_found_in_the_consolidated_metadata() {
-    let (store, log) = logged(consolidated_store());
+    let (store, log) = logged(consolidated_store(), "memory://cons");
     let request = SliceRequest {
         variable: "g/data".into(),
         selections: vec![
@@ -183,7 +173,7 @@ fn a_v2_coordinate_is_found_where_missing_keys_fail() {
             "lat/0",
             values.iter().flat_map(|v| v.to_le_bytes()).collect(),
         );
-        let storage = FailingRoot::over(memory.clone(), false, true);
+        let storage = FailingStore::new(memory.clone(), FailingStore::missing_v3);
         let lat = discover_coord_array(storage, Some(None), &["lat".to_string()], true)
             .unwrap_or_else(|| panic!("lat, from its .zarray with filters {filters}"));
         let values = super::read_coordinate(&lat).expect("values");
@@ -230,116 +220,9 @@ fn root_variables_find_coordinates_in_a_child_group() {
     );
 }
 
-/// A store whose root `zarr.json` cannot be read while `failing`, counting
-/// the reads of it; with `forbids_missing`, a missing `zarr.json` anywhere
-/// is an error too, as S3 answers 403 where it may not list.
-struct FailingRoot {
-    inner: Arc<MemoryStore>,
-    failing: AtomicBool,
-    forbids_missing: bool,
-    root_reads: AtomicUsize,
-}
-
-impl FailingRoot {
-    fn new() -> Arc<Self> {
-        Self::over(consolidated_store(), true, false)
-    }
-
-    fn over(inner: Arc<MemoryStore>, failing: bool, forbids_missing: bool) -> Arc<Self> {
-        Arc::new(Self {
-            inner,
-            failing: AtomicBool::new(failing),
-            forbids_missing,
-            root_reads: AtomicUsize::new(0),
-        })
-    }
-
-    fn check(&self, key: &StoreKey) -> Result<(), StorageError> {
-        let root = key.as_str() == "zarr.json";
-        if root {
-            self.root_reads.fetch_add(1, Ordering::SeqCst);
-        }
-        let forbidden = self.forbids_missing
-            && key.as_str().ends_with("zarr.json")
-            && matches!(self.inner.get(key), Ok(None));
-        match (self.failing.load(Ordering::SeqCst) && root) || forbidden {
-            true => Err(StorageError::Other("timed out".into())),
-            false => Ok(()),
-        }
-    }
-}
-
-impl ReadableStorageTraits for FailingRoot {
-    fn get(&self, key: &StoreKey) -> Result<MaybeBytes, StorageError> {
-        self.check(key)?;
-        self.inner.get(key)
-    }
-
-    fn get_partial_many<'a>(
-        &'a self,
-        key: &StoreKey,
-        byte_ranges: ByteRangeIterator<'a>,
-    ) -> Result<MaybeBytesIterator<'a>, StorageError> {
-        self.check(key)?;
-        self.inner.get_partial_many(key, byte_ranges)
-    }
-
-    fn size_key(&self, key: &StoreKey) -> Result<Option<u64>, StorageError> {
-        self.inner.size_key(key)
-    }
-
-    fn supports_get_partial(&self) -> bool {
-        true
-    }
-}
-
-impl ListableStorageTraits for FailingRoot {
-    fn list(&self) -> Result<StoreKeys, StorageError> {
-        self.inner.list()
-    }
-
-    fn list_prefix(&self, prefix: &StorePrefix) -> Result<StoreKeys, StorageError> {
-        self.inner.list_prefix(prefix)
-    }
-
-    fn list_dir(&self, prefix: &StorePrefix) -> Result<StoreKeysPrefixes, StorageError> {
-        self.inner.list_dir(prefix)
-    }
-
-    fn size_prefix(&self, prefix: &StorePrefix) -> Result<u64, StorageError> {
-        self.inner.size_prefix(prefix)
-    }
-}
-
-impl WritableStorageTraits for FailingRoot {
-    fn set(&self, key: &StoreKey, value: zarrs::storage::Bytes) -> Result<(), StorageError> {
-        self.inner.set(key, value)
-    }
-
-    fn set_partial_many(
-        &self,
-        key: &StoreKey,
-        offset_values: zarrs::storage::OffsetBytesIterator,
-    ) -> Result<(), StorageError> {
-        self.inner.set_partial_many(key, offset_values)
-    }
-
-    fn erase(&self, key: &StoreKey) -> Result<(), StorageError> {
-        self.inner.erase(key)
-    }
-
-    fn erase_prefix(&self, prefix: &StorePrefix) -> Result<(), StorageError> {
-        self.inner.erase_prefix(prefix)
-    }
-
-    fn supports_set_partial(&self) -> bool {
-        false
-    }
-}
-
 #[test]
 fn a_failed_root_read_is_asked_again() {
-    let storage = FailingRoot::new();
+    let storage = FailingStore::new(consolidated_store(), FailingStore::root);
     let store = GenericZarrBlockStore::new(storage.clone(), "memory://flaky", "zarr", "Zarr");
     assert!(store.consolidated().is_none(), "the root could not be read");
     storage.failing.store(false, Ordering::SeqCst);
@@ -348,7 +231,7 @@ fn a_failed_root_read_is_asked_again() {
 
 #[test]
 fn blocks_of_an_open_array_do_not_retry_a_failing_root() {
-    let storage = FailingRoot::new();
+    let storage = FailingStore::new(consolidated_store(), FailingStore::root);
     let store = GenericZarrBlockStore::new(storage.clone(), "memory://down", "zarr", "Zarr");
     let request = SliceRequest {
         variable: "g/data".into(),

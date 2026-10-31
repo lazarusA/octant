@@ -16,7 +16,8 @@ pub type RootListing<'a> = Option<Option<&'a ConsolidatedMetadataMetadata>>;
 /// the store is asked nothing (each probe a request on a remote store), and
 /// the root's child groups are searched only for a root variable (`root`),
 /// so a sibling group's coordinate is never taken for a grouped variable's.
-/// A root known to have none is not read again.
+/// Without it, a listable store's child groups are probed for any variable,
+/// as before. A root known to have none is not read again.
 pub fn discover_coord_array(
     store: ReadableWritableListableStorage,
     consolidated: RootListing<'_>,

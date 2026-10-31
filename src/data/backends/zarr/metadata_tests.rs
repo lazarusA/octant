@@ -35,10 +35,14 @@ fn store() -> Arc<MemoryStore> {
 }
 
 /// `memory` behind a log of its reads, as a block store.
-fn logged(memory: Arc<MemoryStore>) -> (GenericZarrBlockStore, Arc<Mutex<Vec<u8>>>) {
+/// `url` keys the coordinate cache, so each test file keeps its own.
+pub(super) fn logged(
+    memory: Arc<MemoryStore>,
+    url: &str,
+) -> (GenericZarrBlockStore, Arc<Mutex<Vec<u8>>>) {
     let log = Arc::new(Mutex::new(Vec::<u8>::new()));
     let logged = UsageLogStorageAdapter::new(memory, log.clone(), String::new);
-    let store = GenericZarrBlockStore::new(Arc::new(logged), "memory://groups", "zarr", "Zarr");
+    let store = GenericZarrBlockStore::new(Arc::new(logged), url, "zarr", "Zarr");
     (store, log)
 }
 
@@ -61,7 +65,7 @@ fn open(store: &GenericZarrBlockStore, variable: &str) {
 
 #[test]
 fn array_opens_read_the_root_once() {
-    let (store, log) = logged(store());
+    let (store, log) = logged(store(), "memory://groups");
     let mut reads = Vec::new();
     for variable in ["a", "b", "c"] {
         open(&store, variable);
@@ -74,7 +78,7 @@ fn array_opens_read_the_root_once() {
 
 #[test]
 fn inspection_and_opens_share_the_root() {
-    let (store, log) = logged(store());
+    let (store, log) = logged(store(), "memory://groups");
     store.inspect().expect("inspect");
     for variable in ["a", "b", "c"] {
         open(&store, variable);
@@ -141,7 +145,7 @@ fn a_consolidated_store_lists_its_variables_without_listing_keys() {
     }));
     root.store_metadata().expect("root");
 
-    let (store, log) = logged(memory);
+    let (store, log) = logged(memory, "memory://groups");
     let meta = store.inspect().expect("inspect");
     let mut names: Vec<&str> = meta.variables.iter().map(|v| v.name.as_str()).collect();
     names.sort_unstable();

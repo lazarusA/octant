@@ -2,69 +2,25 @@
 //! the store's shared cache never remembers it, so a later reader asks again.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
-use zarrs::storage::byte_range::ByteRangeIterator;
 use zarrs::storage::store::MemoryStore;
-use zarrs::storage::{
-    MaybeBytes, MaybeBytesIterator, ReadableStorageTraits, StorageError, StoreKey,
-    WritableStorageTraits,
-};
+use zarrs::storage::{StoreKey, WritableStorageTraits};
 
 use super::{MetaCache, MetaReader};
+use crate::data::test_stores::FailingStore;
 
 const GROUP: &str = "g/zarr.json";
 
 /// Group `g` with one attribute, whose reads fail while `failing`.
-struct Flaky {
-    inner: MemoryStore,
-    failing: AtomicBool,
-}
-
-impl Flaky {
-    fn new() -> Arc<Self> {
-        let inner = MemoryStore::new();
-        let doc = r#"{"zarr_format":3,"node_type":"group","attributes":{"source":"g"}}"#;
-        let key = StoreKey::new(GROUP).expect("key");
-        inner
-            .set(&key, doc.as_bytes().to_vec().into())
-            .expect("set");
-        Arc::new(Self {
-            inner,
-            failing: AtomicBool::new(true),
-        })
-    }
-
-    fn fails(&self, key: &StoreKey) -> Result<(), StorageError> {
-        if self.failing.load(Ordering::SeqCst) && key.as_str() == GROUP {
-            return Err(StorageError::Other("timed out".into()));
-        }
-        Ok(())
-    }
-}
-
-impl ReadableStorageTraits for Flaky {
-    fn get(&self, key: &StoreKey) -> Result<MaybeBytes, StorageError> {
-        self.fails(key)?;
-        self.inner.get(key)
-    }
-
-    fn get_partial_many<'a>(
-        &'a self,
-        key: &StoreKey,
-        byte_ranges: ByteRangeIterator<'a>,
-    ) -> Result<MaybeBytesIterator<'a>, StorageError> {
-        self.fails(key)?;
-        self.inner.get_partial_many(key, byte_ranges)
-    }
-
-    fn size_key(&self, key: &StoreKey) -> Result<Option<u64>, StorageError> {
-        self.inner.size_key(key)
-    }
-
-    fn supports_get_partial(&self) -> bool {
-        true
-    }
+fn flaky() -> Arc<FailingStore> {
+    let inner = MemoryStore::new();
+    let doc = r#"{"zarr_format":3,"node_type":"group","attributes":{"source":"g"}}"#;
+    let key = StoreKey::new(GROUP).expect("key");
+    inner
+        .set(&key, doc.as_bytes().to_vec().into())
+        .expect("set");
+    FailingStore::new(Arc::new(inner), |key, _| key.as_str() == GROUP)
 }
 
 fn source(attrs: &super::meta_cache::GroupAttrs) -> Option<&str> {
@@ -73,7 +29,7 @@ fn source(attrs: &super::meta_cache::GroupAttrs) -> Option<&str> {
 
 #[test]
 fn a_failed_read_is_asked_again_by_the_next_reader() {
-    let store = Flaky::new();
+    let store = flaky();
     let cache = MetaCache::shared();
     let reader = MetaReader::direct(store.clone()).with_cache(&cache);
     assert_eq!(reader.group_attributes("g"), Ok(None));
@@ -88,7 +44,7 @@ fn a_failed_read_is_asked_again_by_the_next_reader() {
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_walk_does_not_remember_a_failed_read() {
-    let store = Flaky::new();
+    let store = flaky();
     let cache = MetaCache::shared();
     let walk = |cache: &MetaCache| {
         super::direct::walk_concurrent(store.clone(), cache, 3, |reader| {
