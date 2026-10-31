@@ -1,7 +1,7 @@
 //! Unit tests for coordinate bounds and cache.
 
 use crate::data::backends::coord_bounds::{
-    fetch_all_dimension_coordinates, get_cached_coord_bounds,
+    fetch_all_dimension_coordinates, get_cached_coord_values,
 };
 use std::sync::Arc;
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
@@ -59,18 +59,20 @@ fn test_fetch_and_cache_dimension_coordinates() {
     assert_eq!(ends("lon"), Some((3, 0.0, 360.0)));
 
     // Test bounds
-    let lat_bounds = get_cached_coord_bounds(store.clone(), "test_store", "lat");
+    let bounds = |dim| {
+        let values = get_cached_coord_values(store.clone(), "test_store", dim)?;
+        Some((values.first_number()?, values.last_number()?))
+    };
+    let lat_bounds = bounds("lat");
     assert_eq!(lat_bounds, Some((-90.0, 90.0)));
 
-    let lon_bounds = get_cached_coord_bounds(store.clone(), "test_store", "lon");
+    let lon_bounds = bounds("lon");
     assert_eq!(lon_bounds, Some((0.0, 360.0)));
 }
 
 #[test]
 fn evicted_stores_read_their_coordinates_again() {
-    use crate::data::backends::coord_bounds::{
-        evict_coord_values, get_cached_coord_values_with_rank,
-    };
+    use crate::data::backends::coord_bounds::{evict_coord_values, get_cached_coord_values};
     let store = Arc::new(MemoryStore::new());
     let dt =
         DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("float64")).expect("float64");
@@ -82,8 +84,7 @@ fn evicted_stores_read_their_coordinates_again() {
     lat.store_array_subset(&all, &[0.0f64, 1.0])
         .expect("lat values");
     let read = || {
-        get_cached_coord_values_with_rank(store.clone(), " evict_store/", "lat", 0, 1)
-            .and_then(|c| c.last_number())
+        get_cached_coord_values(store.clone(), " evict_store/", "lat").and_then(|c| c.last_number())
     };
     assert_eq!(read(), Some(1.0));
 

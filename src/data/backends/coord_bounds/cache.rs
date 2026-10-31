@@ -49,60 +49,11 @@ fn clean_scope(group_scope: Option<&str>) -> Option<&str> {
         .filter(|g| !g.is_empty())
 }
 
-/// The first and last coordinate values, in storage order; `None` for labels.
-#[inline]
-pub(crate) fn parse_bounds_from_values(values: &CoordValues) -> Option<(f64, f64)> {
-    Some((values.first_number()?, values.last_number()?))
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds(
+/// The store's coordinate `dim_name`, from any of its groups, cached.
+pub fn get_cached_coord_values(
     store: ReadableWritableListableStorage,
     store_url: &str,
     dim_name: &str,
-) -> Option<(f64, f64)> {
-    get_cached_coord_bounds_with_rank(store, store_url, dim_name, usize::MAX, 0)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds_with_rank(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
-) -> Option<(f64, f64)> {
-    get_cached_coord_bounds_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_bounds_scoped(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    group_scope: Option<&str>,
-    known_groups: &[String],
-    _dim_idx: usize,
-    _total_dims: usize,
-) -> Option<(f64, f64)> {
-    let values = get_cached_coord_values_scoped(
-        store,
-        store_url,
-        dim_name,
-        group_scope,
-        known_groups,
-        None,
-    )?;
-    parse_bounds_from_values(&values)
-}
-
-#[allow(clippy::single_range_in_vec_init)]
-pub fn get_cached_coord_values_with_rank(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    dim_name: &str,
-    _dim_idx: usize,
-    _total_dims: usize,
 ) -> Option<CoordValues> {
     get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], None)
 }

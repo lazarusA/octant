@@ -202,10 +202,13 @@ impl BlockStore for GenericZarrBlockStore {
             .and_then(Quantization::scale_array)
             .map(|q| self.get_or_open_array(&q.path))
             .transpose()?;
+        // What is known: a root that keeps failing is retried by array opens
+        // and inspection, never once per block.
+        let consolidated = self.consolidated.get().and_then(Option::as_ref);
         fetch_block_from_cached_array(
             &cached,
             scales.as_deref(),
-            (&self.storage, &self.source_url, self.consolidated()),
+            (&self.storage, &self.source_url, consolidated),
             request,
             on_progress,
         )

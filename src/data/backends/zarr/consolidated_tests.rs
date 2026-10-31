@@ -2,7 +2,7 @@
 //! lists: inspection reads no group, the coordinate search probes no key,
 //! and a failed read of the root is asked again.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
@@ -101,14 +101,27 @@ fn coordinates_are_found_in_the_consolidated_metadata() {
     assert_eq!(documents_read(&log), ["zarr.json"]);
 }
 
-/// A store whose root `zarr.json` cannot be read while `failing`.
+/// A store whose root `zarr.json` cannot be read while `failing`, counting
+/// the reads of it.
 struct FailingRoot {
     inner: Arc<MemoryStore>,
     failing: AtomicBool,
+    root_reads: AtomicUsize,
 }
 
 impl FailingRoot {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            inner: consolidated_store(),
+            failing: AtomicBool::new(true),
+            root_reads: AtomicUsize::new(0),
+        })
+    }
+
     fn check(&self, key: &StoreKey) -> Result<(), StorageError> {
+        if key.as_str() == "zarr.json" {
+            self.root_reads.fetch_add(1, Ordering::SeqCst);
+        }
         match self.failing.load(Ordering::SeqCst) && key.as_str() == "zarr.json" {
             true => Err(StorageError::Other("timed out".into())),
             false => Ok(()),
@@ -186,12 +199,24 @@ impl WritableStorageTraits for FailingRoot {
 
 #[test]
 fn a_failed_root_read_is_asked_again() {
-    let storage = Arc::new(FailingRoot {
-        inner: consolidated_store(),
-        failing: AtomicBool::new(true),
-    });
+    let storage = FailingRoot::new();
     let store = GenericZarrBlockStore::new(storage.clone(), "memory://flaky", "zarr", "Zarr");
     assert!(store.consolidated().is_none(), "the root could not be read");
     storage.failing.store(false, Ordering::SeqCst);
     assert!(store.consolidated().is_some(), "read again, not remembered");
+}
+
+#[test]
+fn blocks_of_an_open_array_do_not_retry_a_failing_root() {
+    let storage = FailingRoot::new();
+    let store = GenericZarrBlockStore::new(storage.clone(), "memory://down", "zarr", "Zarr");
+    let request = SliceRequest {
+        variable: "g/data".into(),
+        selections: vec![DimensionSelection::Index(0), DimensionSelection::Index(0)],
+    };
+    store.fetch_block(&request).expect("first block");
+    let after_open = storage.root_reads.load(Ordering::SeqCst);
+    store.fetch_block(&request).expect("second block");
+    // The array's open tried the root; its blocks ask it nothing more.
+    assert_eq!(storage.root_reads.load(Ordering::SeqCst), after_open);
 }
