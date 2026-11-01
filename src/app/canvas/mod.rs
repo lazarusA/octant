@@ -40,7 +40,11 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
         // (`mesh_budget`).
         match app.effective_canvas_plot_type() {
             crate::plots::PlotType::Surface | crate::plots::PlotType::Sphere => app.rethin_meshes(),
-            crate::plots::PlotType::PointCloud => app.rethin_points(),
+            // The point cloud is built with the volume, so a volume shown
+            // now has it ready at this size when switched to.
+            crate::plots::PlotType::PointCloud | crate::plots::PlotType::Volume => {
+                app.rethin_points();
+            }
             _ => {}
         }
     }
