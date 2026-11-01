@@ -136,7 +136,7 @@ fn composite_hover_lists_channels_instead_of_a_band_row() {
         .as_ref()
         .expect("composite matrix");
     let (val, fields, px, py) =
-        resolve_2d_plot_entries(&app, matrix, meta, var, 2.5 / 3.0, 1.5 / 2.0, None);
+        resolve_2d_plot_entries(&app, matrix, meta, var, (2.5 / 3.0, 1.5 / 2.0), None, None);
 
     assert!(!val.is_nan(), "composite pixel holds a packed color");
     let names: Vec<_> = fields.iter().map(|f| &*f.label).collect();

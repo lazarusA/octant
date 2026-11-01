@@ -40,41 +40,11 @@ impl MatrixData {
         let ys: Vec<usize> = (0..h)
             .map(|y| sample_index(y, stride, self.height))
             .collect();
-        let at = |values: &[f32]| thin(values, self.width, &xs, &ys);
-        let pick = |values: &[f32], idx: &[usize]| -> std::sync::Arc<[f32]> {
-            idx.iter()
-                .map(|&i| values.get(i).copied().unwrap_or(f32::NAN))
-                .collect()
-        };
-        let grid = match &self.grid {
-            CoordinateGrid::Irregular1D {
-                coords_x,
-                coords_y,
-                lon_bounds,
-                lat_bounds,
-            } => CoordinateGrid::Irregular1D {
-                coords_x: pick(coords_x, &xs),
-                coords_y: pick(coords_y, &ys),
-                lon_bounds: *lon_bounds,
-                lat_bounds: *lat_bounds,
-            },
-            CoordinateGrid::Curvilinear2D {
-                lons,
-                lats,
-                lon_bounds,
-                lat_bounds,
-            } => CoordinateGrid::Curvilinear2D {
-                lons: at(lons).into(),
-                lats: at(lats).into(),
-                lon_bounds: *lon_bounds,
-                lat_bounds: *lat_bounds,
-            },
-            regular => regular.clone(),
-        };
+        let grid = thin_grid(&self.grid, self.width, &xs, &ys);
         let mut out = MatrixData::new_with_grid(
             w,
             h,
-            at(&self.values),
+            thin(&self.values, self.width, &xs, &ys),
             self.min_val,
             self.max_val,
             self.dataset_name.clone(),
@@ -83,6 +53,42 @@ impl MatrixData {
         );
         out.unique_values.clone_from(&self.unique_values);
         Some(out)
+    }
+}
+
+/// `grid` with its per-cell coordinates thinned to the columns `xs` and
+/// rows `ys` of a `width`-wide grid.
+fn thin_grid(grid: &CoordinateGrid, width: usize, xs: &[usize], ys: &[usize]) -> CoordinateGrid {
+    let at = |values: &[f32]| thin(values, width, xs, ys);
+    let pick = |values: &[f32], idx: &[usize]| -> std::sync::Arc<[f32]> {
+        idx.iter()
+            .map(|&i| values.get(i).copied().unwrap_or(f32::NAN))
+            .collect()
+    };
+    match grid {
+        CoordinateGrid::Irregular1D {
+            coords_x,
+            coords_y,
+            lon_bounds,
+            lat_bounds,
+        } => CoordinateGrid::Irregular1D {
+            coords_x: pick(coords_x, xs),
+            coords_y: pick(coords_y, ys),
+            lon_bounds: *lon_bounds,
+            lat_bounds: *lat_bounds,
+        },
+        CoordinateGrid::Curvilinear2D {
+            lons,
+            lats,
+            lon_bounds,
+            lat_bounds,
+        } => CoordinateGrid::Curvilinear2D {
+            lons: at(lons).into(),
+            lats: at(lats).into(),
+            lon_bounds: *lon_bounds,
+            lat_bounds: *lat_bounds,
+        },
+        regular => regular.clone(),
     }
 }
 

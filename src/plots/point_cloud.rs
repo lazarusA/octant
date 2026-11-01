@@ -14,6 +14,8 @@ pub struct PointCloudRenderer {
     pub index_count: u32,
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    pub bake_id: super::BakeId,
     pub bind_group: wgpu::BindGroup,
     pub instance_count: AtomicU32,
     /// Kept to build the OIT pipelines on first use.
@@ -151,6 +153,7 @@ impl PointCloudRenderer {
             index_count: indices.len() as u32,
             uniform_buffer,
             data_buffer,
+            bake_id: super::BakeId::next(),
             bind_group,
             instance_count: AtomicU32::new(instance_count),
             shader,

@@ -17,6 +17,8 @@ pub struct Coastline3DRenderer {
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    bake_id: crate::plots::BakeId,
     coord_x_buffer: wgpu::Buffer,
     coord_y_buffer: wgpu::Buffer,
     gpu: RwLock<Coastline3DGpuResources>,
@@ -206,6 +208,7 @@ impl Coastline3DRenderer {
             bind_group_layout,
             uniform_buffer,
             data_buffer,
+            bake_id: crate::plots::BakeId::next(),
             coord_x_buffer,
             coord_y_buffer,
             gpu: RwLock::new(Coastline3DGpuResources {
@@ -336,7 +339,8 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             bytemuck::bytes_of(&uniforms),
         );
         if let Some(channels) = &self.channels {
-            let target = (&self.renderer.data_buffer, self.thinning);
+            let r = &self.renderer;
+            let target = (r.bake_id, &r.data_buffer, self.thinning);
             channels.renderer.update_params(queue, &channels.params);
             channels
                 .renderer

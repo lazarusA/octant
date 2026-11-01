@@ -6,7 +6,7 @@
 
 use wgpu::util::DeviceExt;
 
-use super::channel_bake::{BakeTarget, Thinning};
+use super::channel_bake::Thinning;
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
 
@@ -29,6 +29,7 @@ pub(super) struct VolumeBakePipeline {
 /// The raymarcher's textures of a `[w, h, d]` volume, what a volume bake
 /// writes.
 pub struct VolumeTargets<'a> {
+    pub id: super::BakeId,
     pub colors: &'a wgpu::Texture,
     pub validity: &'a wgpu::Texture,
     pub dims: [u32; 3],
@@ -106,8 +107,8 @@ impl ChannelRenderer {
         params: &ChannelParams,
         targets: &VolumeTargets<'_>,
     ) -> bool {
-        let key = BakeTarget::Texture(targets.colors.clone());
-        let Some(planes_version) = self.bake_needed(&key, params, Thinning::NONE) else {
+        let key = targets.id;
+        let Some(planes_version) = self.bake_needed(key, params, Thinning::NONE) else {
             return false;
         };
         let [w, h, d] = targets.dims.map(|n| n.max(1));
@@ -119,22 +120,58 @@ impl ChannelRenderer {
             d,
             row_words: row_bytes / 4,
         };
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Channel Volume Bake Uniforms"),
-            contents: bytemuck::bytes_of(&uniforms),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
         let validity_words = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Channel Volume Validity"),
             size: u64::from(row_bytes) * u64::from(h) * u64::from(d),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
-        let colors = targets.colors.create_view(&Default::default());
         let bake = self.volume_bake(device);
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = bake.targets_group(device, &uniforms, targets.colors, &validity_words);
+        {
+            let mut pass = encoder.begin_compute_pass(&Default::default());
+            pass.set_pipeline(&bake.pipeline);
+            pass.set_bind_group(0, &group, &[]);
+            pass.set_bind_group(2, &self.bind_group, &[]);
+            pass.dispatch_workgroups(w.div_ceil(4).div_ceil(8), h.div_ceil(8), d);
+        }
+        copy_validity(
+            encoder,
+            &validity_words,
+            targets.validity,
+            row_bytes,
+            [w, h, d],
+        );
+        self.remember_bake(key, params, Thinning::NONE, planes_version);
+        true
+    }
+
+    /// The volume bake pipeline, built on first use.
+    fn volume_bake(&self, device: &wgpu::Device) -> &VolumeBakePipeline {
+        self.volume_bake
+            .get_or_init(|| VolumeBakePipeline::new(device, &self.layout))
+    }
+}
+
+impl VolumeBakePipeline {
+    /// Group 0 of a bake: its `uniforms`, the `colors` texture it writes and
+    /// the `validity` words it fills.
+    fn targets_group(
+        &self,
+        device: &wgpu::Device,
+        uniforms: &VolumeBakeUniforms,
+        colors: &wgpu::Texture,
+        validity: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Channel Volume Bake Uniforms"),
+            contents: bytemuck::bytes_of(uniforms),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        let colors = colors.create_view(&Default::default());
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Channel Volume Bake Targets"),
-            layout: &bake.layout,
+            layout: &self.layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -146,40 +183,36 @@ impl ChannelRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: validity_words.as_entire_binding(),
+                    resource: validity.as_entire_binding(),
                 },
             ],
-        });
-        {
-            let mut pass = encoder.begin_compute_pass(&Default::default());
-            pass.set_pipeline(&bake.pipeline);
-            pass.set_bind_group(0, &group, &[]);
-            pass.set_bind_group(2, &self.bind_group, &[]);
-            pass.dispatch_workgroups(w.div_ceil(4).div_ceil(8), h.div_ceil(8), d);
-        }
-        encoder.copy_buffer_to_texture(
-            wgpu::TexelCopyBufferInfo {
-                buffer: &validity_words,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(row_bytes),
-                    rows_per_image: Some(h),
-                },
-            },
-            targets.validity.as_image_copy(),
-            wgpu::Extent3d {
-                width: w,
-                height: h,
-                depth_or_array_layers: d,
-            },
-        );
-        self.remember_bake(key, params, Thinning::NONE, planes_version);
-        true
+        })
     }
+}
 
-    /// The volume bake pipeline, built on first use.
-    fn volume_bake(&self, device: &wgpu::Device) -> &VolumeBakePipeline {
-        self.volume_bake
-            .get_or_init(|| VolumeBakePipeline::new(device, &self.layout))
-    }
+/// Copies the baked validity `words` (`row_bytes` a row) into the `R8Unorm`
+/// `validity` texture of `[w, h, d]` voxels, not a WebGPU storage format.
+fn copy_validity(
+    encoder: &mut wgpu::CommandEncoder,
+    words: &wgpu::Buffer,
+    validity: &wgpu::Texture,
+    row_bytes: u32,
+    [w, h, d]: [u32; 3],
+) {
+    encoder.copy_buffer_to_texture(
+        wgpu::TexelCopyBufferInfo {
+            buffer: words,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(row_bytes),
+                rows_per_image: Some(h),
+            },
+        },
+        validity.as_image_copy(),
+        wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: d,
+        },
+    );
 }

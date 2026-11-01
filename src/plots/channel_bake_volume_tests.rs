@@ -133,6 +133,7 @@ fn bakes_volumes_as_the_cpu_encodes_them() {
         wgpu::TextureUsages::TEXTURE_BINDING,
     );
     let targets = VolumeTargets {
+        id: super::BakeId::next(),
         colors: &colors,
         validity: &validity,
         dims: [W, H, D].map(|n| n as u32),

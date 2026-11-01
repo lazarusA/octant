@@ -1,14 +1,14 @@
 //! GPU renderers of a layer's 2D matrix data: heatmap, labels, line, and the
 //! sphere, surface and 3D coastlines built from the same grid.
 
+use super::mesh_grid::mesh_budget;
 use super::rebuild::follow_variable;
+use super::shown::{needs_pyramid, shown_data};
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId, MeshGrid};
-use crate::app::state::MeshDetail;
 use crate::data::MatrixData;
 use crate::data::render::decimate::stride_for;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
-use crate::plots::limits::max_storage_elements;
 use crate::plots::{
     Coastline3DRenderer, CoastlineLod, CoastlineRenderer, HeatmapRenderer, LabelRenderer,
     LineRenderer, PlotType, SphereRenderer, SurfaceRenderer,
@@ -73,65 +73,6 @@ impl OctantApp {
         self.coastline_renderer = Some(Arc::new(renderer));
         self.coastline_current_lod = CoastlineLod::Lod110m;
     }
-}
-
-/// The data uploaded to the GPU: `data` itself, or with `pyramid` (the
-/// aggregation, when resampling) the pyramid's sample of the heatmap view
-/// in `nav`, keeping the pyramid on the layer. Composites and single rows are
-/// never resampled.
-fn shown_data(
-    layer: &mut Layer,
-    data: &MatrixData,
-    pyramid: Option<crate::data::AggregationOp>,
-    nav: &crate::app::state::NavigationState,
-) -> MatrixData {
-    let is_composite = layer.composite.enabled
-        || data.dataset_name.contains("RGB Composite")
-        || data.dataset_name.contains("CMYK Composite");
-    let Some(op) = pyramid.filter(|_| !is_composite && data.height > 1) else {
-        layer.data.pyramid = None;
-        layer.data.resampler.set_pyramid(None);
-        return data.clone();
-    };
-    let op = layer.pyramid_op(op);
-    let pyramid = Arc::new(crate::data::MatrixPyramid::new(
-        &data.values,
-        data.width,
-        data.height,
-        &data.dataset_name,
-        op,
-        512,
-    ));
-    layer.data.resampler.set_pyramid(Some(pyramid.clone()));
-    layer.data.pyramid = Some(pyramid.clone());
-    let pan = [nav.heatmap_pan.x, nav.heatmap_pan.y];
-    let (u, v) = crate::data::ViewportResampler::compute_visible_data_bounds(
-        pan,
-        nav.heatmap_zoom,
-        [1.0, 1.0],
-    );
-    let target =
-        crate::data::ViewportResampler::compute_target_resolution(data.width, data.height, 2048);
-    pyramid.sample_viewport(&data.values, u, v, target)
-}
-
-/// Whether a layer of `cells` 2D cells is resampled through a pyramid: when
-/// Resampling is ticked (`enabled`), or when it does not fit one GPU storage
-/// buffer (`limits::max_storage_elements`, the device's own limit).
-pub(crate) fn needs_pyramid(enabled: bool, cells: usize) -> bool {
-    enabled || cells > max_storage_elements()
-}
-
-/// Cells a mesh may always draw, however small the canvas.
-const MIN_MESH_CELLS: usize = 256 * 1024;
-
-/// The most cells the sphere and surface draw at `detail` on a canvas of
-/// `canvas_px`, within one storage buffer.
-pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
-    let pixels = (w as usize).saturating_mul(h as usize);
-    detail
-        .budget(pixels)
-        .clamp(MIN_MESH_CELLS, MAX_GPU_STORAGE_BUFFER_ELEMENTS)
 }
 
 /// Keeps the layer's label colors, then writes `shown` into its renderers

@@ -164,7 +164,7 @@ impl ChannelRenderer {
     }
 
     /// Binds the parameters and planes at group 2.
-    pub(crate) fn bind(&self, rpass: &mut wgpu::RenderPass<'_>) {
+    fn bind(&self, rpass: &mut wgpu::RenderPass<'_>) {
         rpass.set_bind_group(2, &self.bind_group, &[]);
     }
 }
@@ -207,9 +207,7 @@ fn channel_buffers(
 pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
         binding,
-        visibility: wgpu::ShaderStages::VERTEX
-            | wgpu::ShaderStages::FRAGMENT
-            | wgpu::ShaderStages::COMPUTE,
+        visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::COMPUTE,
         ty: wgpu::BindingType::Buffer {
             ty,
             has_dynamic_offset: false,

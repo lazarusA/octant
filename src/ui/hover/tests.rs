@@ -149,3 +149,31 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
         "target pos {target:?} must lie inside canvas {rect:?}"
     );
 }
+
+#[test]
+fn a_thinned_mesh_reads_the_cell_it_draws() {
+    // 1001 columns thinned by 2: 501 drawn, not a whole multiple.
+    let (w, h) = (1001, 3);
+    let values = (0..w * h).map(|i| i as f32).collect();
+    let full = crate::data::MatrixData::new(w, h, values, 0.0, 1.0, "m".into(), 1);
+    let thinned = full.decimated(2).expect("thinned");
+    let mut app = OctantApp::default();
+    app.layers.base.data.mesh = Some(crate::app::layers::MeshGrid {
+        matrix: thinned,
+        stride: 2,
+    });
+    app.layers.base.data.matrix = Some(full);
+    // The centre of drawn column 400 of 501, row 0 of 2.
+    let cell = super::hit::drawn_cell(&app, 400.5 / 501.0, 0.25);
+    assert_eq!(cell, Some((801, 1)), "the middle cell of each 2 x 2");
+    let (_, _, px, py) = super::entries_2d::resolve_2d_plot_entries(
+        &app,
+        app.layers.base.data.matrix.as_ref().expect("matrix"),
+        None,
+        None,
+        (400.5 / 501.0, 0.25),
+        cell,
+        None,
+    );
+    assert_eq!((px, py), (801, 1));
+}

@@ -4,7 +4,6 @@
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
 use crate::data::VolumeData;
-use crate::data::render::decimate::stride_for;
 use crate::plots::common::{MAX_GPU_STORAGE_BUFFER_BYTES, MAX_GPU_STORAGE_BUFFER_ELEMENTS};
 use crate::plots::{PointCloudRenderer, VolumeRenderer};
 use std::sync::Arc;
@@ -102,29 +101,6 @@ impl OctantApp {
             if let Some(matrix) = layer.data.matrix.take() {
                 self.rebuild_pipeline_with_matrix_data(id, matrix);
             }
-        }
-    }
-
-    /// Thins the base layer's sphere and surface again after the Detail
-    /// setting changed, when that changes their stride.
-    pub fn rethin_meshes(&mut self) {
-        let budget =
-            super::rebuild_2d::mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
-        let base = &mut self.layers.base;
-        let Some(matrix) = base.data.matrix.as_ref() else {
-            return;
-        };
-        if matrix.height < 2 || matrix.grid.is_healpix() {
-            return;
-        }
-        let stride = stride_for(matrix.width.saturating_mul(matrix.height), budget);
-        // An unchanged mesh is kept: writing it again would overwrite the
-        // colors a GPU composite baked into it.
-        if base.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
-            return;
-        }
-        if let Some(matrix) = base.data.matrix.take() {
-            self.rebuild_pipeline_with_matrix_data(LayerId::BASE, matrix);
         }
     }
 

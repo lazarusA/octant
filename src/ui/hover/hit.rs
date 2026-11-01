@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::data::MatrixData;
+use crate::data::render::decimate::sample_index;
 use crate::plots::PlotType;
 use crate::ui::hover::camera::Camera3D;
 use crate::ui::hover::raycast_sphere::{raycast_sphere, sphere_target_pos};
@@ -19,6 +20,9 @@ pub struct HitResult {
     pub is_valid: bool,
     pub geo_coords: Option<(f32, f32)>,
     pub point_3d: Option<(usize, usize, usize, f32)>,
+    /// The full-resolution cell a thinned mesh draws where it was hit, which
+    /// the fractions alone can miss by up to a stride (`drawn_cell`).
+    pub cell: Option<(usize, usize)>,
 }
 
 impl HitResult {
@@ -29,6 +33,7 @@ impl HitResult {
             is_valid: false,
             geo_coords: None,
             point_3d: None,
+            cell: None,
         }
     }
 
@@ -44,6 +49,7 @@ impl HitResult {
             is_valid,
             geo_coords: geo,
             point_3d: None,
+            cell: None,
         }
     }
 
@@ -54,8 +60,23 @@ impl HitResult {
             is_valid: true,
             geo_coords: None,
             point_3d: Some(point),
+            cell: None,
         }
     }
+}
+
+/// The full-resolution cell the base layer's thinned mesh draws at
+/// `(nx, ny)` on its own grid (`sample_index`); `None` when not thinned.
+pub(crate) fn drawn_cell(app: &OctantApp, nx: f32, ny: f32) -> Option<(usize, usize)> {
+    let base = &app.layers.base;
+    let (mesh, full) = (base.data.mesh.as_ref()?, base.data.matrix.as_ref()?);
+    let m = &mesh.matrix;
+    let (tx, ty) = m.grid.find_cell_from_norm(nx, ny, m.width, m.height);
+    let k = mesh.stride;
+    Some((
+        sample_index(tx, k, full.width),
+        sample_index(ty, k, full.height),
+    ))
 }
 
 fn hit_sphere(
@@ -68,7 +89,10 @@ fn hit_sphere(
     if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos)
     {
-        HitResult::norm_2d(nx, ny, true, geo)
+        HitResult {
+            cell: drawn_cell(app, nx, ny),
+            ..HitResult::norm_2d(nx, ny, true, geo)
+        }
     } else {
         HitResult::invalid()
     }
@@ -83,7 +107,10 @@ fn hit_surface(
     if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_surface(app, matrix, camera, hover_pos)
     {
-        HitResult::norm_2d(nx, ny, true, geo)
+        HitResult {
+            cell: drawn_cell(app, nx, ny),
+            ..HitResult::norm_2d(nx, ny, true, geo)
+        }
     } else {
         HitResult::invalid()
     }

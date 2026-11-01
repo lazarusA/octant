@@ -62,6 +62,7 @@ fn volume_blend_timed() {
         renderer.write_plane(&queue, c, p);
     }
     let targets = crate::plots::VolumeTargets {
+        id: crate::plots::BakeId::next(),
         colors: &colors,
         validity: &validity,
         dims: [W, H, D].map(|v| v as u32),

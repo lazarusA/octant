@@ -44,7 +44,7 @@ pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
 
-pub use channel_bake::Thinning;
+pub use channel_bake::{BakeId, Thinning};
 pub use channel_bake_volume::VolumeTargets;
 pub use channel_params::{ChannelParams, MAX_CHANNELS};
 pub use channels::{ChannelDraw, ChannelRenderer};

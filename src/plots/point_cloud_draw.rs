@@ -61,8 +61,8 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         self.renderer.update_uniforms(queue, &self.params);
         if let Some(channels) = &self.channels {
             channels.renderer.update_params(queue, &channels.params);
-            let target = &self.renderer.data_buffer;
-            let target = (target, super::Thinning::NONE);
+            let r = &self.renderer;
+            let target = (r.bake_id, &r.data_buffer, super::Thinning::NONE);
             if channels
                 .renderer
                 .bake(device, encoder, &channels.params, target)
@@ -71,6 +71,9 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             }
         }
         let Some(atlas) = super::colormap_atlas::bind_group(callback_resources) else {
+            // No frame of this state: `paint` must not draw an older one.
+            self.renderer.frame.release();
+            self.renderer.oit.release();
             return Vec::new();
         };
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);

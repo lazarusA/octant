@@ -4,7 +4,7 @@
 //! while a display change or new planes cost one compute pass
 //! (`shaders/channel_bake.wgsl`), run only when they change.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use wgpu::util::DeviceExt;
 
@@ -31,15 +31,21 @@ pub(super) struct Baked {
     params: ChannelParams,
     planes_version: u64,
     thinning: Thinning,
-    target: BakeTarget,
+    target: BakeId,
 }
 
-/// What a bake writes: a plot's data buffer, or the raymarcher's color
-/// texture (`channel_bake_volume.rs`).
-#[derive(Clone, PartialEq)]
-pub(super) enum BakeTarget {
-    Buffer(wgpu::Buffer),
-    Texture(wgpu::Texture),
+/// What a bake writes, a plot's data buffer or the raymarcher's color
+/// texture (`channel_bake_volume.rs`), named by an id never reused, so the
+/// memo holds no GPU resource and takes no new target for an old one.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BakeId(u64);
+
+impl BakeId {
+    /// A new target's id.
+    pub fn next() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
 }
 
 /// Targets whose last bake is remembered (a mesh and its 3D coastlines).
@@ -118,7 +124,7 @@ impl BakePipeline {
 }
 
 impl ChannelRenderer {
-    /// Blends the planes in `params` into `target` (one `f32` per cell,
+    /// Blends the planes in `params` into `target`, named `id` (one `f32` per cell,
     /// at most a plane's cells, thinned by `thinning`), unless it already
     /// holds that blend of these planes. Returns whether it baked. `params`
     /// must already be written (`update_params`).
@@ -127,10 +133,9 @@ impl ChannelRenderer {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         params: &ChannelParams,
-        (target, thinning): (&wgpu::Buffer, Thinning),
+        (key, target, thinning): (BakeId, &wgpu::Buffer, Thinning),
     ) -> bool {
-        let key = BakeTarget::Buffer(target.clone());
-        let Some(planes_version) = self.bake_needed(&key, params, thinning) else {
+        let Some(planes_version) = self.bake_needed(key, params, thinning) else {
             return false;
         };
         let cells = (target.size() / 4).min(self.plane_len as u64) as u32;
@@ -179,14 +184,14 @@ impl ChannelRenderer {
     /// `params` and `thinning` yet; `None` when it does.
     pub(super) fn bake_needed(
         &self,
-        target: &BakeTarget,
+        target: BakeId,
         params: &ChannelParams,
         thinning: Thinning,
     ) -> Option<u64> {
         let planes_version = self.planes_version.load(Ordering::Acquire);
         let baked = self.baked.lock().unwrap_or_else(|p| p.into_inner());
         let done = baked.iter().any(|b| {
-            b.target == *target
+            b.target == target
                 && b.params == *params
                 && b.planes_version == planes_version
                 && b.thinning == thinning
@@ -197,7 +202,7 @@ impl ChannelRenderer {
     /// Records that `target` now holds that blend.
     pub(super) fn remember_bake(
         &self,
-        target: BakeTarget,
+        target: BakeId,
         params: &ChannelParams,
         thinning: Thinning,
         planes_version: u64,

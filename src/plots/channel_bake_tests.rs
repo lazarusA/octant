@@ -46,7 +46,12 @@ fn bakes_what_the_cpu_blends() {
         mapped_at_creation: false,
     });
     let mut encoder = device.create_command_encoder(&Default::default());
-    renderer.bake(&device, &mut encoder, &params, (&target, Thinning::NONE));
+    renderer.bake(
+        &device,
+        &mut encoder,
+        &params,
+        (super::BakeId::next(), &target, Thinning::NONE),
+    );
     queue.submit([encoder.finish()]);
     assert_close(&read_back(&device, &queue, &target), &packed);
 
@@ -64,7 +69,12 @@ fn bakes_what_the_cpu_blends() {
         full_height: 8,
     };
     let mut encoder = device.create_command_encoder(&Default::default());
-    renderer.bake(&device, &mut encoder, &params, (&small, thinning));
+    renderer.bake(
+        &device,
+        &mut encoder,
+        &params,
+        (super::BakeId::next(), &small, thinning),
+    );
     queue.submit([encoder.finish()]);
     let want: Vec<f32> = (0..16)
         .map(|i| packed[(i / 4 * 2 + 1) * 8 + i % 4 * 2 + 1])

@@ -14,6 +14,8 @@ pub struct VolumeTextures {
     pub encoding: VolumeEncoding,
     pub dims: Dims,
     value: wgpu::Texture,
+    /// Names `value` to the channel bake.
+    bake_id: crate::plots::BakeId,
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
@@ -52,6 +54,7 @@ impl VolumeTextures {
             value_view: value.create_view(&wgpu::TextureViewDescriptor::default()),
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
+            bake_id: crate::plots::BakeId::next(),
             validity,
             invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(plane as u32)).collect(),
             invalid_total: AtomicU64::new((dims.d * plane) as u64),
@@ -63,6 +66,7 @@ impl VolumeTextures {
     pub fn bake_targets(&self) -> crate::plots::VolumeTargets<'_> {
         let Dims { w, h, d } = self.dims;
         crate::plots::VolumeTargets {
+            id: self.bake_id,
             colors: &self.value,
             validity: &self.validity,
             dims: [w, h, d].map(|n| u32::try_from(n).unwrap_or(u32::MAX)),

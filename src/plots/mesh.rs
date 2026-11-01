@@ -14,6 +14,8 @@ pub struct Mesh3DRenderer {
     pub cube_vertex_buffer: wgpu::Buffer,
     pub cube_index_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    pub bake_id: super::BakeId,
     pub coord_x_buffer: wgpu::Buffer,
     pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
@@ -171,6 +173,7 @@ impl Mesh3DRenderer {
             cube_vertex_buffer,
             cube_index_buffer,
             data_buffer,
+            bake_id: super::BakeId::next(),
             coord_x_buffer,
             coord_y_buffer,
             uniform_buffer,

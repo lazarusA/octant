@@ -5,11 +5,14 @@ pub mod axis_info;
 mod coastline_bounds;
 pub mod color;
 pub(crate) mod greyscale;
+mod mesh_grid;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod mesh_grid_tests;
 pub mod paint;
 pub mod paint_layer;
+mod paint_tiles;
 pub mod rebuild;
 mod rebuild_2d;
+mod shown;
 
-pub(crate) use rebuild_2d::needs_pyramid;
+pub(crate) use shown::needs_pyramid;

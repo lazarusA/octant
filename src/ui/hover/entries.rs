@@ -40,7 +40,15 @@ pub(crate) fn resolve_cell_value_and_dim_entries(
             (hit_val, Vec::new(), hit_x, hit_y)
         }
     } else if let Some(matrix) = matrix {
-        resolve_2d_plot_entries(app, matrix, meta, var, norm_x, norm_y, hit.geo_coords)
+        resolve_2d_plot_entries(
+            app,
+            matrix,
+            meta,
+            var,
+            (norm_x, norm_y),
+            hit.cell,
+            hit.geo_coords,
+        )
     } else {
         (f32::NAN, Vec::new(), 0, 0)
     }
