@@ -8,24 +8,14 @@ use super::oit::{Transparency, Variant, build_pipeline};
 use std::sync::Arc;
 
 impl Mesh3DRenderer {
-    /// Binds groups 0 and 2 (`channels`, else none drawn) and the cube or
-    /// quad template and draws every instance.
-    fn draw_geometry(
-        &self,
-        pass: &mut wgpu::RenderPass<'_>,
-        cubes: bool,
-        channels: Option<&ChannelDraw>,
-    ) {
+    /// Binds group 0 and the cube or quad template and draws every instance.
+    fn draw_geometry(&self, pass: &mut wgpu::RenderPass<'_>, cubes: bool) {
         let (vertices, indices, count) = if cubes {
             (&self.cube_vertex_buffer, &self.cube_index_buffer, 36)
         } else {
             (&self.quad_vertex_buffer, &self.quad_index_buffer, 6)
         };
         pass.set_bind_group(0, &self.bind_group, &[]);
-        match channels {
-            Some(draw) => draw.renderer.bind(pass),
-            None => pass.set_bind_group(2, &self.no_channels, &[]),
-        }
         pass.set_vertex_buffer(0, vertices.slice(..));
         pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
         pass.draw_indexed(0..count, 0, 0..self.num_instances);
@@ -55,7 +45,8 @@ pub struct Mesh3DCallback {
     pub rect: egui::Rect,
     /// The plot's Transparency option, resolved for this device.
     pub transparency: Transparency,
-    /// A multi-channel composite the GPU blends (`channel_value`).
+    /// A multi-channel composite the GPU blends, baked into the data buffer
+    /// (`ChannelRenderer::bake`).
     pub channels: Option<ChannelDraw>,
 }
 
@@ -78,20 +69,23 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         self.renderer.update_uniforms(queue, &self.params);
         if let Some(channels) = &self.channels {
             channels.renderer.update_params(queue, &channels.params);
+            let target = &self.renderer.data_buffer;
+            channels
+                .renderer
+                .bake(device, encoder, &channels.params, target);
         }
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
         {
             let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let (renderer, cubes, channels) =
-                (&self.renderer, self.cubes(), self.channels.as_ref());
+            let (renderer, cubes) = (&self.renderer, self.cubes());
             renderer.oit.render(
                 device,
                 encoder,
                 size,
                 atlas,
                 |variant| renderer.oit_pipeline(device, variant),
-                |pass| renderer.draw_geometry(pass, cubes, channels),
+                |pass| renderer.draw_geometry(pass, cubes),
             );
         } else if self.transparency != Transparency::Oit {
             self.renderer.oit.release();
@@ -120,7 +114,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             return;
         }
         rpass.set_pipeline(pipeline);
-        renderer.draw_geometry(rpass, cubes, self.channels.as_ref());
+        renderer.draw_geometry(rpass, cubes);
     }
 }
 

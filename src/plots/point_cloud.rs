@@ -15,8 +15,6 @@ pub struct PointCloudRenderer {
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
-    /// Group 2 while no channels are drawn.
-    pub(super) no_channels: wgpu::BindGroup,
     pub instance_count: AtomicU32,
     /// Kept to build the OIT pipelines on first use.
     pub(super) shader: wgpu::ShaderModule,
@@ -121,11 +119,7 @@ impl PointCloudRenderer {
         let colormap_layout = super::colormap_atlas::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Point Cloud Pipeline Layout"),
-            bind_group_layouts: &[
-                Some(&bind_group_layout),
-                Some(&colormap_layout),
-                Some(&super::channels::bind_group_layout(device)),
-            ],
+            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
             immediate_size: 0,
         });
 
@@ -154,7 +148,6 @@ impl PointCloudRenderer {
             uniform_buffer,
             data_buffer,
             bind_group,
-            no_channels: super::channels::empty_bind_group(device),
             instance_count: AtomicU32::new(instance_count),
             shader,
             pipeline_layout,

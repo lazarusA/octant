@@ -135,7 +135,7 @@ fn surface_blend_timed() {
         surface.update_data(&queue, &packed.values);
         draw_surface(&device, &queue, &mut resources, &callback(None));
         cpu_change.push(start.elapsed());
-        // After: new uniforms, and the frame blends each vertex.
+        // After: new uniforms, one bake into the surface's data, a frame.
         let start = Instant::now();
         let gpu = callback(Some(gpu_channels(&configs)));
         draw_surface(&device, &queue, &mut resources, &gpu);
@@ -154,7 +154,7 @@ fn surface_blend_timed() {
         median(cpu_change)
     );
     eprintln!(
-        "display change, GPU uniforms + frame       {:>10.2?}",
+        "display change, GPU bake + frame          {:>10.2?}",
         median(gpu_change)
     );
     eprintln!(
@@ -162,7 +162,7 @@ fn surface_blend_timed() {
         median(cpu_draw)
     );
     eprintln!(
-        "one frame, blended per vertex (GPU path)   {:>10.2?}",
+        "one frame, baked colors (GPU path)         {:>10.2?}",
         median(gpu_draw)
     );
 }

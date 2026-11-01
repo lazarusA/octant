@@ -1,6 +1,9 @@
 pub mod camera;
 #[cfg(test)]
 mod camera_tests;
+mod channel_bake;
+#[cfg(test)]
+mod channel_bake_tests;
 pub mod channel_params;
 pub mod channels;
 #[cfg(test)]
@@ -117,8 +120,6 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/oit.wgsl"),
             "\n",
-            include_str!("shaders/common/channel_blend.wgsl"),
-            "\n",
             $plot_shader
         )
     };
@@ -148,8 +149,6 @@ macro_rules! assemble_plot_with_coords_shader {
             include_str!("shaders/common/projections.wgsl"),
             "\n",
             include_str!("shaders/common/height.wgsl"),
-            "\n",
-            include_str!("shaders/common/channel_blend.wgsl"),
             "\n",
             $plot_shader
         )

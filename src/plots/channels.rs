@@ -1,13 +1,16 @@
 //! Multi-channel composites blended on the GPU: a block's channel planes
 //! are uploaded once, and its channels' tints, windows and curves are
 //! uniforms, so a display change costs no CPU blend and no upload. Heatmaps
-//! draw them over their quad, as label images are (`labels.rs`); any
-//! pipeline with `bind_group_layout` at group 2 blends them through
-//! `common/channel_blend.wgsl` `blend_cell`, which mirrors
-//! `ChannelAccumulator`.
+//! draw them over their quad, as label images are (`labels.rs`); the
+//! surface, sphere and point cloud bake them into their data buffer
+//! (`channel_bake.rs`); any pipeline with `bind_group_layout` at group 2
+//! blends them through `common/channel_blend.wgsl` `blend_cell`, which
+//! mirrors `ChannelAccumulator`.
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
+use super::channel_bake::{BakePipeline, Baked};
 use super::channel_params::{ChannelParams, MAX_CHANNELS};
 use super::heatmap::HeatmapRenderer;
 use crate::data::slicing::CompositeStretch;
@@ -27,9 +30,14 @@ pub(crate) const CHANNELS_WGSL: &str = concat!(
 pub struct ChannelRenderer {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
+    pub(super) bake: BakePipeline,
     params_buffer: wgpu::Buffer,
     planes_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    pub(super) bind_group: wgpu::BindGroup,
+    /// Bumped by every plane upload, so a bake knows its planes changed.
+    pub(super) planes_version: AtomicU64,
+    /// What the last bake wrote, to skip the next when nothing changed.
+    pub(super) baked: Mutex<Option<Baked>>,
     /// Cells per plane and planes held.
     pub plane_len: usize,
     pub planes: usize,
@@ -70,7 +78,8 @@ impl ChannelRenderer {
             CHANNELS_WGSL,
             &[Some(&data_layout), None, Some(&layout)],
         );
-        Self::with_pipeline(device, pipeline, layout, planes, plane_len)
+        let bake = BakePipeline::new(device, &layout);
+        Self::with_pipeline(device, (pipeline, layout, bake), planes, plane_len)
     }
 
     /// Keeps `slot` holding `planes` planes of `plane_len` cells: the
@@ -86,8 +95,7 @@ impl ChannelRenderer {
             Some(old) if old.planes == planes && old.plane_len == plane_len => old,
             Some(old) => Arc::new(Self::with_pipeline(
                 device,
-                old.pipeline.clone(),
-                old.layout.clone(),
+                (old.pipeline.clone(), old.layout.clone(), old.bake.clone()),
                 planes,
                 plane_len,
             )),
@@ -99,8 +107,7 @@ impl ChannelRenderer {
 
     fn with_pipeline(
         device: &wgpu::Device,
-        pipeline: wgpu::RenderPipeline,
-        layout: wgpu::BindGroupLayout,
+        (pipeline, layout, bake): (wgpu::RenderPipeline, wgpu::BindGroupLayout, BakePipeline),
         planes: usize,
         plane_len: usize,
     ) -> Self {
@@ -109,9 +116,12 @@ impl ChannelRenderer {
         Self {
             pipeline,
             layout,
+            bake,
             params_buffer,
             planes_buffer,
             bind_group,
+            planes_version: AtomicU64::new(0),
+            baked: Mutex::new(None),
             plane_len,
             planes,
         }
@@ -122,6 +132,7 @@ impl ChannelRenderer {
         if plane < self.planes && values.len() == self.plane_len {
             let offset = (plane * self.plane_len * 4) as u64;
             queue.write_buffer(&self.planes_buffer, offset, bytemuck::cast_slice(values));
+            self.planes_version.fetch_add(1, Ordering::Release);
         }
     }
 
@@ -131,6 +142,7 @@ impl ChannelRenderer {
         if offset.saturating_add(values.len()) <= self.planes * self.plane_len {
             let bytes = (offset * 4) as u64;
             queue.write_buffer(&self.planes_buffer, bytes, bytemuck::cast_slice(values));
+            self.planes_version.fetch_add(1, Ordering::Release);
         }
     }
 
@@ -196,7 +208,9 @@ fn channel_buffers(
 pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
         binding,
-        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        visibility: wgpu::ShaderStages::VERTEX
+            | wgpu::ShaderStages::FRAGMENT
+            | wgpu::ShaderStages::COMPUTE,
         ty: wgpu::BindingType::Buffer {
             ty,
             has_dynamic_offset: false,
