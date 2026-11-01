@@ -55,6 +55,18 @@ impl OitState {
             self.frame = Some(self.compositor.create_frame(device, size));
         }
         self.key = Some(key);
+        self.encode_passes(encoder, atlas, draw);
+    }
+
+    /// Records the opaque pass (clearing color and depth) and the
+    /// translucent pass (clearing the accumulation and revealage, keeping
+    /// the opaque depth) into the frame, with `draw` issuing the draw call.
+    fn encode_passes(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        atlas: &wgpu::BindGroup,
+        draw: impl Fn(&mut wgpu::RenderPass<'_>),
+    ) {
         let Some(frame) = &self.frame else {
             return;
         };

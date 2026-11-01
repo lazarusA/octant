@@ -23,6 +23,8 @@ mod inputs;
 mod pipeline;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod test_scene;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
 pub use inputs::FrameInputs;

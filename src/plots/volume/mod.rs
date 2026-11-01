@@ -15,6 +15,7 @@ pub mod encode;
 mod frame;
 pub mod pipeline;
 mod render;
+mod texture_writes;
 mod textures;
 mod uniforms;
 
