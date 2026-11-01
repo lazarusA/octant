@@ -76,4 +76,4 @@ pub(crate) use pipeline::needs_pyramid;
 pub use state::line_profile::LineLayout;
 pub use state::line_series::{LineColoring, series_line_at, series_t};
 pub use state::plate::{PlateState, WellFields};
-pub use state::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};
+pub use state::{AnimationRole, DimConfig, MeshDetail, OctantApp, SpatialRole, StoreKind};

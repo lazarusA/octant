@@ -44,6 +44,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "Den høyeste verdien ligger flatt, og lavere verdier hever seg over den"
         }
+        PlotOptionsKey::MeshDetail => "Detalj",
+        PlotOptionsKey::MeshDetailHover => {
+            "Celler som tegnes på store rutenett: mer detalj er tregere; pekeren leser alltid hver celle"
+        }
+        PlotOptionsKey::DetailScreen => "Skjerm",
+        PlotOptionsKey::DetailDouble => "2x skjerm",
+        PlotOptionsKey::DetailQuadruple => "4x skjerm",
+        PlotOptionsKey::DetailFull => "Hver celle",
         PlotOptionsKey::Size => "Størrelse",
     })
 }

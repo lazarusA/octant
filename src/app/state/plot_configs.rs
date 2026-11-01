@@ -69,6 +69,8 @@ pub struct MeshPlotConfig {
     pub sphere_displacement: f32,
     pub sphere_mode: u32,
     pub sphere_flip_height: bool,
+    /// How many cells large grids draw (`MeshDetail::budget`).
+    pub detail: MeshDetail,
 }
 
 impl MeshPlotConfig {
@@ -99,6 +101,35 @@ impl Default for MeshPlotConfig {
             sphere_displacement: 0.3,
             sphere_mode: 0,
             sphere_flip_height: false,
+            detail: MeshDetail::default(),
+        }
+    }
+}
+
+/// How many cells a surface or sphere draws at most, against the canvas's
+/// pixels; grids with more are thinned (`MatrixData::decimated`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MeshDetail {
+    /// Half the canvas's pixels: more cells would mostly be under a pixel.
+    #[default]
+    Screen,
+    Double,
+    Quadruple,
+    /// Every cell that fits one storage buffer.
+    Full,
+}
+
+impl MeshDetail {
+    pub const ALL: [Self; 4] = [Self::Screen, Self::Double, Self::Quadruple, Self::Full];
+
+    /// The most cells drawn on a canvas of `pixels`.
+    pub fn budget(self, pixels: usize) -> usize {
+        let screen = pixels / 2;
+        match self {
+            Self::Screen => screen,
+            Self::Double => screen.saturating_mul(2),
+            Self::Quadruple => screen.saturating_mul(4),
+            Self::Full => usize::MAX,
         }
     }
 }

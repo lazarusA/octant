@@ -41,6 +41,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "最大値が平らに置かれ、それより小さい値がその上に盛り上がります"
         }
+        PlotOptionsKey::MeshDetail => "詳細度",
+        PlotOptionsKey::MeshDetailHover => {
+            "大きなグリッドで描くセル数。詳細にするほど遅くなります。ホバーは常にすべてのセルを読みます"
+        }
+        PlotOptionsKey::DetailScreen => "画面",
+        PlotOptionsKey::DetailDouble => "画面の2倍",
+        PlotOptionsKey::DetailQuadruple => "画面の4倍",
+        PlotOptionsKey::DetailFull => "すべてのセル",
         PlotOptionsKey::Size => "サイズ",
     })
 }

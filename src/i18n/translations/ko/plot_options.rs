@@ -42,6 +42,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "가장 높은 값이 바닥에 놓이고 낮은 값일수록 위로 솟습니다"
         }
+        PlotOptionsKey::MeshDetail => "세부 수준",
+        PlotOptionsKey::MeshDetailHover => {
+            "큰 격자에서 그리는 셀 수입니다. 세부 수준이 높을수록 느려지며, 호버는 항상 모든 셀을 읽습니다"
+        }
+        PlotOptionsKey::DetailScreen => "화면",
+        PlotOptionsKey::DetailDouble => "화면의 2배",
+        PlotOptionsKey::DetailQuadruple => "화면의 4배",
+        PlotOptionsKey::DetailFull => "모든 셀",
         PlotOptionsKey::Size => "크기",
     })
 }

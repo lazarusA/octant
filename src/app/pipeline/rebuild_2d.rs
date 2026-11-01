@@ -4,6 +4,7 @@
 use super::rebuild::follow_variable;
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId, MeshGrid};
+use crate::app::state::MeshDetail;
 use crate::data::MatrixData;
 use crate::data::render::decimate::stride_for;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
@@ -41,8 +42,7 @@ impl OctantApp {
             let coastline = is_base.then_some(&mut self.coastline_3d_renderer);
             let base = coastline.map(|slot| (slot, self.coastline_current_lod));
             let reuse = !is_new_variable;
-            let [w, h] = self.layout.canvas_px.map(|p| p as usize);
-            let mesh_budget = (w * h / 2).max(MIN_MESH_CELLS);
+            let mesh_budget = mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
             let rebuilt = sync_renderers(layer, rs, base, (&shown, &data), mesh_budget, reuse);
             if rebuilt && data.height == 1 {
                 // The base layer's plot type is staged in `selected`.
@@ -124,6 +124,15 @@ pub(crate) fn needs_pyramid(enabled: bool, cells: usize) -> bool {
 
 /// Cells a mesh may always draw, however small the canvas.
 const MIN_MESH_CELLS: usize = 256 * 1024;
+
+/// The most cells the sphere and surface draw at `detail` on a canvas of
+/// `canvas_px`, within one storage buffer.
+pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
+    let pixels = (w as usize).saturating_mul(h as usize);
+    detail
+        .budget(pixels)
+        .clamp(MIN_MESH_CELLS, MAX_GPU_STORAGE_BUFFER_ELEMENTS)
+}
 
 /// Keeps the layer's label colors, then writes `shown` into its renderers
 /// when they can take it in place (`reuse`, same grid and size), else builds

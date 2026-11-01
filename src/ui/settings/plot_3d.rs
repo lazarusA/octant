@@ -1,3 +1,4 @@
+use crate::app::MeshDetail;
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
@@ -118,6 +119,7 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         flip_height_checkbox(ui, &mut app.plot_configs.mesh.sphere_flip_height);
     }
+    detail_select(app, ui);
 }
 
 pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -146,6 +148,40 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         egui::Slider::new(&mut app.plot_configs.mesh.surface_displacement, 0.0..=5.0).localized(),
     );
     flip_height_checkbox(ui, &mut app.plot_configs.mesh.surface_flip_height);
+    detail_select(app, ui);
+}
+
+/// How many cells large grids draw (`MeshDetail`), thinning the plotted
+/// sphere and surface again when it changes.
+fn detail_select(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let before = app.plot_configs.mesh.detail;
+    ui.horizontal(|ui| {
+        ui.label(tr(K::MeshDetail))
+            .on_hover_text(tr(K::MeshDetailHover));
+        egui::ComboBox::from_id_salt("settings_mesh_detail")
+            .selected_text(tr(detail_name(before)))
+            .show_ui(ui, |ui| {
+                for detail in MeshDetail::ALL {
+                    ui.selectable_value(
+                        &mut app.plot_configs.mesh.detail,
+                        detail,
+                        tr(detail_name(detail)),
+                    );
+                }
+            });
+    });
+    if app.plot_configs.mesh.detail != before {
+        app.rethin_meshes();
+    }
+}
+
+fn detail_name(detail: MeshDetail) -> K {
+    match detail {
+        MeshDetail::Screen => K::DetailScreen,
+        MeshDetail::Double => K::DetailDouble,
+        MeshDetail::Quadruple => K::DetailQuadruple,
+        MeshDetail::Full => K::DetailFull,
+    }
 }
 
 /// Toggles heights measured down from the top value (`HeightScale::flip`).

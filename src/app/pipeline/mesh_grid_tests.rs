@@ -80,3 +80,20 @@ fn a_resampled_heatmap_keeps_whole_meshes() {
     assert_eq!((mesh.matrix.width, mesh.stride), (512, 2));
     assert_eq!(mesh.matrix.values[0], 1024.0 + 1.0);
 }
+
+#[test]
+fn the_detail_setting_thins_again() {
+    let Some(mut app) = built(1024) else {
+        eprintln!("SKIPPED the_detail_setting_thins_again: no GPU device");
+        return;
+    };
+    let stride = |app: &OctantApp| app.layers.base.data.mesh.as_ref().map(|m| m.stride);
+    app.plot_configs.mesh.detail = crate::app::MeshDetail::Full;
+    app.rethin_meshes();
+    assert_eq!(stride(&app), None, "every cell");
+    let surface = app.layers.base.renderers.surface.as_ref().map(|s| s.width);
+    assert_eq!(surface, Some(1024));
+    app.plot_configs.mesh.detail = crate::app::MeshDetail::Screen;
+    app.rethin_meshes();
+    assert_eq!(stride(&app), Some(2), "thinned again");
+}
