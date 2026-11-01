@@ -179,23 +179,34 @@ fn build_renderers(
     let (device, format) = (&rs.device, rs.target_format);
     let (values, w, h) = (&shown.values, shown.width, shown.height);
     let (cx, cy) = (shown.grid.coords_x(), shown.grid.coords_y());
-    let renderers = &mut layer.renderers;
     let heatmap = HeatmapRenderer::new_with_coords(device, format, values, w, h, cx, cy);
-    renderers.heatmap = Some(Arc::new(heatmap));
-    if !has_3d {
-        renderers.sphere = None;
-        renderers.surface = None;
+    layer.renderers.heatmap = Some(Arc::new(heatmap));
+    if has_3d {
+        build_meshes(layer, base, rs, mesh);
+    } else {
+        layer.renderers.sphere = None;
+        layer.renderers.surface = None;
         if let Some((slot, _)) = base {
             *slot = None;
         }
-        return;
     }
+}
+
+/// Builds the sphere, surface and (given the base layer's 3D coastline slot
+/// and LOD, `base`) 3D coastlines for `mesh`.
+pub(super) fn build_meshes(
+    layer: &mut Layer,
+    base: Option<(&mut Option<Arc<Coastline3DRenderer>>, CoastlineLod)>,
+    rs: &RenderState,
+    mesh: &MatrixData,
+) {
+    let (device, format) = (&rs.device, rs.target_format);
     let (values, w, h) = (&mesh.values, mesh.width, mesh.height);
     let (cx, cy) = (mesh.grid.coords_x(), mesh.grid.coords_y());
     let sphere = SphereRenderer::new_sphere_with_coords(device, format, values, w, h, cx, cy);
     let surface = SurfaceRenderer::new_surface_with_coords(device, format, values, w, h, cx, cy);
-    renderers.sphere = Some(Arc::new(sphere));
-    renderers.surface = Some(Arc::new(surface));
+    layer.renderers.sphere = Some(Arc::new(sphere));
+    layer.renderers.surface = Some(Arc::new(surface));
     if let Some((slot, lod)) = base {
         let buf = crate::plots::load_coastline_sync(lod);
         let coast = Coastline3DRenderer::new(device, format, buf.as_slice(), values, w, h, cx, cy);

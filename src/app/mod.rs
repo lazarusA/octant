@@ -57,6 +57,8 @@ mod panels;
 mod pipeline;
 #[cfg(test)]
 mod pyramid_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod rethin_bench_tests;
 pub mod sources;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]

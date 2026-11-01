@@ -2,9 +2,9 @@
 //! blend and encoding against the GPU bake, timed by hand: `cargo test
 //! --release --lib volume_blend_timed -- --ignored --nocapture`. Four
 //! channels of 256 x 256 x 128 voxels, the most a volume's channels hold
-//! (`MAX_GPU_STORAGE_BUFFER_BYTES`).
+//! (`MAX_GPU_STORAGE_BUFFER_BYTES`), full, half loaded and empty.
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::channel_blend_bench_tests::{RUNS, device, median};
 use crate::data::slicing::{ChannelColorConfig, CompositeStretch};
@@ -36,6 +36,10 @@ fn texture(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::Texture 
     })
 }
 
+/// How much of the volume holds data: every plane, its first half (the
+/// rest still loading), or none (just allocated).
+const FILLS: [(&str, usize); 3] = [("full", D), ("half", D / 2), ("empty", 0)];
+
 #[test]
 #[ignore = "benchmark"]
 fn volume_blend_timed() {
@@ -43,9 +47,26 @@ fn volume_blend_timed() {
         eprintln!("SKIPPED volume_blend_timed: no GPU device");
         return;
     };
+    eprintln!("volume, {C} channels of {W} x {H} x {D} (median of {RUNS} runs)");
+    for (name, planes) in FILLS {
+        let (cpu, gpu) = timed(&device, &queue, planes);
+        eprintln!("{name:<5} CPU blend + encode + upload {cpu:>10.2?}, GPU bake {gpu:>10.2?}");
+    }
+}
+
+/// The median display change of a volume whose first `filled` planes hold
+/// data (the others NaN), CPU blend and encoding against the GPU bake.
+fn timed(device: &wgpu::Device, queue: &wgpu::Queue, filled: usize) -> (Duration, Duration) {
     let n = W * H * D;
     let planes: Vec<Vec<f32>> = (0..C)
-        .map(|c| (0..n).map(|i| ((i * 31 + c * 7) % 251) as f32).collect())
+        .map(|c| {
+            (0..n)
+                .map(|i| match i / (W * H) < filled {
+                    true => ((i * 31 + c * 7) % 251) as f32,
+                    false => f32::NAN,
+                })
+                .collect()
+        })
         .collect();
     let mut configs: Vec<_> = (0..C)
         .map(|i| ChannelColorConfig::new(i, format!("c{i}"), [255, (i * 60) as u8, 0]))
@@ -54,12 +75,12 @@ fn volume_blend_timed() {
     for (c, p) in planes.iter().enumerate() {
         stretch.channel(c, p, None, 1.0);
     }
-    let colors = texture(&device, wgpu::TextureFormat::Rgba8Unorm);
-    let validity = texture(&device, wgpu::TextureFormat::R8Unorm);
+    let colors = texture(device, wgpu::TextureFormat::Rgba8Unorm);
+    let validity = texture(device, wgpu::TextureFormat::R8Unorm);
     let renderer =
-        crate::plots::ChannelRenderer::new(&device, wgpu::TextureFormat::Rgba8Unorm, C, n);
+        crate::plots::ChannelRenderer::new(device, wgpu::TextureFormat::Rgba8Unorm, C, n);
     for (c, p) in planes.iter().enumerate() {
-        renderer.write_plane(&queue, c, p);
+        renderer.write_plane(queue, c, p);
     }
     let targets = crate::plots::VolumeTargets {
         id: crate::plots::BakeId::next(),
@@ -99,20 +120,12 @@ fn volume_blend_timed() {
         // After: new uniforms and one bake.
         let start = Instant::now();
         let params = crate::plots::ChannelParams::of(&configs, &stretch, (0, C), n as u32, None);
-        renderer.update_params(&queue, &params);
+        renderer.update_params(queue, &params);
         let mut encoder = device.create_command_encoder(&Default::default());
-        renderer.bake_volume(&device, &mut encoder, &params, &targets);
+        renderer.bake_volume(device, &mut encoder, &params, &targets);
         queue.submit([encoder.finish()]);
         wait();
         gpu.push(start.elapsed());
     }
-    eprintln!("volume, {C} channels of {W} x {H} x {D} (median of {RUNS} runs)");
-    eprintln!(
-        "display change, CPU blend + encode + upload {:>10.2?}",
-        median(cpu)
-    );
-    eprintln!(
-        "display change, GPU bake                   {:>10.2?}",
-        median(gpu)
-    );
+    (median(cpu), median(gpu))
 }

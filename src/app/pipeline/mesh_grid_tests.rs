@@ -118,8 +118,21 @@ fn a_larger_canvas_thins_less() {
         eprintln!("SKIPPED a_larger_canvas_thins_less: no GPU device");
         return;
     };
+    let heatmap = app.layers.base.renderers.heatmap.clone();
     // 2048 x 1024 pixels show 1 M cells: every one.
     app.layout.canvas_px = [2048, 1024];
     app.rethin_meshes();
     assert!(app.layers.base.data.mesh.is_none());
+    // Only the meshes are built again: resizing never rebuilds the heatmap.
+    let kept = app.layers.base.renderers.heatmap.as_ref();
+    assert!(
+        heatmap
+            .as_ref()
+            .zip(kept)
+            .is_some_and(|(a, b)| std::sync::Arc::ptr_eq(a, b))
+    );
+    assert_eq!(
+        app.layers.base.renderers.surface.as_ref().map(|s| s.width),
+        Some(1024)
+    );
 }

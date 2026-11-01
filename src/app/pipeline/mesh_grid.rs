@@ -1,9 +1,10 @@
 //! How many cells the sphere and surface draw (`MeshDetail`): grids with
 //! more are thinned (`MatrixData::decimated`).
 
+use super::rebuild_2d::build_meshes;
 use crate::app::MeshDetail;
 use crate::app::OctantApp;
-use crate::app::layers::LayerId;
+use crate::app::layers::MeshGrid;
 use crate::data::render::decimate::stride_for;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 
@@ -28,7 +29,7 @@ impl OctantApp {
         let Some(matrix) = base.data.matrix.as_ref() else {
             return;
         };
-        if matrix.height < 2 || matrix.grid.is_healpix() {
+        if matrix.height < 2 || matrix.grid.is_healpix() || base.labels().is_some() {
             return;
         }
         let stride = stride_for(matrix.width, matrix.height, budget);
@@ -37,8 +38,18 @@ impl OctantApp {
         if base.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
             return;
         }
-        if let Some(matrix) = base.data.matrix.take() {
-            self.rebuild_pipeline_with_matrix_data(LayerId::BASE, matrix);
-        }
+        let Some(rs) = &self.wgpu_render_state else {
+            return;
+        };
+        // Only the meshes change: the heatmap and its pyramid stay.
+        let Some(matrix) = base.data.matrix.take() else {
+            return;
+        };
+        let thinned = matrix.decimated(stride);
+        let coastline = Some((&mut self.coastline_3d_renderer, self.coastline_current_lod));
+        build_meshes(base, coastline, rs, thinned.as_ref().unwrap_or(&matrix));
+        base.data.matrix = Some(matrix);
+        base.data.mesh = thinned.map(|matrix| MeshGrid { matrix, stride });
+        base.data.touch_matrix();
     }
 }
