@@ -143,7 +143,9 @@ fn a_volume_keeps_the_gpu_blend() {
 #[test]
 fn a_narrow_volume_blends_on_the_cpu() {
     // One voxel wide: 12 MB of channels, but the bake's validity rows are
-    // padded to 256 bytes, 256 MiB, past one storage buffer.
+    // padded to 256 bytes, 256 MiB, past one storage buffer (WebGPU's
+    // default: the ignored benches record their device's, often larger).
+    crate::plots::limits::set_from_device(&wgpu::Limits::default());
     let Some(app) = projected_as(true, PlotType::Volume, [3, 1024, 1024, 1]) else {
         eprintln!("SKIPPED a_narrow_volume_blends_on_the_cpu: no GPU device");
         return;
