@@ -57,7 +57,6 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .localized()
             .logarithmic(true),
     );
-    detail_select(app, ui);
 }
 
 /// The volume algorithm's name, opening the menu of algorithms.
