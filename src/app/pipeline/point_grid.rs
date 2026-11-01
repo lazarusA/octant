@@ -37,8 +37,8 @@ impl OctantApp {
         })
     }
 
-    /// Builds the base layer's point cloud again after the Detail setting
-    /// or the canvas size changed, when that changes its grid.
+    /// Builds the base layer's point cloud again when its grid changed: the
+    /// Detail setting, the canvas size or the animated axis.
     pub fn rethin_points(&mut self) {
         let base = &self.layers.base;
         let Some(v) = &base.data.volume else {
@@ -56,8 +56,9 @@ impl OctantApp {
             return;
         };
         let renderer = point_cloud_renderer(rs, volume, grid);
+        // Planes still pending go to the new renderer too: a GPU-blended
+        // composite's channels reach the GPU only with them.
         base.renderers.point_cloud = Some(Arc::new(renderer));
-        base.renderers.point_cloud_dirty = None;
         base.data.points = grid;
         base.data.touch_volume();
     }

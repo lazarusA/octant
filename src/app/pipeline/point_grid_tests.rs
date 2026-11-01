@@ -60,3 +60,36 @@ fn large_volumes_draw_thinned_point_clouds() {
     assert_eq!(app.layers.base.data.points, None);
     assert_eq!(instances(&app), Some(200 * 100 * 40));
 }
+
+#[test]
+fn rethinning_keeps_the_planes_still_to_upload() {
+    let Some(mut app) = built() else {
+        eprintln!("SKIPPED rethinning_keeps_the_planes_still_to_upload: no GPU device");
+        return;
+    };
+    // Planes arrived this frame, before a resize thins the cloud again: the
+    // new renderer still gets them (with a GPU blend's channels).
+    app.layers.base.renderers.mark_volume_dirty(3..5);
+    app.layout.canvas_px = [4000, 4000];
+    app.rethin_points();
+    assert_eq!(app.layers.base.data.points, None, "thinned again");
+    assert_eq!(app.layers.base.renderers.point_cloud_dirty, Some(3..5));
+}
+
+#[test]
+fn an_animated_x_axis_draws_every_voxel() {
+    let Some(mut app) = built() else {
+        eprintln!("SKIPPED an_animated_x_axis_draws_every_voxel: no GPU device");
+        return;
+    };
+    assert!(app.layers.base.data.points.is_some());
+    // Animated along x, the cloud's ring shifts move whole voxels.
+    app.selected.dim_config = vec![crate::app::DimConfig {
+        spatial: crate::app::SpatialRole::X,
+        ..Default::default()
+    }];
+    app.selected.animated_dim = Some(0);
+    app.rethin_points();
+    assert_eq!(app.layers.base.data.points, None);
+    assert_eq!(instances(&app), Some(200 * 100 * 40));
+}
