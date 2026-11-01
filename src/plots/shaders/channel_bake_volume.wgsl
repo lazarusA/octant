@@ -3,7 +3,10 @@
 // encodes a CPU-blended one: each voxel's color with its brightest channel
 // as alpha, a missing voxel (no drawn channel valid) filled with the average
 // of its valid 26 neighbors (zeros without any) so trilinear filtering stays
-// smooth, and its validity (255 drawn, 0 missing).
+// smooth, and its validity (255 drawn, 0 missing). A first pass
+// (`mark_planes`) records which Z planes hold any drawn voxel, so a missing
+// voxel with no data in its plane or the next ones fills with zeros without
+// searching, as `planes_have_data` spares the CPU.
 
 struct VolumeBake {
     w: u32,
@@ -22,6 +25,10 @@ var texels: texture_storage_3d<rgba8unorm, write>;
 
 @group(0) @binding(2)
 var<storage, read_write> validity_words: array<u32>;
+
+// 1 for each Z plane holding a drawn voxel (cleared before `mark_planes`).
+@group(0) @binding(3)
+var<storage, read_write> plane_data: array<atomic<u32>>;
 
 // Voxel `(x, y, z)`'s color in 0..255 with its brightest channel as alpha;
 // alpha -1 when missing.
@@ -52,6 +59,31 @@ fn neighbor_average(x: u32, y: u32, z: u32) -> vec4<f32> {
     return select(sum, sum / count, count > 0.0);
 }
 
+// Whether plane `z` or a plane next to it holds a drawn voxel.
+fn planes_have_data(z: u32) -> bool {
+    var any = 0u;
+    for (var nz = max(z, 1u) - 1u; nz < min(z + 2u, vb.d); nz = nz + 1u) {
+        any = any | atomicLoad(&plane_data[nz]);
+    }
+    return any != 0u;
+}
+
+// Marks plane `z` when one of its four voxels from `x0` is drawn; planes
+// already marked skip the blend.
+@compute @workgroup_size(8, 8, 1)
+fn mark_planes(@builtin(global_invocation_id) id: vec3<u32>) {
+    let x0 = id.x * 4u;
+    if (x0 >= vb.w || id.y >= vb.h || id.z >= vb.d || atomicLoad(&plane_data[id.z]) != 0u) {
+        return;
+    }
+    for (var x = x0; x < min(x0 + 4u, vb.w); x = x + 1u) {
+        if (voxel(x, id.y, id.z).a >= 0.0) {
+            atomicStore(&plane_data[id.z], 1u);
+            return;
+        }
+    }
+}
+
 // Four voxels along x per invocation: one validity word.
 @compute @workgroup_size(8, 8, 1)
 fn bake_volume(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -61,6 +93,7 @@ fn bake_volume(@builtin(global_invocation_id) id: vec3<u32>) {
     if (x0 >= vb.w || y >= vb.h || z >= vb.d) {
         return;
     }
+    let isolated = !planes_have_data(z);
     var word = 0u;
     for (var k = 0u; k < 4u; k = k + 1u) {
         let x = x0 + k;
@@ -70,6 +103,8 @@ fn bake_volume(@builtin(global_invocation_id) id: vec3<u32>) {
         var c = voxel(x, y, z);
         if (c.a >= 0.0) {
             word = word | (255u << (8u * k));
+        } else if (isolated) {
+            c = vec4<f32>(0.0);
         } else {
             c = neighbor_average(x, y, z);
         }

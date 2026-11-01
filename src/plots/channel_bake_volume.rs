@@ -2,11 +2,13 @@
 //! textures (`shaders/channel_bake_volume.wgsl`): its `Rgba8Unorm` colors
 //! and `R8Unorm` validity, as `volume/encode.rs` encodes CPU-blended ones,
 //! so the raymarch reads what it reads for those and a display change costs
-//! one compute pass and a copy.
+//! two compute passes (marking the planes holding data, then the bake) and
+//! a copy.
 
-use wgpu::util::DeviceExt;
+use std::sync::Mutex;
 
 use super::channel_bake::Thinning;
+use super::channel_bake_targets::{BakeTargets, copy_validity, validity_row_bytes};
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
 
@@ -16,14 +18,16 @@ pub(super) const SHADER: &str = concat!(
     include_str!("shaders/channel_bake_volume.wgsl"),
 );
 
-/// Validity rows are copied into the texture in rows of this many bytes.
-const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-
-/// The volume bake's compute pipeline and its group 0 (uniforms, colors,
-/// validity words).
+/// The volume bake's compute pipelines (marking the planes holding data,
+/// then the bake) and their group 0 (uniforms, colors, validity words,
+/// plane marks), with the last target's buffers and group.
 pub(super) struct VolumeBakePipeline {
+    mark: wgpu::ComputePipeline,
     pipeline: wgpu::ComputePipeline,
     layout: wgpu::BindGroupLayout,
+    /// Kept for the next bake of the same target (each display change and
+    /// ring step bakes again), replaced by another target's.
+    targets: Mutex<Option<BakeTargets>>,
 }
 
 /// The raymarcher's textures of a `[w, h, d]` volume, what a volume bake
@@ -33,15 +37,6 @@ pub struct VolumeTargets<'a> {
     pub colors: &'a wgpu::Texture,
     pub validity: &'a wgpu::Texture,
     pub dims: [u32; 3],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct VolumeBakeUniforms {
-    w: u32,
-    h: u32,
-    d: u32,
-    row_words: u32,
 }
 
 impl VolumeBakePipeline {
@@ -73,6 +68,7 @@ impl VolumeBakePipeline {
                 buffer(0, wgpu::BufferBindingType::Uniform),
                 colors,
                 buffer(2, wgpu::BufferBindingType::Storage { read_only: false }),
+                buffer(3, wgpu::BufferBindingType::Storage { read_only: false }),
             ],
         });
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -84,27 +80,23 @@ impl VolumeBakePipeline {
             bind_group_layouts: &[Some(&layout), None, Some(channels)],
             immediate_size: 0,
         });
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Channel Volume Bake"),
-            layout: Some(&pipeline_layout),
-            module: &module,
-            entry_point: Some("bake_volume"),
-            compilation_options: Default::default(),
-            cache: None,
-        });
-        Self { pipeline, layout }
+        let entry = |name| {
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some(name),
+                layout: Some(&pipeline_layout),
+                module: &module,
+                entry_point: Some(name),
+                compilation_options: Default::default(),
+                cache: None,
+            })
+        };
+        Self {
+            mark: entry("mark_planes"),
+            pipeline: entry("bake_volume"),
+            layout,
+            targets: Mutex::new(None),
+        }
     }
-}
-
-/// Bytes of one row of `w` validity bytes, padded to whole words and for
-/// the copy into the validity texture.
-fn validity_row_bytes(w: u32) -> u32 {
-    (w.max(1).div_ceil(4) * 4).div_ceil(ROW_ALIGN) * ROW_ALIGN
-}
-
-/// Bytes of the validity words a bake of a `[w, h, d]` volume fills.
-pub fn validity_bytes([w, h, d]: [u32; 3]) -> u64 {
-    u64::from(validity_row_bytes(w)) * u64::from(h.max(1)) * u64::from(d.max(1))
 }
 
 impl ChannelRenderer {
@@ -122,36 +114,8 @@ impl ChannelRenderer {
         let Some(planes_version) = self.bake_needed(key, params, Thinning::NONE) else {
             return false;
         };
-        let [w, h, d] = targets.dims.map(|n| n.max(1));
-        let row_bytes = validity_row_bytes(w);
-        let uniforms = VolumeBakeUniforms {
-            w,
-            h,
-            d,
-            row_words: row_bytes / 4,
-        };
-        let validity_words = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Channel Volume Validity"),
-            size: validity_bytes([w, h, d]),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-        let bake = self.volume_bake(device);
-        let group = bake.targets_group(device, &uniforms, targets.colors, &validity_words);
-        {
-            let mut pass = encoder.begin_compute_pass(&Default::default());
-            pass.set_pipeline(&bake.pipeline);
-            pass.set_bind_group(0, &group, &[]);
-            pass.set_bind_group(2, &self.bind_group, &[]);
-            pass.dispatch_workgroups(w.div_ceil(4).div_ceil(8), h.div_ceil(8), d);
-        }
-        copy_validity(
-            encoder,
-            &validity_words,
-            targets.validity,
-            row_bytes,
-            [w, h, d],
-        );
+        self.volume_bake(device)
+            .encode(device, encoder, &self.bind_group, targets);
         self.remember_bake(key, params, Thinning::NONE, planes_version);
         true
     }
@@ -164,65 +128,37 @@ impl ChannelRenderer {
 }
 
 impl VolumeBakePipeline {
-    /// Group 0 of a bake: its `uniforms`, the `colors` texture it writes and
-    /// the `validity` words it fills.
-    fn targets_group(
+    /// Marks the planes of `targets` holding data, bakes them (with the
+    /// channels' group 2) and copies the validity words into its texture.
+    fn encode(
         &self,
         device: &wgpu::Device,
-        uniforms: &VolumeBakeUniforms,
-        colors: &wgpu::Texture,
-        validity: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Channel Volume Bake Uniforms"),
-            contents: bytemuck::bytes_of(uniforms),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
-        let colors = colors.create_view(&Default::default());
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Channel Volume Bake Targets"),
-            layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&colors),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: validity.as_entire_binding(),
-                },
-            ],
-        })
+        encoder: &mut wgpu::CommandEncoder,
+        channels: &wgpu::BindGroup,
+        targets: &VolumeTargets<'_>,
+    ) {
+        let [w, h, d] = targets.dims.map(|n| n.max(1));
+        let mut kept = self.targets.lock().unwrap_or_else(|p| p.into_inner());
+        let t = match kept.take() {
+            Some(t) if t.id == targets.id => t,
+            _ => BakeTargets::new(device, &self.layout, targets),
+        };
+        encoder.clear_buffer(&t.plane_data, 0, None);
+        for pipeline in [&self.mark, &self.pipeline] {
+            let mut pass = encoder.begin_compute_pass(&Default::default());
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(0, &t.group, &[]);
+            pass.set_bind_group(2, channels, &[]);
+            pass.dispatch_workgroups(w.div_ceil(4).div_ceil(8), h.div_ceil(8), d);
+        }
+        let row_bytes = validity_row_bytes(w);
+        copy_validity(
+            encoder,
+            &t.validity_words,
+            targets.validity,
+            row_bytes,
+            [w, h, d],
+        );
+        *kept = Some(t);
     }
-}
-
-/// Copies the baked validity `words` (`row_bytes` a row) into the `R8Unorm`
-/// `validity` texture of `[w, h, d]` voxels, not a WebGPU storage format.
-fn copy_validity(
-    encoder: &mut wgpu::CommandEncoder,
-    words: &wgpu::Buffer,
-    validity: &wgpu::Texture,
-    row_bytes: u32,
-    [w, h, d]: [u32; 3],
-) {
-    encoder.copy_buffer_to_texture(
-        wgpu::TexelCopyBufferInfo {
-            buffer: words,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(row_bytes),
-                rows_per_image: Some(h),
-            },
-        },
-        validity.as_image_copy(),
-        wgpu::Extent3d {
-            width: w,
-            height: h,
-            depth_or_array_layers: d,
-        },
-    );
 }

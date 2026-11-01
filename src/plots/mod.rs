@@ -2,6 +2,7 @@ pub mod camera;
 #[cfg(test)]
 mod camera_tests;
 mod channel_bake;
+mod channel_bake_targets;
 #[cfg(test)]
 mod channel_bake_tests;
 mod channel_bake_volume;
@@ -45,7 +46,8 @@ pub mod volume;
 use crate::i18n::{PlotKey, tr};
 
 pub use channel_bake::{BakeId, Thinning};
-pub use channel_bake_volume::{VolumeTargets, validity_bytes};
+pub use channel_bake_targets::validity_bytes;
+pub use channel_bake_volume::VolumeTargets;
 pub use channel_params::{ChannelParams, MAX_CHANNELS};
 pub use channels::{ChannelDraw, ChannelRenderer};
 pub use coastline::{
