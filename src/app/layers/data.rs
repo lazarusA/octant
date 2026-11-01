@@ -11,6 +11,9 @@ pub struct LayerData {
     /// The thinned grid the surface, sphere and 3D coastlines draw when
     /// the 2D data has more cells than the canvas budget allows.
     pub mesh: Option<MeshGrid>,
+    /// How the point cloud thins the volume when it has more voxels than
+    /// the canvas budget allows.
+    pub points: Option<PointGrid>,
     pub resampler: ViewportResampler,
     pub volume: Option<VolumeData>,
     /// Counts volume resets (new selections), so cache hits know when the
@@ -51,6 +54,16 @@ pub struct LayerData {
 pub struct MeshGrid {
     pub matrix: MatrixData,
     pub stride: usize,
+}
+
+/// A volume thinned for the point cloud: one voxel in `stride` along x and
+/// y (`VolumeData::thinned_planes`), every Z plane, `width` x `height` a
+/// plane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PointGrid {
+    pub stride: usize,
+    pub width: usize,
+    pub height: usize,
 }
 
 /// The channels of a 3D composite blended on the GPU, stacked along Z:

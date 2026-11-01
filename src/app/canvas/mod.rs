@@ -36,12 +36,12 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     let canvas_px = [px.x.round() as u32, px.y.round() as u32];
     if px.x >= 1.0 && px.y >= 1.0 && canvas_px != app.layout.canvas_px {
         app.layout.canvas_px = canvas_px;
-        // Meshes draw as many cells as the canvas shows (`mesh_budget`).
-        if matches!(
-            app.effective_canvas_plot_type(),
-            crate::plots::PlotType::Surface | crate::plots::PlotType::Sphere
-        ) {
-            app.rethin_meshes();
+        // Meshes and point clouds draw as many cells as the canvas shows
+        // (`mesh_budget`).
+        match app.effective_canvas_plot_type() {
+            crate::plots::PlotType::Surface | crate::plots::PlotType::Sphere => app.rethin_meshes(),
+            crate::plots::PlotType::PointCloud => app.rethin_points(),
+            _ => {}
         }
     }
     let max_zoom = app.heatmap_max_zoom();

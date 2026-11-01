@@ -211,12 +211,9 @@ pub fn resolve_target_screen_pos(
             let sampler = sampler?;
             if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
                 let aspects = app.get_3d_aspect_ratio();
-                volume_target_pos(
-                    camera,
-                    (hit_x, hit_y, hit_z),
-                    (sampler.width, sampler.height, sampler.depth),
-                    aspects,
-                )
+                // On the drawn point (a thinned cloud's grid).
+                let ((x, y), (w, h)) = sampler.drawn_cell(hit_x, hit_y);
+                volume_target_pos(camera, (x, y, hit_z), (w, h, sampler.depth), aspects)
             } else {
                 None
             }

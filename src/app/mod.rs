@@ -55,6 +55,8 @@ pub mod overlays;
 mod overlays_tests;
 mod panels;
 mod pipeline;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod point_cloud_bench_tests;
 #[cfg(test)]
 mod pyramid_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]

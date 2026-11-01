@@ -57,3 +57,12 @@ fn thinned_cells_and_coordinates_are_the_middle_of_each_stride() {
     assert_eq!(&coords_y[..], &[20.0, 40.0]);
     assert!(m.decimated(1).is_none(), "nothing to thin");
 }
+
+#[test]
+fn thinned_planes_keep_every_plane_and_the_middle_of_each_stride() {
+    // 5 x 4 x 3 voxels numbered in order; stride 2 keeps x 1, 3, 4 and y 1, 3.
+    let values: Vec<f32> = (0..60).map(|i| i as f32).collect();
+    let v = crate::data::VolumeData::new(5, 4, 3, values, 0.0, 59.0, String::new());
+    let plane = |z: f32| [6.0, 8.0, 9.0, 16.0, 18.0, 19.0].map(|c| c + 20.0 * z);
+    assert_eq!(v.thinned_planes(2, 1..3), [plane(1.0), plane(2.0)].concat());
+}

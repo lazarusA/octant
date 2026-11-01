@@ -16,6 +16,8 @@ pub struct PointCloudRenderer {
     pub data_buffer: wgpu::Buffer,
     /// Names `data_buffer` to the channel bake.
     pub bake_id: super::BakeId,
+    /// How `data_buffer` thins the volume, for the channel bake.
+    pub thinning: super::Thinning,
     pub bind_group: wgpu::BindGroup,
     pub instance_count: AtomicU32,
     /// Kept to build the OIT pipelines on first use.
@@ -154,6 +156,7 @@ impl PointCloudRenderer {
             uniform_buffer,
             data_buffer,
             bake_id: super::BakeId::next(),
+            thinning: super::Thinning::NONE,
             bind_group,
             instance_count: AtomicU32::new(instance_count),
             shader,
@@ -162,6 +165,11 @@ impl PointCloudRenderer {
             frame: super::frame_cache::FrameSlot::new(target_format),
             inputs: Default::default(),
         }
+    }
+
+    /// This renderer, its data a volume thinned by `thinning`.
+    pub fn with_thinning(self, thinning: super::Thinning) -> Self {
+        Self { thinning, ..self }
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {

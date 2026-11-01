@@ -16,7 +16,7 @@ use crate::plots::{Mesh3DRenderer, PointCloudCallback, PointCloudRenderer};
 
 /// Median times of `RUNS` repaints that turned the camera, then of `RUNS`
 /// that changed nothing, of the callbacks `at(step)` makes.
-fn time<C: CallbackTrait>(
+pub(super) fn time<C: CallbackTrait>(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     resources: &mut CallbackResources,

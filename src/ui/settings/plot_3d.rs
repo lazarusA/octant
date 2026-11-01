@@ -57,6 +57,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .localized()
             .logarithmic(true),
     );
+    detail_select(app, ui);
 }
 
 /// The volume algorithm's name, opening the menu of algorithms.
@@ -152,7 +153,7 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 /// How many cells large grids draw (`MeshDetail`), thinning the plotted
-/// sphere and surface again when it changes.
+/// sphere, surface or point cloud again when it changes.
 fn detail_select(app: &mut OctantApp, ui: &mut egui::Ui) {
     let before = app.plot_configs.mesh.detail;
     ui.horizontal(|ui| {
@@ -172,6 +173,7 @@ fn detail_select(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
     if app.plot_configs.mesh.detail != before {
         app.rethin_meshes();
+        app.rethin_points();
     }
 }
 
@@ -206,4 +208,5 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .localized()
             .logarithmic(true),
     );
+    detail_select(app, ui);
 }

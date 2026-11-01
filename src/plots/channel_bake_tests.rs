@@ -67,6 +67,7 @@ fn bakes_what_the_cpu_blends() {
     let thinning = Thinning {
         stride: 2,
         width: 4,
+        height: 4,
         full_width: 8,
         full_height: 8,
     };
@@ -80,6 +81,31 @@ fn bakes_what_the_cpu_blends() {
     queue.submit([encoder.finish()]);
     let want: Vec<f32> = (0..16)
         .map(|i| packed[(i / 4 * 2 + 1) * 8 + i % 4 * 2 + 1])
+        .collect();
+    assert_close(&read_back(&device, &queue, &small), &want);
+
+    // The same cells as two 8 x 4 planes, thinned by 2 along x and y only
+    // (a point cloud): 4 x 2 cells a plane, every plane.
+    let thinning = Thinning {
+        stride: 2,
+        width: 4,
+        height: 2,
+        full_width: 8,
+        full_height: 4,
+    };
+    let mut encoder = device.create_command_encoder(&Default::default());
+    renderer.bake(
+        &device,
+        &mut encoder,
+        &params,
+        (super::BakeId::next(), &small, thinning),
+    );
+    queue.submit([encoder.finish()]);
+    let want: Vec<f32> = (0..16)
+        .map(|i| {
+            let (z, y, x) = (i / 8, i % 8 / 4, i % 4);
+            packed[(z * 4 + y * 2 + 1) * 8 + x * 2 + 1]
+        })
         .collect();
     assert_close(&read_back(&device, &queue, &small), &want);
 }

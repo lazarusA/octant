@@ -51,13 +51,15 @@ impl BakeId {
 /// Targets whose last bake is remembered (a mesh and its 3D coastlines).
 const REMEMBERED: usize = 4;
 
-/// A target holding a thinned grid of the planes' 2D cells
-/// (`MatrixData::decimated`): one cell in `stride` of `full_width` x
-/// `full_height`, `width` cells a row. `NONE` when its cells are the planes'.
+/// A target holding a thinned grid of the planes' cells
+/// (`MatrixData::decimated`, `VolumeData::thinned_planes`): one cell in
+/// `stride` of `full_width` x `full_height` along x and y, `width` x
+/// `height` a plane, every plane. `NONE` when its cells are the planes'.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Thinning {
     pub stride: u32,
     pub width: u32,
+    pub height: u32,
     pub full_width: u32,
     pub full_height: u32,
 }
@@ -66,6 +68,7 @@ impl Thinning {
     pub const NONE: Self = Self {
         stride: 1,
         width: 1,
+        height: 1,
         full_width: 1,
         full_height: 1,
     };
@@ -80,7 +83,8 @@ struct BakeUniforms {
     width: u32,
     full_width: u32,
     full_height: u32,
-    _pad: [u32; 2],
+    height: u32,
+    _pad: u32,
 }
 
 impl BakePipeline {
@@ -149,7 +153,8 @@ impl ChannelRenderer {
             width: thinning.width.max(1),
             full_width: thinning.full_width.max(1),
             full_height: thinning.full_height.max(1),
-            _pad: [0; 2],
+            height: thinning.height.max(1),
+            _pad: 0,
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Channel Bake Uniforms"),

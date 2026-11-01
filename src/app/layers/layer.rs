@@ -113,6 +113,7 @@ impl Layer {
         crate::plots::Thinning {
             stride: size(mesh.stride),
             width: size(mesh.matrix.width),
+            height: size(mesh.matrix.height),
             full_width: size(full.width),
             full_height: size(full.height),
         }
@@ -131,6 +132,7 @@ impl Layer {
     pub fn clear_3d(&mut self) {
         self.data.volume = None;
         self.data.channel_volume = None;
+        self.data.points = None;
         self.data.touch_volume();
         self.renderers.volume = None;
         self.renderers.point_cloud = None;

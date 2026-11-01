@@ -106,3 +106,23 @@ fn thin(values: &[f32], width: usize, xs: &[usize], ys: &[usize]) -> Vec<f32> {
     }
     out
 }
+
+impl crate::data::VolumeData {
+    /// Planes `z` with one voxel in `stride` along x and y (`sample_index`),
+    /// plane after plane: what a thinned point cloud draws of them.
+    pub fn thinned_planes(&self, stride: usize, z: std::ops::Range<usize>) -> Vec<f32> {
+        let xs: Vec<usize> = (0..self.width.div_ceil(stride))
+            .map(|x| sample_index(x, stride, self.width))
+            .collect();
+        let ys: Vec<usize> = (0..self.height.div_ceil(stride))
+            .map(|y| sample_index(y, stride, self.height))
+            .collect();
+        let plane = self.width * self.height;
+        let mut out = Vec::with_capacity(z.len() * xs.len() * ys.len());
+        for zi in z {
+            let values = self.values.get(zi * plane..(zi + 1) * plane).unwrap_or(&[]);
+            out.extend(thin(values, self.width, &xs, &ys));
+        }
+        out
+    }
+}

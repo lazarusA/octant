@@ -46,9 +46,14 @@ fn flush_layer(layer: &mut Layer, queue: &wgpu::Queue, plot_type: PlotType) {
         PlotType::PointCloud => {
             if let (Some(z), Some(r)) = (renderers.point_cloud_dirty.take(), &renderers.point_cloud)
             {
-                let range = vdata.plane_range(z.start, z.len());
-                if let Some(planes) = vdata.values.get(range.clone()) {
-                    r.update_data_range(queue, range.start, planes);
+                if let Some(g) = &layer.data.points {
+                    let planes = vdata.thinned_planes(g.stride, z.clone());
+                    r.update_data_range(queue, z.start * g.width * g.height, &planes);
+                } else {
+                    let range = vdata.plane_range(z.start, z.len());
+                    if let Some(planes) = vdata.values.get(range.clone()) {
+                        r.update_data_range(queue, range.start, planes);
+                    }
                 }
                 if let Some((cv, gpu)) = channels {
                     upload_channels(cv, gpu, queue, vdata.depth, z);
