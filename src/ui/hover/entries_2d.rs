@@ -33,10 +33,12 @@ pub(crate) fn resolve_2d_plot_entries(
     // multiscale plot's detail tile, where it is drawn, is finer still.
     let idx = py * matrix.width + px;
     let detail = super::detail::detail_cell(app, norm_x, norm_y);
-    let val = detail.map_or_else(
-        || matrix.values.get(idx).copied().unwrap_or(f32::NAN),
-        |d| d.value,
-    );
+    let base = &app.layers.base;
+    let cell = || {
+        base.gpu_blended_cell(px, py)
+            .unwrap_or_else(|| matrix.values.get(idx).copied().unwrap_or(f32::NAN))
+    };
+    let val = detail.map_or_else(cell, |d| d.value);
 
     // A composite mixes every channel, so no single band is selected.
     let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();

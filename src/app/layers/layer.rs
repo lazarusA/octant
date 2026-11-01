@@ -92,7 +92,9 @@ impl Layer {
         self.data.touch_matrix();
         self.renderers.heatmap = None;
         self.renderers.labels = None;
+        self.renderers.channels = None;
         self.renderers.detail = None;
+        self.renderers.detail_channels = None;
         self.data.detail.clear();
         self.renderers.sphere = None;
         self.renderers.surface = None;

@@ -33,9 +33,7 @@ pub fn overlay_values<'a>(
     let drawn = app.layers.overlays().iter().rev().filter(|l| l.is_drawn());
     let mut count = 0;
     for (slot, layer) in out.iter_mut().zip(drawn) {
-        let tile = layer.data.detail.tile.as_ref();
-        let raw = tile
-            .and_then(|t| tile_reading(t, at.norm.0, at.norm.1))
+        let raw = tile_reading(layer, at.norm.0, at.norm.1)
             .map_or_else(|| cell_value(layer, at.cell), |r| r.value);
         let var = layer.selection().variable_info();
         let name = var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name());
@@ -87,6 +85,9 @@ fn composite_kind(app: &OctantApp, layer: &Layer) -> Option<CompositeKind> {
 /// `layer`'s value at cell `(px, py)` of its full-resolution grid, NaN when
 /// it has no data there.
 fn cell_value(layer: &Layer, (px, py): (usize, usize)) -> f32 {
+    if let Some(color) = layer.gpu_blended_cell(px, py) {
+        return color;
+    }
     // The matrix is the full-resolution data, also under a pyramid.
     let value = match &layer.data.matrix {
         Some(matrix) if px < matrix.width => matrix.values.get(py * matrix.width + px),

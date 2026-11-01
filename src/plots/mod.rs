@@ -1,6 +1,10 @@
 pub mod camera;
 #[cfg(test)]
 mod camera_tests;
+pub mod channel_params;
+pub mod channels;
+#[cfg(test)]
+mod channels_tests;
 pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;
@@ -31,6 +35,8 @@ pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
 
+pub use channel_params::{ChannelParams, MAX_CHANNELS};
+pub use channels::{ChannelDraw, ChannelRenderer};
 pub use coastline::{
     Coastline3DCallback, Coastline3DParams, Coastline3DRenderer, CoastlineBuffer,
     CoastlineCallback, CoastlineFetchResult, CoastlineLod, CoastlineReceiver, CoastlineRenderer,

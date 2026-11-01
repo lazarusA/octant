@@ -68,7 +68,7 @@ impl OctantApp {
             layer.selection(),
             self.layer_step(id),
             &layer.data.flipped_dims,
-            &layer.composite,
+            super::want::styled(layer),
         ))
     }
 

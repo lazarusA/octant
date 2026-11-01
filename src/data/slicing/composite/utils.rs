@@ -178,15 +178,11 @@ impl ChannelAccumulator {
     fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig, stretch: &mut CompositeStretch) {
         self.loaded = true;
         let s = stretch.channel(cfg.index, values, cfg.window, 1.0);
-        let (scale, offset, is_i8) = (s.scale, s.offset, s.is_i8);
         let curve = cfg.display.curve();
         let tint = cfg.color_rgb.map(f32::from);
         for ((raw, rgb), valid) in values.iter().zip(&mut self.rgb).zip(&mut self.valid) {
             if !raw.is_nan() {
-                let norm = curve.map(normalize_channel_value(*raw, scale, offset, is_i8, 1.0));
-                for (acc, t) in rgb.iter_mut().zip(tint) {
-                    *acc += norm * t;
-                }
+                super::pixel::add_tinted(rgb, *raw, s, &curve, tint);
                 *valid = true;
             }
         }
@@ -198,17 +194,12 @@ impl ChannelAccumulator {
         if !self.loaded {
             return None;
         }
-        let pack = |([r, g, b], valid): ([f32; 3], bool)| {
-            if valid {
-                pack_rgb(
-                    r.clamp(0.0, 255.0),
-                    g.clamp(0.0, 255.0),
-                    b.clamp(0.0, 255.0),
-                )
-            } else {
-                f32::NAN
-            }
-        };
-        Some(self.rgb.into_iter().zip(self.valid).map(pack).collect())
+        Some(
+            self.rgb
+                .into_iter()
+                .zip(self.valid)
+                .map(|(rgb, valid)| super::pixel::pack_or_nan(rgb, valid))
+                .collect(),
+        )
     }
 }

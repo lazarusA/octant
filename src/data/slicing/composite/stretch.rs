@@ -56,6 +56,17 @@ impl CompositeStretch {
         s
     }
 
+    /// Channel `channel`'s stretch: `window`'s when it has one, else the one
+    /// recorded; never computes one.
+    pub fn of_channel(&self, channel: usize, window: Option<(f32, f32)>) -> Option<Stretch> {
+        if window.is_some() {
+            return Some(Stretch::of(&[], window, 1.0));
+        }
+        (self.channels.iter())
+            .find(|(c, _)| *c == channel)
+            .map(|&(_, s)| s)
+    }
+
     /// The inks' shared stretch: the one recorded, else `make()`, recorded.
     pub fn inks(&mut self, make: impl FnOnce() -> Stretch) -> Stretch {
         *self.inks.get_or_insert_with(make)

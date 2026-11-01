@@ -2,11 +2,11 @@
 
 /// Side of the square test target, in pixels.
 #[cfg(not(target_arch = "wasm32"))]
-const SIZE: u32 = 8;
+pub(super) const SIZE: u32 = 8;
 
 /// A `SIZE`-square 2D texture of `format`.
 #[cfg(not(target_arch = "wasm32"))]
-fn texture(
+pub(super) fn texture(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
     usage: wgpu::TextureUsages,
@@ -29,7 +29,7 @@ fn texture(
 
 /// Copies `target` into a mappable buffer (rows 256 bytes apart) and reads it.
 #[cfg(not(target_arch = "wasm32"))]
-fn read_back(
+pub(super) fn read_back(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     mut encoder: wgpu::CommandEncoder,

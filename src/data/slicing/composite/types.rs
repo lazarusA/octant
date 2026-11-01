@@ -124,6 +124,20 @@ impl ChannelCurve {
         .clamp(0.0, 1.0) as f32;
         if self.inverted { 1.0 - curved } else { curved }
     }
+
+    /// The curve as `channels.wgsl` maps it: the family (0 linear, 1
+    /// polynomial, 2 logarithmic, 3 exponential), whether it inverts, and
+    /// `[k, 255^k, 1 - exp(-255^k)]`.
+    pub fn gpu_terms(&self) -> (u32, bool, [f32; 3]) {
+        let family = match self.family {
+            ChannelFamily::Linear => 0,
+            ChannelFamily::Polynomial => 1,
+            ChannelFamily::Logarithmic => 2,
+            ChannelFamily::Exponential => 3,
+        };
+        let terms = [self.c as f32, self.top as f32, self.exp_span as f32];
+        (family, self.inverted, terms)
+    }
 }
 
 impl ChannelColorConfig {

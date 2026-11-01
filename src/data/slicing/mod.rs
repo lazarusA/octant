@@ -10,7 +10,7 @@ pub mod slice_3d;
 
 pub use composite::{
     ChannelColorConfig, ChannelDisplay, CompositeProbe, CompositeStretch, DEFAULT_CHANNEL_COLORS,
-    Stretch, parse_hex_color, slice_cmyk_composite, slice_multichannel_composite_nd,
+    Stretch, blend_pixel, parse_hex_color, slice_cmyk_composite, slice_multichannel_composite_nd,
     slice_multichannel_volume_composite_nd, slice_rgb_composite, slice_rgb_composite_nd,
     slice_rgb_volume_composite_nd,
 };

@@ -58,6 +58,8 @@ pub struct HeatmapCallback {
     pub aspect_scale: [f32; 2],
     pub coord_mode: u32,
     pub labels: Option<super::labels::LabelDraw>,
+    /// A multi-channel composite blended as drawn, in place of the colormap.
+    pub channels: Option<super::channels::ChannelDraw>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
@@ -83,6 +85,9 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
                 .renderer
                 .update_params(queue, labels.outline, labels.opacity);
         }
+        if let Some(channels) = &self.channels {
+            channels.renderer.update_params(queue, &channels.params);
+        }
         Vec::new()
     }
 
@@ -97,6 +102,10 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         }
         if let Some(labels) = &self.labels {
             labels.renderer.draw(rpass, &self.renderer);
+            return;
+        }
+        if let Some(channels) = &self.channels {
+            channels.renderer.draw(rpass, &self.renderer);
             return;
         }
         if !super::colormap_atlas::bind(rpass, callback_resources) {

@@ -4,8 +4,8 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::plots::{
-    HeatmapRenderer, LabelRenderer, LineRenderer, PlotType, PointCloudRenderer, SphereRenderer,
-    SurfaceRenderer, VolumeRenderer,
+    ChannelRenderer, HeatmapRenderer, LabelRenderer, LineRenderer, PlotType, PointCloudRenderer,
+    SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 
 #[derive(Default)]
@@ -13,8 +13,13 @@ pub struct LayerRenderers {
     pub heatmap: Option<Arc<HeatmapRenderer>>,
     /// The label colors of a label image, drawn over the heatmap's data.
     pub labels: Option<Arc<LabelRenderer>>,
+    /// A multi-channel composite's planes, blended over the heatmap's quad
+    /// as drawn (desktop heatmaps; `block_loading/projection_channels.rs`).
+    pub channels: Option<Arc<ChannelRenderer>>,
     /// A multiscale heatmap's detail tile (`app::detail`).
     pub detail: Option<Arc<HeatmapRenderer>>,
+    /// The detail tile's composite planes, as `channels`.
+    pub detail_channels: Option<Arc<ChannelRenderer>>,
     pub line: Option<Arc<LineRenderer>>,
     pub sphere: Option<Arc<SphereRenderer>>,
     pub surface: Option<Arc<SurfaceRenderer>>,

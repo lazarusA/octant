@@ -102,7 +102,7 @@ impl OctantApp {
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;
-        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims, &base.composite))
+        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims, styled(base)))
     }
 
     /// Drops what no longer belongs to the plot (`context`, `None` when the
@@ -166,11 +166,19 @@ fn level0_window(
 
 /// What a plotted selection shows at `step` with `flips` and `composite`: a
 /// tile is kept while it stays the same.
+/// The composite style a layer's tile is drawn with, `None` when the GPU
+/// blends it from planes as drawn: then its tile outlives style changes.
+pub(super) fn styled(
+    layer: &crate::app::layers::Layer,
+) -> Option<&crate::app::layers::CompositeStyle> {
+    (!layer.blends_on_gpu()).then_some(&layer.composite)
+}
+
 pub(super) fn plot_hash(
     sel: &crate::app::layers::VariableSelection,
     step: usize,
     flips: &[String],
-    composite: &crate::app::layers::CompositeStyle,
+    composite: Option<&crate::app::layers::CompositeStyle>,
 ) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     sel.metadata_generation.hash(&mut h);
@@ -179,6 +187,9 @@ pub(super) fn plot_hash(
     sel.dim_indices.hash(&mut h);
     step.hash(&mut h);
     flips.hash(&mut h);
-    composite.hash_into(&mut h);
+    composite.is_some().hash(&mut h);
+    if let Some(composite) = composite {
+        composite.hash_into(&mut h);
+    }
     h.finish()
 }
