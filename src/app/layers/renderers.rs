@@ -41,7 +41,7 @@ impl LayerRenderers {
         self.point_cloud_dirty = union(self.point_cloud_dirty.take(), z);
     }
 
-    /// Frees the OIT frames of 3D renderers not on screen (`active` is the
+    /// Frees the OIT and cached frames of 3D renderers not on screen (`active` is the
     /// plot type drawn this frame).
     pub fn release_idle_oit_frames(&self, active: PlotType) {
         let meshes = [
@@ -53,12 +53,14 @@ impl LayerRenderers {
                 && let Some(renderer) = renderer
             {
                 renderer.oit.release();
+                renderer.frame.release();
             }
         }
         if active != PlotType::PointCloud
             && let Some(renderer) = &self.point_cloud
         {
             renderer.oit.release();
+            renderer.frame.release();
         }
     }
 }

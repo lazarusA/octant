@@ -76,7 +76,7 @@ impl Blit {
                 device,
                 "Volume Blit Pipeline",
                 include_str!("../shaders/volume/blit.wgsl"),
-                &layout,
+                (&layout, false),
                 target_format,
             ),
             layout,

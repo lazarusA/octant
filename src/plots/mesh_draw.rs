@@ -56,6 +56,16 @@ impl Mesh3DCallback {
     fn cubes(&self) -> bool {
         self.params.mode == self.cube_mode_idx
     }
+
+    /// The pipeline drawing the mesh into egui's pass (or its cached frame).
+    fn pipeline(&self) -> &wgpu::RenderPipeline {
+        let renderer = &self.renderer;
+        match (self.transparency, self.cubes()) {
+            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
+            (Transparency::Off, true) => &renderer.voxel_pipeline,
+            (Transparency::Off, false) => &renderer.render_pipeline,
+        }
+    }
 }
 
 impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
@@ -80,21 +90,31 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
                 self.renderer.inputs.data_changed();
             }
         }
-        if self.transparency == Transparency::Oit
-            && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
-        {
-            let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let (renderer, cubes) = (&self.renderer, self.cubes());
+        let Some(atlas) = super::colormap_atlas::bind_group(callback_resources) else {
+            return Vec::new();
+        };
+        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
+        let (renderer, cubes) = (&self.renderer, self.cubes());
+        let key = renderer.inputs.key((cubes, self.transparency as u8));
+        if self.transparency == Transparency::Oit {
+            renderer.frame.release();
             renderer.oit.render(
                 device,
                 encoder,
-                (size, renderer.inputs.key(cubes)),
+                (size, key),
                 atlas,
                 |variant| renderer.oit_pipeline(device, variant),
                 |pass| renderer.draw_geometry(pass, cubes),
             );
-        } else if self.transparency != Transparency::Oit {
-            self.renderer.oit.release();
+        } else {
+            renderer.oit.release();
+            renderer.frame.render(
+                device,
+                encoder,
+                (size, key),
+                (self.pipeline(), atlas),
+                |pass| renderer.draw_geometry(pass, cubes),
+            );
         }
         Vec::new()
     }
@@ -109,18 +129,16 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             return;
         }
         let renderer = &self.renderer;
-        let cubes = self.cubes();
-        let pipeline = match (self.transparency, cubes) {
-            (Transparency::Oit, _) if renderer.oit.paint(rpass) => return,
-            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
-            (Transparency::Off, true) => &renderer.voxel_pipeline,
-            (Transparency::Off, false) => &renderer.render_pipeline,
+        let drawn = match self.transparency {
+            Transparency::Oit => renderer.oit.paint(rpass),
+            _ => renderer.frame.paint(rpass),
         };
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
+        if drawn || !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }
-        rpass.set_pipeline(pipeline);
-        renderer.draw_geometry(rpass, cubes);
+        // No frame yet (no colormap atlas in `prepare`): drawn directly.
+        rpass.set_pipeline(self.pipeline());
+        renderer.draw_geometry(rpass, self.cubes());
     }
 }
 

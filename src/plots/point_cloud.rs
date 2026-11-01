@@ -20,6 +20,8 @@ pub struct PointCloudRenderer {
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
     pub(crate) oit: OitSlot,
+    /// Its frame when drawn without OIT.
+    pub(crate) frame: super::frame_cache::FrameSlot,
     /// What its OIT frame depends on.
     pub(crate) inputs: super::oit::FrameInputs,
 }
@@ -154,6 +156,7 @@ impl PointCloudRenderer {
             shader,
             pipeline_layout,
             oit: OitSlot::new(target_format),
+            frame: super::frame_cache::FrameSlot::new(target_format),
             inputs: Default::default(),
         }
     }

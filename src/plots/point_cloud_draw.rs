@@ -70,21 +70,31 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
                 self.renderer.inputs.data_changed();
             }
         }
-        if self.transparency == Transparency::Oit
-            && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
-        {
-            let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let renderer = &self.renderer;
+        let Some(atlas) = super::colormap_atlas::bind_group(callback_resources) else {
+            return Vec::new();
+        };
+        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
+        let renderer = &self.renderer;
+        let key = renderer.inputs.key(self.transparency as u8);
+        if self.transparency == Transparency::Oit {
+            renderer.frame.release();
             renderer.oit.render(
                 device,
                 encoder,
-                (size, renderer.inputs.key(())),
+                (size, key),
                 atlas,
                 |variant| renderer.oit_pipeline(device, variant),
                 |pass| renderer.draw_points(pass),
             );
-        } else if self.transparency != Transparency::Oit {
-            self.renderer.oit.release();
+        } else {
+            renderer.oit.release();
+            renderer.frame.render(
+                device,
+                encoder,
+                (size, key),
+                (self.pipeline(), atlas),
+                |pass| renderer.draw_points(pass),
+            );
         }
         Vec::new()
     }
@@ -99,15 +109,25 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             return;
         }
         let renderer = &self.renderer;
-        let pipeline = match self.transparency {
-            Transparency::Oit if renderer.oit.paint(rpass) => return,
-            Transparency::Oit | Transparency::NoDepthWrite => &renderer.transparent_pipeline,
-            Transparency::Off => &renderer.render_pipeline,
+        let drawn = match self.transparency {
+            Transparency::Oit => renderer.oit.paint(rpass),
+            _ => renderer.frame.paint(rpass),
         };
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
+        if drawn || !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }
-        rpass.set_pipeline(pipeline);
+        // No frame yet (no colormap atlas in `prepare`): drawn directly.
+        rpass.set_pipeline(self.pipeline());
         renderer.draw_points(rpass);
+    }
+}
+
+impl PointCloudCallback {
+    /// The pipeline drawing the points into egui's pass (or their cached frame).
+    fn pipeline(&self) -> &wgpu::RenderPipeline {
+        match self.transparency {
+            Transparency::Oit | Transparency::NoDepthWrite => &self.renderer.transparent_pipeline,
+            Transparency::Off => &self.renderer.render_pipeline,
+        }
     }
 }

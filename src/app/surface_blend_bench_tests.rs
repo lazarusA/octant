@@ -14,13 +14,15 @@ use crate::plots::{ChannelDraw, ChannelParams, ChannelRenderer, Mesh3DCallback, 
 
 const FRAME: [u32; 2] = [1920, 1080];
 
-/// Prepares and paints `callback` into one frame, as egui would.
+/// Prepares and paints `callback` over the whole 1920 x 1080 frame, as
+/// egui would.
 pub(super) fn draw_surface(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     resources: &mut CallbackResources,
-    callback: &Mesh3DCallback,
+    callback: &impl CallbackTrait,
 ) {
+    let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0));
     let screen = ScreenDescriptor {
         size_in_pixels: FRAME,
         pixels_per_point: 1.0,
@@ -29,8 +31,8 @@ pub(super) fn draw_surface(
     let extra = callback.prepare(device, queue, &screen, &mut encoder, resources);
     queue.submit(extra.into_iter().chain([encoder.finish()]));
     let info = egui::PaintCallbackInfo {
-        viewport: callback.rect,
-        clip_rect: callback.rect,
+        viewport: rect,
+        clip_rect: rect,
         pixels_per_point: 1.0,
         screen_size_px: FRAME,
     };
@@ -54,7 +56,7 @@ pub(super) fn surface_callback(
         renderer: surface.clone(),
         params: crate::plots::common::Mesh3DUniformParams {
             color,
-            camera: crate::plots::camera::OrbitCamera::default().uniform(),
+            camera: orbit(0),
             displacement_strength: 0.5,
             mode,
             coord_mode: 0,
@@ -69,6 +71,14 @@ pub(super) fn surface_callback(
         channels,
         thinning: crate::plots::Thinning::NONE,
     }
+}
+
+/// The default camera turned by `step` small steps, so each step draws a
+/// new frame.
+pub(super) fn orbit(step: usize) -> crate::plots::camera::CameraUniform {
+    let mut camera = crate::plots::camera::OrbitCamera::default();
+    camera.rotation_y += step as f32 * 0.01;
+    camera.uniform()
 }
 
 #[test]
@@ -151,10 +161,14 @@ fn surface_blend_timed() {
         let gpu = callback(Some(gpu_channels(&configs)));
         draw_surface(&device, &queue, &mut resources, &gpu);
         gpu_change.push(start.elapsed());
-        // Every frame either path draws (orbiting, hovering).
+        // A frame while orbiting (a turned camera: no cached frame).
+        let mut cpu = callback(None);
+        cpu.params.camera = orbit(2 * run + 1);
         let start = Instant::now();
-        draw_surface(&device, &queue, &mut resources, &callback(None));
+        draw_surface(&device, &queue, &mut resources, &cpu);
         cpu_draw.push(start.elapsed());
+        let mut gpu = gpu;
+        gpu.params.camera = orbit(2 * run + 2);
         let start = Instant::now();
         draw_surface(&device, &queue, &mut resources, &gpu);
         gpu_draw.push(start.elapsed());

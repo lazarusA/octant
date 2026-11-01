@@ -15,6 +15,9 @@ pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;
 pub mod device;
+pub mod frame_cache;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod frame_cache_tests;
 pub mod fullscreen;
 pub mod heatmap;
 mod heatmap_draw;

@@ -9,7 +9,7 @@ use std::time::Instant;
 use eframe::egui_wgpu::CallbackResources;
 
 use super::channel_blend_bench_tests::{RUNS, device, median};
-use super::surface_blend_bench_tests::{draw_surface, surface_callback};
+use super::surface_blend_bench_tests::{draw_surface, orbit, surface_callback};
 use crate::plots::Mesh3DRenderer;
 
 /// Grids of 25 M, 6 M, 2 M and 0.5 M cells at TESSERA's 2:1 aspect.
@@ -32,10 +32,17 @@ fn surface_frame_timed() {
             .collect();
         let surface = Arc::new(Mesh3DRenderer::new_surface(&device, format, &values, w, h));
         for (name, mode) in [("smooth", 0), ("cubes", 2)] {
-            let callback = surface_callback(&surface, mode, None);
-            draw_surface(&device, &queue, &mut resources, &callback);
-            let times = (0..RUNS)
-                .map(|_| {
+            draw_surface(
+                &device,
+                &queue,
+                &mut resources,
+                &surface_callback(&surface, mode, None),
+            );
+            // A turned camera each run: the geometry is drawn, never a cached frame.
+            let times = (1..=RUNS)
+                .map(|run| {
+                    let mut callback = surface_callback(&surface, mode, None);
+                    callback.params.camera = orbit(run);
                     let start = Instant::now();
                     draw_surface(&device, &queue, &mut resources, &callback);
                     start.elapsed()

@@ -31,6 +31,8 @@ mod export_lifecycle;
 mod floating;
 #[cfg(test)]
 mod floating_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod frame_cache_bench_tests;
 mod landing;
 pub mod layers;
 pub(crate) mod multiscale;
