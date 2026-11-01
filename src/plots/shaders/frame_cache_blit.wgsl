@@ -5,8 +5,9 @@
 @group(0) @binding(0)
 var frame: texture_2d<f32>;
 
+// Read as an unfilterable float texture: GLSL cannot `textureLoad` a depth one.
 @group(0) @binding(1)
-var frame_depth: texture_depth_2d;
+var frame_depth: texture_2d<f32>;
 
 struct FrameOutput {
     @location(0) color: vec4<f32>,
@@ -18,7 +19,7 @@ fn fs_main(in: FullscreenOutput) -> FrameOutput {
     let size = textureDimensions(frame);
     let texel = min(vec2<u32>(in.uv * vec2<f32>(size)), size - vec2<u32>(1u));
     let color = textureLoad(frame, texel, 0);
-    let depth = textureLoad(frame_depth, texel, 0);
+    let depth = textureLoad(frame_depth, texel, 0).r;
     // Nothing drawn here: leave egui's color and depth alone.
     if (color.a == 0.0 && depth >= 1.0) {
         discard;

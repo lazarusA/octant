@@ -136,7 +136,7 @@ impl FrameState {
             label: Some("Cached Plot Frame Layout"),
             entries: &[
                 texture(0, wgpu::TextureSampleType::Float { filterable: false }),
-                texture(1, wgpu::TextureSampleType::Depth),
+                texture(1, wgpu::TextureSampleType::Float { filterable: false }),
             ],
         });
         let pipeline = super::fullscreen::frame_pipeline(
