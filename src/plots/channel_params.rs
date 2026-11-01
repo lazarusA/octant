@@ -1,5 +1,5 @@
-//! The uniforms of `channels.wgsl`: a multi-channel composite's drawn
-//! channels, built from its style every frame.
+//! The uniforms of `common/channel_blend.wgsl`: a multi-channel composite's
+//! drawn channels, built from its style every frame.
 
 use bytemuck::{Pod, Zeroable};
 
@@ -8,7 +8,7 @@ use crate::data::slicing::{ChannelColorConfig, CompositeStretch};
 /// The most channels one plane buffer holds (`ChannelParams::channels`).
 pub const MAX_CHANNELS: usize = 16;
 
-/// One drawn channel (`Channel` of `channels.wgsl`).
+/// One drawn channel (`Channel` of `common/channel_blend.wgsl`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct ChannelGpu {
@@ -23,7 +23,7 @@ pub struct ChannelGpu {
     curve: [f32; 4],
 }
 
-/// The drawn channels and the NaN color (`ChannelParams` of `channels.wgsl`).
+/// The drawn channels and the NaN color (`ChannelParams` of `common/channel_blend.wgsl`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
 pub struct ChannelParams {

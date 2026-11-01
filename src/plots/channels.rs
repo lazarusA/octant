@@ -1,8 +1,10 @@
-//! Multi-channel composites blended on the GPU (heatmaps): a block's
-//! channel planes are uploaded once, and its channels' tints, windows and
-//! curves are uniforms, so a display change costs no CPU blend and no upload.
-//! Drawn over a heatmap renderer's quad, as label images are
-//! (`labels.rs`); `channels.wgsl` mirrors `ChannelAccumulator`.
+//! Multi-channel composites blended on the GPU: a block's channel planes
+//! are uploaded once, and its channels' tints, windows and curves are
+//! uniforms, so a display change costs no CPU blend and no upload. Heatmaps
+//! draw them over their quad, as label images are (`labels.rs`); any
+//! pipeline with `bind_group_layout` at group 2 blends them through
+//! `common/channel_blend.wgsl` `blend_cell`, which mirrors
+//! `ChannelAccumulator`.
 
 use std::sync::Arc;
 
@@ -16,10 +18,12 @@ pub(crate) const CHANNELS_WGSL: &str = concat!(
     "\n",
     include_str!("shaders/common/quad.wgsl"),
     "\n",
+    include_str!("shaders/common/channel_blend.wgsl"),
+    "\n",
     include_str!("shaders/channels.wgsl"),
 );
 
-/// The pipeline and one block's channel planes.
+/// The quad pipeline and one block's channel planes, bound at group 2.
 pub struct ChannelRenderer {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
@@ -52,7 +56,7 @@ impl ChannelRenderer {
         planes: usize,
         plane_len: usize,
     ) -> Self {
-        let layout = channel_bind_group_layout(device);
+        let layout = bind_group_layout(device);
         let data_layout = super::common::create_plot_with_coords_bind_group_layout(
             device,
             "Channel Data Bind Group Layout",
@@ -64,7 +68,7 @@ impl ChannelRenderer {
             target_format,
             "Channels",
             CHANNELS_WGSL,
-            &[Some(&data_layout), Some(&layout)],
+            &[Some(&data_layout), None, Some(&layout)],
         );
         Self::with_pipeline(device, pipeline, layout, planes, plane_len)
     }
@@ -151,15 +155,21 @@ impl ChannelRenderer {
     pub(crate) fn draw(&self, rpass: &mut wgpu::RenderPass<'static>, heatmap: &HeatmapRenderer) {
         rpass.set_pipeline(&self.pipeline);
         heatmap.bind_quad(rpass);
-        rpass.set_bind_group(1, &self.bind_group, &[]);
+        self.bind(rpass);
         heatmap.draw_quad(rpass);
+    }
+
+    /// Binds the parameters and planes at group 2.
+    pub(crate) fn bind(&self, rpass: &mut wgpu::RenderPass<'static>) {
+        rpass.set_bind_group(2, &self.bind_group, &[]);
     }
 }
 
-fn channel_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+/// Group 2 of every pipeline that blends channels (`channel_blend.wgsl`).
+pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
         binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
+        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
         ty: wgpu::BindingType::Buffer {
             ty,
             has_dynamic_offset: false,
