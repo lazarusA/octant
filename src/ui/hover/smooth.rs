@@ -5,6 +5,7 @@
 
 use crate::app::layers::Layer;
 use crate::data::MatrixData;
+use crate::data::render::decimate::sample_index;
 
 /// Smooth vertex `j` of an axis of `n` cells, in cell units (cell `k` spans
 /// `[k, k + 1]`): its center, or the outer edge for the first and last.
@@ -56,11 +57,22 @@ pub fn bracket_wrapped(x: f32, n: usize) -> (usize, usize, f32) {
     (first, (first + 1) % n, g - floor)
 }
 
-/// Value `layer` draws at cell `(px, py)` of its `matrix`: the packed color
-/// of a composite the GPU blends (as `channel_value` draws it), else the
+/// Value `layer` draws at cell `(px, py)` of `matrix` (its 2D data, or the
+/// thinned grid its meshes draw): the packed color of a composite the GPU
+/// blends (as the bake writes it, at the full-resolution cell), else the
 /// data; NaN past the data.
 pub fn value_at(layer: &Layer, matrix: &MatrixData, px: usize, py: usize) -> f32 {
-    layer.gpu_blended_cell(px, py).unwrap_or_else(|| {
+    let full = match (&layer.data.mesh, &layer.data.matrix) {
+        (Some(mesh), Some(full)) if std::ptr::eq(&mesh.matrix, matrix) => {
+            let k = mesh.stride;
+            (
+                sample_index(px, k, full.width),
+                sample_index(py, k, full.height),
+            )
+        }
+        _ => (px, py),
+    };
+    layer.gpu_blended_cell(full.0, full.1).unwrap_or_else(|| {
         matrix
             .values
             .get(py * matrix.width + px)

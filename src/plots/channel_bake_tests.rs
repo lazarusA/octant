@@ -1,5 +1,6 @@
 //! The bake writes a target buffer with the CPU blend's packed colors.
 
+use super::Thinning;
 use super::channels_tests::{block, configs, cpu};
 use crate::data::slicing::CompositeStretch;
 
@@ -25,7 +26,6 @@ fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, buffer: &wgpu::Buffer) 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn bakes_what_the_cpu_blends() {
-    use crate::data::slicing::composite::utils::unpack_rgb;
     let Some((device, queue)) = super::test_gpu::device() else {
         eprintln!("SKIPPED bakes_what_the_cpu_blends: no GPU device");
         return;
@@ -46,13 +46,36 @@ fn bakes_what_the_cpu_blends() {
         mapped_at_creation: false,
     });
     let mut encoder = device.create_command_encoder(&Default::default());
-    renderer.bake(&device, &mut encoder, &params, &target);
+    renderer.bake(&device, &mut encoder, &params, (&target, Thinning::NONE));
     queue.submit([encoder.finish()]);
-    for (cell, (got, want)) in read_back(&device, &queue, &target)
-        .iter()
-        .zip(&packed)
-        .enumerate()
-    {
+    assert_close(&read_back(&device, &queue, &target), &packed);
+
+    // A grid thinned by 2: 4 x 4 cells, each the middle of its 2 x 2.
+    let small = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 16 * 4,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+    let thinning = Thinning {
+        stride: 2,
+        width: 4,
+        full_width: 8,
+        full_height: 8,
+    };
+    let mut encoder = device.create_command_encoder(&Default::default());
+    renderer.bake(&device, &mut encoder, &params, (&small, thinning));
+    queue.submit([encoder.finish()]);
+    let want: Vec<f32> = (0..16)
+        .map(|i| packed[(i / 4 * 2 + 1) * 8 + i % 4 * 2 + 1])
+        .collect();
+    assert_close(&read_back(&device, &queue, &small), &want);
+}
+
+/// Each baked cell as the CPU packs it, within one level per color.
+fn assert_close(baked: &[f32], packed: &[f32]) {
+    use crate::data::slicing::composite::utils::unpack_rgb;
+    for (cell, (got, want)) in baked.iter().zip(packed).enumerate() {
         if want.is_nan() {
             assert!(got.is_nan(), "cell {cell}: baked {got}, CPU NaN");
             continue;

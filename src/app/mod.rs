@@ -59,6 +59,8 @@ pub mod sources;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod surface_blend_bench_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod surface_frame_bench_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;

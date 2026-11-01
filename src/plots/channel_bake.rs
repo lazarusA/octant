@@ -30,7 +30,31 @@ pub(super) struct BakePipeline {
 pub(super) struct Baked {
     params: ChannelParams,
     planes_version: u64,
+    thinning: Thinning,
     target: wgpu::Buffer,
+}
+
+/// Targets whose last bake is remembered (a mesh and its 3D coastlines).
+const REMEMBERED: usize = 4;
+
+/// A target holding a thinned grid of the planes' 2D cells
+/// (`MatrixData::decimated`): one cell in `stride` of `full_width` x
+/// `full_height`, `width` cells a row. `NONE` when its cells are the planes'.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Thinning {
+    pub stride: u32,
+    pub width: u32,
+    pub full_width: u32,
+    pub full_height: u32,
+}
+
+impl Thinning {
+    pub const NONE: Self = Self {
+        stride: 1,
+        width: 1,
+        full_width: 1,
+        full_height: 1,
+    };
 }
 
 #[repr(C)]
@@ -38,6 +62,10 @@ pub(super) struct Baked {
 struct BakeUniforms {
     cells: u32,
     row: u32,
+    stride: u32,
+    width: u32,
+    full_width: u32,
+    full_height: u32,
     _pad: [u32; 2],
 }
 
@@ -83,19 +111,23 @@ impl BakePipeline {
 
 impl ChannelRenderer {
     /// Blends the planes in `params` into `target` (one `f32` per cell,
-    /// at most a plane's cells), unless it already holds that blend of
-    /// these planes. `params` must already be written (`update_params`).
+    /// at most a plane's cells, thinned by `thinning`), unless it already
+    /// holds that blend of these planes. `params` must already be written
+    /// (`update_params`).
     pub(crate) fn bake(
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         params: &ChannelParams,
-        target: &wgpu::Buffer,
+        (target, thinning): (&wgpu::Buffer, Thinning),
     ) {
         let planes_version = self.planes_version.load(Ordering::Acquire);
         let mut baked = self.baked.lock().unwrap_or_else(|p| p.into_inner());
-        let done = baked.as_ref().is_some_and(|b| {
-            b.params == *params && b.planes_version == planes_version && b.target == *target
+        let done = baked.iter().any(|b| {
+            b.target == *target
+                && b.params == *params
+                && b.planes_version == planes_version
+                && b.thinning == thinning
         });
         if done {
             return;
@@ -107,6 +139,10 @@ impl ChannelRenderer {
         let uniforms = BakeUniforms {
             cells,
             row: x * WORKGROUP,
+            stride: thinning.stride,
+            width: thinning.width.max(1),
+            full_width: thinning.full_width.max(1),
+            full_height: thinning.full_height.max(1),
             _pad: [0; 2],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -134,9 +170,14 @@ impl ChannelRenderer {
         pass.set_bind_group(0, &group, &[]);
         pass.set_bind_group(2, &self.bind_group, &[]);
         pass.dispatch_workgroups(x, y, 1);
-        *baked = Some(Baked {
+        baked.retain(|b| b.target != *target);
+        if baked.len() >= REMEMBERED {
+            baked.remove(0);
+        }
+        baked.push(Baked {
             params: *params,
             planes_version,
+            thinning,
             target: target.clone(),
         });
     }

@@ -38,6 +38,7 @@ pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
 
+pub use channel_bake::Thinning;
 pub use channel_params::{ChannelParams, MAX_CHANNELS};
 pub use channels::{ChannelDraw, ChannelRenderer};
 pub use coastline::{

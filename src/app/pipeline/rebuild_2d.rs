@@ -3,8 +3,9 @@
 
 use super::rebuild::follow_variable;
 use crate::app::OctantApp;
-use crate::app::layers::{Layer, LayerId};
+use crate::app::layers::{Layer, LayerId, MeshGrid};
 use crate::data::MatrixData;
+use crate::data::render::decimate::stride_for;
 use crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
 use crate::plots::limits::max_storage_elements;
 use crate::plots::{
@@ -40,7 +41,10 @@ impl OctantApp {
             let coastline = is_base.then_some(&mut self.coastline_3d_renderer);
             let base = coastline.map(|slot| (slot, self.coastline_current_lod));
             let reuse = !is_new_variable;
-            let rebuilt = sync_renderers(layer, rs, base, &shown, total_elements, reuse);
+            let [w, h] = self.layout.canvas_px.map(|p| p as usize);
+            let mesh_budget = (w * h / 2).max(MIN_MESH_CELLS);
+            let sizes = (total_elements, mesh_budget);
+            let rebuilt = sync_renderers(layer, rs, base, &shown, sizes, reuse);
             if rebuilt && data.height == 1 {
                 // The base layer's plot type is staged in `selected`.
                 let plot_type = if is_base {
@@ -119,19 +123,23 @@ pub(crate) fn needs_pyramid(enabled: bool, cells: usize) -> bool {
     enabled || cells > max_storage_elements()
 }
 
+/// Cells a mesh may always draw, however small the canvas.
+const MIN_MESH_CELLS: usize = 256 * 1024;
+
 /// Keeps the layer's label colors, then writes `shown` into its renderers
 /// when they can take it in place (`reuse`, same grid and size), else builds
 /// them again. The base layer, given with its 3D coastline slot and LOD
 /// (`base`), also gets its line renderer, built once: line plots draw only
 /// the base layer, from data uploaded at paint time. The sphere
 /// and surface only when the full data has at most `MAX_2D_SURFACE_ELEMENTS`
-/// `cells`. Returns whether they were built again.
+/// `cells`, thinned to at most `mesh_budget` cells (`LayerData::mesh`), as a
+/// mesh costs time per cell. Returns whether they were built again.
 fn sync_renderers(
     layer: &mut Layer,
     rs: &RenderState,
     base: Option<(&mut Option<Arc<Coastline3DRenderer>>, CoastlineLod)>,
     shown: &MatrixData,
-    cells: usize,
+    (cells, mesh_budget): (usize, usize),
     reuse: bool,
 ) -> bool {
     if base.is_some() && layer.renderers.line.is_none() {
@@ -147,61 +155,73 @@ fn sync_renderers(
     );
     // Label images are drawn only as heatmaps.
     let has_3d = layer.labels().is_none() && cells <= MAX_2D_SURFACE_ELEMENTS;
-    if reuse && can_update(layer, shown, has_3d) {
+    let stride = stride_for(shown.width.saturating_mul(shown.height), mesh_budget);
+    let thinned = has_3d.then(|| shown.decimated(stride)).flatten();
+    let mesh = thinned.as_ref().unwrap_or(shown);
+    let rebuilt = if reuse && can_update(layer, shown, mesh, has_3d) {
         let coastline = base.as_ref().and_then(|(slot, _)| slot.as_deref());
-        update_renderers(layer, coastline, rs, shown);
-        return false;
-    }
-    build_renderers(layer, base, rs, shown, has_3d);
-    true
+        update_renderers(layer, coastline, rs, shown, mesh);
+        false
+    } else {
+        build_renderers(layer, base, rs, (shown, mesh), has_3d);
+        true
+    };
+    layer.data.mesh = thinned.map(|matrix| MeshGrid { matrix, stride });
+    rebuilt
 }
 
-/// Whether the layer's renderers can take `shown` in place: same grid and
-/// size, with the sphere and surface built when the data has them.
-fn can_update(layer: &Layer, shown: &MatrixData, has_3d: bool) -> bool {
+/// Whether the layer's renderers can take `shown` (and the sphere and
+/// surface its thinned `mesh`) in place: same grid and sizes, with the
+/// sphere and surface built when the data has them.
+fn can_update(layer: &Layer, shown: &MatrixData, mesh: &MatrixData, has_3d: bool) -> bool {
     let same_dimensions = layer.data.matrix.as_ref().is_some_and(|m| {
         m.grid.same_geometry(&shown.grid) && m.width == shown.width && m.height == shown.height
     });
     let r = &layer.renderers;
+    let mesh_fits = |r: &Option<Arc<SurfaceRenderer>>| {
+        r.as_ref()
+            .is_some_and(|r| (r.width, r.height) == (mesh.width, mesh.height))
+    };
     same_dimensions
         && r.heatmap.is_some()
-        && (!has_3d || (r.sphere.is_some() && r.surface.is_some()))
+        && (!has_3d || (mesh_fits(&r.sphere) && mesh_fits(&r.surface)))
 }
 
-/// Writes `shown`'s coordinates and values into the existing renderers.
+/// Writes `shown`'s coordinates and values into the existing heatmap, and
+/// `mesh`'s into the sphere, surface and 3D coastlines.
 fn update_renderers(
     layer: &Layer,
     coastline: Option<&Coastline3DRenderer>,
     rs: &RenderState,
     shown: &MatrixData,
+    mesh: &MatrixData,
 ) {
-    let coords = shown.grid.coords_x().zip(shown.grid.coords_y());
-    let (q, values) = (&rs.queue, &shown.values);
+    let q = &rs.queue;
     macro_rules! update {
-        ($renderer:expr) => {
+        ($renderer:expr, $data:expr) => {
             if let Some(r) = $renderer {
-                if let Some((cx, cy)) = coords {
+                if let Some((cx, cy)) = $data.grid.coords_x().zip($data.grid.coords_y()) {
                     r.update_coords(q, cx, cy);
                 }
-                r.update_data(q, values);
+                r.update_data(q, &$data.values);
             }
         };
     }
     let r = &layer.renderers;
-    update!(r.heatmap.as_deref());
-    update!(r.sphere.as_deref());
-    update!(r.surface.as_deref());
-    update!(coastline);
+    update!(r.heatmap.as_deref(), shown);
+    update!(r.sphere.as_deref(), mesh);
+    update!(r.surface.as_deref(), mesh);
+    update!(coastline, mesh);
 }
 
-/// Builds the heatmap, and with `has_3d` the sphere, surface and (for the
-/// base layer, given its 3D coastline slot and LOD, `base`) 3D coastlines,
-/// for `shown`.
+/// Builds the heatmap for `shown`, and with `has_3d` the sphere, surface
+/// and (for the base layer, given its 3D coastline slot and LOD, `base`) 3D
+/// coastlines for `mesh`.
 fn build_renderers(
     layer: &mut Layer,
     base: Option<(&mut Option<Arc<Coastline3DRenderer>>, CoastlineLod)>,
     rs: &RenderState,
-    shown: &MatrixData,
+    (shown, mesh): (&MatrixData, &MatrixData),
     has_3d: bool,
 ) {
     let (device, format) = (&rs.device, rs.target_format);
@@ -218,6 +238,8 @@ fn build_renderers(
         }
         return;
     }
+    let (values, w, h) = (&mesh.values, mesh.width, mesh.height);
+    let (cx, cy) = (mesh.grid.coords_x(), mesh.grid.coords_y());
     let sphere = SphereRenderer::new_sphere_with_coords(device, format, values, w, h, cx, cy);
     let surface = SurfaceRenderer::new_surface_with_coords(device, format, values, w, h, cx, cy);
     renderers.sphere = Some(Arc::new(sphere));

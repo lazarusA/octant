@@ -93,8 +93,6 @@ const SHADERS: [(&str, &str); 13] = [
             "\n",
             include_str!("shaders/common/height.wgsl"),
             "\n",
-            include_str!("shaders/common/channel_blend.wgsl"),
-            "\n",
             include_str!("shaders/coastline_3d.wgsl"),
         ),
     ),

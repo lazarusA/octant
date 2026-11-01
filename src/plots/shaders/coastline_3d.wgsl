@@ -163,7 +163,7 @@ fn vs_main(
             let data_len = arrayLength(&data_buffer);
             if (data_len > 0u) {
                 let data_idx = min(cell_y * max(coastline_uniforms.width, 1u) + cell_x, data_len - 1u);
-                value = channel_value(data_idx, data_buffer[data_idx]);
+                value = data_buffer[data_idx];
             }
         }
     }

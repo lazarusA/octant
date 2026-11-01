@@ -8,6 +8,9 @@ use crate::data::{MatrixData, MatrixPyramid, ViewportResampler, VolumeData};
 pub struct LayerData {
     pub matrix: Option<MatrixData>,
     pub pyramid: Option<Arc<MatrixPyramid>>,
+    /// The thinned grid the surface, sphere and 3D coastlines draw when
+    /// the 2D data has more cells than the canvas budget allows.
+    pub mesh: Option<MeshGrid>,
     pub resampler: ViewportResampler,
     pub volume: Option<VolumeData>,
     /// Counts volume resets (new selections), so cache hits know when the
@@ -41,6 +44,13 @@ pub struct LayerData {
     pub volume_version: u64,
     /// The finer level's tile drawn over a multiscale heatmap (base layer).
     pub detail: crate::app::detail::DetailState,
+}
+
+/// A 2D matrix with one cell in `stride` along each axis
+/// (`MatrixData::decimated`): what meshes draw, cost growing per cell.
+pub struct MeshGrid {
+    pub matrix: MatrixData,
+    pub stride: usize,
 }
 
 /// The channels of a 3D composite blended on the GPU, stacked along Z:

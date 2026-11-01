@@ -48,6 +48,8 @@ pub struct Mesh3DCallback {
     /// A multi-channel composite the GPU blends, baked into the data buffer
     /// (`ChannelRenderer::bake`).
     pub channels: Option<ChannelDraw>,
+    /// How the drawn grid thins the planes' cells (`Layer::mesh_thinning`).
+    pub thinning: super::Thinning,
 }
 
 impl Mesh3DCallback {
@@ -72,7 +74,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             let target = &self.renderer.data_buffer;
             channels
                 .renderer
-                .bake(device, encoder, &channels.params, target);
+                .bake(device, encoder, &channels.params, (target, self.thinning));
         }
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)

@@ -36,8 +36,9 @@ pub struct ChannelRenderer {
     pub(super) bind_group: wgpu::BindGroup,
     /// Bumped by every plane upload, so a bake knows its planes changed.
     pub(super) planes_version: AtomicU64,
-    /// What the last bake wrote, to skip the next when nothing changed.
-    pub(super) baked: Mutex<Option<Baked>>,
+    /// What the last bakes wrote, per target, to skip the next when
+    /// nothing changed.
+    pub(super) baked: Mutex<Vec<Baked>>,
     /// Cells per plane and planes held.
     pub plane_len: usize,
     pub planes: usize,
@@ -121,7 +122,7 @@ impl ChannelRenderer {
             planes_buffer,
             bind_group,
             planes_version: AtomicU64::new(0),
-            baked: Mutex::new(None),
+            baked: Mutex::new(Vec::new()),
             plane_len,
             planes,
         }
@@ -162,12 +163,6 @@ impl ChannelRenderer {
     pub(crate) fn bind(&self, rpass: &mut wgpu::RenderPass<'_>) {
         rpass.set_bind_group(2, &self.bind_group, &[]);
     }
-}
-
-/// Group 2 for pipelines that blend channels but draw none: no channel
-/// drawn (`channel_value` returns the data).
-pub(crate) fn empty_bind_group(device: &wgpu::Device) -> wgpu::BindGroup {
-    channel_buffers(device, &bind_group_layout(device), 1).2
 }
 
 /// Zeroed parameters (no channel drawn) and a planes buffer of `cells`

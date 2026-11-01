@@ -62,9 +62,12 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         if let Some(channels) = &self.channels {
             channels.renderer.update_params(queue, &channels.params);
             let target = &self.renderer.data_buffer;
-            channels
-                .renderer
-                .bake(device, encoder, &channels.params, target);
+            channels.renderer.bake(
+                device,
+                encoder,
+                &channels.params,
+                (target, super::Thinning::NONE),
+            );
         }
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)

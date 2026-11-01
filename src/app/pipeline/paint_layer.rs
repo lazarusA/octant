@@ -102,6 +102,7 @@ impl OctantApp {
                     probe_start(layer.data.composite_probe.as_ref()),
                     None,
                 ),
+                thinning: layer.mesh_thinning(),
             },
         );
         ui.painter().add(callback);
@@ -210,13 +211,13 @@ impl OctantApp {
 }
 
 /// The first channel of `probe`'s window.
-fn probe_start(probe: Option<&crate::data::slicing::CompositeProbe>) -> Option<usize> {
+pub(super) fn probe_start(probe: Option<&crate::data::slicing::CompositeProbe>) -> Option<usize> {
     probe.map(|p| p.channel_span().0)
 }
 
 /// `layer`'s composite blended by `renderer` from its planes, channel
 /// `c_start` first, in its style this frame; `None` when the CPU blended it.
-fn channel_draw(
+pub(super) fn channel_draw(
     layer: &Layer,
     renderer: &Option<std::sync::Arc<crate::plots::ChannelRenderer>>,
     c_start: Option<usize>,

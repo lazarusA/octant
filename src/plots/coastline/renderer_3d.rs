@@ -20,8 +20,6 @@ pub struct Coastline3DRenderer {
     coord_x_buffer: wgpu::Buffer,
     coord_y_buffer: wgpu::Buffer,
     gpu: RwLock<Coastline3DGpuResources>,
-    /// Group 2 while the plot blends no channels.
-    no_channels: wgpu::BindGroup,
     vertex_count: AtomicU32,
     width: u32,
     height: u32,
@@ -54,8 +52,6 @@ impl Coastline3DRenderer {
                     include_str!("../shaders/common/projections.wgsl"),
                     "\n",
                     include_str!("../shaders/common/height.wgsl"),
-                    "\n",
-                    include_str!("../shaders/common/channel_blend.wgsl"),
                     "\n",
                     include_str!("../shaders/coastline_3d.wgsl"),
                 )
@@ -169,11 +165,7 @@ impl Coastline3DRenderer {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("3D Coastline Pipeline Layout"),
-            bind_group_layouts: &[
-                Some(&bind_group_layout),
-                None,
-                Some(&crate::plots::channels::bind_group_layout(device)),
-            ],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -220,7 +212,6 @@ impl Coastline3DRenderer {
                 coastline_buffer,
                 bind_group,
             }),
-            no_channels: crate::plots::channels::empty_bind_group(device),
             vertex_count: AtomicU32::new((safe_vertices.len() / 2) as u32),
             width: width as u32,
             height: height as u32,
@@ -303,18 +294,20 @@ pub struct Coastline3DCallback {
     pub renderer: Arc<Coastline3DRenderer>,
     pub params: Coastline3DParams,
     pub rect: egui::Rect,
-    /// The plot's channels when the GPU blends its composite, so heights
-    /// follow its colors (their parameters written by the plot's callback).
-    pub channels: Option<Arc<crate::plots::ChannelRenderer>>,
+    /// The plot's composite when the GPU blends it, baked into the heights'
+    /// data as into the plot's (`ChannelRenderer::bake`).
+    pub channels: Option<crate::plots::ChannelDraw>,
+    /// How the grid thins the planes' cells (`Layer::mesh_thinning`).
+    pub thinning: crate::plots::Thinning,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
+        encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         let p = self.params;
@@ -342,6 +335,13 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             0,
             bytemuck::bytes_of(&uniforms),
         );
+        if let Some(channels) = &self.channels {
+            let target = (&self.renderer.data_buffer, self.thinning);
+            channels.renderer.update_params(queue, &channels.params);
+            channels
+                .renderer
+                .bake(device, encoder, &channels.params, target);
+        }
         Vec::new()
     }
 
@@ -363,10 +363,6 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         };
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &res.bind_group, &[]);
-        match &self.channels {
-            Some(channels) => channels.bind(rpass),
-            None => rpass.set_bind_group(2, &self.renderer.no_channels, &[]),
-        }
         let instances = (self.params.line_width.round() as u32 * 2)
             .saturating_sub(1)
             .clamp(1, 7);

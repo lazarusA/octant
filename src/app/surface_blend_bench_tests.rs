@@ -15,7 +15,7 @@ use crate::plots::{ChannelDraw, ChannelParams, ChannelRenderer, Mesh3DCallback, 
 const FRAME: [u32; 2] = [1920, 1080];
 
 /// Prepares and paints `callback` into one frame, as egui would.
-fn draw_surface(
+pub(super) fn draw_surface(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     resources: &mut CallbackResources,
@@ -37,6 +37,38 @@ fn draw_surface(
     frame(device, queue, |rpass| {
         callback.paint(info, rpass, resources)
     });
+}
+
+/// `surface` drawn in `mode` (0 smooth, 1 steps, 2 cubes) as an RGB
+/// composite, blended from `channels` when given, in a 1920 x 1080 frame.
+pub(super) fn surface_callback(
+    surface: &Arc<Mesh3DRenderer>,
+    mode: u32,
+    channels: Option<ChannelDraw>,
+) -> Mesh3DCallback {
+    let color = crate::plots::common::PlotColorParams {
+        colormap: crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
+        ..Default::default()
+    };
+    Mesh3DCallback {
+        renderer: surface.clone(),
+        params: crate::plots::common::Mesh3DUniformParams {
+            color,
+            camera: crate::plots::camera::OrbitCamera::default().uniform(),
+            displacement_strength: 0.5,
+            mode,
+            coord_mode: 0,
+            has_reference_globe: false,
+            lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
+            lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+            flip_height: false,
+        },
+        cube_mode_idx: 2,
+        rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
+        transparency: Default::default(),
+        channels,
+        thinning: crate::plots::Thinning::NONE,
+    }
 }
 
 #[test]
@@ -88,28 +120,7 @@ fn surface_blend_timed() {
         planes.write_plane(&queue, c, &p.values);
     })
     .expect("planes");
-    let color = crate::plots::common::PlotColorParams {
-        colormap: crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
-        ..Default::default()
-    };
-    let callback = |channels: Option<ChannelDraw>| Mesh3DCallback {
-        renderer: surface.clone(),
-        params: crate::plots::common::Mesh3DUniformParams {
-            color,
-            camera: crate::plots::camera::OrbitCamera::default().uniform(),
-            displacement_strength: 0.5,
-            mode: 0,
-            coord_mode: 0,
-            has_reference_globe: false,
-            lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
-            lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
-            flip_height: false,
-        },
-        cube_mode_idx: 2,
-        rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
-        transparency: Default::default(),
-        channels,
-    };
+    let callback = |channels| surface_callback(&surface, 0, channels);
     let gpu_channels = |configs: &[ChannelColorConfig]| ChannelDraw {
         renderer: planes.clone(),
         params: ChannelParams::of(configs, &stretch, (0, CHANNELS), (W * H) as u32, None),

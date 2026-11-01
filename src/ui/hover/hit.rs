@@ -64,7 +64,8 @@ fn hit_sphere(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> HitResult {
-    if let Some(matrix) = matrix
+    // Marched over the grid the sphere draws (`Layer::mesh_view`).
+    if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos)
     {
         HitResult::norm_2d(nx, ny, true, geo)
@@ -79,7 +80,7 @@ fn hit_surface(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> HitResult {
-    if let Some(matrix) = matrix
+    if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_surface(app, matrix, camera, hover_pos)
     {
         HitResult::norm_2d(nx, ny, true, geo)
@@ -170,13 +171,14 @@ pub fn resolve_target_screen_pos(
     point_3d_hit: Option<(usize, usize, usize, f32)>,
 ) -> Option<Pos2> {
     match app.effective_canvas_plot_type() {
+        // On the drawn grid's cell holding `(px, py)`.
         PlotType::Sphere => {
-            let matrix = matrix?;
-            sphere_target_pos(app, matrix, camera, px, py)
+            let (mesh, k) = app.layers.base.mesh_view(matrix?);
+            sphere_target_pos(app, mesh, camera, px / k, py / k)
         }
         PlotType::Surface => {
-            let matrix = matrix?;
-            surface_target_pos(app, matrix, camera, px, py)
+            let (mesh, k) = app.layers.base.mesh_view(matrix?);
+            surface_target_pos(app, mesh, camera, px / k, py / k)
         }
         PlotType::PointCloud | PlotType::Volume => {
             let sampler = sampler?;
