@@ -7,16 +7,19 @@
 use crate::data::coordinates::CoordinateGrid;
 use crate::data::render::MatrixData;
 
-/// The stride along each axis that leaves at most `budget` of `cells`
-/// cells (1 when they fit).
-pub fn stride_for(cells: usize, budget: usize) -> usize {
-    let ratio = cells.div_ceil(budget.max(1));
-    let mut k = (ratio as f64).sqrt().ceil() as usize;
-    // `sqrt` of a large ratio can round down by one.
-    while k.saturating_mul(k) < ratio {
+/// The stride along each axis that leaves at most `budget` cells of a
+/// `width` x `height` grid (1 when they fit), counting the short last
+/// stride of each axis as `decimated` keeps it.
+pub fn stride_for(width: usize, height: usize, budget: usize) -> usize {
+    let budget = budget.max(1);
+    let kept = |k: usize| width.div_ceil(k).saturating_mul(height.div_ceil(k));
+    let ratio = width.saturating_mul(height).div_ceil(budget);
+    let mut k = ((ratio as f64).sqrt() as usize).max(1);
+    // Narrow grids thin along one axis only, so the square root falls short.
+    while kept(k) > budget {
         k += 1;
     }
-    k.max(1)
+    k
 }
 
 /// The full-resolution index of thinned index `i` along an axis of `n`

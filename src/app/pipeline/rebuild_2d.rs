@@ -107,7 +107,7 @@ fn sync_renderers(
     let cells = data.width.saturating_mul(data.height);
     let fits = !data.grid.is_healpix() || cells <= MAX_GPU_STORAGE_BUFFER_ELEMENTS;
     let has_3d = layer.labels().is_none() && fits;
-    let stride = stride_for(cells, mesh_budget);
+    let stride = stride_for(data.width, data.height, mesh_budget);
     let thinned = has_3d.then(|| data.decimated(stride)).flatten();
     let mesh = thinned.as_ref().unwrap_or(data);
     let rebuilt = if reuse && can_update(layer, shown, mesh, has_3d) {

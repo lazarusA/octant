@@ -8,11 +8,26 @@ use crate::data::coordinates::CoordinateGrid;
 
 #[test]
 fn the_stride_leaves_at_most_the_budget() {
-    assert_eq!(stride_for(100, 100), 1);
-    assert_eq!(stride_for(24_714_000, 1_036_800), 5);
-    for (cells, budget) in [(10_001, 100), (7031 * 3515, 500_000), (3, 1)] {
-        let k = stride_for(cells, budget);
-        assert!(cells.div_ceil(k * k) <= budget, "{cells} by {k}");
+    assert_eq!(stride_for(10, 10, 100), 1);
+    assert_eq!(stride_for(7030, 3515, 1_036_800), 5);
+    // Square, narrow and odd grids, counted as `decimated` keeps them: an
+    // 11585^2 grid at 2 keeps 5793^2 cells, past 2^25; a 1 x 70M slice
+    // thins along one axis only.
+    for (w, h, budget) in [
+        (101, 99, 100),
+        (7031, 3515, 500_000),
+        (3, 1, 1),
+        (11_585, 11_585, 1 << 25),
+        (1, 70_000_000, 1 << 25),
+        (1, 10_000_000, 1_036_800),
+    ] {
+        let k = stride_for(w, h, budget);
+        let kept = w.div_ceil(k) * h.div_ceil(k);
+        assert!(kept <= budget, "{w}x{h} by {k} keeps {kept}");
+        if k > 1 {
+            let more = w.div_ceil(k - 1) * h.div_ceil(k - 1);
+            assert!(more > budget, "{w}x{h}: {} would fit", k - 1);
+        }
     }
 }
 

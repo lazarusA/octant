@@ -31,7 +31,7 @@ impl OctantApp {
         if matrix.height < 2 || matrix.grid.is_healpix() {
             return;
         }
-        let stride = stride_for(matrix.width.saturating_mul(matrix.height), budget);
+        let stride = stride_for(matrix.width, matrix.height, budget);
         // An unchanged mesh is kept: writing it again would overwrite the
         // colors a GPU composite baked into it.
         if base.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
