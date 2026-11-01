@@ -54,3 +54,20 @@ fn display_changes_drop_a_cpu_blended_tile() {
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     assert_eq!(tile_level(&app), None, "re-blended on the CPU");
 }
+
+#[test]
+fn display_changes_drop_a_tile_too_big_for_the_gpu() {
+    let Some(mut app) = plotted(true) else {
+        eprintln!("SKIPPED display_changes_drop_a_tile_too_big_for_the_gpu: no GPU device");
+        return;
+    };
+    rest_at(&mut app, 4.0);
+    assert_eq!(tile_level(&app), Some(0));
+    // As when the tile's planes did not fit: blended on the CPU.
+    app.layers.base.renderers.detail_channels = None;
+    app.layers.base.composite.channel_configs[1].color_rgb = [255, 255, 0];
+    app.channel_display_changed(crate::app::layers::LayerId::BASE);
+    assert_eq!(tile_level(&app), None, "the old colors are dropped");
+    rest_at(&mut app, 4.0);
+    assert_eq!(tile_level(&app), Some(0), "asked for again");
+}

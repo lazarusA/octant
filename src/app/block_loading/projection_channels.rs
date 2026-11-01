@@ -22,6 +22,19 @@ impl OctantApp {
         id != LayerId::BASE || !self.layers.get(id).is_some_and(Layer::blends_on_gpu)
     }
 
+    /// After layer `id`'s channel display changed: reloads it, or when the
+    /// GPU blends it, drops a detail tile blended on the CPU (too big for
+    /// the GPU), which holds the old colors; it is asked for again.
+    pub(crate) fn channel_display_changed(&mut self, id: LayerId) {
+        if self.channel_display_reloads(id) {
+            self.load_layer_block(id);
+        } else if let Some(layer) = self.layers.get_mut(id)
+            && layer.renderers.detail_channels.is_none()
+        {
+            layer.data.detail.discard_tile();
+        }
+    }
+
     /// Projects `window` of `block` as layer `id`'s channel planes, when its
     /// multi-channel composite is drawn as a heatmap and they fit one
     /// GPU buffer; `false` (planes dropped) when the CPU blends it instead.

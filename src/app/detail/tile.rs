@@ -157,8 +157,11 @@ impl OctantApp {
         };
         if layer.composite.enabled {
             let c_dim = self.layer_channel_dim(pending.layer).unwrap_or(0);
-            let cells = window.x_range.1.saturating_sub(window.x_range.0)
-                * window.y_range.1.saturating_sub(window.y_range.0);
+            let cells = window
+                .x_range
+                .1
+                .saturating_sub(window.x_range.0)
+                .checked_mul(window.y_range.1.saturating_sub(window.y_range.0))?;
             let count = block.shape.get(c_dim).copied().unwrap_or(0);
             // Planes past the GPU's buffer are blended on the CPU instead.
             if layer.blends_on_gpu() && ChannelRenderer::fits(count, cells) {

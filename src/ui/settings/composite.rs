@@ -110,8 +110,8 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
                 changed |= channel_entry(ui, cfg, id);
             }
         });
-    if changed && app.channel_display_reloads(id) {
-        app.load_layer_block(id);
+    if changed {
+        app.channel_display_changed(id);
     }
 }
 
