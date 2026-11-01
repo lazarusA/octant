@@ -193,6 +193,10 @@ impl OctantApp {
                 desc.to_string(),
             );
             self.rebuild_pipeline_with_volume_data(id, initial_vdata);
+        } else if id == LayerId::BASE {
+            // The key leaves out the animated axis, which decides whether
+            // the point cloud may be thinned (`point_grid`).
+            self.rethin_points();
         }
     }
 
