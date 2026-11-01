@@ -11,7 +11,7 @@ use wgpu::util::DeviceExt;
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
 
-const SHADER: &str = concat!(
+pub(super) const SHADER: &str = concat!(
     include_str!("shaders/common/channel_blend.wgsl"),
     "\n",
     include_str!("shaders/channel_bake.wgsl"),

@@ -5483,6 +5483,7 @@ dependencies = [
  "js-sys",
  "log",
  "md-5",
+ "naga",
  "netcdf",
  "object_store",
  "ome_zarr_metadata",
