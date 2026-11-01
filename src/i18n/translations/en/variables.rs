@@ -43,9 +43,6 @@ pub fn text(key: VariablesKey) -> &'static str {
         VariablesKey::LargeSelectionPyramid => {
             "Large 2D selection ({} cells, {} MB): Automatic multi-resolution pyramid aggregation is enabled."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {} MB). 2D Plane and 1D Line plots remain fully active."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "3D Volume & Point Cloud are disabled for this selection: volume size ({} MB) exceeds the {} MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active."
         }

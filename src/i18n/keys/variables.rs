@@ -41,7 +41,6 @@ crate::i18n::keys::define_keys! {
     Download,
     DownloadCells,
     LargeSelectionPyramid,
-    LargeSelectionNoMeshes,
     LargeVolumeDisabled,
     RoleNone,
     RoleAnimated,

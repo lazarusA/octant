@@ -47,9 +47,6 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeSelectionPyramid => {
             "Seleção 2D grande ({} células, {} MB): a agregação automática em pirâmide de multi-resolução está ativada."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "As malhas de Globo 3D e Superfície 3D estão desativadas para esta seleção grande ({} células, {} MB). Os gráficos de Plano 2D e Linha 1D continuam totalmente ativos."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "Volume 3D e Nuvem de pontos estão desativados para esta seleção: o tamanho do volume ({} MB) excede o limite de {} MB do buffer de armazenamento da GPU. Plano 2D, Linha 1D e Globo 3D continuam ativos."
         }

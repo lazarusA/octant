@@ -5,10 +5,12 @@ use crate::app::layers::LayerId;
 use crate::app::test_support::render_state;
 use crate::data::MatrixData;
 
-/// `n` x `n` cells built into the base layer's renderers on a 512 x 512 canvas.
-fn built(n: usize) -> Option<OctantApp> {
+/// `n` x `n` cells built into the base layer's renderers on a 512 x 512
+/// canvas, through a pyramid when `resampled`.
+fn built_with(n: usize, resampled: bool) -> Option<OctantApp> {
     let mut app = OctantApp {
         wgpu_render_state: Some(render_state()?),
+        enable_pyramid_resampling: resampled,
         ..Default::default()
     };
     app.layout.canvas_px = [512, 512];
@@ -16,6 +18,10 @@ fn built(n: usize) -> Option<OctantApp> {
     let data = MatrixData::new(n, n, values, 0.0, (n * n) as f32, "m".into(), 1);
     app.rebuild_pipeline_with_matrix_data(LayerId::BASE, data);
     Some(app)
+}
+
+fn built(n: usize) -> Option<OctantApp> {
+    built_with(n, false)
 }
 
 #[test]
@@ -56,4 +62,21 @@ fn small_grids_draw_every_cell() {
         app.layers.base.mesh_thinning(),
         crate::plots::Thinning::NONE
     );
+}
+
+#[test]
+fn a_resampled_heatmap_keeps_whole_meshes() {
+    let Some(app) = built_with(1024, true) else {
+        eprintln!("SKIPPED a_resampled_heatmap_keeps_whole_meshes: no GPU device");
+        return;
+    };
+    let layer = &app.layers.base;
+    assert!(
+        layer.data.pyramid.is_some(),
+        "the heatmap samples a pyramid"
+    );
+    // The surface thins the whole data, not the heatmap's sample of it.
+    let mesh = layer.data.mesh.as_ref().expect("thinned");
+    assert_eq!((mesh.matrix.width, mesh.stride), (512, 2));
+    assert_eq!(mesh.matrix.values[0], 1024.0 + 1.0);
 }

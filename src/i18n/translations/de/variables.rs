@@ -47,9 +47,6 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeSelectionPyramid => {
             "Große 2D-Auswahl ({} Zellen, {} MB): Automatische Multi-Resolution-Pyramidenaggregation ist aktiviert."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "3D-Globus- und 3D-Oberflächennetze sind für diese große Auswahl deaktiviert ({} Zellen, {} MB). 2D-Fläche und 1D-Linie bleiben voll verfügbar."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "3D-Volumen und Punktwolke sind für diese Auswahl deaktiviert: Die Volumengröße ({} MB) überschreitet das GPU-Speicherpufferlimit von {} MB. 2D-Fläche, 1D-Linie und 3D-Globus bleiben verfügbar."
         }

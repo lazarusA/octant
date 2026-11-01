@@ -45,9 +45,6 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeSelectionPyramid => {
             "Stort 2D-utvalg ({} celler, {} MB): automatisk aggregering med flernivåpyramide er slått på."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "3D-globus og 3D-overflate er slått av for dette store utvalget ({} celler, {} MB). 2D-plan og 1D-linje er fortsatt tilgjengelige."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "3D-volum og punktsky er slått av for dette utvalget: volumstørrelsen ({} MB) overskrider grensen på {} MB for GPU-lagringsbuffere. 2D-plan, 1D-linje og 3D-globus er fortsatt tilgjengelige."
         }

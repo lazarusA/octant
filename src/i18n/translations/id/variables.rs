@@ -49,9 +49,6 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeSelectionPyramid => {
             "Pilihan 2D besar ({} sel, {} MB): agregasi piramida multi-resolusi otomatis diaktifkan."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "Mesh Bola 3D & Permukaan 3D dinonaktifkan untuk pilihan besar ini ({} sel, {} MB). Plot Bidang 2D dan Garis 1D tetap aktif sepenuhnya."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "Volume 3D & Awan Titik dinonaktifkan untuk pilihan ini: ukuran volume ({} MB) melebihi batas buffer penyimpanan GPU {} MB. Bidang 2D, Garis 1D, dan Bola 3D tetap aktif."
         }

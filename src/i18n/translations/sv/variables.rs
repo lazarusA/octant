@@ -47,9 +47,6 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeSelectionPyramid => {
             "Stort 2D-urval ({} celler, {} MB): automatisk aggregering i flerupplösta pyramider är aktiverad."
         }
-        VariablesKey::LargeSelectionNoMeshes => {
-            "3D-glob och 3D-yta är avaktiverade för detta stora urval ({} celler, {} MB). 2D-plan och 1D-linje är fortfarande helt tillgängliga."
-        }
         VariablesKey::LargeVolumeDisabled => {
             "3D-volym och punktmoln är avaktiverade för detta urval: volymens storlek ({} MB) överskrider GPU:ns gräns på {} MB för lagringsbuffertar. 2D-plan, 1D-linje och 3D-glob är fortfarande tillgängliga."
         }

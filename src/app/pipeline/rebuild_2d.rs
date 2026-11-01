@@ -6,7 +6,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId, MeshGrid};
 use crate::data::MatrixData;
 use crate::data::render::decimate::stride_for;
-use crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
+use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 use crate::plots::limits::max_storage_elements;
 use crate::plots::{
     Coastline3DRenderer, CoastlineLod, CoastlineRenderer, HeatmapRenderer, LabelRenderer,
@@ -43,8 +43,7 @@ impl OctantApp {
             let reuse = !is_new_variable;
             let [w, h] = self.layout.canvas_px.map(|p| p as usize);
             let mesh_budget = (w * h / 2).max(MIN_MESH_CELLS);
-            let sizes = (total_elements, mesh_budget);
-            let rebuilt = sync_renderers(layer, rs, base, &shown, sizes, reuse);
+            let rebuilt = sync_renderers(layer, rs, base, (&shown, &data), mesh_budget, reuse);
             if rebuilt && data.height == 1 {
                 // The base layer's plot type is staged in `selected`.
                 let plot_type = if is_base {
@@ -130,16 +129,16 @@ const MIN_MESH_CELLS: usize = 256 * 1024;
 /// when they can take it in place (`reuse`, same grid and size), else builds
 /// them again. The base layer, given with its 3D coastline slot and LOD
 /// (`base`), also gets its line renderer, built once: line plots draw only
-/// the base layer, from data uploaded at paint time. The sphere
-/// and surface only when the full data has at most `MAX_2D_SURFACE_ELEMENTS`
-/// `cells`, thinned to at most `mesh_budget` cells (`LayerData::mesh`), as a
-/// mesh costs time per cell. Returns whether they were built again.
+/// the base layer, from data uploaded at paint time. The sphere and surface
+/// draw the whole `data` (not the heatmap's pyramid sample) thinned to at
+/// most `mesh_budget` cells (`LayerData::mesh`), as a mesh costs time per
+/// cell, whatever its size. Returns whether they were built again.
 fn sync_renderers(
     layer: &mut Layer,
     rs: &RenderState,
     base: Option<(&mut Option<Arc<Coastline3DRenderer>>, CoastlineLod)>,
-    shown: &MatrixData,
-    (cells, mesh_budget): (usize, usize),
+    (shown, data): (&MatrixData, &MatrixData),
+    mesh_budget: usize,
     reuse: bool,
 ) -> bool {
     if base.is_some() && layer.renderers.line.is_none() {
@@ -154,10 +153,13 @@ fn sync_renderers(
         rs.target_format,
     );
     // Label images are drawn only as heatmaps.
-    let has_3d = layer.labels().is_none() && cells <= MAX_2D_SURFACE_ELEMENTS;
-    let stride = stride_for(shown.width.saturating_mul(shown.height), mesh_budget);
-    let thinned = has_3d.then(|| shown.decimated(stride)).flatten();
-    let mesh = thinned.as_ref().unwrap_or(shown);
+    // HEALPix grids are never thinned: their meshes take every cell.
+    let cells = data.width.saturating_mul(data.height);
+    let fits = !data.grid.is_healpix() || cells <= MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+    let has_3d = layer.labels().is_none() && fits;
+    let stride = stride_for(cells, mesh_budget);
+    let thinned = has_3d.then(|| data.decimated(stride)).flatten();
+    let mesh = thinned.as_ref().unwrap_or(data);
     let rebuilt = if reuse && can_update(layer, shown, mesh, has_3d) {
         let coastline = base.as_ref().and_then(|(slot, _)| slot.as_deref());
         update_renderers(layer, coastline, rs, shown, mesh);
