@@ -99,7 +99,7 @@ impl OctantApp {
                 channels: channel_draw(
                     layer,
                     &layer.renderers.channels,
-                    layer.data.composite_probe.as_ref(),
+                    probe_start(layer.data.composite_probe.as_ref()),
                     None,
                 ),
             },
@@ -140,6 +140,12 @@ impl OctantApp {
                 params,
                 rect: view.plot_rect,
                 transparency: self.transparency_mode(layer),
+                channels: channel_draw(
+                    layer,
+                    &layer.renderers.channels,
+                    layer.data.channel_volume.as_ref().map(|cv| cv.c_start),
+                    None,
+                ),
             },
         );
         ui.painter().add(callback);
@@ -169,7 +175,8 @@ impl OctantApp {
         };
         let color_params = self.get_color_params(layer);
         let nan = (color_params.use_nan_color == 1).then_some(color_params.nan_color);
-        let channels = |renderer: &Option<_>, probe| channel_draw(layer, renderer, probe, nan);
+        let channels =
+            |renderer: &Option<_>, probe| channel_draw(layer, renderer, probe_start(probe), nan);
         let callback = |renderer: &std::sync::Arc<crate::plots::HeatmapRenderer>,
                         coord_mode,
                         labels,
@@ -202,16 +209,21 @@ impl OctantApp {
     }
 }
 
-/// `layer`'s composite blended by `renderer` from the planes of `probe`'s
-/// window, in its style this frame; `None` when the CPU blended it.
+/// The first channel of `probe`'s window.
+fn probe_start(probe: Option<&crate::data::slicing::CompositeProbe>) -> Option<usize> {
+    probe.map(|p| p.channel_span().0)
+}
+
+/// `layer`'s composite blended by `renderer` from its planes, channel
+/// `c_start` first, in its style this frame; `None` when the CPU blended it.
 fn channel_draw(
     layer: &Layer,
     renderer: &Option<std::sync::Arc<crate::plots::ChannelRenderer>>,
-    probe: Option<&crate::data::slicing::CompositeProbe>,
+    c_start: Option<usize>,
     nan_color: Option<[f32; 4]>,
 ) -> Option<crate::plots::ChannelDraw> {
     let renderer = renderer.as_ref().filter(|_| layer.composite.enabled)?;
-    let (c_start, _) = probe?.channel_span();
+    let c_start = c_start?;
     let params = crate::plots::ChannelParams::of(
         &layer.composite.channel_configs,
         layer.data.composite_stretch.as_ref()?,

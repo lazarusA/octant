@@ -1,15 +1,21 @@
 //! Point cloud draw calls and the egui paint callback, with the
 //! transparency modes of [`Transparency`].
 
+use super::channels::ChannelDraw;
 use super::oit::{Transparency, Variant, build_pipeline};
 use super::point_cloud::{PointCloudRenderer, PointCloudUniformParams, PointCloudVertex};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 impl PointCloudRenderer {
-    /// Binds group 0 and the billboard template and draws every point.
-    fn draw_points(&self, pass: &mut wgpu::RenderPass<'_>) {
+    /// Binds groups 0 and 2 (`channels`, else none drawn) and the
+    /// billboard template and draws every point.
+    fn draw_points(&self, pass: &mut wgpu::RenderPass<'_>, channels: Option<&ChannelDraw>) {
         pass.set_bind_group(0, &self.bind_group, &[]);
+        match channels {
+            Some(draw) => draw.renderer.bind(pass),
+            None => pass.set_bind_group(2, &self.no_channels, &[]),
+        }
         pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         pass.draw_indexed(
@@ -42,6 +48,8 @@ pub struct PointCloudCallback {
     pub rect: egui::Rect,
     /// The plot's Transparency option, resolved for this device.
     pub transparency: Transparency,
+    /// A multi-channel composite the GPU blends (`channel_value`).
+    pub channels: Option<ChannelDraw>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
@@ -55,18 +63,21 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
         self.renderer.update_uniforms(queue, &self.params);
+        if let Some(channels) = &self.channels {
+            channels.renderer.update_params(queue, &channels.params);
+        }
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
         {
             let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let renderer = &self.renderer;
+            let (renderer, channels) = (&self.renderer, self.channels.as_ref());
             renderer.oit.render(
                 device,
                 encoder,
                 size,
                 atlas,
                 |variant| renderer.oit_pipeline(device, variant),
-                |pass| renderer.draw_points(pass),
+                |pass| renderer.draw_points(pass, channels),
             );
         } else if self.transparency != Transparency::Oit {
             self.renderer.oit.release();
@@ -93,6 +104,6 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             return;
         }
         rpass.set_pipeline(pipeline);
-        renderer.draw_points(rpass);
+        renderer.draw_points(rpass, self.channels.as_ref());
     }
 }

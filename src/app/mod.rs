@@ -20,6 +20,8 @@ pub mod canvas;
 mod channel_blend_bench_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod channel_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod channel_points_tests;
 #[cfg(test)]
 mod composite_defaults_tests;
 pub mod controllers;
@@ -55,6 +57,8 @@ mod pipeline;
 mod pyramid_tests;
 pub mod sources;
 mod state;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod surface_blend_bench_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;

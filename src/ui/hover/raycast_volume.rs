@@ -1,6 +1,7 @@
 //! 3D volumetric raymarching for Volume and PointCloud plots.
 
 use crate::app::OctantApp;
+use crate::app::layers::Layer;
 use crate::data::MatrixData;
 use crate::plots::PlotType;
 use crate::ui::hover::camera::{Camera3D, Ray3D, intersect_aabb};
@@ -15,6 +16,9 @@ pub struct VolumeSampler<'a> {
     pub shift_x: usize,
     pub shift_y: usize,
     pub shift_z: usize,
+    /// The layer whose volume this is, read through its GPU blend
+    /// (`Layer::gpu_blended_voxel`) when it has one.
+    pub layer: Option<&'a Layer>,
 }
 
 impl<'a> VolumeSampler<'a> {
@@ -32,6 +36,7 @@ impl<'a> VolumeSampler<'a> {
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
+                layer: Some(&app.layers.base),
             })
         } else if let Some(m) = matrix {
             if m.width == 0 || m.height == 0 || m.values.is_empty() {
@@ -45,6 +50,7 @@ impl<'a> VolumeSampler<'a> {
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
+                layer: None,
             })
         } else {
             None
@@ -56,7 +62,8 @@ impl<'a> VolumeSampler<'a> {
         let shifted_y = (cy + self.shift_y) % self.height;
         let shifted_z = (cz + self.shift_z) % self.depth;
         let idx = shifted_z * (self.width * self.height) + shifted_y * self.width + shifted_x;
-        self.values.get(idx).copied().unwrap_or(f32::NAN)
+        let blended = self.layer.and_then(|l| l.gpu_blended_voxel(idx));
+        blended.unwrap_or_else(|| self.values.get(idx).copied().unwrap_or(f32::NAN))
     }
 
     pub fn is_visible(&self, app: &OctantApp, val: f32) -> bool {

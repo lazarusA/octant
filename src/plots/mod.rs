@@ -117,6 +117,8 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/oit.wgsl"),
             "\n",
+            include_str!("shaders/common/channel_blend.wgsl"),
+            "\n",
             $plot_shader
         )
     };

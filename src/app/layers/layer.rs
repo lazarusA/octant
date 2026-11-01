@@ -104,6 +104,7 @@ impl Layer {
     /// Invalidates the 3D volume and its renderers.
     pub fn clear_3d(&mut self) {
         self.data.volume = None;
+        self.data.channel_volume = None;
         self.data.touch_volume();
         self.renderers.volume = None;
         self.renderers.point_cloud = None;

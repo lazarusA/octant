@@ -40,6 +40,15 @@ fn flush_layer(layer: &mut Layer, queue: &wgpu::Queue, plot_type: PlotType) {
                 if let Some(planes) = vdata.values.get(range.clone()) {
                     r.update_data_range(queue, range.start, planes);
                 }
+                // The same planes of each channel the GPU blends.
+                if let (Some(cv), Some(gpu)) = (&layer.data.channel_volume, &renderers.channels) {
+                    for c in 0..cv.channels {
+                        let range = cv.volume.plane_range(c * vdata.depth + z.start, z.len());
+                        if let Some(planes) = cv.volume.values.get(range.clone()) {
+                            gpu.write_cells(queue, range.start, planes);
+                        }
+                    }
+                }
             }
         }
         _ => {}

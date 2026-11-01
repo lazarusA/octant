@@ -25,6 +25,7 @@ pub mod projection;
 pub mod projection_2d;
 pub mod projection_3d;
 pub(crate) mod projection_channels;
+mod projection_channels_3d;
 pub mod projection_hash;
 #[cfg(test)]
 mod slow_store;

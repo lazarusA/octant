@@ -125,6 +125,15 @@ impl ChannelRenderer {
         }
     }
 
+    /// Uploads `values` at cell `offset` of the planes, which run one
+    /// after another (a 3D composite's stacked channel volumes).
+    pub fn write_cells(&self, queue: &wgpu::Queue, offset: usize, values: &[f32]) {
+        if offset.saturating_add(values.len()) <= self.planes * self.plane_len {
+            let bytes = (offset * 4) as u64;
+            queue.write_buffer(&self.planes_buffer, bytes, bytemuck::cast_slice(values));
+        }
+    }
+
     pub(crate) fn update_params(&self, queue: &wgpu::Queue, params: &ChannelParams) {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(params));
     }

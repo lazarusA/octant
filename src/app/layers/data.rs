@@ -18,10 +18,13 @@ pub struct LayerData {
     pub last_volume_block: Option<(u64, Vec<usize>)>,
     /// Which step each Z plane of `volume` holds while Z is the animated axis.
     pub ring: RingPlanes,
+    /// A 3D composite's raw channels when the GPU blends them (`volume`
+    /// then holds the first channel's values, for its grid).
+    pub channel_volume: Option<ChannelVolume>,
     /// Block window behind the plotted 2D composite, for raw per-channel hover values.
     pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
-    /// How the plotted 2D composite stretched its channels, which its detail
-    /// tiles reuse.
+    /// How the plotted composite stretched its channels, which its detail
+    /// tiles (2D) and the GPU blend reuse.
     pub composite_stretch: Option<crate::data::slicing::CompositeStretch>,
     /// Dimensions the plotted data runs opposite to storage order along
     /// (`OctantBlock::flipped_dims`), so the hover can map screen indices back.
@@ -38,6 +41,16 @@ pub struct LayerData {
     pub volume_version: u64,
     /// The finer level's tile drawn over a multiscale heatmap (base layer).
     pub detail: crate::app::detail::DetailState,
+}
+
+/// The channels of a 3D composite blended on the GPU, stacked along Z:
+/// channel `c_start + c`'s plane `z` is plane `c * depth + z` of `volume`
+/// (`depth` the layer volume's), as the GPU holds them
+/// (`plots::ChannelRenderer`, one `w * h * depth` plane per channel).
+pub struct ChannelVolume {
+    pub volume: VolumeData,
+    pub c_start: usize,
+    pub channels: usize,
 }
 
 /// The steps held by a volume whose Z axis is the animated one: a ring

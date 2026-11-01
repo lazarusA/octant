@@ -27,14 +27,27 @@ impl OctantApp {
         target_desc: &str,
         ring_slot: Option<usize>,
     ) -> bool {
-        let composite = self.layers.get(id).is_some_and(|l| l.composite.enabled);
+        let layer = self.layers.get(id);
+        let composite = layer.is_some_and(|l| l.composite.enabled);
+        let gpu_blend = layer.is_some_and(|l| l.data.channel_volume.is_some());
         // Slices read the block in its oriented (flipped) order.
         let oriented = (
             block.oriented_range(x_dim, local_x_range),
             block.oriented_range(y_dim, local_y_range),
             block.oriented_range(z_dim, local_z_range),
         );
+        // The GPU blends raw channels; the volume keeps the selected one's.
+        let channels = if gpu_blend {
+            let dims = (x_dim, y_dim, z_dim, c_dim);
+            let Some(slabs) = self.channel_slabs(id, block, dims, oriented, fixed_indices) else {
+                return false;
+            };
+            slabs
+        } else {
+            Vec::new()
+        };
         let slab_opt = if composite
+            && !gpu_blend
             && block.shape.len() >= 3
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
         {
@@ -86,6 +99,7 @@ impl OctantApp {
             local_z_range.0,
             slab,
             ring_slot,
+            &channels,
         );
         true
     }
@@ -106,6 +120,7 @@ impl OctantApp {
         local_z0: usize,
         slab: VolumeData,
         ring_slot: Option<usize>,
+        channels: &[VolumeData],
     ) {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
@@ -140,6 +155,15 @@ impl OctantApp {
             layer.data.touch_volume();
             layer.data.last_volume_block =
                 Some((layer.data.volume_allocations, block.origin.clone()));
+        }
+        // Each channel's slab at the same place in its stacked volume.
+        if let Some(cv) = &mut layer.data.channel_volume {
+            let depth = slab.depth.min(depth_max.saturating_sub(dest_z));
+            for (c, s) in channels.iter().enumerate() {
+                let at = [dest_x, dest_y, c * depth_max + dest_z];
+                cv.volume
+                    .update_subvolume(at, [s.width, s.height, depth], &s.values);
+            }
         }
         // Uploaded before the next paint, to the renderer on screen only.
         layer

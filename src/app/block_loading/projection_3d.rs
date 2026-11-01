@@ -38,9 +38,18 @@ impl OctantApp {
             z_dim
         };
         let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
-        let ch_hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(id));
+        let cells = nx.saturating_mul(ny).saturating_mul(nz);
+        let gpu_channels = self.gpu_channel_count(id, block, (c_dim, z_dim), cells);
+        // The GPU blends from raw channels, so display changes keep the volume.
+        let ch = match gpu_channels {
+            Some(_) => "gpu".to_string(),
+            None => {
+                let hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(id));
+                format!("{hash:016x}")
+            }
+        };
         let target_desc = format!(
-            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch_hash:016x}",
+            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch}",
             layer.selection().store_target,
             block.variable_name,
             req_x.0,
@@ -56,7 +65,14 @@ impl OctantApp {
             },
         );
 
+        let allocations = layer.data.volume_allocations;
         self.ensure_volume_allocated(id, nx, ny, nz, &target_desc);
+        let reset = self
+            .layers
+            .get(id)
+            .is_some_and(|l| l.data.volume_allocations != allocations);
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        self.sync_channel_volume(id, gpu_channels, c_start, reset);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
@@ -87,9 +103,12 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
-        // Raw channel readouts only exist for 2D composites.
+        // Raw channel readouts only exist for 2D composites; the stretch
+        // only for composites the GPU blends.
         layer.data.composite_probe = None;
-        layer.data.composite_stretch = None;
+        if gpu_channels.is_none() {
+            layer.data.composite_stretch = None;
+        }
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
         for plane in planes {

@@ -54,7 +54,8 @@ fn vs_main(
     let max_idx = arrayLength(&data_buffer) - 1u;
     let data_idx = min(shifted_z * (grid_w * grid_h) + shifted_y * grid_w + shifted_x, max_idx);
 
-    let raw_val = data_buffer[data_idx];
+    // A GPU-blended composite's packed color (`channel_value`), else the data.
+    let raw_val = channel_value(data_idx, data_buffer[data_idx]);
     out.val = raw_val;
     out.local_uv = model.position;
 

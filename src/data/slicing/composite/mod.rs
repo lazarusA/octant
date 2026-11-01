@@ -22,7 +22,7 @@ mod tests;
 
 pub use cmyk::slice_cmyk_composite;
 pub use multichannel::slice_multichannel_composite_nd;
-pub use pixel::blend_pixel;
+pub use pixel::{blend_pixel, blend_samples};
 pub use probe::CompositeProbe;
 pub use rgb::{slice_rgb_composite, slice_rgb_composite_nd};
 pub use stretch::{CompositeStretch, Stretch};
