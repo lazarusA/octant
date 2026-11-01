@@ -200,32 +200,6 @@ impl PointCloudRenderer {
     }
 }
 
-impl PointCloudRenderer {
-    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &PointCloudUniformParams) {
-        let instance_cnt = self.instance_count.load(Ordering::Relaxed);
-        let depth =
-            super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
-        let uniforms = PointCloudUniforms {
-            camera: params.camera,
-            aspect_x: params.aspect_x,
-            aspect_y: params.aspect_y,
-            aspect_z: params.aspect_z,
-            point_size: params.point_size,
-            width: params.width.max(1),
-            height: params.height.max(1),
-            depth,
-            shift_x: params.shift_x,
-            shift_y: params.shift_y,
-            shift_z: params.shift_z,
-            _pad0: 0,
-            _pad1: 0,
-            color: params.color,
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
-        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
-    }
-}
-
 impl super::traits::PlotRenderer for PointCloudRenderer {
     fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
         match data {

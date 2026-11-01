@@ -3,7 +3,9 @@
 
 use super::channels::ChannelDraw;
 use super::oit::{Transparency, Variant, build_pipeline};
-use super::point_cloud::{PointCloudRenderer, PointCloudUniformParams, PointCloudVertex};
+use super::point_cloud::{
+    PointCloudRenderer, PointCloudUniformParams, PointCloudUniforms, PointCloudVertex,
+};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -34,6 +36,34 @@ impl PointCloudRenderer {
             None,
             variant,
         )
+    }
+}
+
+impl PointCloudRenderer {
+    /// Writes the uniforms of a frame drawn with `params`, recording them
+    /// for the frame cache.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &PointCloudUniformParams) {
+        let instance_cnt = self.instance_count.load(Ordering::Relaxed);
+        let depth =
+            super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
+        let uniforms = PointCloudUniforms {
+            camera: params.camera,
+            aspect_x: params.aspect_x,
+            aspect_y: params.aspect_y,
+            aspect_z: params.aspect_z,
+            point_size: params.point_size,
+            width: params.width.max(1),
+            height: params.height.max(1),
+            depth,
+            shift_x: params.shift_x,
+            shift_y: params.shift_y,
+            shift_z: params.shift_z,
+            _pad0: 0,
+            _pad1: 0,
+            color: params.color,
+        };
+        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
     }
 }
 
