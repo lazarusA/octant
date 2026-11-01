@@ -45,13 +45,11 @@ impl OitState {
         atlas: &wgpu::BindGroup,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
     ) {
-        let max = device.limits().max_texture_dimension_2d;
-        let size = size.map(|s| s.clamp(1, max));
-        let same_size = self.frame.as_ref().is_some_and(|f| f.size == size);
-        if same_size && self.key == Some(key) {
+        let held = (self.frame.as_ref().map(|f| f.size), self.key);
+        let Some((size, resize)) = super::frame_update(device, held, (size, key)) else {
             return;
-        }
-        if !same_size {
+        };
+        if resize {
             self.frame = Some(self.compositor.create_frame(device, size));
         }
         self.key = Some(key);

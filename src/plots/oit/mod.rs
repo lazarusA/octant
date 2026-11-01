@@ -13,10 +13,11 @@
 //! without them plots fall back to [`Transparency::NoDepthWrite`].
 //!
 //! Cached like the volume's `FrameKey` frame: the passes rerun only when the
-//! renderer's key changes (`oit_key` of the mesh and point cloud renderers:
-//! their uniforms, a data version bumped by every upload and bake, the
-//! colormap generation, the pipeline) or the size does; other repaints only
-//! composite the frame.
+//! renderer's key changes ([`FrameInputs::key`] of the mesh and point
+//! cloud renderers: their uniforms, a data version bumped by every upload
+//! and bake, the colormap generation, the pipeline) or the size does
+//! ([`frame_update`], shared with `frame_cache::FrameSlot`); other repaints
+//! only composite the frame.
 
 mod frame;
 mod inputs;
@@ -56,6 +57,21 @@ pub enum Transparency {
 pub fn frame_size(rect: &egui::Rect, pixels_per_point: f32) -> [u32; 2] {
     let pixels = rect.size() * pixels_per_point;
     [pixels.x, pixels.y].map(|p| p.round().max(1.0) as u32)
+}
+
+/// What a cached frame held at `held` size, last drawn from `last`, needs
+/// to show `key` at `size` (clamped to the device's texture limit): `None`
+/// when it already does, else the clamped size and whether its targets
+/// must be made again at it.
+pub fn frame_update(
+    device: &wgpu::Device,
+    (held, last): (Option<[u32; 2]>, Option<u64>),
+    (size, key): ([u32; 2], u64),
+) -> Option<([u32; 2], bool)> {
+    let max = device.limits().max_texture_dimension_2d;
+    let size = size.map(|s| s.clamp(1, max));
+    let resize = held != Some(size);
+    (resize || last != Some(key)).then_some((size, resize))
 }
 
 /// Whether the adapter can render OIT frames. Checked once per process.

@@ -55,17 +55,14 @@ impl FrameSlot {
     ) -> bool {
         let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
         let state = state.get_or_insert_with(|| FrameState::new(device, self.target_format));
-        let max = device.limits().max_texture_dimension_2d;
-        let size = size.map(|s| s.clamp(1, max));
-        let same_size = state.targets.as_ref().is_some_and(|t| t.size == size);
-        if same_size && state.key == Some(key) {
+        let held = (state.targets.as_ref().map(|t| t.size), state.key);
+        let Some((size, resize)) = super::oit::frame_update(device, held, (size, key)) else {
             return false;
-        }
-        if !same_size {
-            state.targets = Some(state.create_targets(device, self.target_format, size));
-        }
-        let Some(targets) = &state.targets else {
-            return false;
+        };
+        let (layout, format) = (&state.layout, self.target_format);
+        let targets = match &mut state.targets {
+            Some(t) if !resize => t,
+            slot => slot.insert(Targets::new(device, layout, format, size)),
         };
         state.key = Some(key);
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -153,13 +150,15 @@ impl FrameState {
             key: None,
         }
     }
+}
 
-    fn create_targets(
-        &self,
+impl Targets {
+    fn new(
         device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
         target_format: wgpu::TextureFormat,
         size: [u32; 2],
-    ) -> Targets {
+    ) -> Self {
         let texture = |label, format| {
             device
                 .create_texture(&wgpu::TextureDescriptor {
@@ -183,7 +182,7 @@ impl FrameState {
         let depth = texture("Cached Plot Frame Depth", DEPTH_FORMAT);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Cached Plot Frame"),
-            layout: &self.layout,
+            layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -195,7 +194,7 @@ impl FrameState {
                 },
             ],
         });
-        Targets {
+        Self {
             color,
             depth,
             bind_group,
@@ -237,15 +236,24 @@ pub fn render_frame(
     }
 }
 
-/// Draws the frame `transparency` renders through; `false` when there is
-/// none yet.
+/// Draws the frame `transparency` renders through; without one yet (no
+/// colormap atlas in `prepare`) draws the plot directly with its egui
+/// `pipeline` (`draw` binds group 0 and buffers and issues the draw call),
+/// once the atlas is there.
 pub fn paint_frame(
     (oit, frame): Slots<'_>,
-    transparency: Transparency,
+    (transparency, pipeline): (Transparency, &wgpu::RenderPipeline),
     rpass: &mut wgpu::RenderPass<'static>,
-) -> bool {
-    match transparency {
+    resources: &eframe::egui_wgpu::CallbackResources,
+    draw: impl FnOnce(&mut wgpu::RenderPass<'static>),
+) {
+    let drawn = match transparency {
         Transparency::Oit => oit.paint(rpass),
         _ => frame.paint(rpass),
+    };
+    if drawn || !super::colormap_atlas::bind(rpass, resources) {
+        return;
     }
+    rpass.set_pipeline(pipeline);
+    draw(rpass);
 }

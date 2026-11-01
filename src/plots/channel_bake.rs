@@ -127,6 +127,22 @@ impl BakePipeline {
     }
 }
 
+impl super::channels::ChannelDraw {
+    /// Writes this frame's parameters and bakes the blend into `target`
+    /// (`ChannelRenderer::bake`), as surfaces, spheres, point clouds and 3D
+    /// coastlines do before drawing. Returns whether it baked.
+    pub(crate) fn bake_into(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target: (BakeId, &wgpu::Buffer, Thinning),
+    ) -> bool {
+        self.renderer.update_params(queue, &self.params);
+        self.renderer.bake(device, encoder, &self.params, target)
+    }
+}
+
 impl ChannelRenderer {
     /// Blends the planes in `params` into `target`, named `id` (one `f32` per cell,
     /// at most a plane's cells, thinned by `thinning`), unless it already

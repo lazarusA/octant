@@ -90,14 +90,10 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         super::colormap_atlas::prepare(device, queue, callback_resources);
         self.renderer.update_uniforms(queue, &self.params);
         if let Some(channels) = &self.channels {
-            channels.renderer.update_params(queue, &channels.params);
             let r = &self.renderer;
             let target = (r.bake_id, &r.data_buffer, r.thinning);
-            if channels
-                .renderer
-                .bake(device, encoder, &channels.params, target)
-            {
-                self.renderer.inputs.data_changed();
+            if channels.bake_into(device, queue, encoder, target) {
+                r.inputs.data_changed();
             }
         }
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
@@ -125,14 +121,13 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             return;
         }
         let renderer = &self.renderer;
-        let slots = (&renderer.oit, &renderer.frame);
-        let drawn = super::frame_cache::paint_frame(slots, self.transparency, rpass);
-        if drawn || !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
-        }
-        // No frame yet (no colormap atlas in `prepare`): drawn directly.
-        rpass.set_pipeline(self.pipeline());
-        renderer.draw_points(rpass);
+        super::frame_cache::paint_frame(
+            (&renderer.oit, &renderer.frame),
+            (self.transparency, self.pipeline()),
+            rpass,
+            callback_resources,
+            |rpass| renderer.draw_points(rpass),
+        );
     }
 }
 

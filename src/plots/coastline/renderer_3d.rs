@@ -341,10 +341,7 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         if let Some(channels) = &self.channels {
             let r = &self.renderer;
             let target = (r.bake_id, &r.data_buffer, self.thinning);
-            channels.renderer.update_params(queue, &channels.params);
-            channels
-                .renderer
-                .bake(device, encoder, &channels.params, target);
+            channels.bake_into(device, queue, encoder, target);
         }
         Vec::new()
     }
