@@ -3,8 +3,11 @@
 //! receives them (several blocks in a frame upload once). The other renderer
 //! keeps its pending planes until it is shown.
 
+use std::ops::Range;
+
 use crate::app::OctantApp;
-use crate::app::layers::{ChannelVolume, Layer};
+use crate::app::layers::{ChannelVolume, Layer, PointGrid};
+use crate::data::VolumeData;
 use crate::plots::{ChannelRenderer, PlotType};
 
 impl OctantApp {
@@ -46,14 +49,11 @@ fn flush_layer(layer: &mut Layer, queue: &wgpu::Queue, plot_type: PlotType) {
         PlotType::PointCloud => {
             if let (Some(z), Some(r)) = (renderers.point_cloud_dirty.take(), &renderers.point_cloud)
             {
-                if let Some(g) = &layer.data.points {
-                    let planes = vdata.thinned_planes(g.stride, z.clone());
-                    r.update_data_range(queue, z.start * g.width * g.height, &planes);
-                } else {
-                    let range = vdata.plane_range(z.start, z.len());
-                    if let Some(planes) = vdata.values.get(range.clone()) {
-                        r.update_data_range(queue, range.start, planes);
-                    }
+                let points = layer.data.points.as_ref();
+                let scratch = &mut renderers.point_planes;
+                let (offset, planes) = point_cloud_planes(vdata, points, z.clone(), scratch);
+                if !planes.is_empty() {
+                    r.update_data_range(queue, offset, planes);
                 }
                 if let Some((cv, gpu)) = channels {
                     upload_channels(cv, gpu, queue, vdata.depth, z);
@@ -78,4 +78,20 @@ fn upload_channels(
             gpu.write_cells(queue, range.start, planes);
         }
     }
+}
+
+/// Where planes `z` of `vdata` go in a point cloud's buffer and what they
+/// hold there: thinned into `scratch` by `points`, else the volume's own.
+pub(super) fn point_cloud_planes<'a>(
+    vdata: &'a VolumeData,
+    points: Option<&PointGrid>,
+    z: Range<usize>,
+    scratch: &'a mut Vec<f32>,
+) -> (usize, &'a [f32]) {
+    if let Some(g) = points {
+        vdata.write_thinned_planes(g.stride, z.clone(), scratch);
+        return (z.start * g.width * g.height, scratch);
+    }
+    let range = vdata.plane_range(z.start, z.len());
+    (range.start, vdata.values.get(range).unwrap_or(&[]))
 }

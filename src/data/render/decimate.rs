@@ -111,18 +111,30 @@ impl crate::data::VolumeData {
     /// Planes `z` with one voxel in `stride` along x and y (`sample_index`),
     /// plane after plane: what a thinned point cloud draws of them.
     pub fn thinned_planes(&self, stride: usize, z: std::ops::Range<usize>) -> Vec<f32> {
-        let xs: Vec<usize> = (0..self.width.div_ceil(stride))
-            .map(|x| sample_index(x, stride, self.width))
-            .collect();
-        let ys: Vec<usize> = (0..self.height.div_ceil(stride))
-            .map(|y| sample_index(y, stride, self.height))
-            .collect();
-        let plane = self.width * self.height;
-        let mut out = Vec::with_capacity(z.len() * xs.len() * ys.len());
-        for zi in z {
-            let values = self.values.get(zi * plane..(zi + 1) * plane).unwrap_or(&[]);
-            out.extend(thin(values, self.width, &xs, &ys));
-        }
+        let mut out = Vec::new();
+        self.write_thinned_planes(stride, z, &mut out);
         out
+    }
+
+    /// `thinned_planes` into `out` (cleared first), reusing its memory.
+    pub fn write_thinned_planes(
+        &self,
+        stride: usize,
+        z: std::ops::Range<usize>,
+        out: &mut Vec<f32>,
+    ) {
+        let (w, h) = (self.width.div_ceil(stride), self.height.div_ceil(stride));
+        let plane = self.width * self.height;
+        out.clear();
+        out.reserve(z.len() * w * h);
+        for zi in z {
+            for y in 0..h {
+                let row = zi * plane + sample_index(y, stride, self.height) * self.width;
+                out.extend((0..w).map(|x| {
+                    let at = row + sample_index(x, stride, self.width);
+                    self.values.get(at).copied().unwrap_or(f32::NAN)
+                }));
+            }
+        }
     }
 }

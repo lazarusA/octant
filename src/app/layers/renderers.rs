@@ -29,6 +29,9 @@ pub struct LayerRenderers {
     pub volume_dirty: Option<Range<usize>>,
     /// Z planes of the layer's volume not yet uploaded to the point cloud renderer.
     pub point_cloud_dirty: Option<Range<usize>>,
+    /// A thinned point cloud's changed planes on their way to the GPU,
+    /// kept so playback steps reuse its memory.
+    pub point_planes: Vec<f32>,
 }
 
 impl LayerRenderers {

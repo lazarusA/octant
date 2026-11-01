@@ -37,3 +37,5 @@ pub mod volume_slab;
 #[cfg(test)]
 mod volume_step_tests;
 pub mod volume_upload;
+#[cfg(test)]
+mod volume_upload_tests;
