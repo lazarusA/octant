@@ -36,6 +36,12 @@ struct VertexOutput {
     @location(4) rgb: vec3<f32>,
 };
 
+// The value cell `i` draws: a GPU-blended composite's packed color, else
+// the data (`channel_value`).
+fn cell_value(i: u32) -> f32 {
+    return channel_value(i, data_buffer[i]);
+}
+
 fn get_normalized_height(val: f32) -> f32 {
     return normalized_height(
         val,
@@ -61,7 +67,7 @@ fn vs_main(
     let max_idx = arrayLength(&data_buffer) - 1u;
     let safe_idx = min(instance_idx, max_idx);
 
-    var raw_val = data_buffer[safe_idx];
+    var raw_val = cell_value(safe_idx);
 
     var world_x: f32;
     var world_z: f32;
@@ -119,7 +125,7 @@ fn vs_main(
         } else {
             let sx = smooth_corner(cell_x, model.position.x, grid_w, false);
             let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
-            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            raw_val = cell_value(min(sy.cell * grid_w + sx.cell, max_idx));
             let bounds_u = get_cell_normalized_bounds_x(sx.at_cell, grid_w, uniforms.coord_mode);
             let bounds_v = get_cell_normalized_bounds_y(sy.at_cell, grid_h, uniforms.coord_mode);
             let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);

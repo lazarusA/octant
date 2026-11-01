@@ -3,6 +3,7 @@
 //! (`shaders/common/height.wgsl`): values sit at cell centers, the first and
 //! last stretched to the axis edges, unless the axis wraps around.
 
+use crate::app::layers::Layer;
 use crate::data::MatrixData;
 
 /// Smooth vertex `j` of an axis of `n` cells, in cell units (cell `k` spans
@@ -55,13 +56,17 @@ pub fn bracket_wrapped(x: f32, n: usize) -> (usize, usize, f32) {
     (first, (first + 1) % n, g - floor)
 }
 
-/// Value of cell `(px, py)`, NaN past the data.
-pub fn value_at(matrix: &MatrixData, px: usize, py: usize) -> f32 {
-    matrix
-        .values
-        .get(py * matrix.width + px)
-        .copied()
-        .unwrap_or(f32::NAN)
+/// Value `layer` draws at cell `(px, py)` of its `matrix`: the packed color
+/// of a composite the GPU blends (as `channel_value` draws it), else the
+/// data; NaN past the data.
+pub fn value_at(layer: &Layer, matrix: &MatrixData, px: usize, py: usize) -> f32 {
+    layer.gpu_blended_cell(px, py).unwrap_or_else(|| {
+        matrix
+            .values
+            .get(py * matrix.width + px)
+            .copied()
+            .unwrap_or(f32::NAN)
+    })
 }
 
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {

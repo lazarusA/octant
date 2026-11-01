@@ -45,12 +45,19 @@ pub fn mesh_hit_key(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> Option<u64>
         base.composite.enabled,
     ];
     let modes = (mesh.surface_mode, mesh.sphere_mode);
+    // Heights of a composite the GPU blends follow its channel display.
+    let channels = base.blends_on_gpu().then(|| {
+        let mut h = std::hash::DefaultHasher::new();
+        base.composite.hash_into(&mut h);
+        std::hash::Hasher::finish(&h)
+    });
     Some(hash_key((
         plot_type,
         floats,
         flags,
         modes,
         base.data.matrix_version,
+        channels,
     )))
 }
 

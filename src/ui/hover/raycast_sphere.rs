@@ -3,6 +3,7 @@
 use std::f32::consts::PI;
 
 use crate::app::OctantApp;
+use crate::app::layers::Layer;
 use crate::data::MatrixData;
 use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
@@ -13,6 +14,7 @@ use egui::Pos2;
 
 /// The globe as sphere.wgsl draws it, by longitude and latitude (radians).
 pub struct SphereField<'a> {
+    layer: &'a Layer,
     matrix: &'a MatrixData,
     scale: HeightScale,
     mode: u32,
@@ -20,8 +22,9 @@ pub struct SphereField<'a> {
 }
 
 impl<'a> SphereField<'a> {
-    pub fn new(app: &OctantApp, matrix: &'a MatrixData) -> Self {
+    pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
         Self {
+            layer: &app.layers.base,
             matrix,
             scale: height_scale(app, true),
             mode: app.plot_configs.mesh.sphere_mode,
@@ -70,7 +73,7 @@ impl<'a> SphereField<'a> {
 
     /// Radial displacement of cell `(px, py)` (`get_normalized_radial_dr`).
     fn dr_at(&self, px: usize, py: usize) -> f32 {
-        let val = value_at(self.matrix, px, py);
+        let val = value_at(self.layer, self.matrix, px, py);
         if self.mode == 0 || !val.is_finite() {
             return 0.0;
         }

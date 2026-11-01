@@ -85,3 +85,19 @@ fn blend_cell(cell: u32) -> vec4<f32> {
     let level = floor(clamp(rgb, vec3<f32>(0.0), vec3<f32>(255.0))) / 255.0;
     return vec4<f32>(level, select(0.0, 1.0, valid));
 }
+
+// What a 2D plot draws at `cell` whose data is `raw`: with drawn channels,
+// their blend packed as `pack_rgb` packs CPU-blended composites (NaN where
+// no channel is valid, `pack_or_nan`), so heights, colors and missing data
+// read it as they read those; else `raw`.
+fn channel_value(cell: u32, raw: f32) -> f32 {
+    if (channel_params.count == 0u) {
+        return raw;
+    }
+    let color = blend_cell(cell);
+    if (color.a == 0.0) {
+        return bitcast<f32>(0x7FC00000u);
+    }
+    let level = vec3<u32>(round(color.rgb * 255.0));
+    return f32(level.r | (level.g << 8u) | (level.b << 16u));
+}

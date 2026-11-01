@@ -18,6 +18,8 @@ pub struct Mesh3DRenderer {
     pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
+    /// Group 2 while no channels are drawn.
+    pub(super) no_channels: wgpu::BindGroup,
     pub num_instances: u32,
     pub width: usize,
     pub height: usize,
@@ -129,9 +131,14 @@ impl Mesh3DRenderer {
         );
 
         let colormap_layout = super::colormap_atlas::bind_group_layout(device);
+        let channel_layout = super::channels::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Mesh 3D Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
+            bind_group_layouts: &[
+                Some(&bind_group_layout),
+                Some(&colormap_layout),
+                Some(&channel_layout),
+            ],
             immediate_size: 0,
         });
 
@@ -171,6 +178,7 @@ impl Mesh3DRenderer {
             coord_y_buffer,
             uniform_buffer,
             bind_group,
+            no_channels: super::channels::empty_bind_group(device),
             num_instances,
             width,
             height,

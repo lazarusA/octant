@@ -24,7 +24,7 @@ pub mod raycast_surface;
 pub mod raycast_volume;
 pub mod sample_1d;
 pub mod sample_2d;
-mod smooth;
+pub(crate) mod smooth;
 
 pub use camera::{Camera3D, Ray3D, intersect_aabb};
 pub use enrich::{

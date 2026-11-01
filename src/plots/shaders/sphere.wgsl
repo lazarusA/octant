@@ -47,6 +47,12 @@ fn get_normalized_radial_dr(val: f32) -> f32 {
     return h * 0.4 * uniforms.displacement_strength;
 }
 
+// The value cell `i` draws: a GPU-blended composite's packed color, else
+// the data (`channel_value`).
+fn cell_value(i: u32) -> f32 {
+    return channel_value(i, data_buffer[i]);
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -62,7 +68,7 @@ fn vs_main(
     let max_idx = arrayLength(&data_buffer) - 1u;
     let safe_idx = min(instance_idx, max_idx);
 
-    var raw_val = data_buffer[safe_idx];
+    var raw_val = cell_value(safe_idx);
 
     let coords = get_lon_lat(
         cell_x, cell_y, model.position.xy, grid_w, grid_h,
@@ -76,7 +82,7 @@ fn vs_main(
 
     if (uniforms.sphere_mode == 0u) {
         // Mode 0: Smooth Sphere Projection (unit sphere)
-        raw_val = data_buffer[safe_idx];
+        raw_val = cell_value(safe_idx);
         pos_3d = lon_lat_to_cartesian(1.0, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 1u) {
@@ -88,7 +94,7 @@ fn vs_main(
         } else {
             let sx = smooth_corner(cell_x, model.position.x, grid_w, uniforms.coord_mode == 0u);
             let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
-            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            raw_val = cell_value(min(sy.cell * grid_w + sx.cell, max_idx));
             let corner = get_lon_lat(
                 sx.at_cell, sy.at_cell, vec2<f32>(sx.frac, sy.frac), grid_w, grid_h,
                 uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
@@ -102,7 +108,7 @@ fn vs_main(
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 2u) {
         // Mode 2: Flat Steps
-        raw_val = data_buffer[safe_idx];
+        raw_val = cell_value(safe_idx);
         let dr = get_normalized_radial_dr(raw_val);
         let center_coords = get_lon_lat(
             cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h,
@@ -112,7 +118,7 @@ fn vs_main(
         normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
     } else {
         // Mode 3: 3D Radial Lego Cubes
-        raw_val = data_buffer[safe_idx];
+        raw_val = cell_value(safe_idx);
         let dr = get_normalized_radial_dr(raw_val);
         var radius: f32;
         if (dr >= 0.0) {

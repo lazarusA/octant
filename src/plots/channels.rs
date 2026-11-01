@@ -104,30 +104,8 @@ impl ChannelRenderer {
         planes: usize,
         plane_len: usize,
     ) -> Self {
-        let params = ChannelParams::of(&[], &CompositeStretch::default(), (0, 0), 0, None);
-        let params_buffer =
-            super::common::create_uniform_buffer(device, "Channel Params Buffer", &params);
-        let planes_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Channel Planes Buffer"),
-            // Storage buffers can't be empty.
-            size: (planes.max(1) * plane_len.max(1) * 4) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Channel Bind Group"),
-            layout: &layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: params_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: planes_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let (params_buffer, planes_buffer, bind_group) =
+            channel_buffers(device, &layout, planes * plane_len);
         Self {
             pipeline,
             layout,
@@ -160,9 +138,49 @@ impl ChannelRenderer {
     }
 
     /// Binds the parameters and planes at group 2.
-    pub(crate) fn bind(&self, rpass: &mut wgpu::RenderPass<'static>) {
+    pub(crate) fn bind(&self, rpass: &mut wgpu::RenderPass<'_>) {
         rpass.set_bind_group(2, &self.bind_group, &[]);
     }
+}
+
+/// Group 2 for pipelines that blend channels but draw none: no channel
+/// drawn (`channel_value` returns the data).
+pub(crate) fn empty_bind_group(device: &wgpu::Device) -> wgpu::BindGroup {
+    channel_buffers(device, &bind_group_layout(device), 1).2
+}
+
+/// Zeroed parameters (no channel drawn) and a planes buffer of `cells`
+/// values, bound by `layout`.
+fn channel_buffers(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    cells: usize,
+) -> (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup) {
+    let params = ChannelParams::of(&[], &CompositeStretch::default(), (0, 0), 0, None);
+    let params_buffer =
+        super::common::create_uniform_buffer(device, "Channel Params Buffer", &params);
+    let planes_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Channel Planes Buffer"),
+        // Storage buffers can't be empty.
+        size: (cells.max(1) * 4) as u64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Channel Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: params_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: planes_buffer.as_entire_binding(),
+            },
+        ],
+    });
+    (params_buffer, planes_buffer, bind_group)
 }
 
 /// Group 2 of every pipeline that blends channels (`channel_blend.wgsl`).

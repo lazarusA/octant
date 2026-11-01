@@ -314,6 +314,9 @@ impl OctantApp {
                                 == crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
                         },
                         rect: plot_rect,
+                        channels: (self.layers.base.blends_on_gpu())
+                            .then(|| self.layers.base.renderers.channels.clone())
+                            .flatten(),
                     },
                 );
                 ui.painter().add(cb);

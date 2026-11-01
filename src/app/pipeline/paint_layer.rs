@@ -96,6 +96,12 @@ impl OctantApp {
                 cube_mode_idx,
                 rect: view.plot_rect,
                 transparency: self.transparency_mode(layer),
+                channels: channel_draw(
+                    layer,
+                    &layer.renderers.channels,
+                    layer.data.composite_probe.as_ref(),
+                    None,
+                ),
             },
         );
         ui.painter().add(callback);

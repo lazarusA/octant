@@ -147,6 +147,8 @@ macro_rules! assemble_plot_with_coords_shader {
             "\n",
             include_str!("shaders/common/height.wgsl"),
             "\n",
+            include_str!("shaders/common/channel_blend.wgsl"),
+            "\n",
             $plot_shader
         )
     };

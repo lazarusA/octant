@@ -1,6 +1,7 @@
 //! Multi-channel composites blended on the GPU: the in-memory pyramid's
-//! three `t2m` steps as tinted channels of a heatmap, plotted with a real
-//! (headless) GPU render state, against the same plot blended on the CPU.
+//! three `t2m` steps as tinted channels of a heatmap or surface, plotted
+//! with a real (headless) GPU render state, against the same plot blended
+//! on the CPU.
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
@@ -90,17 +91,28 @@ fn turning_the_composite_off_drops_the_planes() {
 }
 
 #[test]
-fn a_surface_blends_on_the_cpu_again() {
-    let (Some(mut gpu), Some(cpu)) = (plotted(true), plotted(false)) else {
-        eprintln!("SKIPPED a_surface_blends_on_the_cpu_again: no GPU device");
+fn a_surface_keeps_the_gpu_blend() {
+    let (Some(mut gpu), Some(mut cpu)) = (plotted(true), plotted(false)) else {
+        eprintln!("SKIPPED a_surface_keeps_the_gpu_blend: no GPU device");
         return;
     };
-    gpu.switch_plot_type(crate::plots::PlotType::Surface);
-    poll_until(&mut gpu, |app| !app.layers.base.blends_on_gpu());
+    for app in [&mut gpu, &mut cpu] {
+        let before = app.layers.base.data.matrix_version;
+        app.switch_plot_type(crate::plots::PlotType::Surface);
+        poll_until(app, |app| app.layers.base.data.matrix_version != before);
+    }
+    assert!(gpu.layers.base.blends_on_gpu(), "planes on the GPU");
+    assert!(!gpu.channel_display_reloads(LayerId::BASE));
     let (Some(got), Some(want)) = (&gpu.layers.base.data.matrix, &cpu.layers.base.data.matrix)
     else {
         panic!("both plotted");
     };
-    // The mesh reads packed colors from the matrix, not the first channel.
-    assert_eq!(got.values, want.values);
+    // The heights the hover marches: each cell's color as the CPU packed it.
+    for py in 0..want.height {
+        for px in 0..want.width {
+            let value = crate::ui::hover::smooth::value_at(&gpu.layers.base, got, px, py);
+            let packed = want.values[py * want.width + px];
+            assert_eq!(value.to_bits(), packed.to_bits(), "cell {px}, {py}");
+        }
+    }
 }

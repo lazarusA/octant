@@ -1,5 +1,5 @@
-//! Multi-channel composites blended on the GPU: a heatmap
-//! layer's composite uploads its block's raw channel planes once
+//! Multi-channel composites blended on the GPU: a heatmap, surface or
+//! sphere layer's composite uploads its block's raw channel planes once
 //! (`plots::ChannelRenderer`), and its tints, windows and curves are drawn
 //! from the layer's style every frame, so changing them reloads nothing.
 
@@ -36,8 +36,9 @@ impl OctantApp {
     }
 
     /// Projects `window` of `block` as layer `id`'s channel planes, when its
-    /// multi-channel composite is drawn as a heatmap and they fit one
-    /// GPU buffer; `false` (planes dropped) when the CPU blends it instead.
+    /// multi-channel composite is drawn as a heatmap, surface or sphere and
+    /// they fit one GPU buffer; `false` (planes dropped) when the CPU blends
+    /// it instead.
     pub(crate) fn project_channel_planes(
         &mut self,
         id: LayerId,
@@ -86,9 +87,12 @@ impl OctantApp {
         c_dim: usize,
         window: &PlaneWindow,
     ) -> Option<(Arc<ChannelRenderer>, MatrixData, CompositeStretch)> {
-        let heatmap = self
-            .layer_selections(id)
-            .is_some_and(|(_, staged)| staged.plot_type == PlotType::Heatmap);
+        let plane_plot = self.layer_selections(id).is_some_and(|(_, staged)| {
+            matches!(
+                staged.plot_type,
+                PlotType::Heatmap | PlotType::Surface | PlotType::Sphere
+            )
+        });
         let style = &self.layers.get(id)?.composite;
         let multichannel = !style.channel_configs.is_empty() && !self.layer_is_geotiff(id);
         let rs = self.wgpu_render_state.as_ref()?;
@@ -98,7 +102,7 @@ impl OctantApp {
             window.y_range.1.saturating_sub(window.y_range.0),
         );
         let plane_len = w.checked_mul(h)?;
-        let gpu = heatmap && multichannel && ChannelRenderer::fits(count, plane_len);
+        let gpu = plane_plot && multichannel && ChannelRenderer::fits(count, plane_len);
         if !gpu {
             return None;
         }
