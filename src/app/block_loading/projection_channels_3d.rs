@@ -10,7 +10,8 @@ use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::CompositeStretch;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES;
-use crate::plots::{ChannelRenderer, MAX_CHANNELS, PlotType};
+use crate::plots::limits::max_storage_bytes;
+use crate::plots::{ChannelRenderer, MAX_CHANNELS, PlotType, validity_bytes};
 
 /// The ranges of a slab within a block, in its oriented order.
 pub(super) type SlabRanges = ((usize, usize), (usize, usize), (usize, usize));
@@ -20,13 +21,14 @@ impl OctantApp {
     /// the GPU blends for layer `id`'s volume of `cells` voxels: a
     /// multi-channel composite (not GeoTIFF) drawn as a point cloud or
     /// volume (baked into its textures, `channel_bake_volume`), whose
-    /// channels fit one storage buffer; `None` when the CPU blends it.
+    /// channels and the bake's padded validity words each fit one storage
+    /// buffer; `None` when the CPU blends it.
     pub(super) fn gpu_channel_count(
         &self,
         id: LayerId,
         block: &OctantBlock,
         (c_dim, z_dim): (usize, usize),
-        cells: usize,
+        [nx, ny, nz]: [usize; 3],
     ) -> Option<usize> {
         let points = self.layer_selections(id).is_some_and(|(_, staged)| {
             matches!(staged.plot_type, PlotType::PointCloud | PlotType::Volume)
@@ -38,9 +40,14 @@ impl OctantApp {
         }
         self.wgpu_render_state.as_ref()?;
         let count = block.shape.get(c_dim).copied()?;
+        let cells = nx.checked_mul(ny)?.checked_mul(nz)?;
         let bytes = count.checked_mul(cells)?.checked_mul(4)?;
-        ((1..=MAX_CHANNELS).contains(&count) && bytes <= MAX_GPU_STORAGE_BUFFER_BYTES)
-            .then_some(count)
+        let dims = [nx, ny, nz].map(|n| u32::try_from(n).unwrap_or(u32::MAX));
+        let validity = usize::try_from(validity_bytes(dims)).unwrap_or(usize::MAX);
+        ((1..=MAX_CHANNELS).contains(&count)
+            && bytes <= MAX_GPU_STORAGE_BUFFER_BYTES
+            && validity <= max_storage_bytes())
+        .then_some(count)
     }
 
     /// Keeps layer `id`'s channel volume and planes for `count` channels

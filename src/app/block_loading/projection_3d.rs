@@ -38,8 +38,7 @@ impl OctantApp {
             z_dim
         };
         let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
-        let cells = nx.saturating_mul(ny).saturating_mul(nz);
-        let gpu_channels = self.gpu_channel_count(id, block, (c_dim, z_dim), cells);
+        let gpu_channels = self.gpu_channel_count(id, block, (c_dim, z_dim), [nx, ny, nz]);
         // The GPU blends from raw channels, so display changes keep the volume.
         let ch = match gpu_channels {
             Some(_) => "gpu".to_string(),

@@ -12,7 +12,12 @@ use crate::plots::PlotType;
 const SHAPE: [usize; 4] = [3, 2, 4, 5];
 
 fn block() -> OctantBlock {
-    let len: usize = SHAPE.iter().product();
+    block_of(SHAPE)
+}
+
+/// A `(c, z, y, x)` block of `shape` with a NaN every seventh value.
+fn block_of(shape: [usize; 4]) -> OctantBlock {
+    let len: usize = shape.iter().product();
     let values: Vec<f32> = (0..len)
         .map(|i| match i % 7 {
             0 => f32::NAN,
@@ -21,7 +26,7 @@ fn block() -> OctantBlock {
         .collect();
     OctantBlock::new(
         "img".into(),
-        SHAPE.to_vec(),
+        shape.to_vec(),
         ["c", "z", "y", "x"].map(String::from).to_vec(),
         vec![0; 4],
         values,
@@ -33,9 +38,15 @@ fn block() -> OctantBlock {
 /// The block projected as a point cloud composite of three tinted
 /// channels, with a GPU when `gpu` (`None` without one).
 fn projected(gpu: bool) -> Option<OctantApp> {
+    projected_as(gpu, PlotType::PointCloud, SHAPE)
+}
+
+/// A block of `shape` projected as a `plot_type` composite of three tinted
+/// channels, with a GPU when `gpu` (`None` without one).
+fn projected_as(gpu: bool, plot_type: PlotType, shape: [usize; 4]) -> Option<OctantApp> {
     let mut app = OctantApp {
         selected: VariableSelection {
-            plot_type: PlotType::PointCloud,
+            plot_type,
             ..Default::default()
         },
         ..Default::default()
@@ -51,10 +62,10 @@ fn projected(gpu: bool) -> Option<OctantApp> {
             ChannelColorConfig::new(i, format!("c{i}"), tint)
         })
         .collect();
-    let [_, z, y, x] = SHAPE;
+    let [_, z, y, x] = shape;
     app.apply_3d_volume_projection(
         LayerId::BASE,
-        &block(),
+        &block_of(shape),
         3,
         2,
         1,
@@ -127,4 +138,19 @@ fn a_volume_keeps_the_gpu_blend() {
     );
     assert!(app.layers.base.blends_on_gpu(), "baked into its textures");
     assert!(!app.channel_display_reloads(LayerId::BASE));
+}
+
+#[test]
+fn a_narrow_volume_blends_on_the_cpu() {
+    // One voxel wide: 12 MB of channels, but the bake's validity rows are
+    // padded to 256 bytes, 256 MiB, past one storage buffer.
+    let Some(app) = projected_as(true, PlotType::Volume, [3, 1024, 1024, 1]) else {
+        eprintln!("SKIPPED a_narrow_volume_blends_on_the_cpu: no GPU device");
+        return;
+    };
+    assert!(
+        app.layers.base.data.channel_volume.is_none(),
+        "colors on the CPU"
+    );
+    assert!(app.layers.base.data.volume.is_some(), "still drawn");
 }

@@ -96,6 +96,14 @@ impl VolumeBakePipeline {
     }
 }
 
+/// Bytes of the validity words a bake of a `[w, h, d]` volume fills, its
+/// rows padded for the copy into the validity texture.
+pub fn validity_bytes([w, h, d]: [u32; 3]) -> u64 {
+    let row_bytes = w.max(1).div_ceil(4) * 4;
+    let row_bytes = row_bytes.div_ceil(ROW_ALIGN) * ROW_ALIGN;
+    u64::from(row_bytes) * u64::from(h.max(1)) * u64::from(d.max(1))
+}
+
 impl ChannelRenderer {
     /// Blends the planes (one `w * h * d` volume per channel) in `params`
     /// into `targets`, unless they already hold that blend. Returns whether
@@ -122,7 +130,7 @@ impl ChannelRenderer {
         };
         let validity_words = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Channel Volume Validity"),
-            size: u64::from(row_bytes) * u64::from(h) * u64::from(d),
+            size: validity_bytes([w, h, d]),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
