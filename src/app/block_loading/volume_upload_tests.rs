@@ -26,6 +26,6 @@ fn changed_planes_upload_where_the_cloud_draws_them() {
     };
     let (offset, planes) = point_cloud_planes(&v, Some(&grid), 2..3, &mut scratch);
     assert_eq!(offset, 12);
-    assert_eq!(planes, &[46.0, 48.0, 49.0, 56.0, 58.0, 59.0]);
+    assert_eq!(planes, &[45.0, 47.0, 49.0, 55.0, 57.0, 59.0]);
     assert_eq!(planes, v.thinned_planes(2, 2..3), "as the cloud was built");
 }

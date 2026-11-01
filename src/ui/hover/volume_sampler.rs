@@ -5,7 +5,7 @@
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, PointGrid};
 use crate::data::MatrixData;
-use crate::data::render::decimate::sample_index;
+use crate::data::render::decimate::{drawn_index, sample_index};
 use crate::plots::PlotType;
 
 /// Helper for volumetric sampling, circular dataset shifts, and 3D ray marching.
@@ -82,7 +82,13 @@ impl<'a> VolumeSampler<'a> {
     /// The drawn grid's cell showing voxel `(x, y)`, and the grid's size.
     pub fn drawn_cell(&self, x: usize, y: usize) -> ((usize, usize), (usize, usize)) {
         match self.drawn {
-            Some(g) => ((x / g.stride, y / g.stride), (g.width, g.height)),
+            Some(g) => (
+                (
+                    drawn_index(x, g.stride, self.width),
+                    drawn_index(y, g.stride, self.height),
+                ),
+                (g.width, g.height),
+            ),
             None => ((x, y), (self.width, self.height)),
         }
     }

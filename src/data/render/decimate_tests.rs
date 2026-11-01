@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::MatrixData;
-use super::decimate::{sample_index, stride_for};
+use super::decimate::{drawn_index, sample_index, stride_for};
 use crate::data::coordinates::CoordinateGrid;
 
 #[test]
@@ -32,7 +32,7 @@ fn the_stride_leaves_at_most_the_budget() {
 }
 
 #[test]
-fn thinned_cells_and_coordinates_are_the_middle_of_each_stride() {
+fn thinned_cells_and_coordinates_are_the_middle_of_each_drawn_span() {
     let (w, h) = (5, 4);
     let values: Vec<f32> = (0..w * h).map(|i| i as f32).collect();
     let grid = CoordinateGrid::Irregular1D {
@@ -44,25 +44,53 @@ fn thinned_cells_and_coordinates_are_the_middle_of_each_stride() {
     let m = MatrixData::new_with_grid(w, h, values, 0.0, 19.0, "m".into(), 1, grid);
     let d = m.decimated(2).expect("thinned");
     assert_eq!((d.width, d.height), (3, 2));
-    // x: 1, 3, 4 (the last stride is short); y: 1, 3.
+    // x: 0, 2, 4 (3 cells drawn over 5); y: 1, 3.
     assert_eq!(sample_index(2, 2, 5), 4);
-    assert_eq!(d.values, vec![6.0, 8.0, 9.0, 16.0, 18.0, 19.0]);
+    assert_eq!(d.values, vec![5.0, 7.0, 9.0, 15.0, 17.0, 19.0]);
     let CoordinateGrid::Irregular1D {
         coords_x, coords_y, ..
     } = &d.grid
     else {
         panic!("irregular grid kept");
     };
-    assert_eq!(&coords_x[..], &[1.0, 7.0, 15.0]);
+    assert_eq!(&coords_x[..], &[0.0, 3.0, 15.0]);
     assert_eq!(&coords_y[..], &[20.0, 40.0]);
     assert!(m.decimated(1).is_none(), "nothing to thin");
 }
 
 #[test]
-fn thinned_planes_keep_every_plane_and_the_middle_of_each_stride() {
-    // 5 x 4 x 3 voxels numbered in order; stride 2 keeps x 1, 3, 4 and y 1, 3.
+fn thinned_planes_keep_every_plane_and_the_middle_of_each_drawn_span() {
+    // 5 x 4 x 3 voxels numbered in order; stride 2 keeps x 0, 2, 4 and y 1, 3.
     let values: Vec<f32> = (0..60).map(|i| i as f32).collect();
     let v = crate::data::VolumeData::new(5, 4, 3, values, 0.0, 59.0, String::new());
-    let plane = |z: f32| [6.0, 8.0, 9.0, 16.0, 18.0, 19.0].map(|c| c + 20.0 * z);
+    let plane = |z: f32| [5.0, 7.0, 9.0, 15.0, 17.0, 19.0].map(|c| c + 20.0 * z);
     assert_eq!(v.thinned_planes(2, 1..3), [plane(1.0), plane(2.0)].concat());
+}
+
+#[test]
+fn each_drawn_cell_shows_the_cell_under_its_middle() {
+    // Drawn cells spread evenly over the axis, as regular grids and point
+    // clouds draw them: 1951 by 50 draws 40, each over 48.8 cells.
+    for (n, k) in [
+        (1951_usize, 50_usize),
+        (5, 2),
+        (8, 2),
+        (1001, 2),
+        (7, 3),
+        (2, 2),
+        (9, 1),
+    ] {
+        let w = n.div_ceil(k);
+        for i in 0..w {
+            let x = sample_index(i, k, n);
+            let middle = (i as f64 + 0.5) * n as f64 / w as f64;
+            assert!(
+                (x as f64 + 0.5 - middle).abs() <= 0.5,
+                "{n} by {k}: drawn {i} shows {x}, its middle {middle}"
+            );
+            assert_eq!(drawn_index(x, k, n), i, "{n} by {k}: {x} back to {i}");
+        }
+        assert_eq!(drawn_index(n - 1, k, n), w - 1);
+    }
+    assert_eq!(sample_index(20, 50, 1951), 999);
 }

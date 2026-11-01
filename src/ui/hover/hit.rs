@@ -2,7 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::data::MatrixData;
-use crate::data::render::decimate::sample_index;
+use crate::data::render::decimate::{drawn_index, sample_index};
 use crate::plots::PlotType;
 use crate::ui::hover::camera::Camera3D;
 use crate::ui::hover::raycast_sphere::{raycast_sphere, sphere_target_pos};
@@ -200,12 +200,22 @@ pub fn resolve_target_screen_pos(
     match app.effective_canvas_plot_type() {
         // On the drawn grid's cell holding `(px, py)`.
         PlotType::Sphere => {
-            let (mesh, k) = app.layers.base.mesh_view(matrix?);
-            sphere_target_pos(app, mesh, camera, px / k, py / k)
+            let full = matrix?;
+            let (mesh, k) = app.layers.base.mesh_view(full);
+            let (x, y) = (
+                drawn_index(px, k, full.width),
+                drawn_index(py, k, full.height),
+            );
+            sphere_target_pos(app, mesh, camera, x, y)
         }
         PlotType::Surface => {
-            let (mesh, k) = app.layers.base.mesh_view(matrix?);
-            surface_target_pos(app, mesh, camera, px / k, py / k)
+            let full = matrix?;
+            let (mesh, k) = app.layers.base.mesh_view(full);
+            let (x, y) = (
+                drawn_index(px, k, full.width),
+                drawn_index(py, k, full.height),
+            );
+            surface_target_pos(app, mesh, camera, x, y)
         }
         PlotType::PointCloud | PlotType::Volume => {
             let sampler = sampler?;

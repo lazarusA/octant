@@ -1,8 +1,8 @@
 //! A 2D matrix thinned for drawing as a mesh: a surface or sphere costs
 //! time per cell (one instance each), not per screen pixel, so grids with
 //! more cells than the canvas has pixels draw one cell in `stride` along
-//! each axis. Nearest sampling, so packed composite colors and label ids
-//! stay exact.
+//! each axis, spread evenly over it as the full grid's cells are. Nearest
+//! sampling, so packed composite colors and label ids stay exact.
 
 use crate::data::coordinates::CoordinateGrid;
 use crate::data::render::MatrixData;
@@ -23,9 +23,22 @@ pub fn stride_for(width: usize, height: usize, budget: usize) -> usize {
 }
 
 /// The full-resolution index of thinned index `i` along an axis of `n`
-/// cells: the middle cell of its `stride` cells.
+/// cells thinned by `stride`: the cell under the middle of the span it is
+/// drawn over, as the `n.div_ceil(stride)` drawn cells spread evenly over
+/// the axis (`floor((2i + 1) n / 2w)`; `sample_index` in
+/// `shaders/channel_bake.wgsl`).
 pub fn sample_index(i: usize, stride: usize, n: usize) -> usize {
-    (i * stride + stride / 2).min(n.saturating_sub(1))
+    let w = n.div_ceil(stride.max(1)).max(1) as u64;
+    let x = (2 * i as u64 + 1) * n as u64 / (2 * w);
+    (x as usize).min(n.saturating_sub(1))
+}
+
+/// The thinned index drawn over full-resolution index `x` of an axis of
+/// `n` cells thinned by `stride`: the inverse of [`sample_index`].
+pub fn drawn_index(x: usize, stride: usize, n: usize) -> usize {
+    let w = n.div_ceil(stride.max(1)).max(1);
+    let i = x as u64 * w as u64 / n.max(1) as u64;
+    (i as usize).min(w - 1)
 }
 
 impl MatrixData {

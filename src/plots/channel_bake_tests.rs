@@ -108,6 +108,29 @@ fn bakes_what_the_cpu_blends() {
         })
         .collect();
     assert_close(&read_back(&device, &queue, &small), &want);
+
+    // A 7 x 9 grid thinned by 3, not a whole multiple: 3 x 3 cells, each
+    // the cell under its middle, as `sample_index` picks it.
+    let thinning = Thinning {
+        stride: 3,
+        width: 3,
+        height: 3,
+        full_width: 7,
+        full_height: 9,
+    };
+    let mut encoder = device.create_command_encoder(&Default::default());
+    renderer.bake(
+        &device,
+        &mut encoder,
+        &params,
+        (super::BakeId::next(), &small, thinning),
+    );
+    queue.submit([encoder.finish()]);
+    use crate::data::render::decimate::sample_index;
+    let want: Vec<f32> = (0..9)
+        .map(|i| packed[sample_index(i / 3, 3, 9) * 7 + sample_index(i % 3, 3, 7)])
+        .collect();
+    assert_close(&read_back(&device, &queue, &small)[..9], &want);
 }
 
 /// Each baked cell as the CPU packs it, within one level per color.

@@ -165,7 +165,13 @@ fn a_thinned_mesh_reads_the_cell_it_draws() {
     app.layers.base.data.matrix = Some(full);
     // The centre of drawn column 400 of 501, row 0 of 2.
     let cell = super::hit::drawn_cell(&app, 400.5 / 501.0, 0.25);
-    assert_eq!(cell, Some((801, 1)), "the middle cell of each 2 x 2");
+    // Column 400 of 501 is drawn over 800.2 (1001 / 501 cells each); row 0
+    // of 2 over cell 0.75 of 3.
+    assert_eq!(
+        cell,
+        Some((800, 0)),
+        "the cell under each drawn cell's middle"
+    );
     let (_, _, px, py) = super::entries_2d::resolve_2d_plot_entries(
         &app,
         app.layers.base.data.matrix.as_ref().expect("matrix"),
@@ -175,5 +181,5 @@ fn a_thinned_mesh_reads_the_cell_it_draws() {
         cell,
         None,
     );
-    assert_eq!((px, py), (801, 1));
+    assert_eq!((px, py), (800, 0));
 }
