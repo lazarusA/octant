@@ -10,10 +10,11 @@ use super::channel_bake_volume::VolumeTargets;
 /// Validity rows are copied into the texture in rows of this many bytes.
 const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 
-/// One target's group 0 and the buffers behind it.
+/// The buffers of one target's group 0, kept between its bakes; the group
+/// itself is made per bake, so nothing kept holds the target's texture.
 pub(super) struct BakeTargets {
     pub(super) id: super::BakeId,
-    pub(super) group: wgpu::BindGroup,
+    uniforms: wgpu::Buffer,
     pub(super) validity_words: wgpu::Buffer,
     pub(super) plane_data: wgpu::Buffer,
 }
@@ -39,13 +40,8 @@ pub fn validity_bytes([w, h, d]: [u32; 3]) -> u64 {
 }
 
 impl BakeTargets {
-    /// Group 0 of bakes into `targets`: their uniforms, the colors texture,
-    /// the validity words and the plane marks.
-    pub(super) fn new(
-        device: &wgpu::Device,
-        layout: &wgpu::BindGroupLayout,
-        targets: &VolumeTargets<'_>,
-    ) -> Self {
+    /// The uniforms, validity words and plane marks of bakes into `targets`.
+    pub(super) fn new(device: &wgpu::Device, targets: &VolumeTargets<'_>) -> Self {
         let [w, h, d] = targets.dims.map(|n| n.max(1));
         let uniforms = VolumeBakeUniforms {
             w,
@@ -53,7 +49,7 @@ impl BakeTargets {
             d,
             row_words: validity_row_bytes(w) / 4,
         };
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let uniforms = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Channel Volume Bake Uniforms"),
             contents: bytemuck::bytes_of(&uniforms),
             usage: wgpu::BufferUsages::UNIFORM,
@@ -68,26 +64,33 @@ impl BakeTargets {
                 mapped_at_creation: false,
             })
         };
-        let validity_words = storage("Channel Volume Validity", validity_bytes([w, h, d]));
-        let plane_data = storage("Channel Volume Planes With Data", u64::from(d) * 4);
-        let colors = targets.colors.create_view(&Default::default());
+        Self {
+            id: targets.id,
+            uniforms,
+            validity_words: storage("Channel Volume Validity", validity_bytes([w, h, d])),
+            plane_data: storage("Channel Volume Planes With Data", u64::from(d) * 4),
+        }
+    }
+
+    /// Group 0 of a bake writing `colors` (`layout`).
+    pub(super) fn group(
+        &self,
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        colors: &wgpu::Texture,
+    ) -> wgpu::BindGroup {
+        let colors = colors.create_view(&Default::default());
         let entry = |binding, resource| wgpu::BindGroupEntry { binding, resource };
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Channel Volume Bake Targets"),
             layout,
             entries: &[
-                entry(0, uniform_buffer.as_entire_binding()),
+                entry(0, self.uniforms.as_entire_binding()),
                 entry(1, wgpu::BindingResource::TextureView(&colors)),
-                entry(2, validity_words.as_entire_binding()),
-                entry(3, plane_data.as_entire_binding()),
+                entry(2, self.validity_words.as_entire_binding()),
+                entry(3, self.plane_data.as_entire_binding()),
             ],
-        });
-        Self {
-            id: targets.id,
-            group,
-            validity_words,
-            plane_data,
-        }
+        })
     }
 }
 

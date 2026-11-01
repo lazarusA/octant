@@ -20,13 +20,13 @@ pub(super) const SHADER: &str = concat!(
 
 /// The volume bake's compute pipelines (marking the planes holding data,
 /// then the bake) and their group 0 (uniforms, colors, validity words,
-/// plane marks), with the last target's buffers and group.
+/// plane marks), with the last target's buffers.
 pub(super) struct VolumeBakePipeline {
     mark: wgpu::ComputePipeline,
     pipeline: wgpu::ComputePipeline,
     layout: wgpu::BindGroupLayout,
-    /// Kept for the next bake of the same target (each display change and
-    /// ring step bakes again), replaced by another target's.
+    /// Buffers kept for the next bake of the same target (each display
+    /// change and ring step bakes again), replaced by another target's.
     targets: Mutex<Option<BakeTargets>>,
 }
 
@@ -112,13 +112,14 @@ impl VolumeBakePipeline {
         let mut kept = self.targets.lock().unwrap_or_else(|p| p.into_inner());
         let t = match kept.take() {
             Some(t) if t.id == targets.id => t,
-            _ => BakeTargets::new(device, &self.layout, targets),
+            _ => BakeTargets::new(device, targets),
         };
+        let group = t.group(device, &self.layout, targets.colors);
         encoder.clear_buffer(&t.plane_data, 0, None);
         for pipeline in [&self.mark, &self.pipeline] {
             let mut pass = encoder.begin_compute_pass(&Default::default());
             pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &t.group, &[]);
+            pass.set_bind_group(0, &group, &[]);
             pass.set_bind_group(2, channels, &[]);
             pass.dispatch_workgroups(w.div_ceil(4).div_ceil(8), h.div_ceil(8), d);
         }
