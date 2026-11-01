@@ -85,6 +85,27 @@ impl LayerData {
         self.volume_version = self.volume_version.wrapping_add(1);
     }
 
+    /// Empties Z plane `slot` of `volume` and, when the GPU blends its
+    /// channels, that plane of every channel, which is what it draws.
+    pub fn empty_volume_plane(&mut self, slot: usize) {
+        let Some(volume) = &mut self.volume else {
+            return;
+        };
+        let depth = volume.depth;
+        let range = volume.plane_range(slot, 1);
+        if let Some(plane) = volume.values.get_mut(range) {
+            plane.fill(f32::NAN);
+        }
+        if let Some(cv) = &mut self.channel_volume {
+            for c in 0..cv.channels {
+                let range = cv.volume.plane_range(c * depth + slot, 1);
+                if let Some(plane) = cv.volume.values.get_mut(range) {
+                    plane.fill(f32::NAN);
+                }
+            }
+        }
+    }
+
     /// Full-resolution `(width, height)` of the 2D data (before any pyramid
     /// resampling), or 1024 x 1024 when there is none.
     pub fn dimensions_2d(&self) -> (usize, usize) {

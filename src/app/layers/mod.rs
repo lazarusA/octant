@@ -7,6 +7,8 @@ mod alignment;
 mod alignment_tests;
 mod colorbar;
 mod data;
+#[cfg(test)]
+mod data_tests;
 mod id;
 mod layer;
 mod load;
