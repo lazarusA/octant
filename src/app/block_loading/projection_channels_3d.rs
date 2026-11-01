@@ -21,8 +21,9 @@ impl OctantApp {
     /// the GPU blends for layer `id`'s volume of `cells` voxels: a
     /// multi-channel composite (not GeoTIFF) drawn as a point cloud or
     /// volume (baked into its textures, `channel_bake_volume`), whose
-    /// channels and the bake's padded validity words each fit one storage
-    /// buffer; `None` when the CPU blends it.
+    /// channels fit one storage buffer, and for a volume the bake's padded
+    /// validity words too (a point cloud bakes none; switching between them
+    /// projects again, which asks again); `None` when the CPU blends it.
     pub(super) fn gpu_channel_count(
         &self,
         id: LayerId,
@@ -30,9 +31,10 @@ impl OctantApp {
         (c_dim, z_dim): (usize, usize),
         [nx, ny, nz]: [usize; 3],
     ) -> Option<usize> {
-        let points = self.layer_selections(id).is_some_and(|(_, staged)| {
-            matches!(staged.plot_type, PlotType::PointCloud | PlotType::Volume)
-        });
+        let plot_type = self
+            .layer_selections(id)
+            .map(|(_, staged)| staged.plot_type);
+        let points = matches!(plot_type, Some(PlotType::PointCloud | PlotType::Volume));
         let style = &self.layers.get(id)?.composite;
         let multichannel = style.enabled && !style.channel_configs.is_empty();
         if !points || !multichannel || self.layer_is_geotiff(id) || c_dim == z_dim {
@@ -44,10 +46,11 @@ impl OctantApp {
         let bytes = count.checked_mul(cells)?.checked_mul(4)?;
         let dims = [nx, ny, nz].map(|n| u32::try_from(n).unwrap_or(u32::MAX));
         let validity = usize::try_from(validity_bytes(dims)).unwrap_or(usize::MAX);
+        let fits_validity = plot_type != Some(PlotType::Volume) || validity <= max_storage_bytes();
         ((1..=MAX_CHANNELS).contains(&count)
             && bytes <= MAX_GPU_STORAGE_BUFFER_BYTES
-            && validity <= max_storage_bytes())
-        .then_some(count)
+            && fits_validity)
+            .then_some(count)
     }
 
     /// Keeps layer `id`'s channel volume and planes for `count` channels

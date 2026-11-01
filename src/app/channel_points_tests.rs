@@ -2,9 +2,10 @@
 //! `(c, z, y, x)` block projected with a real (headless) GPU render state
 //! keeps its raw channels, whose blend matches the CPU's packed volume.
 
-use crate::app::OctantApp;
 use crate::app::layers::{LayerId, VariableSelection};
 use crate::app::test_support::render_state;
+use crate::app::test_support::{TARGET, poll_until, register_store, write_array};
+use crate::app::{OctantApp, StoreKind};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::ChannelColorConfig;
 use crate::plots::PlotType;
@@ -154,5 +155,47 @@ fn a_narrow_volume_blends_on_the_cpu() {
         app.layers.base.data.channel_volume.is_none(),
         "colors on the CPU"
     );
+    assert!(app.layers.base.data.volume.is_some(), "still drawn");
+}
+
+/// A narrow point cloud blends on the GPU (it bakes no validity words);
+/// switched to a volume, whose padded validity rows pass one storage
+/// buffer, it projects again and blends on the CPU.
+#[test]
+fn a_narrow_point_cloud_blends_on_the_gpu_until_drawn_as_a_volume() {
+    let Some(rs) = render_state() else {
+        eprintln!("SKIPPED a_narrow_point_cloud_blends_on_the_gpu: no GPU device");
+        return;
+    };
+    crate::plots::limits::set_from_device(&wgpu::Limits::default());
+    let store = std::sync::Arc::new(zarrs::storage::store::MemoryStore::new());
+    let (dims, shape) = (["c", "z", "y", "x"], [3, 1024, 1024, 1]);
+    write_array(&store, "img", &dims, &shape, &[3, 256, 256, 1]);
+    let mut app = OctantApp {
+        wgpu_render_state: Some(rs),
+        ..Default::default()
+    };
+    let meta = register_store(&mut app, store, TARGET);
+    let var = meta.variables[0].clone();
+    app.selected.store_kind = StoreKind::RemoteZarr;
+    app.selected.store_target = TARGET.to_string();
+    app.load_new_metadata(meta);
+    app.layout.show_hero = false;
+    app.selected.plot_type = PlotType::PointCloud;
+    crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
+    app.selected.dim_ranges[1] = (0, 1023);
+    app.selected.dim_ranges[2] = (0, 1023);
+    app.plot_selection();
+    poll_until(&mut app, |a| a.layers.base.data.volume.is_some());
+    // The composite turned on as its Settings toggle does: then a reload.
+    let composite = &mut app.layers.base.composite;
+    composite.enabled = true;
+    composite.channel_configs = (0..3)
+        .map(|i| ChannelColorConfig::new(i, format!("c{i}"), [0, 0, 0]))
+        .collect();
+    app.load_selected_variable_block();
+    poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_some());
+    app.switch_plot_type(PlotType::Volume);
+    poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_none());
     assert!(app.layers.base.data.volume.is_some(), "still drawn");
 }
