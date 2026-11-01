@@ -123,6 +123,12 @@ impl OctantApp {
                 // Half resolution while rotating or zooming; the
                 // frame after the input stops renders in full.
                 scale: if self.nav.view_interacting { 0.5 } else { 1.0 },
+                channels: channel_draw(
+                    layer,
+                    &layer.renderers.channels,
+                    layer.data.channel_volume.as_ref().map(|cv| cv.c_start),
+                    None,
+                ),
             },
         );
         ui.painter().add(callback);

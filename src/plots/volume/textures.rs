@@ -59,6 +59,23 @@ impl VolumeTextures {
         })
     }
 
+    /// What a composite bake writes (`ChannelRenderer::bake_volume`).
+    pub fn bake_targets(&self) -> crate::plots::VolumeTargets<'_> {
+        let Dims { w, h, d } = self.dims;
+        crate::plots::VolumeTargets {
+            colors: &self.value,
+            validity: &self.validity,
+            dims: [w, h, d].map(|n| u32::try_from(n).unwrap_or(u32::MAX)),
+        }
+    }
+
+    /// After a bake: the data changed, and voxels may be missing (the bake
+    /// does not count them, so the shader reads validity).
+    pub fn mark_baked(&self) {
+        self.version.fetch_add(1, Ordering::Relaxed);
+        self.set_invalid_counts(0, std::iter::repeat_n(1, self.dims.d));
+    }
+
     pub fn version(&self) -> u64 {
         self.version.load(Ordering::Relaxed)
     }
@@ -240,7 +257,13 @@ fn create_texture(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
         format,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        // Composite colors may be baked on the GPU (`channel_bake_volume`).
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | match format {
+                wgpu::TextureFormat::Rgba8Unorm => wgpu::TextureUsages::STORAGE_BINDING,
+                _ => wgpu::TextureUsages::empty(),
+            },
         view_formats: &[],
     })
 }

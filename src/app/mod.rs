@@ -64,6 +64,8 @@ mod surface_frame_bench_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod volume_blend_bench_tests;
 pub(crate) mod window_title;
 
 pub use layers::VariableSelection;

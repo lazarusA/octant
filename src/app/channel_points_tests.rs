@@ -1,4 +1,4 @@
-//! Multi-channel composites drawn as point clouds blend on the GPU: a
+//! Multi-channel composites drawn as point clouds or volumes blend on the GPU: a
 //! `(c, z, y, x)` block projected with a real (headless) GPU render state
 //! keeps its raw channels, whose blend matches the CPU's packed volume.
 
@@ -101,9 +101,9 @@ fn points_blend_on_the_gpu_what_the_cpu_blends() {
 }
 
 #[test]
-fn a_volume_blends_on_the_cpu() {
+fn a_volume_keeps_the_gpu_blend() {
     let Some(mut app) = projected(true) else {
-        eprintln!("SKIPPED a_volume_blends_on_the_cpu: no GPU device");
+        eprintln!("SKIPPED a_volume_keeps_the_gpu_blend: no GPU device");
         return;
     };
     app.selected.plot_type = PlotType::Volume;
@@ -125,9 +125,6 @@ fn a_volume_blends_on_the_cpu() {
         true,
         0,
     );
-    assert!(
-        !app.layers.base.blends_on_gpu(),
-        "the raymarcher reads packed colors"
-    );
-    assert!(app.layers.base.data.channel_volume.is_none());
+    assert!(app.layers.base.blends_on_gpu(), "baked into its textures");
+    assert!(!app.channel_display_reloads(LayerId::BASE));
 }

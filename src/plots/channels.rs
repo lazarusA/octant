@@ -8,9 +8,10 @@
 //! mirrors `ChannelAccumulator`.
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use super::channel_bake::{BakePipeline, Baked};
+use super::channel_bake_volume::VolumeBakePipeline;
 use super::channel_params::{ChannelParams, MAX_CHANNELS};
 use super::heatmap::HeatmapRenderer;
 use crate::data::slicing::CompositeStretch;
@@ -29,8 +30,10 @@ pub(crate) const CHANNELS_WGSL: &str = concat!(
 /// The quad pipeline and one block's channel planes, bound at group 2.
 pub struct ChannelRenderer {
     pipeline: wgpu::RenderPipeline,
-    layout: wgpu::BindGroupLayout,
+    pub(super) layout: wgpu::BindGroupLayout,
     pub(super) bake: BakePipeline,
+    /// The raymarcher's bake, built when a volume first needs it.
+    pub(super) volume_bake: OnceLock<VolumeBakePipeline>,
     params_buffer: wgpu::Buffer,
     planes_buffer: wgpu::Buffer,
     pub(super) bind_group: wgpu::BindGroup,
@@ -118,6 +121,7 @@ impl ChannelRenderer {
             pipeline,
             layout,
             bake,
+            volume_bake: OnceLock::new(),
             params_buffer,
             planes_buffer,
             bind_group,

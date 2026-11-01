@@ -1,4 +1,4 @@
-//! Multi-channel composites blended on the GPU in 3D: a point cloud layer's
+//! Multi-channel composites blended on the GPU in 3D: a point cloud or volume layer's
 //! composite keeps its block's raw channels as one volume per channel
 //! (`ChannelVolume`, stacked along Z), uploaded with the volume's planes,
 //! and its tints, windows and curves are drawn from the layer's style every
@@ -18,7 +18,8 @@ pub(super) type SlabRanges = ((usize, usize), (usize, usize), (usize, usize));
 impl OctantApp {
     /// How many channels of `block` (along `c_dim`, not the volume's Z)
     /// the GPU blends for layer `id`'s volume of `cells` voxels: a
-    /// multi-channel composite (not GeoTIFF) drawn as a point cloud, whose
+    /// multi-channel composite (not GeoTIFF) drawn as a point cloud or
+    /// volume (baked into its textures, `channel_bake_volume`), whose
     /// channels fit one storage buffer; `None` when the CPU blends it.
     pub(super) fn gpu_channel_count(
         &self,
@@ -27,9 +28,9 @@ impl OctantApp {
         (c_dim, z_dim): (usize, usize),
         cells: usize,
     ) -> Option<usize> {
-        let points = self
-            .layer_selections(id)
-            .is_some_and(|(_, staged)| staged.plot_type == PlotType::PointCloud);
+        let points = self.layer_selections(id).is_some_and(|(_, staged)| {
+            matches!(staged.plot_type, PlotType::PointCloud | PlotType::Volume)
+        });
         let style = &self.layers.get(id)?.composite;
         let multichannel = style.enabled && !style.channel_configs.is_empty();
         if !points || !multichannel || self.layer_is_geotiff(id) || c_dim == z_dim {

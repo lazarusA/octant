@@ -42,7 +42,9 @@ impl MatrixData {
             .collect();
         let at = |values: &[f32]| thin(values, self.width, &xs, &ys);
         let pick = |values: &[f32], idx: &[usize]| -> std::sync::Arc<[f32]> {
-            idx.iter().map(|&i| values.get(i).copied().unwrap_or(f32::NAN)).collect()
+            idx.iter()
+                .map(|&i| values.get(i).copied().unwrap_or(f32::NAN))
+                .collect()
         };
         let grid = match &self.grid {
             CoordinateGrid::Irregular1D {

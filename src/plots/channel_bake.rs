@@ -26,12 +26,20 @@ pub(super) struct BakePipeline {
     layout: wgpu::BindGroupLayout,
 }
 
-/// What a target buffer was last baked from.
+/// What a target was last baked from.
 pub(super) struct Baked {
     params: ChannelParams,
     planes_version: u64,
     thinning: Thinning,
-    target: wgpu::Buffer,
+    target: BakeTarget,
+}
+
+/// What a bake writes: a plot's data buffer, or the raymarcher's color
+/// texture (`channel_bake_volume.rs`).
+#[derive(Clone, PartialEq)]
+pub(super) enum BakeTarget {
+    Buffer(wgpu::Buffer),
+    Texture(wgpu::Texture),
 }
 
 /// Targets whose last bake is remembered (a mesh and its 3D coastlines).
@@ -121,17 +129,10 @@ impl ChannelRenderer {
         params: &ChannelParams,
         (target, thinning): (&wgpu::Buffer, Thinning),
     ) {
-        let planes_version = self.planes_version.load(Ordering::Acquire);
-        let mut baked = self.baked.lock().unwrap_or_else(|p| p.into_inner());
-        let done = baked.iter().any(|b| {
-            b.target == *target
-                && b.params == *params
-                && b.planes_version == planes_version
-                && b.thinning == thinning
-        });
-        if done {
+        let key = BakeTarget::Buffer(target.clone());
+        let Some(planes_version) = self.bake_needed(&key, params, thinning) else {
             return;
-        }
+        };
         let cells = (target.size() / 4).min(self.plane_len as u64) as u32;
         let groups = cells.div_ceil(WORKGROUP).max(1);
         let max = device.limits().max_compute_workgroups_per_dimension.max(1);
@@ -170,7 +171,38 @@ impl ChannelRenderer {
         pass.set_bind_group(0, &group, &[]);
         pass.set_bind_group(2, &self.bind_group, &[]);
         pass.dispatch_workgroups(x, y, 1);
-        baked.retain(|b| b.target != *target);
+        self.remember_bake(key, params, thinning, planes_version);
+    }
+
+    /// The planes' version when `target` does not hold their blend in
+    /// `params` and `thinning` yet; `None` when it does.
+    pub(super) fn bake_needed(
+        &self,
+        target: &BakeTarget,
+        params: &ChannelParams,
+        thinning: Thinning,
+    ) -> Option<u64> {
+        let planes_version = self.planes_version.load(Ordering::Acquire);
+        let baked = self.baked.lock().unwrap_or_else(|p| p.into_inner());
+        let done = baked.iter().any(|b| {
+            b.target == *target
+                && b.params == *params
+                && b.planes_version == planes_version
+                && b.thinning == thinning
+        });
+        (!done).then_some(planes_version)
+    }
+
+    /// Records that `target` now holds that blend.
+    pub(super) fn remember_bake(
+        &self,
+        target: BakeTarget,
+        params: &ChannelParams,
+        thinning: Thinning,
+        planes_version: u64,
+    ) {
+        let mut baked = self.baked.lock().unwrap_or_else(|p| p.into_inner());
+        baked.retain(|b| b.target != target);
         if baked.len() >= REMEMBERED {
             baked.remove(0);
         }
@@ -178,7 +210,7 @@ impl ChannelRenderer {
             params: *params,
             planes_version,
             thinning,
-            target: target.clone(),
+            target,
         });
     }
 }

@@ -10,6 +10,9 @@ pub struct VolumeCallback {
     /// Frame resolution relative to the viewport's pixels: below 1 while the
     /// user drags or zooms, 1 once the view settles.
     pub scale: f32,
+    /// A multi-channel composite the GPU blends, baked into the textures
+    /// (`VolumeRenderer::bake_channels`).
+    pub channels: Option<crate::plots::ChannelDraw>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
@@ -22,6 +25,10 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         crate::plots::colormap_atlas::prepare(device, queue, callback_resources);
+        if let Some(channels) = &self.channels {
+            self.renderer
+                .bake_channels(device, queue, encoder, channels);
+        }
         // Viewport pixels, rounded as `setup_viewport_and_scissor` does.
         let pixels = self.rect.size() * screen_descriptor.pixels_per_point;
         let scale = self.scale.clamp(0.1, 1.0);

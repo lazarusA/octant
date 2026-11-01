@@ -139,6 +139,28 @@ impl VolumeRenderer {
         self.textures.upload_planes(queue, data, z);
     }
 
+    /// Blends `channels` into the textures of a composite volume, unless
+    /// they already hold that blend (`ChannelRenderer::bake_volume`).
+    pub fn bake_channels(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        channels: &crate::plots::ChannelDraw,
+    ) {
+        if self.textures.encoding != VolumeEncoding::PackedRgb {
+            return;
+        }
+        channels.renderer.update_params(queue, &channels.params);
+        let targets = self.textures.bake_targets();
+        if channels
+            .renderer
+            .bake_volume(device, encoder, &channels.params, &targets)
+        {
+            self.textures.mark_baked();
+        }
+    }
+
     fn state(&self) -> VolumeState {
         let Dims { w, h, d } = self.textures.dims;
         VolumeState {
