@@ -76,6 +76,25 @@ pub struct ChannelVolume {
     pub channels: usize,
 }
 
+impl ChannelVolume {
+    /// Writes each channel's slab of `slabs` at `[x, y, z]` of its volume
+    /// (`depth` planes a channel), as deep as the slab or the volume's end.
+    pub fn write_slabs(
+        &mut self,
+        [x, y, z]: [usize; 3],
+        depth: usize,
+        slab_depth: usize,
+        slabs: &[VolumeData],
+    ) {
+        let planes = slab_depth.min(depth.saturating_sub(z));
+        for (c, s) in slabs.iter().enumerate() {
+            let at = [x, y, c * depth + z];
+            self.volume
+                .update_subvolume(at, [s.width, s.height, planes], &s.values);
+        }
+    }
+}
+
 /// The steps held by a volume whose Z axis is the animated one: a ring
 /// buffer the step turns (`get_volume_shifts`), plane `slot` holding
 /// `steps[slot]`, for volume allocation `allocation`; `anchor` is the last

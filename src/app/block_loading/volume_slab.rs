@@ -1,5 +1,6 @@
 //! Writing a block's 3D slab into a layer's volume, mirrored along flipped dimensions.
 
+use super::projection_channels_3d::SlabRanges;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::data::VolumeData;
@@ -36,9 +37,9 @@ impl OctantApp {
             block.oriented_range(y_dim, local_y_range),
             block.oriented_range(z_dim, local_z_range),
         );
+        let dims = (x_dim, y_dim, z_dim, c_dim);
         // The GPU blends raw channels; the volume keeps the selected one's.
         let channels = if gpu_blend {
-            let dims = (x_dim, y_dim, z_dim, c_dim);
             let Some(slabs) = self.channel_slabs(id, block, dims, oriented, fixed_indices) else {
                 return false;
             };
@@ -46,43 +47,18 @@ impl OctantApp {
         } else {
             Vec::new()
         };
-        let slab_opt = if composite
-            && !gpu_blend
-            && block.shape.len() >= 3
-            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
-        {
-            self.slice_3d_composite_volume(
-                id,
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                z_dim,
-                oriented.0,
-                oriented.1,
-                oriented.2,
-                fixed_indices,
-                target_desc,
-            )
-        } else {
-            None
-        };
-
-        let slab_opt = slab_opt.or_else(|| {
-            block.volume_with_ranges(
-                x_dim,
-                y_dim,
-                z_dim,
-                oriented.0,
-                oriented.1,
-                oriented.2,
-                fixed_indices,
-                target_desc,
-                compute_bounds,
-            )
-        });
-
-        let Some(slab) = slab_opt else {
+        let cpu_composite = composite && !gpu_blend;
+        let sliced = self.slice_slab(
+            id,
+            block,
+            dims,
+            oriented,
+            fixed_indices,
+            compute_bounds,
+            target_desc,
+            cpu_composite,
+        );
+        let Some(slab) = sliced else {
             return false;
         };
         self.commit_volume_slab(
@@ -102,6 +78,57 @@ impl OctantApp {
             &channels,
         );
         true
+    }
+
+    /// `block`'s slab over the `oriented` ranges of its `(x, y, z, c)`
+    /// `dims`: the colors of a composite the CPU blends (`cpu_composite`),
+    /// else its values.
+    #[allow(clippy::too_many_arguments)]
+    fn slice_slab(
+        &self,
+        id: LayerId,
+        block: &OctantBlock,
+        dims: (usize, usize, usize, usize),
+        oriented: SlabRanges,
+        fixed: &[usize],
+        compute_bounds: bool,
+        target_desc: &str,
+        cpu_composite: bool,
+    ) -> Option<VolumeData> {
+        let (x_dim, y_dim, z_dim, c_dim) = dims;
+        let (x, y, z) = oriented;
+        let composite = (cpu_composite
+            && block.shape.len() >= 3
+            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1)
+            .then(|| {
+                self.slice_3d_composite_volume(
+                    id,
+                    block,
+                    c_dim,
+                    x_dim,
+                    y_dim,
+                    z_dim,
+                    x,
+                    y,
+                    z,
+                    fixed,
+                    target_desc,
+                )
+            })
+            .flatten();
+        composite.or_else(|| {
+            block.volume_with_ranges(
+                x_dim,
+                y_dim,
+                z_dim,
+                x,
+                y,
+                z,
+                fixed,
+                target_desc,
+                compute_bounds,
+            )
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -156,14 +183,8 @@ impl OctantApp {
             layer.data.last_volume_block =
                 Some((layer.data.volume_allocations, block.origin.clone()));
         }
-        // Each channel's slab at the same place in its stacked volume.
         if let Some(cv) = &mut layer.data.channel_volume {
-            let depth = slab.depth.min(depth_max.saturating_sub(dest_z));
-            for (c, s) in channels.iter().enumerate() {
-                let at = [dest_x, dest_y, c * depth_max + dest_z];
-                cv.volume
-                    .update_subvolume(at, [s.width, s.height, depth], &s.values);
-            }
+            cv.write_slabs([dest_x, dest_y, dest_z], depth_max, slab.depth, channels);
         }
         // Uploaded before the next paint, to the renderer on screen only.
         layer

@@ -6,6 +6,7 @@ use crate::app::MeshDetail;
 use crate::app::OctantApp;
 use crate::app::layers::MeshGrid;
 use crate::data::render::decimate::stride_for;
+use crate::plots::PlotType;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 
 /// Cells a mesh may always draw, however small the canvas.
@@ -21,6 +22,24 @@ pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
 }
 
 impl OctantApp {
+    /// Records the canvas's size in pixels `px`; meshes and point clouds
+    /// draw as many cells as it shows (`mesh_budget`), so a new size thins
+    /// the shown one again.
+    pub fn record_canvas_size(&mut self, px: egui::Vec2) {
+        let canvas_px = [px.x.round() as u32, px.y.round() as u32];
+        if px.x < 1.0 || px.y < 1.0 || canvas_px == self.layout.canvas_px {
+            return;
+        }
+        self.layout.canvas_px = canvas_px;
+        match self.effective_canvas_plot_type() {
+            PlotType::Surface | PlotType::Sphere => self.rethin_meshes(),
+            // The point cloud is built with the volume, so a volume shown
+            // now has it ready at this size when switched to.
+            PlotType::PointCloud | PlotType::Volume => self.rethin_points(),
+            _ => {}
+        }
+    }
+
     /// Thins the base layer's sphere and surface again after the Detail
     /// setting or the canvas size changed, when that changes their stride.
     pub fn rethin_meshes(&mut self) {

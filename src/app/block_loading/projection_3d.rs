@@ -39,30 +39,14 @@ impl OctantApp {
         };
         let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
         let gpu_channels = self.gpu_channel_count(id, block, (c_dim, z_dim), [nx, ny, nz]);
-        // The GPU blends from raw channels, so display changes keep the volume.
-        let ch = match gpu_channels {
-            Some(_) => "gpu".to_string(),
-            None => {
-                let hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(id));
-                format!("{hash:016x}")
-            }
+        let fixed = if is_3d_spatial_anim {
+            &[] as &[usize]
+        } else {
+            fixed_indices
         };
-        let target_desc = format!(
-            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch}",
-            layer.selection().store_target,
-            block.variable_name,
-            req_x.0,
-            req_x.1,
-            req_y.0,
-            req_y.1,
-            req_z.0,
-            req_z.1,
-            if is_3d_spatial_anim {
-                &[] as &[usize]
-            } else {
-                fixed_indices
-            },
-        );
+        let ranges = (req_x, req_y, req_z);
+        let gpu = gpu_channels.is_some();
+        let target_desc = self.volume_key(layer, block, [nx, ny, nz], ranges, fixed, gpu);
 
         let allocations = layer.data.volume_allocations;
         self.ensure_volume_allocated(id, nx, ny, nz, &target_desc);
@@ -129,6 +113,38 @@ impl OctantApp {
                 self.record_ring_plane(id, p.slot, p.step);
             }
         }
+    }
+
+    /// What `layer`'s volume of `[nx, ny, nz]` voxels holds: the variable,
+    /// the requested ranges and fixed indices, and how its composite is
+    /// colored. One the GPU blends (`gpu`) keeps its raw channels, so
+    /// display changes keep the volume; else they reallocate it.
+    fn volume_key(
+        &self,
+        layer: &Layer,
+        block: &OctantBlock,
+        [nx, ny, nz]: [usize; 3],
+        (req_x, req_y, req_z): ((usize, usize), (usize, usize), (usize, usize)),
+        fixed: &[usize],
+        gpu: bool,
+    ) -> String {
+        let ch = if gpu {
+            "gpu".to_string()
+        } else {
+            let hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(layer.id()));
+            format!("{hash:016x}")
+        };
+        format!(
+            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={fixed:?} ch={ch}",
+            layer.selection().store_target,
+            block.variable_name,
+            req_x.0,
+            req_x.1,
+            req_y.0,
+            req_y.1,
+            req_z.0,
+            req_z.1,
+        )
     }
 
     /// Whether `layer`'s GPU renderers are missing or encode the wrong format.

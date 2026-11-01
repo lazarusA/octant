@@ -162,18 +162,13 @@ impl ChannelRenderer {
             usage: wgpu::BufferUsages::UNIFORM,
         });
         let bake = &self.bake;
+        let entry = |binding, resource| wgpu::BindGroupEntry { binding, resource };
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Channel Bake Target"),
             layout: &bake.layout,
             entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: target.as_entire_binding(),
-                },
+                entry(0, uniform_buffer.as_entire_binding()),
+                entry(1, target.as_entire_binding()),
             ],
         });
         let mut pass = encoder.begin_compute_pass(&Default::default());
