@@ -70,38 +70,18 @@ impl OitState {
         let Some(frame) = &self.frame else {
             return;
         };
-        let clear = |view, color| {
-            Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(color),
-                    store: wgpu::StoreOp::Store,
-                },
-            })
-        };
-        let depth = |load| {
-            Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &frame.depth,
-                depth_ops: Some(wgpu::Operations {
-                    load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            })
-        };
+        let depth = |load| depth_attachment(&frame.depth, load);
         let passes = [
             (
                 &self.opaque,
-                [clear(&frame.opaque, wgpu::Color::TRANSPARENT), None],
+                [cleared(&frame.opaque, wgpu::Color::TRANSPARENT), None],
                 wgpu::LoadOp::Clear(1.0),
             ),
             (
                 &self.accumulate,
                 [
-                    clear(&frame.accum, wgpu::Color::TRANSPARENT),
-                    clear(&frame.reveal, wgpu::Color::WHITE),
+                    cleared(&frame.accum, wgpu::Color::TRANSPARENT),
+                    cleared(&frame.reveal, wgpu::Color::WHITE),
                 ],
                 wgpu::LoadOp::Load,
             ),
@@ -190,4 +170,35 @@ impl OitSlot {
             s.release_frame();
         }
     }
+}
+
+/// A color attachment of `view` cleared to `color` and stored.
+fn cleared(
+    view: &wgpu::TextureView,
+    color: wgpu::Color,
+) -> Option<wgpu::RenderPassColorAttachment<'_>> {
+    Some(wgpu::RenderPassColorAttachment {
+        view,
+        depth_slice: None,
+        resolve_target: None,
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(color),
+            store: wgpu::StoreOp::Store,
+        },
+    })
+}
+
+/// The depth attachment of `view`, loaded by `load` and stored.
+fn depth_attachment(
+    view: &wgpu::TextureView,
+    load: wgpu::LoadOp<f32>,
+) -> Option<wgpu::RenderPassDepthStencilAttachment<'_>> {
+    Some(wgpu::RenderPassDepthStencilAttachment {
+        view,
+        depth_ops: Some(wgpu::Operations {
+            load,
+            store: wgpu::StoreOp::Store,
+        }),
+        stencil_ops: None,
+    })
 }

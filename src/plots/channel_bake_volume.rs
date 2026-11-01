@@ -41,36 +41,7 @@ pub struct VolumeTargets<'a> {
 
 impl VolumeBakePipeline {
     pub(super) fn new(device: &wgpu::Device, channels: &wgpu::BindGroupLayout) -> Self {
-        let compute = wgpu::ShaderStages::COMPUTE;
-        let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: compute,
-            ty: wgpu::BindingType::Buffer {
-                ty,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
-        let colors = wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: compute,
-            ty: wgpu::BindingType::StorageTexture {
-                access: wgpu::StorageTextureAccess::WriteOnly,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                view_dimension: wgpu::TextureViewDimension::D3,
-            },
-            count: None,
-        };
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Channel Volume Bake Layout"),
-            entries: &[
-                buffer(0, wgpu::BufferBindingType::Uniform),
-                colors,
-                buffer(2, wgpu::BufferBindingType::Storage { read_only: false }),
-                buffer(3, wgpu::BufferBindingType::Storage { read_only: false }),
-            ],
-        });
+        let layout = targets_layout(device);
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Channel Volume Bake"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
@@ -161,4 +132,39 @@ impl VolumeBakePipeline {
         );
         *kept = Some(t);
     }
+}
+
+/// Group 0 of the volume bake: uniforms, the colors it writes, the
+/// validity words and the plane marks.
+fn targets_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let compute = wgpu::ShaderStages::COMPUTE;
+    let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: compute,
+        ty: wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    };
+    let colors = wgpu::BindGroupLayoutEntry {
+        binding: 1,
+        visibility: compute,
+        ty: wgpu::BindingType::StorageTexture {
+            access: wgpu::StorageTextureAccess::WriteOnly,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            view_dimension: wgpu::TextureViewDimension::D3,
+        },
+        count: None,
+    };
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Channel Volume Bake Layout"),
+        entries: &[
+            buffer(0, wgpu::BufferBindingType::Uniform),
+            colors,
+            buffer(2, wgpu::BufferBindingType::Storage { read_only: false }),
+            buffer(3, wgpu::BufferBindingType::Storage { read_only: false }),
+        ],
+    })
 }
