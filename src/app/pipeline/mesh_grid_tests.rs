@@ -88,12 +88,38 @@ fn the_detail_setting_thins_again() {
         return;
     };
     let stride = |app: &OctantApp| app.layers.base.data.mesh.as_ref().map(|m| m.stride);
+    let bake_id = |app: &OctantApp| {
+        app.layers
+            .base
+            .renderers
+            .surface
+            .as_ref()
+            .map(|s| s.bake_id)
+    };
+    let thinned = bake_id(&app);
     app.plot_configs.mesh.detail = crate::app::MeshDetail::Full;
     app.rethin_meshes();
     assert_eq!(stride(&app), None, "every cell");
     let surface = app.layers.base.renderers.surface.as_ref().map(|s| s.width);
     assert_eq!(surface, Some(1024));
+    // A new mesh is a new bake target, so a GPU composite bakes into it.
+    assert_ne!(bake_id(&app), thinned);
     app.plot_configs.mesh.detail = crate::app::MeshDetail::Screen;
     app.rethin_meshes();
     assert_eq!(stride(&app), Some(2), "thinned again");
+    let kept = bake_id(&app);
+    app.rethin_meshes();
+    assert_eq!(bake_id(&app), kept, "the same stride keeps the mesh");
+}
+
+#[test]
+fn a_larger_canvas_thins_less() {
+    let Some(mut app) = built(1024) else {
+        eprintln!("SKIPPED a_larger_canvas_thins_less: no GPU device");
+        return;
+    };
+    // 2048 x 1024 pixels show 1 M cells: every one.
+    app.layout.canvas_px = [2048, 1024];
+    app.rethin_meshes();
+    assert!(app.layers.base.data.mesh.is_none());
 }

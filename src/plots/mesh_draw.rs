@@ -90,35 +90,18 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
                 self.renderer.inputs.data_changed();
             }
         }
-        let Some(atlas) = super::colormap_atlas::bind_group(callback_resources) else {
-            // No frame of this state: `paint` must not draw an older one.
-            self.renderer.frame.release();
-            self.renderer.oit.release();
-            return Vec::new();
-        };
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
         let (renderer, cubes) = (&self.renderer, self.cubes());
         let key = renderer.inputs.key((cubes, self.transparency as u8));
-        if self.transparency == Transparency::Oit {
-            renderer.frame.release();
-            renderer.oit.render(
-                device,
-                encoder,
-                (size, key),
-                atlas,
-                |variant| renderer.oit_pipeline(device, variant),
-                |pass| renderer.draw_geometry(pass, cubes),
-            );
-        } else {
-            renderer.oit.release();
-            renderer.frame.render(
-                device,
-                encoder,
-                (size, key),
-                (self.pipeline(), atlas),
-                |pass| renderer.draw_geometry(pass, cubes),
-            );
-        }
+        super::frame_cache::render_frame(
+            (&renderer.oit, &renderer.frame),
+            device,
+            encoder,
+            (self.transparency, size, key),
+            super::colormap_atlas::bind_group(callback_resources),
+            (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
+            |pass| renderer.draw_geometry(pass, cubes),
+        );
         Vec::new()
     }
 
@@ -132,10 +115,8 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             return;
         }
         let renderer = &self.renderer;
-        let drawn = match self.transparency {
-            Transparency::Oit => renderer.oit.paint(rpass),
-            _ => renderer.frame.paint(rpass),
-        };
+        let slots = (&renderer.oit, &renderer.frame);
+        let drawn = super::frame_cache::paint_frame(slots, self.transparency, rpass);
         if drawn || !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }

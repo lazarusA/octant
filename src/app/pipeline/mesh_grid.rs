@@ -21,7 +21,7 @@ pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
 
 impl OctantApp {
     /// Thins the base layer's sphere and surface again after the Detail
-    /// setting changed, when that changes their stride.
+    /// setting or the canvas size changed, when that changes their stride.
     pub fn rethin_meshes(&mut self) {
         let budget = mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
         let base = &mut self.layers.base;

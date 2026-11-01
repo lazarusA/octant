@@ -33,8 +33,16 @@ pub fn canvas_id() -> egui::Id {
 pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
     let ctx = ui.ctx().clone();
     let px = canvas_rect.size() * ctx.pixels_per_point();
-    if px.x >= 1.0 && px.y >= 1.0 {
-        app.layout.canvas_px = [px.x.round() as u32, px.y.round() as u32];
+    let canvas_px = [px.x.round() as u32, px.y.round() as u32];
+    if px.x >= 1.0 && px.y >= 1.0 && canvas_px != app.layout.canvas_px {
+        app.layout.canvas_px = canvas_px;
+        // Meshes draw as many cells as the canvas shows (`mesh_budget`).
+        if matches!(
+            app.effective_canvas_plot_type(),
+            crate::plots::PlotType::Surface | crate::plots::PlotType::Sphere
+        ) {
+            app.rethin_meshes();
+        }
     }
     let max_zoom = app.heatmap_max_zoom();
     app.nav.limit_heatmap_zoom(max_zoom);

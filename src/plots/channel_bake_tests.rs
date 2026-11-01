@@ -45,13 +45,15 @@ fn bakes_what_the_cpu_blends() {
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     });
+    let id = super::BakeId::next();
     let mut encoder = device.create_command_encoder(&Default::default());
-    renderer.bake(
-        &device,
-        &mut encoder,
-        &params,
-        (super::BakeId::next(), &target, Thinning::NONE),
-    );
+    let bake = |encoder: &mut wgpu::CommandEncoder, id| {
+        renderer.bake(&device, encoder, &params, (id, &target, Thinning::NONE))
+    };
+    assert!(bake(&mut encoder, id), "a new target bakes");
+    assert!(!bake(&mut encoder, id), "a baked one is skipped");
+    // A rebuilt mesh (new renderer, new id) always bakes again.
+    assert!(bake(&mut encoder, super::BakeId::next()), "a new id bakes");
     queue.submit([encoder.finish()]);
     assert_close(&read_back(&device, &queue, &target), &packed);
 

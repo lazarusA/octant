@@ -7,7 +7,7 @@
 
 use std::sync::Mutex;
 
-use super::oit::DEPTH_FORMAT;
+use super::oit::{DEPTH_FORMAT, OitSlot, Transparency, Variant};
 
 /// The offscreen targets of one frame.
 struct Targets {
@@ -201,5 +201,51 @@ impl FrameState {
             bind_group,
             size,
         }
+    }
+}
+
+/// A mesh's or point cloud's frames: its OIT frame and its cached frame.
+pub type Slots<'a> = (&'a OitSlot, &'a FrameSlot);
+
+/// Renders the plot (`draw`) into the frame `transparency` draws through,
+/// with its egui `pipeline` or the OIT variants `build` makes, freeing the
+/// other frame; frees both without a colormap `atlas`, so `paint_frame`
+/// draws no older frame.
+pub fn render_frame(
+    (oit, frame): Slots<'_>,
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+    (transparency, size, key): (Transparency, [u32; 2], u64),
+    atlas: Option<&wgpu::BindGroup>,
+    (pipeline, build): (
+        &wgpu::RenderPipeline,
+        impl Fn(&Variant<'_>) -> wgpu::RenderPipeline,
+    ),
+    draw: impl Fn(&mut wgpu::RenderPass<'_>),
+) {
+    let Some(atlas) = atlas else {
+        frame.release();
+        oit.release();
+        return;
+    };
+    if transparency == Transparency::Oit {
+        frame.release();
+        oit.render(device, encoder, (size, key), atlas, build, draw);
+    } else {
+        oit.release();
+        frame.render(device, encoder, (size, key), (pipeline, atlas), draw);
+    }
+}
+
+/// Draws the frame `transparency` renders through; `false` when there is
+/// none yet.
+pub fn paint_frame(
+    (oit, frame): Slots<'_>,
+    transparency: Transparency,
+    rpass: &mut wgpu::RenderPass<'static>,
+) -> bool {
+    match transparency {
+        Transparency::Oit => oit.paint(rpass),
+        _ => frame.paint(rpass),
     }
 }
