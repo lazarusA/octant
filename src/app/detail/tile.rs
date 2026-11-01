@@ -15,6 +15,10 @@ use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
 use crate::plots::{ChannelRenderer, HeatmapRenderer};
 
+/// A tile's matrix, its composite window and, where the GPU blends it, its
+/// channel planes.
+type TileSlice = (MatrixData, Option<CompositeProbe>, Option<Vec<MatrixData>>);
+
 impl OctantApp {
     /// `want`'s tile: the request reading its cells (the current step of an
     /// animated dimension) and the store it reads from.
@@ -124,11 +128,7 @@ impl OctantApp {
     /// with its plot's stretch, and the window behind it, or where the GPU
     /// blends its layer the first channel and every channel's plane); `None`
     /// when it runs in another orientation than its layer's plot.
-    fn slice_tile(
-        &self,
-        pending: &PendingDetail,
-        block: &OctantBlock,
-    ) -> Option<(MatrixData, Option<CompositeProbe>, Option<Vec<MatrixData>>)> {
+    fn slice_tile(&self, pending: &PendingDetail, block: &OctantBlock) -> Option<TileSlice> {
         let layer = self.layers.get(pending.layer)?;
         let flips = &layer.data.flipped_dims;
         let same_flips = flips.len() == block.flipped_dims.len()
@@ -155,26 +155,10 @@ impl OctantApp {
             y_range: block.oriented_range(by, local_y),
             fixed: &fixed,
         };
-        if layer.composite.enabled {
-            let c_dim = self.layer_channel_dim(pending.layer).unwrap_or(0);
-            let cells = window
-                .x_range
-                .1
-                .saturating_sub(window.x_range.0)
-                .checked_mul(window.y_range.1.saturating_sub(window.y_range.0))?;
-            let count = block.shape.get(c_dim).copied().unwrap_or(0);
-            // Planes past the GPU's buffer are blended on the CPU instead.
-            if layer.blends_on_gpu() && ChannelRenderer::fits(count, cells) {
-                let mut planes = Vec::new();
-                each_plane(block, c_dim, &window, |_, plane| planes.push(plane))?;
-                let (x_range, y_range) = (window.x_range, window.y_range);
-                let probe = CompositeProbe::new(block, c_dim, bx, by, x_range, y_range, &fixed);
-                return Some((planes.first()?.clone(), Some(probe), Some(planes)));
-            }
-            let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
-            if let Some(c) = self.slice_composite(pending.layer, block, c_dim, &window, stretch) {
-                return Some((c.matrix, Some(c.probe), None));
-            }
+        if layer.composite.enabled
+            && let Some(tile) = self.slice_tile_composite(pending.layer, block, &window)
+        {
+            return Some(tile);
         }
         let matrix = block.slice_2d_with_ranges(
             window.x_dim,
@@ -187,6 +171,35 @@ impl OctantApp {
             false,
         )?;
         Some((matrix, None, None))
+    }
+
+    /// `window` of `block` as layer `id`'s composite tile: every channel's
+    /// plane and the first as its matrix where the GPU blends the layer and
+    /// they fit its buffer, else blended on the CPU in the plot's stretch.
+    fn slice_tile_composite(
+        &self,
+        id: LayerId,
+        block: &OctantBlock,
+        window: &PlaneWindow,
+    ) -> Option<TileSlice> {
+        let layer = self.layers.get(id)?;
+        let c_dim = self.layer_channel_dim(id).unwrap_or(0);
+        let (x_range, y_range) = (window.x_range, window.y_range);
+        let cells = (x_range.1.saturating_sub(x_range.0))
+            .checked_mul(y_range.1.saturating_sub(y_range.0))?;
+        let count = block.shape.get(c_dim).copied().unwrap_or(0);
+        if layer.blends_on_gpu() && ChannelRenderer::fits(count, cells) {
+            let mut planes = Vec::new();
+            if each_plane(block, c_dim, window, |_, plane| planes.push(plane)).is_some() {
+                let (bx, by) = (window.x_dim, window.y_dim);
+                let probe =
+                    CompositeProbe::new(block, c_dim, bx, by, x_range, y_range, window.fixed);
+                return Some((planes.first()?.clone(), Some(probe), Some(planes)));
+            }
+        }
+        let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
+        let c = self.slice_composite(id, block, c_dim, window, stretch)?;
+        Some((c.matrix, Some(c.probe), None))
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the

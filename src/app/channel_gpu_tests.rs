@@ -88,3 +88,19 @@ fn turning_the_composite_off_drops_the_planes() {
     poll_until(&mut app, |app| app.layers.base.renderers.channels.is_none());
     assert!(!app.layers.base.blends_on_gpu());
 }
+
+#[test]
+fn a_surface_blends_on_the_cpu_again() {
+    let (Some(mut gpu), Some(cpu)) = (plotted(true), plotted(false)) else {
+        eprintln!("SKIPPED a_surface_blends_on_the_cpu_again: no GPU device");
+        return;
+    };
+    gpu.switch_plot_type(crate::plots::PlotType::Surface);
+    poll_until(&mut gpu, |app| !app.layers.base.blends_on_gpu());
+    let (Some(got), Some(want)) = (&gpu.layers.base.data.matrix, &cpu.layers.base.data.matrix)
+    else {
+        panic!("both plotted");
+    };
+    // The mesh reads packed colors from the matrix, not the first channel.
+    assert_eq!(got.values, want.values);
+}
