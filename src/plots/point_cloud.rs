@@ -20,6 +20,8 @@ pub struct PointCloudRenderer {
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
     pub(crate) oit: OitSlot,
+    /// What its OIT frame depends on.
+    pub(crate) inputs: super::oit::FrameInputs,
 }
 
 impl PointCloudRenderer {
@@ -152,10 +154,12 @@ impl PointCloudRenderer {
             shader,
             pipeline_layout,
             oit: OitSlot::new(target_format),
+            inputs: Default::default(),
         }
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
+        self.inputs.data_changed();
         if !data.is_empty()
             && super::common::safe_write_buffer(
                 queue,
@@ -171,6 +175,7 @@ impl PointCloudRenderer {
 
     /// Uploads `data` at element `offset` without touching the rest of the volume.
     pub fn update_data_range(&self, queue: &wgpu::Queue, offset: usize, data: &[f32]) {
+        self.inputs.data_changed();
         super::common::safe_write_buffer_range(
             queue,
             &self.data_buffer,
@@ -203,6 +208,7 @@ impl PointCloudRenderer {
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
     }
 }
 

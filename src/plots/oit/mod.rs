@@ -12,18 +12,20 @@
 //! Needs blendable float targets and per-target blending ([`supported`]);
 //! without them plots fall back to [`Transparency::NoDepthWrite`].
 //!
-//! Not cached yet: unlike the volume's `FrameKey` frame, both passes and the
-//! composite rerun on every repaint (including pointer moves) while OIT is
-//! active. A cache keyed on the uniforms, a data upload version (meshes and
-//! point clouds have none yet), the colormap generation and the size would
-//! skip the passes when nothing changed.
+//! Cached like the volume's `FrameKey` frame: the passes rerun only when the
+//! renderer's key changes (`oit_key` of the mesh and point cloud renderers:
+//! their uniforms, a data version bumped by every upload and bake, the
+//! colormap generation, the pipeline) or the size does; other repaints only
+//! composite the frame.
 
 mod frame;
+mod inputs;
 mod pipeline;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
+pub use inputs::FrameInputs;
 pub use pipeline::{ACCUMULATE, OPAQUE, Variant, build_pipeline, egui_target};
 pub use state::{OitSlot, OitState};
 

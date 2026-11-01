@@ -72,9 +72,13 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         if let Some(channels) = &self.channels {
             channels.renderer.update_params(queue, &channels.params);
             let target = &self.renderer.data_buffer;
-            channels
+            let target = (target, self.thinning);
+            if channels
                 .renderer
-                .bake(device, encoder, &channels.params, (target, self.thinning));
+                .bake(device, encoder, &channels.params, target)
+            {
+                self.renderer.inputs.data_changed();
+            }
         }
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
@@ -84,7 +88,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             renderer.oit.render(
                 device,
                 encoder,
-                size,
+                (size, renderer.inputs.key(cubes)),
                 atlas,
                 |variant| renderer.oit_pipeline(device, variant),
                 |pass| renderer.draw_geometry(pass, cubes),

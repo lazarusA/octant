@@ -120,18 +120,18 @@ impl BakePipeline {
 impl ChannelRenderer {
     /// Blends the planes in `params` into `target` (one `f32` per cell,
     /// at most a plane's cells, thinned by `thinning`), unless it already
-    /// holds that blend of these planes. `params` must already be written
-    /// (`update_params`).
+    /// holds that blend of these planes. Returns whether it baked. `params`
+    /// must already be written (`update_params`).
     pub(crate) fn bake(
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         params: &ChannelParams,
         (target, thinning): (&wgpu::Buffer, Thinning),
-    ) {
+    ) -> bool {
         let key = BakeTarget::Buffer(target.clone());
         let Some(planes_version) = self.bake_needed(&key, params, thinning) else {
-            return;
+            return false;
         };
         let cells = (target.size() / 4).min(self.plane_len as u64) as u32;
         let groups = cells.div_ceil(WORKGROUP).max(1);
@@ -172,6 +172,7 @@ impl ChannelRenderer {
         pass.set_bind_group(2, &self.bind_group, &[]);
         pass.dispatch_workgroups(x, y, 1);
         self.remember_bake(key, params, thinning, planes_version);
+        true
     }
 
     /// The planes' version when `target` does not hold their blend in

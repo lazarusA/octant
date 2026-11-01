@@ -25,6 +25,8 @@ pub struct Mesh3DRenderer {
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
     pub(crate) oit: OitSlot,
+    /// What its OIT frame depends on.
+    pub(crate) inputs: super::oit::FrameInputs,
 }
 
 impl Mesh3DRenderer {
@@ -177,6 +179,7 @@ impl Mesh3DRenderer {
             shader,
             pipeline_layout,
             oit: OitSlot::new(target_format),
+            inputs: Default::default(),
         }
     }
 
@@ -196,9 +199,11 @@ impl Mesh3DRenderer {
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
     }
 
     pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
+        self.inputs.data_changed();
         if !coords_x.is_empty() {
             super::common::safe_write_buffer(
                 queue,
@@ -218,6 +223,7 @@ impl Mesh3DRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
+        self.inputs.data_changed();
         super::common::safe_write_buffer(
             queue,
             &self.data_buffer,

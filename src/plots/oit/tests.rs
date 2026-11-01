@@ -100,6 +100,13 @@ fn scene(device: &wgpu::Device, queue: &wgpu::Queue) -> Scene {
     }
 }
 
+/// A frame key per layer order, so each order renders.
+fn key_of(order: &[u32]) -> u64 {
+    let mut h = std::hash::DefaultHasher::new();
+    std::hash::Hash::hash(order, &mut h);
+    std::hash::Hasher::finish(&h)
+}
+
 /// Renders the layers in `order`, composites them over a transparent target
 /// and returns the first pixel.
 fn render(device: &wgpu::Device, queue: &wgpu::Queue, scene: &mut Scene, order: &[u32]) -> [u8; 4] {
@@ -129,14 +136,18 @@ fn render(device: &wgpu::Device, queue: &wgpu::Queue, scene: &mut Scene, order: 
     };
     let mut encoder = device.create_command_encoder(&Default::default());
     let empty = &scene.empty;
-    scene
-        .state
-        .render(device, &mut encoder, [SIZE; 2], atlas, |pass| {
+    scene.state.render(
+        device,
+        &mut encoder,
+        ([SIZE; 2], key_of(order)),
+        atlas,
+        |pass| {
             pass.set_bind_group(0, empty, &[]);
             for &layer in order {
                 pass.draw(0..3, layer..layer + 1);
             }
-        });
+        },
+    );
     {
         let color_view = color.create_view(&Default::default());
         let depth_view = depth.create_view(&Default::default());
@@ -258,4 +269,30 @@ fn oit_many_near_layers_do_not_overflow() {
         assert!(near(c, 127.5), "{name} {c}");
     }
     assert!(near(a, 255.0), "alpha {a}");
+}
+
+#[test]
+fn an_unchanged_frame_is_not_rendered_again() {
+    let Some((device, queue)) = gpu() else {
+        eprintln!("SKIPPED an_unchanged_frame_is_not_rendered_again: no GPU device");
+        return;
+    };
+    let mut scene = scene(&device, &queue);
+    render(&device, &queue, &mut scene, &[0, 1]);
+    let Some(atlas) = crate::plots::colormap_atlas::bind_group(&scene.resources) else {
+        panic!("atlas missing");
+    };
+    let mut encoder = device.create_command_encoder(&Default::default());
+    let size_key = ([SIZE; 2], key_of(&[0, 1]));
+    scene
+        .state
+        .render(&device, &mut encoder, size_key, atlas, |_| {
+            panic!("same key and size: nothing to draw");
+        });
+    let drawn = std::cell::Cell::new(false);
+    let size_key = ([SIZE; 2], key_of(&[1, 0]));
+    scene
+        .state
+        .render(&device, &mut encoder, size_key, atlas, |_| drawn.set(true));
+    assert!(drawn.get(), "a new key draws");
 }

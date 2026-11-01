@@ -9,6 +9,9 @@ pub struct OitState {
     accumulate: wgpu::RenderPipeline,
     compositor: Compositor,
     frame: Option<OitFrame>,
+    /// What `frame` was rendered from, so an unchanged frame is not
+    /// rendered again.
+    key: Option<u64>,
 }
 
 impl OitState {
@@ -24,25 +27,34 @@ impl OitState {
             accumulate: build(&ACCUMULATE),
             compositor: Compositor::new(device, target_format),
             frame: None,
+            key: None,
         }
     }
 
     /// Records the opaque and translucent passes at `size` pixels into
-    /// `encoder`. `draw` binds the renderer's group 0 and buffers and issues
-    /// its draw call; the pipeline and the colormap `atlas` (group 1) are set.
+    /// `encoder`, unless the frame was last rendered at that size from
+    /// `key` (everything its pixels depend on: the renderer's uniforms and
+    /// data, the colormaps). `draw` binds the renderer's group 0 and buffers
+    /// and issues its draw call; the pipeline and the colormap `atlas`
+    /// (group 1) are set.
     pub fn render(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
+        (size, key): ([u32; 2], u64),
         atlas: &wgpu::BindGroup,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
     ) {
         let max = device.limits().max_texture_dimension_2d;
         let size = size.map(|s| s.clamp(1, max));
-        if self.frame.as_ref().is_none_or(|f| f.size != size) {
+        let same_size = self.frame.as_ref().is_some_and(|f| f.size == size);
+        if same_size && self.key == Some(key) {
+            return;
+        }
+        if !same_size {
             self.frame = Some(self.compositor.create_frame(device, size));
         }
+        self.key = Some(key);
         let Some(frame) = &self.frame else {
             return;
         };
@@ -105,6 +117,7 @@ impl OitState {
     /// allocates a new frame.
     pub fn release_frame(&mut self) {
         self.frame = None;
+        self.key = None;
     }
 
     /// Composites the last rendered frame into the current viewport. Returns
@@ -140,7 +153,7 @@ impl OitSlot {
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
+        size: ([u32; 2], u64),
         atlas: &wgpu::BindGroup,
         build: impl Fn(&Variant<'_>) -> wgpu::RenderPipeline,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
