@@ -170,3 +170,41 @@ fn bakes_volumes_as_the_cpu_encodes_them() {
     let mut encoder = device.create_command_encoder(&Default::default());
     assert!(!renderer.bake_volume(&device, &mut encoder, &params, &targets));
 }
+
+/// A target whose validity words pass one storage binding (a narrow volume
+/// whose planes were kept for its point cloud) is not baked, rather than
+/// failing validation. Skipped without a GPU.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn volumes_past_one_storage_binding_are_not_baked() {
+    let Some((device, queue)) = super::test_gpu::device() else {
+        eprintln!("SKIPPED volumes_past_one_storage_binding_are_not_baked: no GPU device");
+        return;
+    };
+    let renderer =
+        super::ChannelRenderer::new(&device, wgpu::TextureFormat::Rgba8Unorm, 1, W * H * D);
+    let configs = [ChannelColorConfig::new(0, "c0".into(), [255, 0, 0])];
+    let stretch = CompositeStretch::default();
+    let params = super::ChannelParams::of(&configs, &stretch, (0, 1), (W * H * D) as u32, None);
+    renderer.update_params(&queue, &params);
+    let colors = texture(
+        &device,
+        wgpu::TextureFormat::Rgba8Unorm,
+        wgpu::TextureUsages::STORAGE_BINDING,
+    );
+    let validity = texture(
+        &device,
+        wgpu::TextureFormat::R8Unorm,
+        wgpu::TextureUsages::TEXTURE_BINDING,
+    );
+    // 16 voxels wide: 256-byte validity rows, 2^34 bytes in all.
+    let targets = VolumeTargets {
+        id: super::BakeId::next(),
+        colors: &colors,
+        validity: &validity,
+        dims: [16, 1 << 14, 1 << 12],
+    };
+    let mut encoder = device.create_command_encoder(&Default::default());
+    assert!(!renderer.bake_volume(&device, &mut encoder, &params, &targets));
+    queue.submit([encoder.finish()]);
+}

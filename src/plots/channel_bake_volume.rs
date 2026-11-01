@@ -8,7 +8,7 @@
 use std::sync::Mutex;
 
 use super::channel_bake::Thinning;
-use super::channel_bake_targets::{BakeTargets, copy_validity, validity_row_bytes};
+use super::channel_bake_targets::{BakeTargets, copy_validity, validity_bytes, validity_row_bytes};
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
 
@@ -72,8 +72,10 @@ impl VolumeBakePipeline {
 
 impl ChannelRenderer {
     /// Blends the planes (one `w * h * d` volume per channel) in `params`
-    /// into `targets`, unless they already hold that blend. Returns whether
-    /// it baked. `params` must already be written (`update_params`).
+    /// into `targets`, unless they already hold that blend or its validity
+    /// words pass one storage binding (planes kept for a point cloud, drawn
+    /// as a volume before its reprojection). Returns whether it baked.
+    /// `params` must already be written (`update_params`).
     pub(crate) fn bake_volume(
         &self,
         device: &wgpu::Device,
@@ -81,6 +83,10 @@ impl ChannelRenderer {
         params: &ChannelParams,
         targets: &VolumeTargets<'_>,
     ) -> bool {
+        let limit = device.limits().max_storage_buffer_binding_size;
+        if validity_bytes(targets.dims) > limit {
+            return false;
+        }
         let key = targets.id;
         let Some(planes_version) = self.bake_needed(key, params, Thinning::NONE) else {
             return false;

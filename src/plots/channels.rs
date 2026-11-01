@@ -32,8 +32,9 @@ pub struct ChannelRenderer {
     pipeline: wgpu::RenderPipeline,
     pub(super) layout: wgpu::BindGroupLayout,
     pub(super) bake: BakePipeline,
-    /// The raymarcher's bake, built when a volume first needs it.
-    pub(super) volume_bake: OnceLock<VolumeBakePipeline>,
+    /// The raymarcher's bake, built when a volume first needs it and shared
+    /// with the renderers `sync` makes for other plane sizes.
+    pub(super) volume_bake: Arc<OnceLock<VolumeBakePipeline>>,
     params_buffer: wgpu::Buffer,
     planes_buffer: wgpu::Buffer,
     pub(super) bind_group: wgpu::BindGroup,
@@ -87,7 +88,8 @@ impl ChannelRenderer {
     }
 
     /// Keeps `slot` holding `planes` planes of `plane_len` cells: the
-    /// pipeline is built once, the planes buffer again when its size changes.
+    /// pipelines are built once, the planes buffer again when its size
+    /// changes.
     pub fn sync(
         slot: &mut Option<Arc<Self>>,
         device: &wgpu::Device,
@@ -97,12 +99,15 @@ impl ChannelRenderer {
     ) -> Arc<Self> {
         let renderer = match slot.take() {
             Some(old) if old.planes == planes && old.plane_len == plane_len => old,
-            Some(old) => Arc::new(Self::with_pipeline(
-                device,
-                (old.pipeline.clone(), old.layout.clone(), old.bake.clone()),
-                planes,
-                plane_len,
-            )),
+            Some(old) => Arc::new(Self {
+                volume_bake: old.volume_bake.clone(),
+                ..Self::with_pipeline(
+                    device,
+                    (old.pipeline.clone(), old.layout.clone(), old.bake.clone()),
+                    planes,
+                    plane_len,
+                )
+            }),
             None => Arc::new(Self::new(device, target_format, planes, plane_len)),
         };
         *slot = Some(renderer.clone());
@@ -121,7 +126,7 @@ impl ChannelRenderer {
             pipeline,
             layout,
             bake,
-            volume_bake: OnceLock::new(),
+            volume_bake: Arc::default(),
             params_buffer,
             planes_buffer,
             bind_group,
