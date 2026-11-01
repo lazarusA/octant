@@ -10,7 +10,7 @@ use super::channel_bake::Thinning;
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
 
-const SHADER: &str = concat!(
+pub(super) const SHADER: &str = concat!(
     include_str!("shaders/common/channel_blend.wgsl"),
     "\n",
     include_str!("shaders/channel_bake_volume.wgsl"),
@@ -96,12 +96,15 @@ impl VolumeBakePipeline {
     }
 }
 
-/// Bytes of the validity words a bake of a `[w, h, d]` volume fills, its
-/// rows padded for the copy into the validity texture.
+/// Bytes of one row of `w` validity bytes, padded to whole words and for
+/// the copy into the validity texture.
+fn validity_row_bytes(w: u32) -> u32 {
+    (w.max(1).div_ceil(4) * 4).div_ceil(ROW_ALIGN) * ROW_ALIGN
+}
+
+/// Bytes of the validity words a bake of a `[w, h, d]` volume fills.
 pub fn validity_bytes([w, h, d]: [u32; 3]) -> u64 {
-    let row_bytes = w.max(1).div_ceil(4) * 4;
-    let row_bytes = row_bytes.div_ceil(ROW_ALIGN) * ROW_ALIGN;
-    u64::from(row_bytes) * u64::from(h.max(1)) * u64::from(d.max(1))
+    u64::from(validity_row_bytes(w)) * u64::from(h.max(1)) * u64::from(d.max(1))
 }
 
 impl ChannelRenderer {
@@ -120,8 +123,7 @@ impl ChannelRenderer {
             return false;
         };
         let [w, h, d] = targets.dims.map(|n| n.max(1));
-        let row_bytes = w.div_ceil(4) * 4;
-        let row_bytes = row_bytes.div_ceil(ROW_ALIGN) * ROW_ALIGN;
+        let row_bytes = validity_row_bytes(w);
         let uniforms = VolumeBakeUniforms {
             w,
             h,
