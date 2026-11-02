@@ -2,12 +2,12 @@
 //!
 //! Operates purely through `BlockRequest`, which carries its own store, so
 //! this is backend-agnostic and works across requests that target
-//! different `StoreHandle`s within the same batch.
+//! different `StoreHandle`s.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 use web_time::Instant;
 
@@ -27,7 +27,7 @@ pub struct PrefetchResult {
 }
 
 pub struct BlockPrefetcher {
-    tx: SyncSender<PrefetchResult>,
+    tx: Sender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
     pending: HashMap<BlockCacheKey, u64>,
     /// Blocks whose last fetch failed, and when: the lookahead skips them
@@ -55,7 +55,7 @@ impl BlockPrefetcher {
     }
 
     pub fn with_max_concurrent_threads(max_concurrent_threads: usize) -> Self {
-        let (tx, rx) = sync_channel(128);
+        let (tx, rx) = channel();
         Self {
             tx,
             rx,
@@ -239,7 +239,7 @@ impl BlockPrefetcher {
     pub fn abort(&mut self) {
         self.aborted.store(true, Ordering::Relaxed);
         self.aborted = Arc::new(AtomicBool::new(false));
-        let (tx, rx) = sync_channel(self.max_concurrent_threads * 2);
+        let (tx, rx) = channel();
         (self.tx, self.rx) = (tx, rx);
         self.pending.clear();
         self.completed_bytes.store(0, Ordering::Relaxed);
@@ -247,3 +247,7 @@ impl BlockPrefetcher {
         self.failed.clear();
     }
 }
+
+#[cfg(test)]
+#[path = "prefetch_channel_tests.rs"]
+mod channel_tests;

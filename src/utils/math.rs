@@ -1,12 +1,13 @@
 //! Mathematical helper functions and numerical reductions.
 
-/// Computes the finite minimum and maximum values in a slice of `f32`s, filtering out NaNs and infinities.
+/// Computes the finite minimum and maximum values in a slice of `f32`s, filtering out NaNs, infinities
+/// and |v| > 1e30, which the shaders draw as missing (NetCDF's default fill 9.97e36).
 /// Returns `(0.0, 1.0)` as fallback if no valid finite values are present.
 pub fn compute_finite_min_max(values: &[f32]) -> (f32, f32) {
     let (lo, hi) = values
         .iter()
         .copied()
-        .filter(|v| v.is_finite())
+        .filter(|v| v.is_finite() && v.abs() <= 1e30)
         .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
             (lo.min(v), hi.max(v))
         });
@@ -255,6 +256,11 @@ mod tests {
 
         let nans = vec![f32::NAN, f32::INFINITY];
         assert_eq!(compute_finite_min_max(&nans), (0.0, 1.0));
+
+        // |v| > 1e30 is drawn as missing (NetCDF's default fill 9.97e36).
+        let filled = [271.0, 300.0, 9.97e36, -9.97e36];
+        assert_eq!(compute_finite_min_max(&filled), (271.0, 300.0));
+        assert_eq!(compute_finite_min_max(&[9.97e36]), (0.0, 1.0));
     }
 
     #[test]

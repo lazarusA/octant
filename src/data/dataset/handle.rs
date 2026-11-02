@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use super::source::DataSource;
 use crate::data::{
-    blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback},
+    blocks::{BlockStore, BlockStoreError, ProgressCallback},
     metadata::{CoordValues, DatasetMetadata, VariableInfo},
     octant_block::OctantBlock,
     slice_request::SliceRequest,
@@ -65,16 +65,5 @@ impl StoreHandle {
         on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         self.backend.fetch_block_with_progress(request, on_progress)
-    }
-
-    /// Fetches several variables/selections from this same store in one
-    /// call, letting the backend optimize a coordinated read if it wants
-    /// to.
-    ///
-    /// All requests here must target this store. A batch spanning multiple
-    /// stores should go through `BlockRequestBatch` + `BlockLoader`
-    /// instead, which groups by store before calling this per group.
-    pub fn fetch_many(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        self.backend.fetch_blocks(requests)
     }
 }

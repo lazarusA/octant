@@ -54,11 +54,4 @@ impl BlockStore for WasmZarrBlockStore {
         self.generic_store
             .fetch_block_with_progress(request, on_progress)
     }
-
-    fn fetch_blocks(
-        &self,
-        requests: &[SliceRequest],
-    ) -> Result<crate::data::blocks::BlockResult, BlockStoreError> {
-        self.generic_store.fetch_blocks(requests)
-    }
 }

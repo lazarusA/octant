@@ -8,7 +8,7 @@ use async_tiff::metadata::TiffMetadataReader;
 use async_tiff::metadata::cache::ReadaheadMetadataCache;
 use async_tiff::reader::AsyncFileReader;
 
-use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
@@ -216,13 +216,5 @@ impl BlockStore for GeoTiffBlockStore {
                 .await
             })
         }
-    }
-
-    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        let blocks = requests
-            .iter()
-            .map(|r| self.fetch_block(r))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(BlockResult::new(blocks))
     }
 }

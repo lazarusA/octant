@@ -12,7 +12,8 @@ pub fn unpredict_buffer(
     width: usize,
     endianness: Endianness,
 ) -> Result<Vec<u8>, String> {
-    if endianness == Endianness::BigEndian {
+    // The floating-point predictor restores the byte order itself while unshuffling.
+    if endianness == Endianness::BigEndian && predictor != Predictor::FloatingPoint {
         match bits {
             16 => buf
                 .as_chunks_mut::<2>()

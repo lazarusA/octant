@@ -2,7 +2,7 @@
 //! their metadata alone and a variable's coordinates arrive when it is chosen.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::data::StoreHandle;
 use crate::data::metadata::{CoordValues, VariableInfo};
@@ -16,7 +16,7 @@ pub struct CoordResult {
 
 /// Queues coordinate reads, at most once per `(dataset, variable)`, and hands back results.
 pub struct CoordinateLoader {
-    tx: SyncSender<CoordResult>,
+    tx: Sender<CoordResult>,
     rx: Receiver<CoordResult>,
     requested: HashSet<(String, String)>,
     pending: usize,
@@ -24,7 +24,7 @@ pub struct CoordinateLoader {
 
 impl Default for CoordinateLoader {
     fn default() -> Self {
-        let (tx, rx) = sync_channel(64);
+        let (tx, rx) = channel();
         Self {
             tx,
             rx,

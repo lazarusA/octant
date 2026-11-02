@@ -11,7 +11,6 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use super::request::BlockResult;
 use crate::data::metadata::{CoordValues, VariableInfo};
 use crate::data::{octant_block::OctantBlock, slice_request::SliceRequest};
 
@@ -86,16 +85,4 @@ pub trait BlockStore: MaybeSendSync {
         request: &SliceRequest,
         _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError>;
-
-    /// Default implementation for loading multiple variables from this
-    /// same backend in one call.
-    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        let mut blocks = Vec::with_capacity(requests.len());
-
-        for request in requests {
-            blocks.push(self.fetch_block(request)?);
-        }
-
-        Ok(BlockResult::new(blocks))
-    }
 }

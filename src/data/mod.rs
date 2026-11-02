@@ -20,9 +20,8 @@ pub mod slicing;
 pub(crate) mod test_stores;
 
 pub use blocks::{
-    BlockBatchOutcome, BlockCache, BlockCacheKey, BlockLoadOutcome, BlockLoader, BlockPrefetcher,
-    BlockRequest, BlockRequestBatch, BlockResult, BlockStore, BlockStoreError, PrefetchResult,
-    ProgressCallback, VariableCacheSummary,
+    BlockCache, BlockCacheKey, BlockLoader, BlockPrefetcher, BlockRequest, BlockStore,
+    BlockStoreError, PrefetchResult, ProgressCallback, VariableCacheSummary,
 };
 pub use calibration::DataCalibration;
 pub use coordinates::{
