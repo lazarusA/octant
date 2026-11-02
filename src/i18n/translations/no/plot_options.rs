@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Detalj",
         PlotOptionsKey::MeshDetailHover => {
-            "Celler som tegnes på store rutenett: mer detalj er tregere; pekeren leser alltid hver celle"
+            "Celler som tegnes på store rutenett: mer detalj er tregere; pekeren leser alltid hver celle; Hver celle stopper ved det én GPU-buffer rommer"
         }
         PlotOptionsKey::DetailScreen => "Skjerm",
         PlotOptionsKey::DetailDouble => "2x skjerm",

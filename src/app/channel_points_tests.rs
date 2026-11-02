@@ -158,7 +158,8 @@ fn a_narrow_volume_blends_on_the_cpu() {
     assert!(app.layers.base.data.volume.is_some(), "still drawn");
 }
 
-/// A narrow point cloud blends on the GPU (it bakes no validity words);
+/// A narrow point cloud blends on the GPU (it bakes no validity words), a
+/// new channel window reallocating its volume and a heatmap dropping it;
 /// switched to a volume, whose padded validity rows pass one storage
 /// buffer, it projects again and blends on the CPU.
 #[test]
@@ -169,7 +170,7 @@ fn a_narrow_point_cloud_blends_on_the_gpu_until_drawn_as_a_volume() {
     };
     crate::plots::limits::set_from_device(&wgpu::Limits::default());
     let store = std::sync::Arc::new(zarrs::storage::store::MemoryStore::new());
-    let (dims, shape) = (["c", "z", "y", "x"], [3, 1024, 1024, 1]);
+    let (dims, shape) = (["c", "z", "y", "x"], [6, 1024, 1024, 1]);
     write_array(&store, "img", &dims, &shape, &[3, 256, 256, 1]);
     let mut app = OctantApp {
         wgpu_render_state: Some(rs),
@@ -195,7 +196,25 @@ fn a_narrow_point_cloud_blends_on_the_gpu_until_drawn_as_a_volume() {
         .collect();
     app.load_selected_variable_block();
     poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_some());
+    // A range in the next channel chunk reads a new block window: a new
+    // volume, holding only its channels.
+    let allocations = app.layers.base.data.volume_allocations;
+    app.selected.dim_ranges[0] = (3, 5);
+    app.plot_selection();
+    let window = |a: &OctantApp| {
+        let cv = a.layers.base.data.channel_volume.as_ref();
+        cv.map(|c| (c.c_start, c.channels))
+    };
+    poll_until(&mut app, |a| window(a) == Some((3, 3)));
+    assert!(app.layers.base.data.volume_allocations > allocations);
     app.switch_plot_type(PlotType::Volume);
     poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_none());
     assert!(app.layers.base.data.volume.is_some(), "still drawn");
+    // The heatmap drops the channel volume; back in 3D it is built again.
+    app.switch_plot_type(PlotType::PointCloud);
+    poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_some());
+    app.switch_plot_type(PlotType::Heatmap);
+    poll_until(&mut app, |a| a.layers.base.data.channel_volume.is_none());
+    app.switch_plot_type(PlotType::PointCloud);
+    poll_until(&mut app, |a| window(a) == Some((3, 3)));
 }

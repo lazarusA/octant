@@ -48,7 +48,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Dettaglio",
         PlotOptionsKey::MeshDetailHover => {
-            "Celle disegnate sulle griglie grandi: più dettaglio è più lento; il passaggio del mouse legge sempre ogni cella"
+            "Celle disegnate sulle griglie grandi: più dettaglio è più lento; il passaggio del mouse legge sempre ogni cella; Ogni cella si ferma a quanto contiene un buffer della GPU"
         }
         PlotOptionsKey::DetailScreen => "Schermo",
         PlotOptionsKey::DetailDouble => "2x schermo",

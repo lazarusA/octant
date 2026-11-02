@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use super::channel_bake::{BakePipeline, Baked};
 use super::channel_bake_volume::VolumeBakePipeline;
 use super::channel_params::{ChannelParams, MAX_CHANNELS};
+use super::common::bgl_entry;
 use super::heatmap::HeatmapRenderer;
 use crate::data::slicing::CompositeStretch;
 
@@ -210,16 +211,8 @@ fn channel_buffers(
 
 /// Group 2 of every pipeline that blends channels (`channel_blend.wgsl`).
 pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer {
-            ty,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    };
+    let stages = wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::COMPUTE;
+    let buffer = |binding, ty| bgl_entry(binding, stages, ty);
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Channel Bind Group Layout"),
         entries: &[

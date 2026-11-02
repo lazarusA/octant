@@ -171,7 +171,8 @@ fn bakes_volumes_as_the_cpu_encodes_them() {
     assert!(!renderer.bake_volume(&device, &mut encoder, &params, &targets));
 }
 
-/// A target whose validity words pass one storage binding (a narrow volume
+/// A target whose validity words pass one storage binding, or
+/// `MAX_GPU_STORAGE_BUFFER_BYTES` on devices that bind more (a narrow volume
 /// whose planes were kept for its point cloud) is not baked, rather than
 /// failing validation. Skipped without a GPU.
 #[cfg(not(target_arch = "wasm32"))]

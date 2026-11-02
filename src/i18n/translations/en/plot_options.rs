@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> &'static str {
         }
         PlotOptionsKey::MeshDetail => "Detail",
         PlotOptionsKey::MeshDetailHover => {
-            "Cells large grids draw: more detail turns slower; the hover always reads every cell"
+            "Cells large grids draw: more detail turns slower; the hover always reads every cell; Every cell stops at what one GPU buffer holds"
         }
         PlotOptionsKey::DetailScreen => "Screen",
         PlotOptionsKey::DetailDouble => "2x screen",

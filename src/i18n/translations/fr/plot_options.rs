@@ -48,7 +48,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Détail",
         PlotOptionsKey::MeshDetailHover => {
-            "Cellules dessinées sur les grandes grilles : plus de détail est plus lent ; le survol lit toujours chaque cellule"
+            "Cellules dessinées sur les grandes grilles : plus de détail est plus lent ; le survol lit toujours chaque cellule ; Chaque cellule s'arrête à ce que contient un tampon GPU"
         }
         PlotOptionsKey::DetailScreen => "Écran",
         PlotOptionsKey::DetailDouble => "2x écran",

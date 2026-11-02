@@ -44,7 +44,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "세부 수준",
         PlotOptionsKey::MeshDetailHover => {
-            "큰 격자에서 그리는 셀 수입니다. 세부 수준이 높을수록 느려지며, 호버는 항상 모든 셀을 읽습니다"
+            "큰 격자에서 그리는 셀 수입니다. 세부 수준이 높을수록 느려지며, 호버는 항상 모든 셀을 읽습니다. '모든 셀'은 GPU 버퍼 하나에 들어가는 만큼까지입니다"
         }
         PlotOptionsKey::DetailScreen => "화면",
         PlotOptionsKey::DetailDouble => "화면의 2배",

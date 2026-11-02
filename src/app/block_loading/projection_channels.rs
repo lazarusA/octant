@@ -50,6 +50,11 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return false;
         };
+        // The 2D planes replace the volume's channel buffer and stretch: a
+        // kept volume would come back to 3D with neither.
+        if layer.data.channel_volume.is_some() {
+            layer.clear_3d();
+        }
         let Some((renderer, matrix, stretch)) = planes else {
             layer.renderers.channels = None;
             return false;

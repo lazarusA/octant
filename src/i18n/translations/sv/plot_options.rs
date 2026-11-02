@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Detalj",
         PlotOptionsKey::MeshDetailHover => {
-            "Celler som ritas på stora rutnät: mer detalj är långsammare; muspekaren läser alltid varje cell"
+            "Celler som ritas på stora rutnät: mer detalj är långsammare; muspekaren läser alltid varje cell; Varje cell stannar vid vad en GPU-buffert rymmer"
         }
         PlotOptionsKey::DetailScreen => "Skärm",
         PlotOptionsKey::DetailDouble => "2x skärm",

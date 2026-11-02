@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 
 use super::expansion::expand_coastline_line_list;
 use super::types::{Coastline3DParams, Coastline3DUniforms};
+use crate::plots::common::bgl_entry;
 
 struct Coastline3DGpuResources {
     coastline_buffer: wgpu::Buffer,
@@ -368,23 +369,6 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             .saturating_sub(1)
             .clamp(1, 7);
         rpass.draw(0..vertex_count, 0..instances);
-    }
-}
-
-fn bgl_entry(
-    binding: u32,
-    visibility: wgpu::ShaderStages,
-    ty: wgpu::BufferBindingType,
-) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-            ty,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
     }
 }
 

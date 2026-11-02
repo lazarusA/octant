@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Detalhe",
         PlotOptionsKey::MeshDetailHover => {
-            "Células desenhadas em grades grandes: mais detalhe é mais lento; o cursor sempre lê cada célula"
+            "Células desenhadas em grades grandes: mais detalhe é mais lento; o cursor sempre lê cada célula; Cada célula se limita ao que cabe em um buffer da GPU"
         }
         PlotOptionsKey::DetailScreen => "Tela",
         PlotOptionsKey::DetailDouble => "2x tela",

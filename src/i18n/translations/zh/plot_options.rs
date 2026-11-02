@@ -41,7 +41,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => "最大值平放，较小的值在其上方升起",
         PlotOptionsKey::MeshDetail => "细节",
         PlotOptionsKey::MeshDetailHover => {
-            "大网格上绘制的单元格：细节越多越慢；悬停始终读取每个单元格"
+            "大网格上绘制的单元格：细节越多越慢；悬停始终读取每个单元格；「每个单元格」以一个 GPU 缓冲区能容纳的为限"
         }
         PlotOptionsKey::DetailScreen => "屏幕",
         PlotOptionsKey::DetailDouble => "屏幕的2倍",

@@ -10,6 +10,7 @@ use wgpu::util::DeviceExt;
 
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
+use super::common::bgl_entry;
 
 pub(super) const SHADER: &str = concat!(
     include_str!("shaders/common/channel_blend.wgsl"),
@@ -89,16 +90,7 @@ struct BakeUniforms {
 
 impl BakePipeline {
     pub(super) fn new(device: &wgpu::Device, channels: &wgpu::BindGroupLayout) -> Self {
-        let entry = |binding, ty| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer {
-                ty,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
+        let entry = |binding, ty| bgl_entry(binding, wgpu::ShaderStages::COMPUTE, ty);
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Channel Bake Layout"),
             entries: &[

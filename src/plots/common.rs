@@ -429,6 +429,25 @@ pub fn create_plot_with_coords_bind_group(
 
 pub use crate::utils::math::calculate_3d_depth;
 
+/// A buffer entry of a bind group layout, without dynamic offset or
+/// minimum size.
+pub fn bgl_entry(
+    binding: u32,
+    visibility: wgpu::ShaderStages,
+    ty: wgpu::BufferBindingType,
+) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}
+
 /// Helper to create a standard DepthStencilState with Depth32Float format.
 pub fn default_depth_stencil_state(
     depth_write_enabled: bool,

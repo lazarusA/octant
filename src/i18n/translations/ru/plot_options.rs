@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Детализация",
         PlotOptionsKey::MeshDetailHover => {
-            "Ячейки, которые рисуются на больших сетках: чем больше деталей, тем медленнее; подсказка всегда читает каждую ячейку"
+            "Ячейки, которые рисуются на больших сетках: чем больше деталей, тем медленнее; подсказка всегда читает каждую ячейку; режим Каждая ячейка ограничен тем, что вмещает один буфер GPU"
         }
         PlotOptionsKey::DetailScreen => "Экран",
         PlotOptionsKey::DetailDouble => "2x экран",

@@ -44,7 +44,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Tarkkuus",
         PlotOptionsKey::MeshDetailHover => {
-            "Suurten hilojen piirretyt solut: suurempi tarkkuus on hitaampi; osoitin lukee aina jokaisen solun"
+            "Suurten hilojen piirretyt solut: suurempi tarkkuus on hitaampi; osoitin lukee aina jokaisen solun; Jokainen solu rajoittuu siihen, mitä yhteen GPU-puskuriin mahtuu"
         }
         PlotOptionsKey::DetailScreen => "Näyttö",
         PlotOptionsKey::DetailDouble => "2x näyttö",

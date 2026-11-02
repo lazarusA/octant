@@ -46,7 +46,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Деталізація",
         PlotOptionsKey::MeshDetailHover => {
-            "Комірки, що малюються на великих сітках: чим більше деталей, тим повільніше; підказка завжди читає кожну комірку"
+            "Комірки, що малюються на великих сітках: чим більше деталей, тим повільніше; підказка завжди читає кожну комірку; режим Кожна комірка обмежений тим, що вміщує один буфер GPU"
         }
         PlotOptionsKey::DetailScreen => "Екран",
         PlotOptionsKey::DetailDouble => "2x екран",

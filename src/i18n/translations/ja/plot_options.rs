@@ -43,7 +43,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "詳細度",
         PlotOptionsKey::MeshDetailHover => {
-            "大きなグリッドで描くセル数。詳細にするほど遅くなります。ホバーは常にすべてのセルを読みます"
+            "大きなグリッドで描くセル数。詳細にするほど遅くなります。ホバーは常にすべてのセルを読みます。「すべてのセル」は GPU バッファ 1 つに収まる分までです"
         }
         PlotOptionsKey::DetailScreen => "画面",
         PlotOptionsKey::DetailDouble => "画面の2倍",

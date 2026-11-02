@@ -11,6 +11,7 @@ use super::channel_bake::Thinning;
 use super::channel_bake_targets::{BakeTargets, copy_validity, validity_bytes, validity_row_bytes};
 use super::channel_params::ChannelParams;
 use super::channels::ChannelRenderer;
+use super::common::{MAX_GPU_STORAGE_BUFFER_BYTES, bgl_entry};
 
 pub(super) const SHADER: &str = concat!(
     include_str!("shaders/common/channel_blend.wgsl"),
@@ -84,7 +85,8 @@ impl ChannelRenderer {
         targets: &VolumeTargets<'_>,
     ) -> bool {
         let limit = device.limits().max_storage_buffer_binding_size;
-        if validity_bytes(targets.dims) > limit {
+        let cap = u64::try_from(MAX_GPU_STORAGE_BUFFER_BYTES).unwrap_or(u64::MAX);
+        if validity_bytes(targets.dims) > limit.min(cap) {
             return false;
         }
         let key = targets.id;
@@ -145,16 +147,7 @@ impl VolumeBakePipeline {
 /// validity words and the plane marks.
 fn targets_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let compute = wgpu::ShaderStages::COMPUTE;
-    let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: compute,
-        ty: wgpu::BindingType::Buffer {
-            ty,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    };
+    let buffer = |binding, ty| bgl_entry(binding, compute, ty);
     let colors = wgpu::BindGroupLayoutEntry {
         binding: 1,
         visibility: compute,

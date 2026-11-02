@@ -45,7 +45,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         }
         PlotOptionsKey::MeshDetail => "Detail",
         PlotOptionsKey::MeshDetailHover => {
-            "Sel yang digambar pada grid besar: lebih detail lebih lambat; hover selalu membaca setiap sel"
+            "Sel yang digambar pada grid besar: lebih detail lebih lambat; hover selalu membaca setiap sel; Setiap sel dibatasi pada isi satu buffer GPU"
         }
         PlotOptionsKey::DetailScreen => "Layar",
         PlotOptionsKey::DetailDouble => "2x layar",

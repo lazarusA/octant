@@ -45,7 +45,8 @@ impl OctantApp {
             fixed_indices
         };
         let ranges = (req_x, req_y, req_z);
-        let gpu = gpu_channels.is_some();
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        let gpu = gpu_channels.map(|count| (c_start, count));
         let target_desc = self.volume_key(layer, block, [nx, ny, nz], ranges, fixed, gpu);
 
         let allocations = layer.data.volume_allocations;
@@ -54,7 +55,6 @@ impl OctantApp {
             .layers
             .get(id)
             .is_some_and(|l| l.data.volume_allocations != allocations);
-        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
         self.sync_channel_volume(id, gpu_channels, c_start, reset);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
@@ -117,8 +117,9 @@ impl OctantApp {
 
     /// What `layer`'s volume of `[nx, ny, nz]` voxels holds: the variable,
     /// the requested ranges and fixed indices, and how its composite is
-    /// colored. One the GPU blends (`gpu`) keeps its raw channels, so
-    /// display changes keep the volume; else they reallocate it.
+    /// colored. One the GPU blends (`gpu`: first channel and count) keeps
+    /// its raw channels, so display changes keep the volume and only a new
+    /// channel window reallocates it; else display changes reallocate it.
     fn volume_key(
         &self,
         layer: &Layer,
@@ -126,10 +127,10 @@ impl OctantApp {
         [nx, ny, nz]: [usize; 3],
         (req_x, req_y, req_z): ((usize, usize), (usize, usize), (usize, usize)),
         fixed: &[usize],
-        gpu: bool,
+        gpu: Option<(usize, usize)>,
     ) -> String {
-        let ch = if gpu {
-            "gpu".to_string()
+        let ch = if let Some((c_start, count)) = gpu {
+            format!("gpu{c_start}+{count}")
         } else {
             let hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(layer.id()));
             format!("{hash:016x}")

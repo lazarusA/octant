@@ -10,7 +10,6 @@ use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::CompositeStretch;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES;
-use crate::plots::limits::max_storage_bytes;
 use crate::plots::{ChannelRenderer, MAX_CHANNELS, PlotType, validity_bytes};
 
 /// The ranges of a slab within a block, in its oriented order.
@@ -46,7 +45,10 @@ impl OctantApp {
         let bytes = count.checked_mul(cells)?.checked_mul(4)?;
         let dims = [nx, ny, nz].map(|n| u32::try_from(n).unwrap_or(u32::MAX));
         let validity = usize::try_from(validity_bytes(dims)).unwrap_or(usize::MAX);
-        let fits_validity = plot_type != Some(PlotType::Volume) || validity <= max_storage_bytes();
+        // Rows padded to 256 bytes: capped as the channels are, so a narrow
+        // volume never takes a buffer many times its voxels.
+        let fits_validity =
+            plot_type != Some(PlotType::Volume) || validity <= MAX_GPU_STORAGE_BUFFER_BYTES;
         ((1..=MAX_CHANNELS).contains(&count)
             && bytes <= MAX_GPU_STORAGE_BUFFER_BYTES
             && fits_validity)

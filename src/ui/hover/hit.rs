@@ -199,23 +199,19 @@ pub fn resolve_target_screen_pos(
 ) -> Option<Pos2> {
     match app.effective_canvas_plot_type() {
         // On the drawn grid's cell holding `(px, py)`.
-        PlotType::Sphere => {
+        plot @ (PlotType::Sphere | PlotType::Surface) => {
             let full = matrix?;
             let (mesh, k) = app.layers.base.mesh_view(full);
             let (x, y) = (
                 drawn_index(px, k, full.width),
                 drawn_index(py, k, full.height),
             );
-            sphere_target_pos(app, mesh, camera, x, y)
-        }
-        PlotType::Surface => {
-            let full = matrix?;
-            let (mesh, k) = app.layers.base.mesh_view(full);
-            let (x, y) = (
-                drawn_index(px, k, full.width),
-                drawn_index(py, k, full.height),
-            );
-            surface_target_pos(app, mesh, camera, x, y)
+            let target = if plot == PlotType::Sphere {
+                sphere_target_pos
+            } else {
+                surface_target_pos
+            };
+            target(app, mesh, camera, x, y)
         }
         PlotType::PointCloud | PlotType::Volume => {
             let sampler = sampler?;
