@@ -7,13 +7,13 @@ use std::time::{Duration, Instant};
 
 use crate::data::slicing::{ChannelColorConfig, CompositeStretch};
 
-const W: usize = 7031;
-const H: usize = 3515;
-const CHANNELS: usize = 4;
-const RUNS: usize = 5;
+pub(super) const W: usize = 7031;
+pub(super) const H: usize = 3515;
+pub(super) const CHANNELS: usize = 4;
+pub(super) const RUNS: usize = 5;
 
 /// A device with the adapter's own limits, as the app requests them.
-fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
+pub(super) fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
     let rt = tokio::runtime::Runtime::new().ok()?;
     rt.block_on(async {
         let adapter = wgpu::Instance::default()
@@ -28,7 +28,7 @@ fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
     })
 }
 
-fn block() -> crate::data::octant_block::OctantBlock {
+pub(super) fn block() -> crate::data::octant_block::OctantBlock {
     let values: Vec<f32> = (0..CHANNELS * W * H)
         .map(|i| ((i.wrapping_mul(2_654_435_761)) % 256) as f32)
         .collect();
@@ -43,17 +43,17 @@ fn block() -> crate::data::octant_block::OctantBlock {
     )
 }
 
-fn median(mut v: Vec<Duration>) -> Duration {
+pub(super) fn median(mut v: Vec<Duration>) -> Duration {
     v.sort();
     v[v.len() / 2]
 }
 
-/// Draws `renderer` over `heatmap` into a 1920 x 1080 target and waits.
-fn frame(
+/// Runs `draw` in a pass over a 1920 x 1080 color and depth target and
+/// waits for the GPU.
+pub(super) fn frame(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    heatmap: &crate::plots::HeatmapRenderer,
-    renderer: &crate::plots::ChannelRenderer,
+    draw: impl FnOnce(&mut wgpu::RenderPass<'static>),
 ) {
     let size = wgpu::Extent3d {
         width: 1920,
@@ -87,7 +87,11 @@ fn frame(
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &depth,
-                    depth_ops: None,
+                    // Writable: meshes write depth.
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
                     stencil_ops: None,
                 }),
                 timestamp_writes: None,
@@ -95,7 +99,7 @@ fn frame(
                 multiview_mask: None,
             })
             .forget_lifetime();
-        renderer.draw(&mut rpass, heatmap);
+        draw(&mut rpass);
     }
     queue.submit([encoder.finish()]);
     let _ = device.poll(wgpu::PollType::wait_indefinitely());
@@ -162,7 +166,7 @@ fn channel_blend_timed() {
             None,
         );
         renderer.update_params(&queue, &params);
-        frame(&device, &queue, &heatmap, &renderer);
+        frame(&device, &queue, |r| renderer.draw(r, &heatmap));
         gpu_change.push(start.elapsed());
         // A block arriving: blend and upload, against planes cut and uploaded.
         let start = Instant::now();
@@ -188,9 +192,9 @@ fn channel_blend_timed() {
         wait();
         gpu_block.push(start.elapsed());
         // Every frame the GPU path draws, once the upload has settled.
-        frame(&device, &queue, &heatmap, &renderer);
+        frame(&device, &queue, |r| renderer.draw(r, &heatmap));
         let start = Instant::now();
-        frame(&device, &queue, &heatmap, &renderer);
+        frame(&device, &queue, |r| renderer.draw(r, &heatmap));
         draw.push(start.elapsed());
     }
     eprintln!("{CHANNELS} channels of {W} x {H} (median of {RUNS} runs)");

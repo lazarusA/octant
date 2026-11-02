@@ -5,7 +5,7 @@ use crate::data::slicing::{ChannelColorConfig, CompositeStretch};
 
 /// Three 8 x 8 channels: a ramp with missing cells, int8-like values (read
 /// as bit patterns) and wide floats.
-fn block() -> crate::data::octant_block::OctantBlock {
+pub(super) fn block() -> crate::data::octant_block::OctantBlock {
     let n = 64;
     let ramp = (0..n).map(|i| if i % 9 == 0 { f32::NAN } else { i as f32 });
     let int8 = (0..n).map(|i| (i as f32) - 20.0);
@@ -23,7 +23,7 @@ fn block() -> crate::data::octant_block::OctantBlock {
 }
 
 /// Every curve family, a window, an inversion and distinct tints.
-fn configs() -> Vec<ChannelColorConfig> {
+pub(super) fn configs() -> Vec<ChannelColorConfig> {
     let mut c: Vec<_> = (0..3)
         .map(|i| {
             ChannelColorConfig::new(
@@ -44,7 +44,7 @@ fn configs() -> Vec<ChannelColorConfig> {
 }
 
 /// The CPU blend packed, and each channel's plane, as the app slices them.
-fn cpu(
+pub(super) fn cpu(
     block: &crate::data::octant_block::OctantBlock,
     configs: &[ChannelColorConfig],
     stretch: &mut CompositeStretch,

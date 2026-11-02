@@ -14,12 +14,20 @@ pub struct PointCloudRenderer {
     pub index_count: u32,
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    pub bake_id: super::BakeId,
+    /// How `data_buffer` thins the volume, for the channel bake.
+    pub thinning: super::Thinning,
     pub bind_group: wgpu::BindGroup,
     pub instance_count: AtomicU32,
     /// Kept to build the OIT pipelines on first use.
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
     pub(crate) oit: OitSlot,
+    /// Its frame when drawn without OIT.
+    pub(crate) frame: super::frame_cache::FrameSlot,
+    /// What its OIT frame depends on.
+    pub(crate) inputs: super::oit::FrameInputs,
 }
 
 impl PointCloudRenderer {
@@ -147,15 +155,25 @@ impl PointCloudRenderer {
             index_count: indices.len() as u32,
             uniform_buffer,
             data_buffer,
+            bake_id: super::BakeId::next(),
+            thinning: super::Thinning::NONE,
             bind_group,
             instance_count: AtomicU32::new(instance_count),
             shader,
             pipeline_layout,
             oit: OitSlot::new(target_format),
+            frame: super::frame_cache::FrameSlot::new(target_format),
+            inputs: Default::default(),
         }
     }
 
+    /// This renderer, its data a volume thinned by `thinning`.
+    pub fn with_thinning(self, thinning: super::Thinning) -> Self {
+        Self { thinning, ..self }
+    }
+
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
+        self.inputs.data_changed();
         if !data.is_empty()
             && super::common::safe_write_buffer(
                 queue,
@@ -171,6 +189,7 @@ impl PointCloudRenderer {
 
     /// Uploads `data` at element `offset` without touching the rest of the volume.
     pub fn update_data_range(&self, queue: &wgpu::Queue, offset: usize, data: &[f32]) {
+        self.inputs.data_changed();
         super::common::safe_write_buffer_range(
             queue,
             &self.data_buffer,
@@ -178,31 +197,6 @@ impl PointCloudRenderer {
             data,
             "PointCloudRenderer::update_data_range",
         );
-    }
-}
-
-impl PointCloudRenderer {
-    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &PointCloudUniformParams) {
-        let instance_cnt = self.instance_count.load(Ordering::Relaxed);
-        let depth =
-            super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
-        let uniforms = PointCloudUniforms {
-            camera: params.camera,
-            aspect_x: params.aspect_x,
-            aspect_y: params.aspect_y,
-            aspect_z: params.aspect_z,
-            point_size: params.point_size,
-            width: params.width.max(1),
-            height: params.height.max(1),
-            depth,
-            shift_x: params.shift_x,
-            shift_y: params.shift_y,
-            shift_z: params.shift_z,
-            _pad0: 0,
-            _pad1: 0,
-            color: params.color,
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 }
 

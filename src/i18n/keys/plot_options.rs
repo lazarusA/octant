@@ -41,6 +41,12 @@ crate::i18n::keys::define_keys! {
     Height,
     FlipHeights,
     FlipHeightsHover,
+    MeshDetail,
+    MeshDetailHover,
+    DetailScreen,
+    DetailDouble,
+    DetailQuadruple,
+    DetailFull,
     Size,
     }
 }

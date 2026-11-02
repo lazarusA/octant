@@ -193,8 +193,8 @@ fn the_hover_reads_the_tile_where_it_is_drawn() {
         &matrix,
         meta.as_ref(),
         var.as_ref(),
-        0.4,
-        0.4,
+        (0.4, 0.4),
+        None,
         None,
     );
     assert_eq!(val, cell.value);

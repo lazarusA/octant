@@ -12,11 +12,6 @@ pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 128 * 1024 * 1024;
 /// [`MAX_GPU_STORAGE_BUFFER_BYTES`] in `f32` values.
 pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
     MAX_GPU_STORAGE_BUFFER_BYTES / std::mem::size_of::<f32>();
-/// The most 2D cells the sphere and surface are built for. They are built
-/// with every 2D plot, next to the heatmap, so they keep the default budget
-/// whatever the device allows.
-pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_STORAGE_BUFFER_ELEMENTS;
-
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -433,6 +428,25 @@ pub fn create_plot_with_coords_bind_group(
 }
 
 pub use crate::utils::math::calculate_3d_depth;
+
+/// A buffer entry of a bind group layout, without dynamic offset or
+/// minimum size.
+pub fn bgl_entry(
+    binding: u32,
+    visibility: wgpu::ShaderStages,
+    ty: wgpu::BufferBindingType,
+) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}
 
 /// Helper to create a standard DepthStencilState with Depth32Float format.
 pub fn default_depth_stencil_state(

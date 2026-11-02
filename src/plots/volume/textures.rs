@@ -2,6 +2,7 @@
 //! and validity (`R8Unorm`), uploaded as whole Z planes.
 
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
+use super::texture_writes::{create_texture, region_3d, write_region, write_valid_planes};
 use crate::i18n::{NoticesKey as K, filled, tr};
 use crate::ui::toast::{Severity, report};
 use std::ops::Range;
@@ -14,6 +15,8 @@ pub struct VolumeTextures {
     pub encoding: VolumeEncoding,
     pub dims: Dims,
     value: wgpu::Texture,
+    /// Names `value` to the channel bake.
+    bake_id: crate::plots::BakeId,
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
@@ -52,11 +55,30 @@ impl VolumeTextures {
             value_view: value.create_view(&wgpu::TextureViewDescriptor::default()),
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
+            bake_id: crate::plots::BakeId::next(),
             validity,
             invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(plane as u32)).collect(),
             invalid_total: AtomicU64::new((dims.d * plane) as u64),
             version: AtomicU64::new(0),
         })
+    }
+
+    /// What a composite bake writes (`ChannelRenderer::bake_volume`).
+    pub fn bake_targets(&self) -> crate::plots::VolumeTargets<'_> {
+        let Dims { w, h, d } = self.dims;
+        crate::plots::VolumeTargets {
+            id: self.bake_id,
+            colors: &self.value,
+            validity: &self.validity,
+            dims: [w, h, d].map(|n| u32::try_from(n).unwrap_or(u32::MAX)),
+        }
+    }
+
+    /// After a bake: the data changed, and voxels may be missing (the bake
+    /// does not count them, so the shader reads validity).
+    pub fn mark_baked(&self) {
+        self.version.fetch_add(1, Ordering::Relaxed);
+        self.set_invalid_counts(0, std::iter::repeat_n(1, self.dims.d));
     }
 
     pub fn version(&self) -> u64 {
@@ -163,84 +185,4 @@ impl VolumeTextures {
         write_region(queue, &self.validity, origin, extent, &planes.validity, w);
         self.set_invalid_counts(planes.z.start, planes.invalid_per_plane.into_iter());
     }
-}
-
-fn region_3d(dims: Dims, z: Range<usize>) -> (wgpu::Origin3d, wgpu::Extent3d) {
-    (
-        wgpu::Origin3d {
-            x: 0,
-            y: 0,
-            z: z.start as u32,
-        },
-        wgpu::Extent3d {
-            width: dims.w as u32,
-            height: dims.h as u32,
-            depth_or_array_layers: z.len() as u32,
-        },
-    )
-}
-
-fn write_region(
-    queue: &wgpu::Queue,
-    texture: &wgpu::Texture,
-    origin: wgpu::Origin3d,
-    extent: wgpu::Extent3d,
-    bytes: &[u8],
-    bytes_per_row: u32,
-) {
-    let layout = wgpu::TexelCopyBufferLayout {
-        offset: 0,
-        bytes_per_row: Some(bytes_per_row),
-        rows_per_image: Some(extent.height),
-    };
-    let tex = wgpu::TexelCopyTextureInfo {
-        texture,
-        mip_level: 0,
-        origin,
-        aspect: wgpu::TextureAspect::All,
-    };
-    queue.write_texture(tex, bytes, layout, extent);
-}
-
-fn write_valid_planes(queue: &wgpu::Queue, texture: &wgpu::Texture, dims: Dims, z: Range<usize>) {
-    const CHUNK: usize = 65536;
-    static ONES: [u8; CHUNK] = [255u8; CHUNK];
-    let plane = dims.plane();
-    let step = (CHUNK / plane.max(1)).max(1);
-    let mut z0 = z.start;
-    while z0 < z.end {
-        let z1 = (z0 + step).min(z.end);
-        let voxels = (z1 - z0) * plane;
-        let buf = if voxels <= CHUNK {
-            &ONES[..voxels]
-        } else {
-            &vec![255; voxels]
-        };
-        let (origin, extent) = region_3d(dims, z0..z1);
-        write_region(queue, texture, origin, extent, buf, dims.w as u32);
-        z0 = z1;
-    }
-}
-
-fn create_texture(
-    device: &wgpu::Device,
-    label: &str,
-    dims: Dims,
-    format: wgpu::TextureFormat,
-) -> wgpu::Texture {
-    let size = wgpu::Extent3d {
-        width: dims.w as u32,
-        height: dims.h as u32,
-        depth_or_array_layers: dims.d as u32,
-    };
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: Some(label),
-        size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D3,
-        format,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    })
 }

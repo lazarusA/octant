@@ -16,8 +16,8 @@ pub(crate) fn resolve_2d_plot_entries(
     matrix: &MatrixData,
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
-    norm_x: f32,
-    norm_y: f32,
+    (norm_x, norm_y): (f32, f32),
+    cell: Option<(usize, usize)>,
     geo_coords: Option<(f32, f32)>,
 ) -> (f32, Vec<HoverField>, usize, usize) {
     let (orig_w, orig_h) = if let Some(pyr) = &app.layers.base.data.pyramid {
@@ -25,9 +25,11 @@ pub(crate) fn resolve_2d_plot_entries(
     } else {
         (matrix.width, matrix.height)
     };
-    let (px, py) = matrix
-        .grid
-        .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h);
+    let (px, py) = cell.unwrap_or_else(|| {
+        matrix
+            .grid
+            .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h)
+    });
 
     // The matrix is the full-resolution data, also under a pyramid; a
     // multiscale plot's detail tile, where it is drawn, is finer still.

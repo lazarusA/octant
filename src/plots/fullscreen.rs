@@ -6,12 +6,13 @@
 pub const FULLSCREEN_WGSL: &str = include_str!("shaders/common/fullscreen.wgsl");
 
 /// Pipeline running `fs_main` of `fragment_wgsl` (which reads `FullscreenOutput`)
-/// over the viewport, with its frame bound at group 0 through `layout`.
+/// over the viewport, with its frame bound at group 0 through `layout`;
+/// with `writes_depth` its `frag_depth` replaces egui's depth there.
 pub fn frame_pipeline(
     device: &wgpu::Device,
     label: &str,
     fragment_wgsl: &str,
-    layout: &wgpu::BindGroupLayout,
+    (layout, writes_depth): (&wgpu::BindGroupLayout, bool),
     target_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -43,9 +44,10 @@ pub fn frame_pipeline(
             compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState::default(),
-        // egui's pass carries a depth attachment; the frame ignores it.
+        // egui's pass carries a depth attachment; the frame ignores it
+        // unless it brings its own depth.
         depth_stencil: Some(super::common::default_depth_stencil_state(
-            false,
+            writes_depth,
             wgpu::CompareFunction::Always,
         )),
         multisample: wgpu::MultisampleState::default(),

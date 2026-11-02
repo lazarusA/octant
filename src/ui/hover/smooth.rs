@@ -3,7 +3,9 @@
 //! (`shaders/common/height.wgsl`): values sit at cell centers, the first and
 //! last stretched to the axis edges, unless the axis wraps around.
 
+use crate::app::layers::Layer;
 use crate::data::MatrixData;
+use crate::data::render::decimate::sample_index;
 
 /// Smooth vertex `j` of an axis of `n` cells, in cell units (cell `k` spans
 /// `[k, k + 1]`): its center, or the outer edge for the first and last.
@@ -55,13 +57,28 @@ pub fn bracket_wrapped(x: f32, n: usize) -> (usize, usize, f32) {
     (first, (first + 1) % n, g - floor)
 }
 
-/// Value of cell `(px, py)`, NaN past the data.
-pub fn value_at(matrix: &MatrixData, px: usize, py: usize) -> f32 {
-    matrix
-        .values
-        .get(py * matrix.width + px)
-        .copied()
-        .unwrap_or(f32::NAN)
+/// Value `layer` draws at cell `(px, py)` of `matrix` (its 2D data, or the
+/// thinned grid its meshes draw): the packed color of a composite the GPU
+/// blends (as the bake writes it, at the full-resolution cell), else the
+/// data; NaN past the data.
+pub fn value_at(layer: &Layer, matrix: &MatrixData, px: usize, py: usize) -> f32 {
+    let full = match (&layer.data.mesh, &layer.data.matrix) {
+        (Some(mesh), Some(full)) if std::ptr::eq(&mesh.matrix, matrix) => {
+            let k = mesh.stride;
+            (
+                sample_index(px, k, full.width),
+                sample_index(py, k, full.height),
+            )
+        }
+        _ => (px, py),
+    };
+    layer.gpu_blended_cell(full.0, full.1).unwrap_or_else(|| {
+        matrix
+            .values
+            .get(py * matrix.width + px)
+            .copied()
+            .unwrap_or(f32::NAN)
+    })
 }
 
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {

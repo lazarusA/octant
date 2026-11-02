@@ -1,8 +1,11 @@
 //! Point cloud draw calls and the egui paint callback, with the
 //! transparency modes of [`Transparency`].
 
+use super::channels::ChannelDraw;
 use super::oit::{Transparency, Variant, build_pipeline};
-use super::point_cloud::{PointCloudRenderer, PointCloudUniformParams, PointCloudVertex};
+use super::point_cloud::{
+    PointCloudRenderer, PointCloudUniformParams, PointCloudUniforms, PointCloudVertex,
+};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -36,12 +39,43 @@ impl PointCloudRenderer {
     }
 }
 
+impl PointCloudRenderer {
+    /// Writes the uniforms of a frame drawn with `params`, recording them
+    /// for the frame cache.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &PointCloudUniformParams) {
+        let instance_cnt = self.instance_count.load(Ordering::Relaxed);
+        let depth =
+            super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
+        let uniforms = PointCloudUniforms {
+            camera: params.camera,
+            aspect_x: params.aspect_x,
+            aspect_y: params.aspect_y,
+            aspect_z: params.aspect_z,
+            point_size: params.point_size,
+            width: params.width.max(1),
+            height: params.height.max(1),
+            depth,
+            shift_x: params.shift_x,
+            shift_y: params.shift_y,
+            shift_z: params.shift_z,
+            _pad0: 0,
+            _pad1: 0,
+            color: params.color,
+        };
+        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
+    }
+}
+
 pub struct PointCloudCallback {
     pub renderer: Arc<PointCloudRenderer>,
     pub params: PointCloudUniformParams,
     pub rect: egui::Rect,
     /// The plot's Transparency option, resolved for this device.
     pub transparency: Transparency,
+    /// A multi-channel composite the GPU blends, baked into the data buffer
+    /// (`ChannelRenderer::bake`).
+    pub channels: Option<ChannelDraw>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
@@ -55,22 +89,25 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
         self.renderer.update_uniforms(queue, &self.params);
-        if self.transparency == Transparency::Oit
-            && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
-        {
-            let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let renderer = &self.renderer;
-            renderer.oit.render(
-                device,
-                encoder,
-                size,
-                atlas,
-                |variant| renderer.oit_pipeline(device, variant),
-                |pass| renderer.draw_points(pass),
-            );
-        } else if self.transparency != Transparency::Oit {
-            self.renderer.oit.release();
+        if let Some(channels) = &self.channels {
+            let r = &self.renderer;
+            let target = (r.bake_id, &r.data_buffer, r.thinning);
+            if channels.bake_into(device, queue, encoder, target) {
+                r.inputs.data_changed();
+            }
         }
+        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
+        let renderer = &self.renderer;
+        let key = renderer.inputs.key(self.transparency as u8);
+        super::frame_cache::render_frame(
+            (&renderer.oit, &renderer.frame),
+            device,
+            encoder,
+            (self.transparency, size, key),
+            super::colormap_atlas::bind_group(callback_resources),
+            (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
+            |pass| renderer.draw_points(pass),
+        );
         Vec::new()
     }
 
@@ -84,15 +121,22 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             return;
         }
         let renderer = &self.renderer;
-        let pipeline = match self.transparency {
-            Transparency::Oit if renderer.oit.paint(rpass) => return,
-            Transparency::Oit | Transparency::NoDepthWrite => &renderer.transparent_pipeline,
-            Transparency::Off => &renderer.render_pipeline,
-        };
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
+        super::frame_cache::paint_frame(
+            (&renderer.oit, &renderer.frame),
+            (self.transparency, self.pipeline()),
+            rpass,
+            callback_resources,
+            |rpass| renderer.draw_points(rpass),
+        );
+    }
+}
+
+impl PointCloudCallback {
+    /// The pipeline drawing the points into egui's pass (or their cached frame).
+    fn pipeline(&self) -> &wgpu::RenderPipeline {
+        match self.transparency {
+            Transparency::Oit | Transparency::NoDepthWrite => &self.renderer.transparent_pipeline,
+            Transparency::Off => &self.renderer.render_pipeline,
         }
-        rpass.set_pipeline(pipeline);
-        renderer.draw_points(rpass);
     }
 }

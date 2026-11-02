@@ -14,6 +14,8 @@ pub struct Mesh3DRenderer {
     pub cube_vertex_buffer: wgpu::Buffer,
     pub cube_index_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    pub bake_id: super::BakeId,
     pub coord_x_buffer: wgpu::Buffer,
     pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
@@ -25,6 +27,10 @@ pub struct Mesh3DRenderer {
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
     pub(crate) oit: OitSlot,
+    /// Its frame when drawn without OIT.
+    pub(crate) frame: super::frame_cache::FrameSlot,
+    /// What its OIT frame depends on.
+    pub(crate) inputs: super::oit::FrameInputs,
 }
 
 impl Mesh3DRenderer {
@@ -167,6 +173,7 @@ impl Mesh3DRenderer {
             cube_vertex_buffer,
             cube_index_buffer,
             data_buffer,
+            bake_id: super::BakeId::next(),
             coord_x_buffer,
             coord_y_buffer,
             uniform_buffer,
@@ -177,6 +184,8 @@ impl Mesh3DRenderer {
             shader,
             pipeline_layout,
             oit: OitSlot::new(target_format),
+            frame: super::frame_cache::FrameSlot::new(target_format),
+            inputs: Default::default(),
         }
     }
 
@@ -196,9 +205,11 @@ impl Mesh3DRenderer {
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+        self.inputs.uniforms_written(bytemuck::bytes_of(&uniforms));
     }
 
     pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
+        self.inputs.data_changed();
         if !coords_x.is_empty() {
             super::common::safe_write_buffer(
                 queue,
@@ -218,6 +229,7 @@ impl Mesh3DRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
+        self.inputs.data_changed();
         super::common::safe_write_buffer(
             queue,
             &self.data_buffer,

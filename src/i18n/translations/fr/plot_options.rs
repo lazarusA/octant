@@ -46,6 +46,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "La valeur la plus haute est à plat et les valeurs plus basses s'élèvent au-dessus"
         }
+        PlotOptionsKey::MeshDetail => "Détail",
+        PlotOptionsKey::MeshDetailHover => {
+            "Cellules dessinées sur les grandes grilles : plus de détail est plus lent ; le survol lit toujours chaque cellule ; Chaque cellule s'arrête à ce que contient un tampon GPU"
+        }
+        PlotOptionsKey::DetailScreen => "Écran",
+        PlotOptionsKey::DetailDouble => "2x écran",
+        PlotOptionsKey::DetailQuadruple => "4x écran",
+        PlotOptionsKey::DetailFull => "Chaque cellule",
         PlotOptionsKey::Size => "Taille",
     })
 }

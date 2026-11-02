@@ -101,23 +101,37 @@ pub fn drawn_channels(
     c_start: usize,
     num_channels: usize,
 ) -> Vec<(&ChannelColorConfig, usize)> {
-    let local = |c: &ChannelColorConfig| c.index.checked_sub(c_start).filter(|&l| l < num_channels);
-    let mut drawn: Vec<_> = configs
+    let mut drawn: Vec<_> = drawn_in_config_order(configs, c_start, num_channels).collect();
+    drawn.sort_by_key(|(c, _)| c.index);
+    drawn
+}
+
+/// [`drawn_channels`] in `configs` order (the order the GPU blends them),
+/// without allocating: for callers reading one cell at a time.
+pub fn drawn_in_config_order(
+    configs: &[ChannelColorConfig],
+    c_start: usize,
+    num_channels: usize,
+) -> impl Iterator<Item = (&ChannelColorConfig, usize)> {
+    let local =
+        move |c: &ChannelColorConfig| c.index.checked_sub(c_start).filter(|&l| l < num_channels);
+    let ticked = configs
         .iter()
         .filter(|c| c.visible)
-        .filter_map(|c| Some((c, local(c)?)))
-        .collect();
-    if drawn.is_empty() {
-        // No ticked channel in the window: its first one, as with the composite off.
-        drawn.extend(
+        .filter_map(move |c| Some((c, local(c)?)));
+    // No ticked channel in the window: its first one, as with the composite off.
+    let first = ticked
+        .clone()
+        .next()
+        .is_none()
+        .then(|| {
             configs
                 .iter()
                 .find(|c| c.index == c_start && num_channels > 0)
-                .map(|c| (c, 0)),
-        );
-    }
-    drawn.sort_by_key(|(c, _)| c.index);
-    drawn
+        })
+        .flatten()
+        .map(|c| (c, 0));
+    ticked.chain(first)
 }
 
 /// The packed tints of `block`'s drawn channels (along `c_dim`, from `configs`,

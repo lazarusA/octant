@@ -1,5 +1,8 @@
 //! Plotted data containers and Level-of-Detail (LOD) resamplers.
 
+pub mod decimate;
+#[cfg(test)]
+mod decimate_tests;
 pub mod matrix;
 pub mod payload;
 pub mod pyramid;

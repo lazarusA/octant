@@ -9,6 +9,9 @@ pub struct OitState {
     accumulate: wgpu::RenderPipeline,
     compositor: Compositor,
     frame: Option<OitFrame>,
+    /// What `frame` was rendered from, so an unchanged frame is not
+    /// rendered again.
+    key: Option<u64>,
 }
 
 impl OitState {
@@ -24,60 +27,59 @@ impl OitState {
             accumulate: build(&ACCUMULATE),
             compositor: Compositor::new(device, target_format),
             frame: None,
+            key: None,
         }
     }
 
     /// Records the opaque and translucent passes at `size` pixels into
-    /// `encoder`. `draw` binds the renderer's group 0 and buffers and issues
-    /// its draw call; the pipeline and the colormap `atlas` (group 1) are set.
+    /// `encoder`, unless the frame was last rendered at that size from
+    /// `key` (everything its pixels depend on: the renderer's uniforms and
+    /// data, the colormaps). `draw` binds the renderer's group 0 and buffers
+    /// and issues its draw call; the pipeline and the colormap `atlas`
+    /// (group 1) are set.
     pub fn render(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
+        (size, key): ([u32; 2], u64),
         atlas: &wgpu::BindGroup,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
     ) {
-        let max = device.limits().max_texture_dimension_2d;
-        let size = size.map(|s| s.clamp(1, max));
-        if self.frame.as_ref().is_none_or(|f| f.size != size) {
+        let held = (self.frame.as_ref().map(|f| f.size), self.key);
+        let Some((size, resize)) = super::frame_update(device, held, (size, key)) else {
+            return;
+        };
+        if resize {
             self.frame = Some(self.compositor.create_frame(device, size));
         }
+        self.key = Some(key);
+        self.encode_passes(encoder, atlas, draw);
+    }
+
+    /// Records the opaque pass (clearing color and depth) and the
+    /// translucent pass (clearing the accumulation and revealage, keeping
+    /// the opaque depth) into the frame, with `draw` issuing the draw call.
+    fn encode_passes(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        atlas: &wgpu::BindGroup,
+        draw: impl Fn(&mut wgpu::RenderPass<'_>),
+    ) {
         let Some(frame) = &self.frame else {
             return;
         };
-        let clear = |view, color| {
-            Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(color),
-                    store: wgpu::StoreOp::Store,
-                },
-            })
-        };
-        let depth = |load| {
-            Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &frame.depth,
-                depth_ops: Some(wgpu::Operations {
-                    load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            })
-        };
+        let depth = |load| depth_attachment(&frame.depth, load);
         let passes = [
             (
                 &self.opaque,
-                [clear(&frame.opaque, wgpu::Color::TRANSPARENT), None],
+                [cleared(&frame.opaque, wgpu::Color::TRANSPARENT), None],
                 wgpu::LoadOp::Clear(1.0),
             ),
             (
                 &self.accumulate,
                 [
-                    clear(&frame.accum, wgpu::Color::TRANSPARENT),
-                    clear(&frame.reveal, wgpu::Color::WHITE),
+                    cleared(&frame.accum, wgpu::Color::TRANSPARENT),
+                    cleared(&frame.reveal, wgpu::Color::WHITE),
                 ],
                 wgpu::LoadOp::Load,
             ),
@@ -105,6 +107,7 @@ impl OitState {
     /// allocates a new frame.
     pub fn release_frame(&mut self) {
         self.frame = None;
+        self.key = None;
     }
 
     /// Composites the last rendered frame into the current viewport. Returns
@@ -140,7 +143,7 @@ impl OitSlot {
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
+        size: ([u32; 2], u64),
         atlas: &wgpu::BindGroup,
         build: impl Fn(&Variant<'_>) -> wgpu::RenderPipeline,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
@@ -165,4 +168,35 @@ impl OitSlot {
             s.release_frame();
         }
     }
+}
+
+/// A color attachment of `view` cleared to `color` and stored.
+fn cleared(
+    view: &wgpu::TextureView,
+    color: wgpu::Color,
+) -> Option<wgpu::RenderPassColorAttachment<'_>> {
+    Some(wgpu::RenderPassColorAttachment {
+        view,
+        depth_slice: None,
+        resolve_target: None,
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(color),
+            store: wgpu::StoreOp::Store,
+        },
+    })
+}
+
+/// The depth attachment of `view`, loaded by `load` and stored.
+fn depth_attachment(
+    view: &wgpu::TextureView,
+    load: wgpu::LoadOp<f32>,
+) -> Option<wgpu::RenderPassDepthStencilAttachment<'_>> {
+    Some(wgpu::RenderPassDepthStencilAttachment {
+        view,
+        depth_ops: Some(wgpu::Operations {
+            load,
+            store: wgpu::StoreOp::Store,
+        }),
+        stencil_ops: None,
+    })
 }

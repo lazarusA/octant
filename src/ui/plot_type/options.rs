@@ -6,7 +6,7 @@ use crate::app::{OctantApp, SpatialRole};
 use crate::data::coordinates::{CoordinateGrid, HealpixOrder};
 use crate::i18n::{PlotKey, fill, tr};
 use crate::plots::PlotType;
-use crate::plots::common::{MAX_2D_SURFACE_ELEMENTS, MAX_GPU_STORAGE_BUFFER_BYTES};
+use crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES;
 use crate::ui::variables_panel::{
     calculate_selected_2d_elements, calculate_selected_surface_elements,
     calculate_selected_volume_elements,
@@ -48,8 +48,8 @@ struct Facts {
     label_image: bool,
     volume_mb: f64,
     volume_fits: bool,
-    surface_mb: f64,
-    surface_fits: bool,
+    /// A HEALPix grid's cells, never thinned, past one storage buffer.
+    healpix_mb: Option<f64>,
     supported: Option<&'static [PlotType]>,
     grid_name: &'static str,
     aggregated: bool,
@@ -64,7 +64,6 @@ impl Facts {
         // 3D types read their own level of a multiscale variable: measured
         // there, and never aggregated like the heatmap.
         let volume = var.map_or(0, |_| calculate_selected_volume_elements(app));
-        let surface = calculate_selected_surface_elements(app);
         let multiscale = var.is_some_and(|v| v.stack_base().is_some());
         let discrete = app
             .selected
@@ -72,6 +71,10 @@ impl Facts {
             .iter()
             .any(|c| c.spatial == SpatialRole::Grid);
         let (supported, grid_name) = supported_plots(app, discrete);
+        let healpix = discrete || plotted_grid(app).is_some_and(CoordinateGrid::is_healpix);
+        let mesh = calculate_selected_surface_elements(app);
+        let max = crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+        let healpix_mb = (healpix && mesh > max).then(|| megabytes(mesh));
         let aggregated = !multiscale
             && if app.is_exploring_unplotted_variable() {
                 !has_3d
@@ -84,8 +87,7 @@ impl Facts {
             label_image: var.is_some_and(crate::data::VariableInfo::is_label_image),
             volume_mb: megabytes(volume),
             volume_fits: volume <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
-            surface_mb: megabytes(surface),
-            surface_fits: surface <= MAX_2D_SURFACE_ELEMENTS,
+            healpix_mb,
             supported,
             grid_name,
             aggregated,
@@ -102,12 +104,14 @@ impl Facts {
             Blocked::Unsupported(self.grid_name)
         } else if plot_type == PlotType::Heatmap {
             return None;
+        } else if surface {
+            // Meshes draw a thinned grid of any size (`LayerData::mesh`),
+            // except HEALPix, whose cells are not laid out in rows.
+            return self.healpix_mb.map(Blocked::GpuLimit);
         } else if self.aggregated {
             Blocked::Aggregation
         } else if volumetric && !self.volume_fits {
             Blocked::GpuLimit(self.volume_mb)
-        } else if surface && !self.surface_fits {
-            Blocked::GpuLimit(self.surface_mb)
         } else {
             return None;
         })
@@ -134,16 +138,20 @@ fn supported_plots(app: &OctantApp, discrete: bool) -> (Option<&'static [PlotTyp
             tr(PlotKey::GridHealpixDiscrete),
         );
     }
+    match plotted_grid(app) {
+        Some(grid) => (Some(grid.supported_plot_types()), grid.name()),
+        None => (None, "active"),
+    }
+}
+
+/// The plotted grid, when the variable shown is the plotted one.
+fn plotted_grid(app: &OctantApp) -> Option<&CoordinateGrid> {
     let var = app
         .selected_variable_info()
         .or_else(|| app.plotted_variable_info());
     let plotted = app.plotted_variable_info().map(|p| &p.name);
-    match &app.layers.base.data.matrix {
-        Some(m) if var.map(|v| &v.name) == plotted => {
-            (Some(m.grid.supported_plot_types()), m.grid.name())
-        }
-        _ => (None, "active"),
-    }
+    let matrix = app.layers.base.data.matrix.as_ref()?;
+    (var.map(|v| &v.name) == plotted).then_some(&matrix.grid)
 }
 
 /// Every plot type and whether it can be picked. A plotted type whose data

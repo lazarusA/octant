@@ -44,6 +44,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "Наибольшее значение лежит внизу, а меньшие поднимаются над ним"
         }
+        PlotOptionsKey::MeshDetail => "Детализация",
+        PlotOptionsKey::MeshDetailHover => {
+            "Ячейки, которые рисуются на больших сетках: чем больше деталей, тем медленнее; подсказка всегда читает каждую ячейку; режим Каждая ячейка ограничен тем, что вмещает один буфер GPU"
+        }
+        PlotOptionsKey::DetailScreen => "Экран",
+        PlotOptionsKey::DetailDouble => "2x экран",
+        PlotOptionsKey::DetailQuadruple => "4x экран",
+        PlotOptionsKey::DetailFull => "Каждая ячейка",
         PlotOptionsKey::Size => "Размер",
     })
 }

@@ -7,6 +7,8 @@ mod alignment;
 mod alignment_tests;
 mod colorbar;
 mod data;
+#[cfg(test)]
+mod data_tests;
 mod id;
 mod layer;
 mod load;
@@ -24,7 +26,7 @@ mod window;
 pub(crate) use alignment::dim_named;
 pub use alignment::{Alignment, classify};
 pub use colorbar::{BarOrientation, ColorbarPlacement, Slot};
-pub use data::LayerData;
+pub use data::{ChannelVolume, LayerData, MeshGrid, PointGrid};
 pub use id::LayerId;
 pub use layer::{LABEL_BUF, Layer};
 pub use load::LoadState;

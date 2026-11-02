@@ -38,25 +38,24 @@ impl OctantApp {
             z_dim
         };
         let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
-        let ch_hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(id));
-        let target_desc = format!(
-            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch_hash:016x}",
-            layer.selection().store_target,
-            block.variable_name,
-            req_x.0,
-            req_x.1,
-            req_y.0,
-            req_y.1,
-            req_z.0,
-            req_z.1,
-            if is_3d_spatial_anim {
-                &[] as &[usize]
-            } else {
-                fixed_indices
-            },
-        );
+        let gpu_channels = self.gpu_channel_count(id, block, (c_dim, z_dim), [nx, ny, nz]);
+        let fixed = if is_3d_spatial_anim {
+            &[] as &[usize]
+        } else {
+            fixed_indices
+        };
+        let ranges = (req_x, req_y, req_z);
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        let gpu = gpu_channels.map(|count| (c_start, count));
+        let target_desc = self.volume_key(layer, block, [nx, ny, nz], ranges, fixed, gpu);
 
+        let allocations = layer.data.volume_allocations;
         self.ensure_volume_allocated(id, nx, ny, nz, &target_desc);
+        let reset = self
+            .layers
+            .get(id)
+            .is_some_and(|l| l.data.volume_allocations != allocations);
+        self.sync_channel_volume(id, gpu_channels, c_start, reset);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
@@ -87,9 +86,12 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
-        // Raw channel readouts only exist for 2D composites.
+        // Raw channel readouts only exist for 2D composites; the stretch
+        // only for composites the GPU blends.
         layer.data.composite_probe = None;
-        layer.data.composite_stretch = None;
+        if gpu_channels.is_none() {
+            layer.data.composite_stretch = None;
+        }
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
         for plane in planes {
@@ -111,6 +113,39 @@ impl OctantApp {
                 self.record_ring_plane(id, p.slot, p.step);
             }
         }
+    }
+
+    /// What `layer`'s volume of `[nx, ny, nz]` voxels holds: the variable,
+    /// the requested ranges and fixed indices, and how its composite is
+    /// colored. One the GPU blends (`gpu`: first channel and count) keeps
+    /// its raw channels, so display changes keep the volume and only a new
+    /// channel window reallocates it; else display changes reallocate it.
+    fn volume_key(
+        &self,
+        layer: &Layer,
+        block: &OctantBlock,
+        [nx, ny, nz]: [usize; 3],
+        (req_x, req_y, req_z): ((usize, usize), (usize, usize), (usize, usize)),
+        fixed: &[usize],
+        gpu: Option<(usize, usize)>,
+    ) -> String {
+        let ch = if let Some((c_start, count)) = gpu {
+            format!("gpu{c_start}+{count}")
+        } else {
+            let hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(layer.id()));
+            format!("{hash:016x}")
+        };
+        format!(
+            "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={fixed:?} ch={ch}",
+            layer.selection().store_target,
+            block.variable_name,
+            req_x.0,
+            req_x.1,
+            req_y.0,
+            req_y.1,
+            req_z.0,
+            req_z.1,
+        )
     }
 
     /// Whether `layer`'s GPU renderers are missing or encode the wrong format.
@@ -159,6 +194,10 @@ impl OctantApp {
                 desc.to_string(),
             );
             self.rebuild_pipeline_with_volume_data(id, initial_vdata);
+        } else if id == LayerId::BASE {
+            // The key leaves out the animated axis, which decides whether
+            // the point cloud may be thinned (`point_grid`).
+            self.rethin_points();
         }
     }
 

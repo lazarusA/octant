@@ -61,7 +61,13 @@ fn uneven_south_to_north_netcdf_rows_hover_with_their_own_latitude() {
     let var = meta.and_then(|m| m.variables.get(idx));
     let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
     let (val, fields, _, _) = crate::ui::hover::entries_2d::resolve_2d_plot_entries(
-        &app, matrix, meta, var, 0.2, 0.05, None,
+        &app,
+        matrix,
+        meta,
+        var,
+        (0.2, 0.05),
+        None,
+        None,
     );
     let lat = fields
         .iter()

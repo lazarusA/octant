@@ -180,6 +180,8 @@ required-features = ["font-tools"]
 blusc = "0.0.6"
 # Checks that the bundled CJK subsets cover their translations.
 skrifa = "0.44"
+# Checks that shaders compile for wgpu's GL backend (wgpu's own naga).
+naga = { version = "30.0.1", features = ["wgsl-in", "glsl-out"] }
 
 [patch.crates-io]
 blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }

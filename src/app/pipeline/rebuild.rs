@@ -1,11 +1,12 @@
 //! GPU render pipeline initialization, caching, and buffer allocation: 3D
 //! volume renderers and coastline LODs here, 2D renderers in `rebuild_2d`.
 
+use super::point_grid::point_cloud_renderer;
 use crate::app::OctantApp;
-use crate::app::layers::{Layer, LayerId};
+use crate::app::layers::{Layer, LayerId, PointGrid};
 use crate::data::VolumeData;
+use crate::plots::VolumeRenderer;
 use crate::plots::common::{MAX_GPU_STORAGE_BUFFER_BYTES, MAX_GPU_STORAGE_BUFFER_ELEMENTS};
-use crate::plots::{PointCloudRenderer, VolumeRenderer};
 use std::sync::Arc;
 
 /// Starts the color range at the data's `range` when the layer shows a new
@@ -41,13 +42,17 @@ impl OctantApp {
             return;
         }
         let step = self.layer_step(id);
+        // Only the base layer draws 3D plots.
+        let grid = (id == LayerId::BASE)
+            .then(|| self.point_grid([data.width, data.height, data.depth]))
+            .flatten();
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
         let upload_later = self
             .wgpu_render_state
             .as_ref()
-            .is_some_and(|rs| rebuild_volume_renderers(layer, rs, &data));
+            .is_some_and(|rs| rebuild_volume_renderers(layer, rs, &data, grid));
         follow_variable(
             layer,
             "3d",
@@ -118,13 +123,15 @@ impl OctantApp {
     }
 }
 
-/// Builds `layer`'s volume and point cloud renderers for `data`, unless they
-/// already have its dimensions and encoding: whether `data` is then uploaded
-/// later instead (before the next paint, to the renderer on screen).
+/// Builds `layer`'s volume and point cloud renderers for `data` (the point
+/// cloud thinned by `grid`), unless they already have its dimensions,
+/// encoding and grid: whether `data` is then uploaded later instead (before
+/// the next paint, to the renderer on screen).
 fn rebuild_volume_renderers(
     layer: &mut Layer,
     rs: &eframe::egui_wgpu::RenderState,
     data: &VolumeData,
+    grid: Option<PointGrid>,
 ) -> bool {
     let encoding = layer.volume_encoding();
     let renderers = &mut layer.renderers;
@@ -135,13 +142,14 @@ fn rebuild_volume_renderers(
             .volume
             .as_ref()
             .is_some_and(|r| r.encoding() == encoding);
-    if same_dimensions && renderers.point_cloud.is_some() {
+    if same_dimensions && renderers.point_cloud.is_some() && layer.data.points == grid {
         return true;
     }
     let (w, h) = (data.width as u32, data.height as u32);
     let (device, format) = (&rs.device, rs.target_format);
     let volume = VolumeRenderer::new(device, &rs.queue, format, &data.values, w, h, encoding);
-    let point_cloud = PointCloudRenderer::new(device, format, &data.values, w, h);
+    let point_cloud = point_cloud_renderer(rs, data, grid);
+    layer.data.points = grid;
     renderers.volume = volume.map(Arc::new);
     renderers.point_cloud = Some(Arc::new(point_cloud));
     // New renderers start from `data`: nothing is pending.

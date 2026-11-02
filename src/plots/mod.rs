@@ -1,6 +1,13 @@
 pub mod camera;
 #[cfg(test)]
 mod camera_tests;
+mod channel_bake;
+mod channel_bake_targets;
+#[cfg(test)]
+mod channel_bake_tests;
+mod channel_bake_volume;
+#[cfg(test)]
+mod channel_bake_volume_tests;
 pub mod channel_params;
 pub mod channels;
 #[cfg(test)]
@@ -9,6 +16,9 @@ pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;
 pub mod device;
+pub mod frame_cache;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod frame_cache_tests;
 pub mod fullscreen;
 pub mod heatmap;
 mod heatmap_draw;
@@ -35,6 +45,9 @@ pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
 
+pub use channel_bake::{BakeId, Thinning};
+pub use channel_bake_targets::validity_bytes;
+pub use channel_bake_volume::VolumeTargets;
 pub use channel_params::{ChannelParams, MAX_CHANNELS};
 pub use channels::{ChannelDraw, ChannelRenderer};
 pub use coastline::{

@@ -1,6 +1,7 @@
 //! Mesh draw calls and the egui paint callback, with the
 //! transparency modes of [`Transparency`].
 
+use super::channels::ChannelDraw;
 use super::common::{Mesh3DUniformParams, MeshVertex3D};
 use super::mesh::Mesh3DRenderer;
 use super::oit::{Transparency, Variant, build_pipeline};
@@ -44,11 +45,26 @@ pub struct Mesh3DCallback {
     pub rect: egui::Rect,
     /// The plot's Transparency option, resolved for this device.
     pub transparency: Transparency,
+    /// A multi-channel composite the GPU blends, baked into the data buffer
+    /// (`ChannelRenderer::bake`).
+    pub channels: Option<ChannelDraw>,
+    /// How the drawn grid thins the planes' cells (`Layer::mesh_thinning`).
+    pub thinning: super::Thinning,
 }
 
 impl Mesh3DCallback {
     fn cubes(&self) -> bool {
         self.params.mode == self.cube_mode_idx
+    }
+
+    /// The pipeline drawing the mesh into egui's pass (or its cached frame).
+    fn pipeline(&self) -> &wgpu::RenderPipeline {
+        let renderer = &self.renderer;
+        match (self.transparency, self.cubes()) {
+            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
+            (Transparency::Off, true) => &renderer.voxel_pipeline,
+            (Transparency::Off, false) => &renderer.render_pipeline,
+        }
     }
 }
 
@@ -63,22 +79,25 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
         self.renderer.update_uniforms(queue, &self.params);
-        if self.transparency == Transparency::Oit
-            && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
-        {
-            let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            let (renderer, cubes) = (&self.renderer, self.cubes());
-            renderer.oit.render(
-                device,
-                encoder,
-                size,
-                atlas,
-                |variant| renderer.oit_pipeline(device, variant),
-                |pass| renderer.draw_geometry(pass, cubes),
-            );
-        } else if self.transparency != Transparency::Oit {
-            self.renderer.oit.release();
+        if let Some(channels) = &self.channels {
+            let r = &self.renderer;
+            let target = (r.bake_id, &r.data_buffer, self.thinning);
+            if channels.bake_into(device, queue, encoder, target) {
+                r.inputs.data_changed();
+            }
         }
+        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
+        let (renderer, cubes) = (&self.renderer, self.cubes());
+        let key = renderer.inputs.key((cubes, self.transparency as u8));
+        super::frame_cache::render_frame(
+            (&renderer.oit, &renderer.frame),
+            device,
+            encoder,
+            (self.transparency, size, key),
+            super::colormap_atlas::bind_group(callback_resources),
+            (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
+            |pass| renderer.draw_geometry(pass, cubes),
+        );
         Vec::new()
     }
 
@@ -92,18 +111,13 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             return;
         }
         let renderer = &self.renderer;
-        let cubes = self.cubes();
-        let pipeline = match (self.transparency, cubes) {
-            (Transparency::Oit, _) if renderer.oit.paint(rpass) => return,
-            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
-            (Transparency::Off, true) => &renderer.voxel_pipeline,
-            (Transparency::Off, false) => &renderer.render_pipeline,
-        };
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
-        }
-        rpass.set_pipeline(pipeline);
-        renderer.draw_geometry(rpass, cubes);
+        super::frame_cache::paint_frame(
+            (&renderer.oit, &renderer.frame),
+            (self.transparency, self.pipeline()),
+            rpass,
+            callback_resources,
+            |rpass| renderer.draw_geometry(rpass, self.cubes()),
+        );
     }
 }
 

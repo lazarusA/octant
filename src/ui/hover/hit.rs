@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::data::MatrixData;
+use crate::data::render::decimate::{drawn_index, sample_index};
 use crate::plots::PlotType;
 use crate::ui::hover::camera::Camera3D;
 use crate::ui::hover::raycast_sphere::{raycast_sphere, sphere_target_pos};
@@ -19,6 +20,9 @@ pub struct HitResult {
     pub is_valid: bool,
     pub geo_coords: Option<(f32, f32)>,
     pub point_3d: Option<(usize, usize, usize, f32)>,
+    /// The full-resolution cell a thinned mesh draws where it was hit, which
+    /// the fractions alone can miss by up to a stride (`drawn_cell`).
+    pub cell: Option<(usize, usize)>,
 }
 
 impl HitResult {
@@ -29,6 +33,7 @@ impl HitResult {
             is_valid: false,
             geo_coords: None,
             point_3d: None,
+            cell: None,
         }
     }
 
@@ -44,6 +49,7 @@ impl HitResult {
             is_valid,
             geo_coords: geo,
             point_3d: None,
+            cell: None,
         }
     }
 
@@ -54,8 +60,23 @@ impl HitResult {
             is_valid: true,
             geo_coords: None,
             point_3d: Some(point),
+            cell: None,
         }
     }
+}
+
+/// The full-resolution cell the base layer's thinned mesh draws at
+/// `(nx, ny)` on its own grid (`sample_index`); `None` when not thinned.
+pub(crate) fn drawn_cell(app: &OctantApp, nx: f32, ny: f32) -> Option<(usize, usize)> {
+    let base = &app.layers.base;
+    let (mesh, full) = (base.data.mesh.as_ref()?, base.data.matrix.as_ref()?);
+    let m = &mesh.matrix;
+    let (tx, ty) = m.grid.find_cell_from_norm(nx, ny, m.width, m.height);
+    let k = mesh.stride;
+    Some((
+        sample_index(tx, k, full.width),
+        sample_index(ty, k, full.height),
+    ))
 }
 
 fn hit_sphere(
@@ -64,10 +85,14 @@ fn hit_sphere(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> HitResult {
-    if let Some(matrix) = matrix
+    // Marched over the grid the sphere draws (`Layer::mesh_view`).
+    if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos)
     {
-        HitResult::norm_2d(nx, ny, true, geo)
+        HitResult {
+            cell: drawn_cell(app, nx, ny),
+            ..HitResult::norm_2d(nx, ny, true, geo)
+        }
     } else {
         HitResult::invalid()
     }
@@ -79,10 +104,13 @@ fn hit_surface(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> HitResult {
-    if let Some(matrix) = matrix
+    if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
         && let Some((nx, ny, geo)) = raycast_surface(app, matrix, camera, hover_pos)
     {
-        HitResult::norm_2d(nx, ny, true, geo)
+        HitResult {
+            cell: drawn_cell(app, nx, ny),
+            ..HitResult::norm_2d(nx, ny, true, geo)
+        }
     } else {
         HitResult::invalid()
     }
@@ -170,24 +198,28 @@ pub fn resolve_target_screen_pos(
     point_3d_hit: Option<(usize, usize, usize, f32)>,
 ) -> Option<Pos2> {
     match app.effective_canvas_plot_type() {
-        PlotType::Sphere => {
-            let matrix = matrix?;
-            sphere_target_pos(app, matrix, camera, px, py)
-        }
-        PlotType::Surface => {
-            let matrix = matrix?;
-            surface_target_pos(app, matrix, camera, px, py)
+        // On the drawn grid's cell holding `(px, py)`.
+        plot @ (PlotType::Sphere | PlotType::Surface) => {
+            let full = matrix?;
+            let (mesh, k) = app.layers.base.mesh_view(full);
+            let (x, y) = (
+                drawn_index(px, k, full.width),
+                drawn_index(py, k, full.height),
+            );
+            let target = if plot == PlotType::Sphere {
+                sphere_target_pos
+            } else {
+                surface_target_pos
+            };
+            target(app, mesh, camera, x, y)
         }
         PlotType::PointCloud | PlotType::Volume => {
             let sampler = sampler?;
             if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
                 let aspects = app.get_3d_aspect_ratio();
-                volume_target_pos(
-                    camera,
-                    (hit_x, hit_y, hit_z),
-                    (sampler.width, sampler.height, sampler.depth),
-                    aspects,
-                )
+                // On the drawn point (a thinned cloud's grid).
+                let ((x, y), (w, h)) = sampler.drawn_cell(hit_x, hit_y);
+                volume_target_pos(camera, (x, y, hit_z), (w, h, sampler.depth), aspects)
             } else {
                 None
             }

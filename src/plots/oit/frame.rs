@@ -67,7 +67,7 @@ impl Compositor {
                 device,
                 "OIT Composite Pipeline",
                 include_str!("../shaders/oit/composite.wgsl"),
-                &layout,
+                (&layout, false),
                 target_format,
             ),
             layout,

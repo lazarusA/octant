@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 
 use super::expansion::expand_coastline_line_list;
 use super::types::{Coastline3DParams, Coastline3DUniforms};
+use crate::plots::common::bgl_entry;
 
 struct Coastline3DGpuResources {
     coastline_buffer: wgpu::Buffer,
@@ -17,6 +18,8 @@ pub struct Coastline3DRenderer {
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
+    /// Names `data_buffer` to the channel bake.
+    bake_id: crate::plots::BakeId,
     coord_x_buffer: wgpu::Buffer,
     coord_y_buffer: wgpu::Buffer,
     gpu: RwLock<Coastline3DGpuResources>,
@@ -206,6 +209,7 @@ impl Coastline3DRenderer {
             bind_group_layout,
             uniform_buffer,
             data_buffer,
+            bake_id: crate::plots::BakeId::next(),
             coord_x_buffer,
             coord_y_buffer,
             gpu: RwLock::new(Coastline3DGpuResources {
@@ -294,15 +298,20 @@ pub struct Coastline3DCallback {
     pub renderer: Arc<Coastline3DRenderer>,
     pub params: Coastline3DParams,
     pub rect: egui::Rect,
+    /// The plot's composite when the GPU blends it, baked into the heights'
+    /// data as into the plot's (`ChannelRenderer::bake`).
+    pub channels: Option<crate::plots::ChannelDraw>,
+    /// How the grid thins the planes' cells (`Layer::mesh_thinning`).
+    pub thinning: crate::plots::Thinning,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
+        encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         let p = self.params;
@@ -330,6 +339,11 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             0,
             bytemuck::bytes_of(&uniforms),
         );
+        if let Some(channels) = &self.channels {
+            let r = &self.renderer;
+            let target = (r.bake_id, &r.data_buffer, self.thinning);
+            channels.bake_into(device, queue, encoder, target);
+        }
         Vec::new()
     }
 
@@ -355,23 +369,6 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             .saturating_sub(1)
             .clamp(1, 7);
         rpass.draw(0..vertex_count, 0..instances);
-    }
-}
-
-fn bgl_entry(
-    binding: u32,
-    visibility: wgpu::ShaderStages,
-    ty: wgpu::BufferBindingType,
-) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-            ty,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
     }
 }
 

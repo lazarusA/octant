@@ -1,6 +1,7 @@
 //! 3D heightfield surface raycasting and target point projection.
 
 use crate::app::OctantApp;
+use crate::app::layers::Layer;
 use crate::data::MatrixData;
 use crate::ui::hover::camera::{Camera3D, Ray3D, intersect_aabb};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
@@ -23,6 +24,7 @@ pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
 /// `(u, v)` (`get_cell_normalized_bounds_*`; irregular grids reach past
 /// `[0, 1]` by half a cell).
 pub struct SurfaceField<'a> {
+    layer: &'a Layer,
     matrix: &'a MatrixData,
     scale: HeightScale,
     mode: u32,
@@ -32,7 +34,7 @@ pub struct SurfaceField<'a> {
 }
 
 impl<'a> SurfaceField<'a> {
-    pub fn new(app: &OctantApp, matrix: &'a MatrixData) -> Self {
+    pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
         let (w, h) = (matrix.width.max(1), matrix.height.max(1));
         let aspect = if matrix.grid.is_healpix() {
             2.0
@@ -40,6 +42,7 @@ impl<'a> SurfaceField<'a> {
             (w as f32 / h as f32).max(0.1)
         };
         Self {
+            layer: &app.layers.base,
             matrix,
             scale: height_scale(app, false),
             mode: app.plot_configs.mesh.surface_mode,
@@ -49,7 +52,7 @@ impl<'a> SurfaceField<'a> {
     }
 
     fn height_at(&self, px: usize, py: usize) -> f32 {
-        let val = value_at(self.matrix, px, py);
+        let val = value_at(self.layer, self.matrix, px, py);
         surface_height(val, &self.scale, self.mode, self.disp)
     }
 

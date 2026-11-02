@@ -228,9 +228,9 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
-        let Some(volume) = &mut layer.data.volume else {
+        if layer.data.volume.is_none() {
             return;
-        };
+        }
         let mut emptied = false;
         for (slot, step) in w.planes() {
             let Some(held) = layer.data.ring.steps.get_mut(slot) else {
@@ -238,10 +238,7 @@ impl OctantApp {
             };
             if held.is_some_and(|h| h != step) {
                 *held = None;
-                let range = volume.plane_range(slot, 1);
-                if let Some(plane) = volume.values.get_mut(range) {
-                    plane.fill(f32::NAN);
-                }
+                layer.data.empty_volume_plane(slot);
                 layer.renderers.mark_volume_dirty(slot..slot + 1);
                 emptied = true;
             }

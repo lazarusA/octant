@@ -1,79 +1,12 @@
 //! 3D volumetric raymarching for Volume and PointCloud plots.
 
 use crate::app::OctantApp;
-use crate::data::MatrixData;
 use crate::plots::PlotType;
 use crate::ui::hover::camera::{Camera3D, Ray3D, intersect_aabb};
+pub use crate::ui::hover::volume_sampler::VolumeSampler;
 use egui::Pos2;
 
-/// Helper for volumetric sampling, circular dataset shifts, and 3D ray marching.
-pub struct VolumeSampler<'a> {
-    pub width: usize,
-    pub height: usize,
-    pub depth: usize,
-    pub values: &'a [f32],
-    pub shift_x: usize,
-    pub shift_y: usize,
-    pub shift_z: usize,
-}
-
-impl<'a> VolumeSampler<'a> {
-    pub fn from_app(app: &'a OctantApp, matrix: Option<&'a MatrixData>) -> Option<Self> {
-        let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
-        if let Some(v) = &app.layers.base.data.volume {
-            if v.width == 0 || v.height == 0 || v.depth == 0 || v.values.is_empty() {
-                return None;
-            }
-            Some(Self {
-                width: v.width,
-                height: v.height,
-                depth: v.depth,
-                values: &v.values,
-                shift_x: shift_x as usize,
-                shift_y: shift_y as usize,
-                shift_z: shift_z as usize,
-            })
-        } else if let Some(m) = matrix {
-            if m.width == 0 || m.height == 0 || m.values.is_empty() {
-                return None;
-            }
-            Some(Self {
-                width: m.width,
-                height: m.height,
-                depth: 1,
-                values: &m.values,
-                shift_x: shift_x as usize,
-                shift_y: shift_y as usize,
-                shift_z: shift_z as usize,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn sample_cell(&self, cx: usize, cy: usize, cz: usize) -> f32 {
-        let shifted_x = (cx + self.shift_x) % self.width;
-        let shifted_y = (cy + self.shift_y) % self.height;
-        let shifted_z = (cz + self.shift_z) % self.depth;
-        let idx = shifted_z * (self.width * self.height) + shifted_y * self.width + shifted_x;
-        self.values.get(idx).copied().unwrap_or(f32::NAN)
-    }
-
-    pub fn is_visible(&self, app: &OctantApp, val: f32) -> bool {
-        let is_nan = val.is_nan() || val.abs() > 1e30;
-        if is_nan {
-            app.layers.base.color.use_nan_color
-        } else if app.layers.base.composite.enabled {
-            (val.to_bits() & 0x00FF_FFFF) != 0
-        } else {
-            let in_low =
-                app.layers.base.color.use_lowclip || val >= app.layers.base.color.range_min;
-            let in_high =
-                app.layers.base.color.use_highclip || val <= app.layers.base.color.range_max;
-            in_low && in_high
-        }
-    }
-
+impl VolumeSampler<'_> {
     /// Marches a ray through the 3D dataset.
     pub fn march_ray(
         &self,
@@ -117,6 +50,8 @@ impl<'a> VolumeSampler<'a> {
             && canvas_plot_type == PlotType::Volume
             && app.plot_configs.volume.algorithm == 4;
 
+        // Rays pick the cells of the grid drawn (a thinned cloud's).
+        let (_, (gw, gh)) = self.drawn_cell(0, 0);
         for i in 0..num_steps {
             let t = t_start + (i as f32 + 0.5) * dt;
             let px_world = ray.origin[0] + t * ray.dir[0];
@@ -137,15 +72,16 @@ impl<'a> VolumeSampler<'a> {
 
             if (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v) && (0.0..1.0).contains(&w) {
                 let cx = if is_half_scale {
-                    ((u * (self.width - 1) as f32).round() as usize).min(self.width - 1)
+                    ((u * (gw - 1) as f32).round() as usize).min(gw - 1)
                 } else {
-                    ((u * self.width as f32).floor() as usize).min(self.width - 1)
+                    ((u * gw as f32).floor() as usize).min(gw - 1)
                 };
                 let cy = if is_half_scale {
-                    ((v * (self.height - 1) as f32).round() as usize).min(self.height - 1)
+                    ((v * (gh - 1) as f32).round() as usize).min(gh - 1)
                 } else {
-                    ((v * self.height as f32).floor() as usize).min(self.height - 1)
+                    ((v * gh as f32).floor() as usize).min(gh - 1)
                 };
+                let (cx, cy) = self.drawn_voxel(cx, cy);
                 let cz = if is_half_scale {
                     ((w * (self.depth - 1) as f32).round() as usize).min(self.depth - 1)
                 } else {

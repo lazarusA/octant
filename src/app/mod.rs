@@ -20,6 +20,8 @@ pub mod canvas;
 mod channel_blend_bench_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod channel_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod channel_points_tests;
 #[cfg(test)]
 mod composite_defaults_tests;
 pub mod controllers;
@@ -29,6 +31,8 @@ mod export_lifecycle;
 mod floating;
 #[cfg(test)]
 mod floating_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod frame_cache_bench_tests;
 mod landing;
 pub mod layers;
 pub(crate) mod multiscale;
@@ -51,13 +55,23 @@ pub mod overlays;
 mod overlays_tests;
 mod panels;
 mod pipeline;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod point_cloud_bench_tests;
 #[cfg(test)]
 mod pyramid_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod rethin_bench_tests;
 pub mod sources;
 mod state;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod surface_blend_bench_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod surface_frame_bench_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod volume_blend_bench_tests;
 pub(crate) mod window_title;
 
 pub use layers::VariableSelection;
@@ -66,4 +80,4 @@ pub(crate) use pipeline::needs_pyramid;
 pub use state::line_profile::LineLayout;
 pub use state::line_series::{LineColoring, series_line_at, series_t};
 pub use state::plate::{PlateState, WellFields};
-pub use state::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};
+pub use state::{AnimationRole, DimConfig, MeshDetail, OctantApp, SpatialRole, StoreKind};

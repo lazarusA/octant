@@ -44,6 +44,14 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::FlipHeightsHover => {
             "Найбільше значення лежить пласко, а менші піднімаються над ним"
         }
+        PlotOptionsKey::MeshDetail => "Деталізація",
+        PlotOptionsKey::MeshDetailHover => {
+            "Комірки, що малюються на великих сітках: чим більше деталей, тим повільніше; підказка завжди читає кожну комірку; режим Кожна комірка обмежений тим, що вміщує один буфер GPU"
+        }
+        PlotOptionsKey::DetailScreen => "Екран",
+        PlotOptionsKey::DetailDouble => "2x екран",
+        PlotOptionsKey::DetailQuadruple => "4x екран",
+        PlotOptionsKey::DetailFull => "Кожна комірка",
         PlotOptionsKey::Size => "Розмір",
     })
 }

@@ -33,7 +33,7 @@ fn mesh_and_point_cloud_pipelines_validate() {
 }
 
 /// Every plot shader, by name.
-const SHADERS: [(&str, &str); 13] = [
+const SHADERS: [(&str, &str); 16] = [
     (
         "sphere",
         crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl")),
@@ -69,6 +69,16 @@ const SHADERS: [(&str, &str); 13] = [
             include_str!("shaders/oit/composite.wgsl")
         ),
     ),
+    (
+        "frame_cache_blit",
+        concat!(
+            include_str!("shaders/common/fullscreen.wgsl"),
+            "\n",
+            include_str!("shaders/frame_cache_blit.wgsl")
+        ),
+    ),
+    ("channel_bake", super::channel_bake::SHADER),
+    ("channel_bake_volume", super::channel_bake_volume::SHADER),
     (
         "line",
         crate::assemble_plot_shader!(include_str!("shaders/line.wgsl")),
@@ -167,5 +177,55 @@ fn uniform_layouts_match_wgsl() {
     ];
     for (shader, name, size) in blocks {
         assert_eq!(wgsl_size(shader, name), size, "{shader} {name}");
+    }
+}
+
+/// Every entry point of every plot shader compiles for wgpu's GL backend
+/// (GLSL ES 3.10, the first with storage buffers and compute), which
+/// eframe falls back to without Vulkan or Metal: GLSL lacks some WGSL
+/// (`textureLoad` of a depth texture), which only this would show.
+#[test]
+fn plot_shaders_compile_for_gl() {
+    use naga::back::glsl;
+    let options = glsl::Options {
+        version: glsl::Version::Embedded {
+            version: 310,
+            is_webgl: false,
+        },
+        ..Default::default()
+    };
+    for (name, source) in SHADERS {
+        let module = naga::front::wgsl::parse_str(source).expect("shader parses");
+        let info = naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::all(),
+        )
+        .validate(&module)
+        .expect("shader validates");
+        // Overrides take their defaults, as the volume's `ALGORITHM` does.
+        let constants = naga::back::PipelineConstants::default();
+        let (module, info) =
+            naga::back::pipeline_constants::process_overrides(&module, &info, None, &constants)
+                .expect("overrides resolve");
+        for ep in &module.entry_points {
+            let pipeline = glsl::PipelineOptions {
+                shader_stage: ep.stage,
+                entry_point: ep.name.clone(),
+                multiview: None,
+            };
+            let mut out = String::new();
+            let written = glsl::Writer::new(
+                &mut out,
+                &module,
+                &info,
+                &options,
+                &pipeline,
+                naga::proc::BoundsCheckPolicies::default(),
+            )
+            .and_then(|mut writer| writer.write().map(|_| ()));
+            if let Err(e) = written {
+                panic!("'{name}' {} does not compile for GL: {e}", ep.name);
+            }
+        }
     }
 }

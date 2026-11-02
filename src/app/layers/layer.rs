@@ -4,6 +4,7 @@ use super::{
     Alignment, ColorStyle, ColorbarPlacement, CompositeStyle, LayerData, LayerId, LayerRenderers,
     LoadState, Slot, Source, VariableSelection,
 };
+use crate::data::MatrixData;
 use crate::plots::VolumeEncoding;
 
 pub struct Layer {
@@ -98,12 +99,40 @@ impl Layer {
         self.data.detail.clear();
         self.renderers.sphere = None;
         self.renderers.surface = None;
+        self.data.mesh = None;
         self.renderers.line = None;
+    }
+
+    /// How this layer's surface and sphere grid thins its 2D data, for the
+    /// bake of a composite the GPU blends.
+    pub fn mesh_thinning(&self) -> crate::plots::Thinning {
+        let (Some(mesh), Some(full)) = (&self.data.mesh, &self.data.matrix) else {
+            return crate::plots::Thinning::NONE;
+        };
+        let size = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        crate::plots::Thinning {
+            stride: size(mesh.stride),
+            width: size(mesh.matrix.width),
+            height: size(mesh.matrix.height),
+            full_width: size(full.width),
+            full_height: size(full.height),
+        }
+    }
+
+    /// The grid this layer's surface and sphere draw for its 2D data
+    /// `full`, and its stride over `full` (1 when it is `full`).
+    pub fn mesh_view<'a>(&'a self, full: &'a MatrixData) -> (&'a MatrixData, usize) {
+        match &self.data.mesh {
+            Some(mesh) => (&mesh.matrix, mesh.stride),
+            None => (full, 1),
+        }
     }
 
     /// Invalidates the 3D volume and its renderers.
     pub fn clear_3d(&mut self) {
         self.data.volume = None;
+        self.data.channel_volume = None;
+        self.data.points = None;
         self.data.touch_volume();
         self.renderers.volume = None;
         self.renderers.point_cloud = None;

@@ -51,8 +51,6 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     let total_2d_elements = window_2d_elements(&app.selected, &window);
     let large_2d = if total_2d_elements > crate::plots::limits::max_storage_elements() {
         Some((Icon::Bolt, IconTone::Info, K::LargeSelectionPyramid))
-    } else if total_2d_elements > crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-        Some((Icon::Info, IconTone::Warning, K::LargeSelectionNoMeshes))
     } else {
         None
     };

@@ -112,8 +112,9 @@ impl OctantApp {
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
             point_size: self.plot_configs.point_cloud.point_size,
-            width: ctx.width,
-            height: ctx.height,
+            // A thinned cloud's own grid (`PointGrid`).
+            width: layer.data.points.map_or(ctx.width, |g| g.width as u32),
+            height: layer.data.points.map_or(ctx.height, |g| g.height as u32),
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
@@ -271,53 +272,7 @@ impl OctantApp {
                 }
             }
 
-            if canvas_plot_type != PlotType::Heatmap
-                && let Some(renderer) = self.coastline_3d_renderer.as_ref().map(Arc::clone)
-            {
-                let sphere = canvas_plot_type == PlotType::Sphere;
-                // Coastlines follow the base layer's grid.
-                let mesh_params = self.get_mesh_3d_uniform_params(
-                    &self.layers.base,
-                    sphere,
-                    crate::plots::common::compute_aspect_ratio(&plot_rect),
-                );
-                let (lon_bounds, lat_bounds) = self.coastline_bounds_3d(sphere, &mesh_params);
-                let line_color = self.coastline_color.unwrap_or_else(|| {
-                    if ui.visuals().dark_mode {
-                        [1.0, 1.0, 1.0, 0.75]
-                    } else {
-                        [0.15, 0.15, 0.15, 0.85]
-                    }
-                });
-                let cb = eframe::egui_wgpu::Callback::new_paint_callback(
-                    plot_rect,
-                    crate::plots::Coastline3DCallback {
-                        renderer,
-                        params: crate::plots::Coastline3DParams {
-                            camera: mesh_params.camera,
-                            displacement_strength: mesh_params.displacement_strength,
-                            plot_kind: u32::from(sphere),
-                            plot_mode: mesh_params.mode,
-                            line_width: self.coastline_line_width,
-                            coord_mode: mesh_params.coord_mode,
-                            crop_to_domain: if self.coastline_crop_to_data_domain {
-                                1
-                            } else {
-                                0
-                            },
-                            lon_bounds,
-                            lat_bounds,
-                            color: line_color,
-                            color_range: [mesh_params.color.cmin, mesh_params.color.cmax],
-                            flip_height: mesh_params.flip_height,
-                            composite: mesh_params.color.colormap
-                                == crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
-                        },
-                        rect: plot_rect,
-                    },
-                );
-                ui.painter().add(cb);
-            }
+            self.paint_coastlines_3d(ui, plot_rect, canvas_plot_type);
         }
     }
 }
