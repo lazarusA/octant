@@ -13,6 +13,7 @@ fn built_with(n: usize, resampled: bool) -> Option<OctantApp> {
         enable_pyramid_resampling: resampled,
         ..Default::default()
     };
+    app.plot_configs.mesh.detail = crate::app::MeshDetail::Screen;
     app.layout.canvas_px = [512, 512];
     let values = (0..n * n).map(|i| i as f32).collect();
     let data = MatrixData::new(n, n, values, 0.0, (n * n) as f32, "m".into(), 1);

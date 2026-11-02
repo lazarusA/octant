@@ -19,6 +19,7 @@ fn built() -> Option<OctantApp> {
         ..Default::default()
     };
     app.selected.plot_type = PlotType::PointCloud;
+    app.plot_configs.mesh.detail = crate::app::MeshDetail::Screen;
     app.layout.canvas_px = [512, 512];
     let (w, h, d) = SIZE;
     let values = (0..w * h * d).map(|i| i as f32).collect();

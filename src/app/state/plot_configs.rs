@@ -111,11 +111,11 @@ impl Default for MeshPlotConfig {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MeshDetail {
     /// Half the canvas's pixels: more cells would mostly be under a pixel.
-    #[default]
     Screen,
     Double,
     Quadruple,
     /// Every cell that fits one storage buffer.
+    #[default]
     Full,
 }
 
