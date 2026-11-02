@@ -32,6 +32,7 @@ fn rethin_timed() {
             ..Default::default()
         };
         app.selected.plot_type = PlotType::Surface;
+        app.plot_configs.mesh.detail = crate::app::MeshDetail::Screen;
         app.layout.canvas_px = CANVASES[0];
         let values: Vec<f32> = (0..w * h).map(|i| (i % 1000) as f32).collect();
         let matrix = MatrixData::new(w, h, values, 0.0, 999.0, "m".into(), 1);
