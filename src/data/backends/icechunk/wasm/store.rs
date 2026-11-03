@@ -128,11 +128,4 @@ impl BlockStore for WasmIcechunkBlockStore {
     ) -> Result<OctantBlock, BlockStoreError> {
         self.inner.fetch_block_with_progress(request, on_progress)
     }
-
-    fn fetch_blocks(
-        &self,
-        requests: &[SliceRequest],
-    ) -> Result<crate::data::blocks::BlockResult, BlockStoreError> {
-        self.inner.fetch_blocks(requests)
-    }
 }

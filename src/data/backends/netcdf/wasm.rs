@@ -1,6 +1,6 @@
 //! WebAssembly fallback stub for NetCDF backend.
 
-use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
@@ -36,10 +36,6 @@ impl BlockStore for NetCdfBlockStore {
         _request: &SliceRequest,
         _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
-        Err("NetCDF is not supported on WASM".into())
-    }
-
-    fn fetch_blocks(&self, _requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
         Err("NetCDF is not supported on WASM".into())
     }
 }

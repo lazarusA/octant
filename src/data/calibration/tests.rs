@@ -64,3 +64,23 @@ fn test_data_calibration_passthrough_when_empty() {
     assert!(!cal.has_transformation());
     assert_eq!(cal.transform(42.5), 42.5f32);
 }
+
+/// A zero fill (or GeoTIFF nodata) masks only zero, not every value near it.
+#[test]
+fn zero_fill_keeps_tiny_values() {
+    let cal = DataCalibration {
+        fill_value: Some(0.0),
+        ..Default::default()
+    };
+    assert!(cal.transform_f64(0.0).is_nan(), "0 is the fill value");
+    assert_eq!(cal.transform_f64(1e-6), 1e-6);
+    let mut slice = [0.0f32, -0.0, 1e-6, -5e-6];
+    cal.transform_slice_in_place(&mut slice);
+    assert!(slice[0].is_nan() && slice[1].is_nan(), "{slice:?}");
+    assert_eq!(&slice[2..], &[1e-6, -5e-6]);
+
+    use crate::data::backends::geotiff::blit::is_nodata;
+    assert!(is_nodata(0.0, Some(0.0)));
+    assert!(!is_nodata(5e-7, Some(0.0)));
+    assert!(is_nodata(-9999.0, Some(-9999.0)));
+}

@@ -11,7 +11,7 @@ use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::quantization::{self, PixelScale, Quantization};
 use super::storage::open_raw_array;
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
-use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::{MetaCache, MetaReader};
 use crate::data::slice_request::SliceRequest;
@@ -212,17 +212,5 @@ impl BlockStore for GenericZarrBlockStore {
             request,
             on_progress,
         )
-    }
-
-    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        #[cfg(not(target_arch = "wasm32"))]
-        let blocks: Result<_, BlockStoreError> = {
-            use rayon::prelude::*;
-            requests.par_iter().map(|r| self.fetch_block(r)).collect()
-        };
-        #[cfg(target_arch = "wasm32")]
-        let blocks: Result<_, BlockStoreError> =
-            requests.iter().map(|r| self.fetch_block(r)).collect();
-        blocks.map(BlockResult::new)
     }
 }

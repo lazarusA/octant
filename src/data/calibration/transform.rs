@@ -24,7 +24,7 @@ impl DataCalibration {
     #[inline]
     pub fn transform_f64(&self, val: f64) -> f64 {
         if let Some(fv) = self.fill_value
-            && ((val - fv).abs() <= 1e-5 * fv.abs().max(1.0) || (val.is_nan() && fv.is_nan()))
+            && ((val - fv).abs() <= 1e-5 * fv.abs() || (val.is_nan() && fv.is_nan()))
         {
             return f64::NAN;
         }
@@ -68,7 +68,7 @@ impl DataCalibration {
         for elem in slice.iter_mut() {
             let val = *elem;
             if let Some(fv) = fill
-                && ((val - fv).abs() <= 1e-5 * fv.abs().max(1.0) || (val.is_nan() && fv.is_nan()))
+                && ((val - fv).abs() <= 1e-5 * fv.abs() || (val.is_nan() && fv.is_nan()))
             {
                 *elem = f32::NAN;
                 continue;

@@ -237,7 +237,7 @@ pub fn is_nodata(val: f32, nodata: Option<f64>) -> bool {
         if nd_f32.is_nan() || val.to_bits() == nd_f32.to_bits() {
             true
         } else {
-            (val - nd_f32).abs() <= (nd_f32.abs() * 1e-5).max(1e-6)
+            (val - nd_f32).abs() <= nd_f32.abs() * 1e-5
         }
     } else {
         false

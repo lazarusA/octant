@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::Sender;
 
 use super::cache::BlockCacheKey;
 use super::prefetch::PrefetchResult;
@@ -11,7 +11,7 @@ use crate::data::octant_block::OctantBlock;
 
 pub(super) struct Task {
     pub(super) key: BlockCacheKey,
-    pub(super) tx: SyncSender<PrefetchResult>,
+    pub(super) tx: Sender<PrefetchResult>,
     pub(super) completed: Arc<AtomicU64>,
     pub(super) aborted: Arc<AtomicBool>,
     pub(super) active: Arc<AtomicUsize>,

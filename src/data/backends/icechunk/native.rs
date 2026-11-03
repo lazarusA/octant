@@ -5,7 +5,7 @@ use std::error::Error;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use crate::data::backends::zarr::GenericZarrBlockStore;
-use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
@@ -160,9 +160,5 @@ impl BlockStore for IcechunkBlockStore {
         on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         self.inner.fetch_block_with_progress(request, on_progress)
-    }
-
-    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        self.inner.fetch_blocks(requests)
     }
 }

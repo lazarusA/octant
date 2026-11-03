@@ -137,3 +137,35 @@ fn a_larger_canvas_thins_less() {
         Some(1024)
     );
 }
+
+/// Overlays are never drawn as meshes, so they build none.
+#[test]
+fn overlays_build_no_meshes() {
+    use crate::app::test_support::{make_resident, memory_app, poll_until, selection_of};
+    use crate::data::SliceRequest;
+    let Some(rs) = render_state() else {
+        return;
+    };
+    let (mut app, meta) = memory_app();
+    app.wgpu_render_state = Some(rs);
+    make_resident(&mut app, &SliceRequest::full_range("t2m", &[3, 5, 4]));
+    make_resident(&mut app, &SliceRequest::full_range("sst", &[3, 5, 4]));
+    app.selected = selection_of(&mut app, &meta, "t2m");
+    app.plot_selection();
+    let sst = meta
+        .variables
+        .iter()
+        .position(|v| v.name.trim_matches('/') == "sst");
+    let id = app.add_overlay(sst.expect("sst")).expect("overlay");
+    poll_until(&mut app, |app| {
+        app.layers.get(id).is_some_and(|l| l.data.matrix.is_some())
+    });
+    let base = &app.layers.base.renderers;
+    assert!(
+        base.surface.is_some() && base.sphere.is_some(),
+        "the base layer has meshes"
+    );
+    let overlay = &app.layers.get(id).expect("overlay").renderers;
+    assert!(overlay.heatmap.is_some(), "the overlay draws");
+    assert!(overlay.surface.is_none() && overlay.sphere.is_none());
+}

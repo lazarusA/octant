@@ -102,11 +102,11 @@ fn sync_renderers(
         &rs.device,
         rs.target_format,
     );
-    // Label images are drawn only as heatmaps.
+    // Label images are drawn only as heatmaps, and overlays never as meshes.
     // HEALPix grids are never thinned: their meshes take every cell.
     let cells = data.width.saturating_mul(data.height);
     let fits = !data.grid.is_healpix() || cells <= MAX_GPU_STORAGE_BUFFER_ELEMENTS;
-    let has_3d = layer.labels().is_none() && fits;
+    let has_3d = base.is_some() && layer.labels().is_none() && fits;
     let stride = stride_for(data.width, data.height, mesh_budget);
     let thinned = has_3d.then(|| data.decimated(stride)).flatten();
     let mesh = thinned.as_ref().unwrap_or(data);
