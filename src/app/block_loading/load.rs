@@ -76,6 +76,7 @@ impl OctantApp {
         };
         layer.load.block_key = block_request.as_ref().map(BlockRequest::cache_key);
         layer.load.slice_request = Some(slice_request);
+        layer.load.requested = None;
 
         let source_id = &layer_request.source_id;
         if self.show_resident_block(id, source_id, anim_dim, step) {
@@ -90,8 +91,10 @@ impl OctantApp {
         // Cache MISS: request the current chunk; the lookahead follows once it
         // arrives (`poll_block_prefetch_results`).
         // Playback may move on meanwhile; the block is shown at this step.
+        let requested = (id == LayerId::BASE).then(|| self.selected.clone());
         if let Some(layer) = self.layers.get_mut(id) {
             layer.load.pending_target_step = Some(step);
+            layer.load.requested = requested;
         }
         self.status_message = format!(
             "[block cache] Downloading window for '{}'...",
