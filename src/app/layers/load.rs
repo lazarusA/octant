@@ -1,5 +1,6 @@
 //! A layer's pending block request.
 
+use super::VariableSelection;
 use crate::data::{BlockCacheKey, SliceRequest};
 
 #[derive(Debug, Clone, Default)]
@@ -9,6 +10,9 @@ pub struct LoadState {
     /// The latest requested view: blocks of an older selection, variable or
     /// plot layout are not projected into it.
     pub slice_request: Option<SliceRequest>,
+    /// The base layer's staged selection its pending block was requested
+    /// from: the plot takes it on arrival, whatever is staged by then.
+    pub requested: Option<VariableSelection>,
     /// Step the requested block is shown at when it arrives (playback may
     /// move on meanwhile).
     pub pending_target_step: Option<usize>,

@@ -26,15 +26,21 @@ impl OctantApp {
         }
     }
 
-    /// Settles layer `id`'s request for `block`: the base layer's staged
-    /// selection becomes the plotted one, and the view moves to the step the
-    /// request was made at. Whether it moved to that step.
+    /// Settles layer `id`'s request for `block`: the base layer plots the
+    /// selection it was requested from (another variable staged since stays
+    /// staged), and the view moves to the step the request was made at.
+    /// Whether it moved to that step.
     pub(super) fn accept_requested_block(&mut self, id: LayerId, block: &OctantBlock) -> bool {
-        if let Some(layer) = self.layers.get_mut(id) {
+        let requested = self.layers.get_mut(id).and_then(|layer| {
             layer.load.block_key = None;
-        }
+            layer.load.requested.take()
+        });
         if id == LayerId::BASE {
+            let staged = requested.map(|r| std::mem::replace(&mut self.selected, r));
             self.sync_plotted_state_for(Some(&block.variable_name));
+            if let Some(staged) = staged {
+                self.selected = staged;
+            }
         }
         let Some(layer) = self.layers.get_mut(id) else {
             return false;

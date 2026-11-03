@@ -1,6 +1,8 @@
 //! Loading path through `DatasetManager`/`BlockCache`/`BlockPrefetcher`.
 
 mod arrival;
+#[cfg(test)]
+mod arrival_tests;
 pub(crate) mod block_axes;
 #[cfg(test)]
 mod block_axes_tests;

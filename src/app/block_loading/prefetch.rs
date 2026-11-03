@@ -40,24 +40,17 @@ impl OctantApp {
         }
 
         let req = BlockRequest::new(store_handle, SliceRequest::new(&var_info.name, selections));
+        // The window is the shown selection's: the base layer keeps it on arrival.
+        let requested = (id == LayerId::BASE).then(|| {
+            let shown = self.layers.base.selection();
+            crate::app::multiscale::at_base(shown).unwrap_or_else(|| shown.clone())
+        });
         if let Some(layer) = self.layers.get_mut(id) {
             layer.load.block_key = Some(req.cache_key());
             layer.load.pending_target_step = Some(step);
+            layer.load.requested = requested;
         }
         self.block_prefetcher.request_now(req, &self.block_cache);
-    }
-
-    /// Shows `target_step` when the base layer holds it (loading the animated
-    /// overlays at it too), else prefetches every drawn layer's window there.
-    pub fn request_step_or_load(&mut self, target_step: usize) {
-        if self.layer_step_resident(LayerId::BASE, target_step) {
-            self.playback.current_timestep = target_step;
-            self.load_step_blocks();
-        } else {
-            for id in self.layers.drawn_ids() {
-                self.prefetch_layer_window(id, target_step);
-            }
-        }
     }
 
     /// Progressively prefetches lookahead block windows along every drawn
