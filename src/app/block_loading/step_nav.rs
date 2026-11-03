@@ -6,9 +6,10 @@ use crate::app::layers::LayerId;
 impl OctantApp {
     /// Shows `target_step` when the base layer holds it (loading the animated
     /// overlays at it too), else prefetches every drawn layer's window there
-    /// (the shown selections'), shown at that step when it arrives. While
-    /// another variable is staged, or a new plot's block is loading, it steps
-    /// the plotted view, as playback does (`with_plotted_selection`).
+    /// (the shown selections'), shown at that step when it arrives, unless a
+    /// new plot's block is loading. While another variable is staged, or a
+    /// new plot's block is loading, it steps the plotted view, as playback
+    /// does (`with_plotted_selection`).
     pub fn request_step_or_load(&mut self, target_step: usize) {
         if self.layer_step_resident(LayerId::BASE, target_step) {
             let show = |app: &mut Self| {
@@ -20,7 +21,9 @@ impl OctantApp {
             } else {
                 show(self);
             }
-        } else {
+        } else if !self.new_plot_pending() {
+            // A new plot's block keeps the base layer's request: it shows
+            // when it arrives, and only then do steps fetch.
             for id in self.layers.drawn_ids() {
                 self.prefetch_layer_window(id, target_step);
             }

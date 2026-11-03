@@ -50,6 +50,35 @@ impl OctantApp {
         request_pending || self.is_exploring_unplotted_variable()
     }
 
+    /// Whether the base layer waits on the block of a new plot: its latest
+    /// request (Plot's) is not the shown selection's, or nothing is plotted yet.
+    pub(crate) fn new_plot_pending(&self) -> bool {
+        let load = &self.layers.base.load;
+        let (Some(latest), Some(key)) = (&load.slice_request, &load.block_key) else {
+            return false;
+        };
+        if !self.block_prefetcher.is_pending(key) {
+            return false;
+        }
+        let shown = self
+            .layers
+            .base
+            .selection()
+            .metadata
+            .is_some()
+            .then(|| self.shown_layer_request(LayerId::BASE))
+            .flatten();
+        shown.is_none_or(|shown| {
+            shown.source_id != key.source_id
+                || shown.request.variable != latest.variable
+                || !crate::data::blocks::key::selections_match_except_anim(
+                    &shown.request.selections,
+                    &latest.selections,
+                    shown.anim_dim,
+                )
+        })
+    }
+
     /// Whether a block with cache key `key` belongs to layer `id`'s latest
     /// requested view (any step): blocks of an older selection, variable or
     /// plot layout must not be projected into it.

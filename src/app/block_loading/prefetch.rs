@@ -41,10 +41,7 @@ impl OctantApp {
 
         let req = BlockRequest::new(store_handle, SliceRequest::new(&var_info.name, selections));
         // The window is the shown selection's: the base layer keeps it on arrival.
-        let requested = (id == LayerId::BASE).then(|| {
-            let shown = self.layers.base.selection();
-            crate::app::multiscale::at_base(shown).unwrap_or_else(|| shown.clone())
-        });
+        let requested = (id == LayerId::BASE).then(|| self.layers.base.selection().clone());
         if let Some(layer) = self.layers.get_mut(id) {
             layer.load.block_key = Some(req.cache_key());
             layer.load.pending_target_step = Some(step);

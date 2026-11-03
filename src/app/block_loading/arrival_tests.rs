@@ -85,3 +85,39 @@ fn a_selection_left_by_a_failed_fetch_is_never_plotted() {
     poll_until(&mut app, |app| app.playback.current_timestep == 1);
     assert_eq!(plotted_name(&app).as_deref(), Some("t2m"));
 }
+
+#[test]
+fn a_step_pressed_while_a_new_plot_loads_keeps_the_new_plot() {
+    let (mut app, meta) = t2m_fetched();
+    app.selected = selection_of(&mut app, &meta, "sst");
+    app.plot_selection();
+    app.step_next();
+    poll_until(&mut app, |app| plotted_name(app).as_deref() == Some("sst"));
+    assert!(app.layers.base.data.matrix.is_some());
+}
+
+#[test]
+fn a_multiscale_plot_steps_on_its_level_while_another_variable_is_staged() {
+    let (mut app, meta) = crate::app::test_support::pyramid_app();
+    app.layout.canvas_px = [20, 20];
+    app.selected = selection_of(&mut app, &meta, "0/t2m");
+    app.plot_selection();
+    poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
+    let before = app.plotted().clone();
+    assert_eq!(plotted_name(&app).as_deref(), Some("2/t2m"));
+    app.selected = selection_of(&mut app, &meta, "0/sst");
+    app.step_next();
+    poll_until(&mut app, |app| app.playback.current_timestep == 1);
+    assert_eq!(plotted_name(&app).as_deref(), Some("2/t2m"));
+    assert_eq!(app.plotted().dim_ranges[1..], before.dim_ranges[1..]);
+    assert_eq!(name(&app.selected).as_deref(), Some("0/sst"));
+}
+
+#[test]
+fn a_step_pressed_while_a_new_range_loads_keeps_the_new_range() {
+    let (mut app, _) = t2m_fetched();
+    app.selected.dim_ranges[1] = (1, 3);
+    app.plot_selection();
+    app.step_next();
+    poll_until(&mut app, |app| app.plotted().dim_ranges[1] == (1, 3));
+}
