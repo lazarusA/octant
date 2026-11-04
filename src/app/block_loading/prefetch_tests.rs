@@ -181,3 +181,15 @@ fn the_abort_button_keeps_the_lookahead_stopped() {
     assert_eq!(resident(&app), vec![0]);
     assert_eq!(app.block_prefetcher.pending_count(), 0);
 }
+
+#[test]
+fn plotting_after_the_abort_button_resumes_the_lookahead() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    app.abort_current_fetch();
+    // The shown step (a cache hit) while the aborted fetches hold every worker.
+    app.plot_selection();
+    poll_until(&mut app, "the lookahead stalled", |app| {
+        resident(app).len() > 1
+    });
+}

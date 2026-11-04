@@ -41,6 +41,8 @@ pub struct BlockPrefetcher {
     aborted: Arc<AtomicBool>,
     /// Set when an aborted task frees its worker, which sends no result.
     freed: Arc<AtomicBool>,
+    /// `freed` ignored: after the Abort button, until the next abort (Plot).
+    quiet: bool,
     /// The running fetches started while aborted ones still ran, whose
     /// reads count into `progress` too: no figure until they all end.
     strays: bool,
@@ -69,6 +71,7 @@ impl BlockPrefetcher {
             max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
             aborted: Arc::new(AtomicBool::new(false)),
             freed: Arc::new(AtomicBool::new(false)),
+            quiet: false,
             strays: false,
         }
     }
@@ -85,12 +88,12 @@ impl BlockPrefetcher {
 
     /// Whether an aborted task freed its worker since the last call.
     pub fn take_freed(&self) -> bool {
-        self.freed.swap(false, Ordering::AcqRel)
+        self.freed.swap(false, Ordering::AcqRel) && !self.quiet
     }
 
-    /// Forgets the workers the running aborted tasks will free.
+    /// Ignores the workers aborted tasks free until the next abort.
     pub fn ignore_strays(&mut self) {
-        self.freed = Arc::new(AtomicBool::new(false));
+        self.quiet = true;
     }
 
     /// Schedules one request even when every worker is busy: the block a view
@@ -238,6 +241,7 @@ impl BlockPrefetcher {
         self.aborted = Arc::new(AtomicBool::new(false));
         let (tx, rx) = channel();
         (self.tx, self.rx) = (tx, rx);
+        self.quiet = false;
         self.pending.clear();
         super::progress::reset();
         self.failed.clear();
