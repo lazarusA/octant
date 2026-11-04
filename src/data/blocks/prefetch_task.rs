@@ -14,6 +14,7 @@ pub(super) struct Task {
     pub(super) tx: Sender<PrefetchResult>,
     pub(super) aborted: Arc<AtomicBool>,
     pub(super) active: Arc<AtomicUsize>,
+    pub(super) freed: Arc<AtomicBool>,
 }
 
 impl Task {
@@ -23,6 +24,7 @@ impl Task {
         let aborted = self.aborted.load(Ordering::Relaxed);
         if aborted {
             self.active.fetch_sub(1, Ordering::Relaxed);
+            self.freed.store(true, Ordering::Relaxed);
         }
         aborted
     }
@@ -38,6 +40,9 @@ impl Task {
     /// Releases the worker slot and sends `result`.
     pub(super) fn finish(self, result: Result<OctantBlock, String>) {
         self.active.fetch_sub(1, Ordering::Relaxed);
+        if self.aborted.load(Ordering::Relaxed) {
+            self.freed.store(true, Ordering::Relaxed);
+        }
         let _ = self.tx.send(PrefetchResult {
             key: self.key,
             result,

@@ -146,3 +146,38 @@ fn a_failing_chunk_is_not_fetched_after_every_download() {
         "a failing chunk was asked again at once"
     );
 }
+
+/// Polls for `wait`; the steps resident then.
+fn resident_after(app: &mut OctantApp, wait: Duration) -> Vec<usize> {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        app.poll_block_prefetch_results();
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    resident(app)
+}
+
+#[test]
+fn plotting_again_resumes_the_lookahead_an_abort_left_running() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    // The shown step again (a cache hit): the slow lookahead fetches keep
+    // their workers, unread, and its new requests are refused.
+    app.plot_selection();
+    assert!(
+        resident_after(&mut app, Duration::from_millis(1500)).len() > 1,
+        "the lookahead stalled"
+    );
+}
+
+#[test]
+fn the_abort_button_keeps_the_lookahead_stopped() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    app.abort_current_fetch();
+    assert_eq!(
+        resident_after(&mut app, Duration::from_millis(500)),
+        vec![0]
+    );
+    assert_eq!(app.block_prefetcher.pending_count(), 0);
+}

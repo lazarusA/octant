@@ -184,8 +184,9 @@ impl OctantApp {
 
         // Whenever worker slots free up, refused detail tiles first, then
         // the remaining chunks in the selection:
-        if had_completed {
-            self.retry_refused_details();
+        let freed = self.block_prefetcher.take_freed();
+        self.retry_refused_details();
+        if had_completed || freed {
             self.prefetch_animated_ranges();
         }
     }
@@ -193,6 +194,8 @@ impl OctantApp {
     /// Aborts all ongoing data transfers and prefetch worker threads.
     pub fn abort_current_fetch(&mut self) {
         self.block_prefetcher.abort();
+        // What the aborted fetches free must not restart the lookahead.
+        self.block_prefetcher.ignore_strays();
         self.playback.is_playing = false;
         for layer in self.layers.iter_mut() {
             layer.load.pending_target_step = None;
