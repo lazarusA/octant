@@ -197,6 +197,7 @@ impl OctantApp {
         let source_id = params.source_id;
         for &chunk_idx in indices {
             if self.block_prefetcher.active_worker_threads() >= params.max_concurrent {
+                self.block_prefetcher.hear_strays();
                 break;
             }
             let chunk_start = chunk_idx * params.cs;

@@ -193,3 +193,19 @@ fn plotting_after_the_abort_button_resumes_the_lookahead() {
         resident(app).len() > 1
     });
 }
+
+#[test]
+fn stepping_after_the_abort_button_resumes_the_lookahead() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    poll_until(&mut app, "step 1 never arrived", |app| {
+        app.layer_step_resident(LayerId::BASE, 1)
+    });
+    app.abort_current_fetch();
+    let before = resident(&app).len();
+    // A cached step while the aborted fetch holds the lookahead's worker.
+    app.step_next();
+    poll_until(&mut app, "the lookahead stalled", |app| {
+        resident(app).len() > before
+    });
+}
