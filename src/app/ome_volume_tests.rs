@@ -107,14 +107,21 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
         calculate_selected_2d_elements, calculate_selected_surface_elements,
     };
     assert_eq!(calculate_selected_2d_elements(&app), 512 * 512);
-    // One z plane on a small canvas: the heatmap reads the level of its
-    // pixels, surfaces the finest within one buffer.
+    // One z plane on a small canvas: surfaces, thinned to the canvas, read
+    // the level of its pixels as the heatmap does.
     app.selected.dim_ranges[1] = (10, 10);
     app.selected.dim_config[1].range = (10, 10);
     app.selected.dim_config[1].active = false;
     app.layout.canvas_px = [512, 512];
     assert_eq!(calculate_selected_2d_elements(&app), 512 * 512);
-    assert_eq!(calculate_selected_surface_elements(&app), 2048 * 2048);
+    assert_eq!(calculate_selected_surface_elements(&app), 512 * 512);
+    app.selected.plot_type = PlotType::Volume;
+    assert_eq!(
+        app.selection_level(&app.selected),
+        Some(0),
+        "volumes: every voxel"
+    );
+    app.selected.plot_type = PlotType::Heatmap;
     app.layout.canvas_px = [4096, 4096];
     app.selected.dim_ranges[1] = (0, 63);
     app.selected.dim_config[1].range = (0, 63);

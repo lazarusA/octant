@@ -28,6 +28,7 @@ impl Task {
     }
 
     /// Counts `bytes` downloaded, until an abort.
+    #[cfg(target_arch = "wasm32")]
     pub(super) fn progress(&self, bytes: u64) {
         if !self.aborted.load(Ordering::Relaxed) {
             super::progress::bytes(bytes);

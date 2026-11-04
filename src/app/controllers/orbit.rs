@@ -65,20 +65,29 @@ impl PlotController for Orbit3DController {
         self.plot_type
     }
 
-    /// The finest level whose window fits one GPU storage buffer, as the
-    /// heatmap fits its buffer; a volume's x, y and z also within the 3D
-    /// texture size every WebGPU device offers.
+    /// The finest level whose window fits one GPU storage buffer. A volume
+    /// draws every voxel, so its x, y and z only stay within the 3D texture
+    /// size every WebGPU device offers; surfaces, spheres and point clouds
+    /// thin x and y to the canvas (`mesh_budget`), so they read no more
+    /// cells there than canvas pixels, as the heatmap does.
     fn resolution_demand(
         &self,
         var: &VariableInfo,
         dim_config: &[DimConfig],
-        _canvas_px: [u32; 2],
+        canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        let want = match self.plot_type {
-            PlotType::Volume => DimDemand::Pixels(MAX_TEXTURE_3D),
-            _ => DimDemand::Any,
-        };
-        super::traits::spatial_demand(var, dim_config, want)
+        if self.plot_type == PlotType::Volume {
+            let want = DimDemand::Pixels(MAX_TEXTURE_3D);
+            return super::traits::spatial_demand(var, dim_config, want);
+        }
+        let mut demand = super::traits::spatial_demand(var, dim_config, DimDemand::Any);
+        if let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(dim_config)
+            && x != y
+        {
+            demand.dims[x] = DimDemand::Pixels(canvas_px[0]);
+            demand.dims[y] = DimDemand::Pixels(canvas_px[1]);
+        }
+        demand
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {

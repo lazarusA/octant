@@ -18,9 +18,16 @@ type LabelBuf = [u8; 160];
 pub struct FetchProgress(Snapshot);
 
 impl FetchProgress {
-    /// Returns `None` when no fetch is in flight.
+    /// Returns `None` when no fetch is in flight. While aborted fetches
+    /// still run their reads count without a plan, so no figure shows.
     pub fn from_app(app: &OctantApp) -> Option<Self> {
-        (app.block_prefetcher.pending_count() > 0).then(|| Self(progress::snapshot()))
+        let prefetcher = &app.block_prefetcher;
+        let pending = prefetcher.pending_count();
+        let strays = prefetcher.active_worker_threads() > pending;
+        (pending > 0).then(|| match strays {
+            true => Self(Snapshot::default()),
+            false => Self(progress::snapshot()),
+        })
     }
 
     /// The percentage and bytes when a reader planned its chunks (remote

@@ -98,10 +98,8 @@ impl BlockPrefetcher {
             if task.cancelled() {
                 return;
             }
-            let mut on_progress = |bytes| task.progress(bytes);
             let result = crate::utils::executor::catch_panic(|| {
-                BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
-                    .map_err(|error| error.to_string())
+                BlockLoader::load_one(&request).map_err(|error| error.to_string())
             });
             task.finish(result);
         });

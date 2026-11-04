@@ -64,14 +64,6 @@ impl SliceRequest {
         }
     }
 
-    /// Computes the total number of elements requested across all dimensions.
-    pub fn estimated_elements(&self) -> usize {
-        self.selections.iter().fold(1usize, |acc, sel| {
-            let (start, end) = sel.bounds();
-            acc.saturating_mul(end.saturating_sub(start).max(1))
-        })
-    }
-
     /// Converts the slice selections into a Zarr `ArraySubset` clamped against dimension lengths.
     pub fn to_array_subset(&self, shape: &[u64]) -> zarrs::array::ArraySubset {
         let mut ranges = Vec::with_capacity(self.selections.len());
@@ -101,18 +93,6 @@ mod tests {
     fn test_dimension_selection_bounds() {
         assert_eq!(DimensionSelection::index(5).bounds(), (5, 6));
         assert_eq!(DimensionSelection::range(2, 10).bounds(), (2, 10));
-    }
-
-    #[test]
-    fn test_slice_request_estimated_elements() {
-        let req = SliceRequest::new(
-            "temperature",
-            vec![
-                DimensionSelection::range(0, 5),
-                DimensionSelection::range(10, 20),
-            ],
-        );
-        assert_eq!(req.estimated_elements(), 5 * 10);
     }
 
     #[test]
