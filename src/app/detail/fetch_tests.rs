@@ -1,34 +1,92 @@
-//! Detail tile fetches: refused while every worker is busy, shared with a
-//! layer's own block, and kept over a small pan.
+//! Detail tile fetches: refused while every worker is busy (also by fetches
+//! an abort left running), shared with a layer's own block, and kept over a
+//! small pan.
 
 use super::tests::{frame_at, frame_with, plotted, rest_at, tile_level, view};
 use crate::app::OctantApp;
 use crate::app::pipeline::paint_layer::CanvasView;
 use crate::app::test_support::poll_until;
+use crate::data::blocks::{BlockStore, BlockStoreError};
+use crate::data::octant_block::OctantBlock;
+use crate::data::{BlockRequest, SliceRequest, StoreHandle};
 use crate::plots::PlotType;
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex};
 
-/// Another block of the store, fetched in the background.
-fn other_block(app: &OctantApp) -> crate::data::BlockRequest {
+/// A store whose fetches say they started, then wait until the gate opens.
+struct Gated {
+    inner: StoreHandle,
+    started: Sender<()>,
+    gate: Mutex<Receiver<()>>,
+}
+
+impl BlockStore for Gated {
+    fn backend_name(&self) -> &str {
+        "gated"
+    }
+
+    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
+        self.inner.variables()
+    }
+
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
+        let _ = self.started.send(());
+        let _ = self.gate.lock().unwrap_or_else(|p| p.into_inner()).recv();
+        self.inner.fetch(request)
+    }
+}
+
+/// Another block of the store, behind a gate, and its start signal.
+fn other_block(app: &OctantApp) -> (BlockRequest, Sender<()>, Receiver<()>) {
     let sel = app.plotted().clone();
     let source_id = app.selection_source_id(&sel);
     let handle = app
         .resolve_store_handle(&source_id, &sel.store_target, sel.store_kind)
         .expect("store");
-    let slice = crate::data::SliceRequest::full_range("2/sst", &[3, 16, 16]);
-    crate::data::BlockRequest::new(handle, slice)
+    let (open, gate) = channel();
+    let (started, starts) = channel();
+    let gated = Gated {
+        inner: handle.clone(),
+        started,
+        gate: Mutex::new(gate),
+    };
+    let handle = StoreHandle::new(handle.source().clone(), Arc::new(gated));
+    let slice = SliceRequest::full_range("2/sst", &[3, 16, 16]);
+    (BlockRequest::new(handle, slice), open, starts)
 }
 
 #[test]
 fn a_tile_refused_by_busy_workers_is_asked_again_once_one_frees() {
     let mut app = plotted();
     app.block_prefetcher = crate::data::BlockPrefetcher::with_max_concurrent_threads(1);
-    let busy = other_block(&app);
+    let (busy, open, _) = other_block(&app);
     assert!(app.block_prefetcher.request(busy, &app.block_cache));
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     let state = &app.layers.base.data.detail;
     assert!(state.pending.is_none() && state.tile.is_none(), "refused");
     // The busy fetch completes; the tile is asked for again and arrives.
+    drop(open);
+    poll_until(&mut app, |app| tile_level(app).is_some());
+    assert_eq!(tile_level(&app), Some(0));
+}
+
+#[test]
+fn a_tile_refused_by_a_fetch_an_abort_left_running_is_asked_again() {
+    let mut app = plotted();
+    app.block_prefetcher = crate::data::BlockPrefetcher::with_max_concurrent_threads(1);
+    let (busy, open, starts) = other_block(&app);
+    assert!(app.block_prefetcher.request(busy, &app.block_cache));
+    // Aborted once running: a queued fetch would free its worker at once.
+    starts
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the fetch starts");
+    app.block_prefetcher.abort();
+    frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
+    frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
+    assert!(app.layers.base.data.detail.pending.is_none(), "refused");
+    // The aborted fetch frees its worker with no result to poll.
+    drop(open);
     poll_until(&mut app, |app| tile_level(app).is_some());
     assert_eq!(tile_level(&app), Some(0));
 }

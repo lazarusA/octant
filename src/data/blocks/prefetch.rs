@@ -39,6 +39,10 @@ pub struct BlockPrefetcher {
     active_worker_threads: Arc<AtomicUsize>,
     max_concurrent_threads: usize,
     aborted: Arc<AtomicBool>,
+    /// Set when an aborted task frees its worker, which sends no result.
+    freed: Arc<AtomicBool>,
+    /// `freed` ignored: after the Abort button, until the lookahead waits.
+    muted: bool,
     /// The running fetches started while aborted ones still ran, whose
     /// reads count into `progress` too: no figure until they all end.
     strays: bool,
@@ -66,14 +70,35 @@ impl BlockPrefetcher {
             active_worker_threads: Arc::new(AtomicUsize::new(0)),
             max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
             aborted: Arc::new(AtomicBool::new(false)),
+            freed: Arc::new(AtomicBool::new(false)),
+            muted: false,
             strays: false,
         }
     }
 
     /// Schedules one request, unless every worker is busy.
     pub fn request(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
+        self.has_free_worker() && self.request_now(request, cache)
+    }
+
+    /// Whether a worker is free, counting fetches an abort left running.
+    pub fn has_free_worker(&self) -> bool {
         self.active_worker_threads() < self.max_concurrent_threads
-            && self.request_now(request, cache)
+    }
+
+    /// Whether an aborted task freed its worker since the last call.
+    pub fn take_freed(&self) -> bool {
+        self.freed.swap(false, Ordering::AcqRel) && !self.muted
+    }
+
+    /// Ignores the workers aborted tasks free until [`Self::hear_freed`].
+    pub fn mute_freed(&mut self) {
+        self.muted = true;
+    }
+
+    /// Hears freed workers again: the lookahead waits for one.
+    pub fn hear_freed(&mut self) {
+        self.muted = false;
     }
 
     /// Schedules one request even when every worker is busy: the block a view
@@ -97,6 +122,7 @@ impl BlockPrefetcher {
             tx: self.tx.clone(),
             aborted: self.aborted.clone(),
             active: self.active_worker_threads.clone(),
+            freed: self.freed.clone(),
         };
 
         #[cfg(not(target_arch = "wasm32"))]

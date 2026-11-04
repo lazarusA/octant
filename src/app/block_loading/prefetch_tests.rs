@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use super::slow_store::store_app;
+use crate::app::test_support::poll_until;
 
 const NT: usize = 20;
 /// Bytes of one heatmap block (one step: the 32^3 depth, lat, lon slab).
@@ -145,4 +146,49 @@ fn a_failing_chunk_is_not_fetched_after_every_download() {
         starts.len(),
         "a failing chunk was asked again at once"
     );
+}
+
+#[test]
+fn plotting_again_resumes_the_lookahead_an_abort_left_running() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    // The shown step again (a cache hit): the slow lookahead fetches keep
+    // their workers, unread, and its new requests are refused.
+    app.plot_selection();
+    poll_until(&mut app, |app| resident(app).len() > 1);
+}
+
+#[test]
+fn the_abort_button_keeps_the_lookahead_stopped() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    app.abort_current_fetch();
+    poll_until(&mut app, |app| {
+        app.block_prefetcher.active_worker_threads() == 0
+    });
+    app.poll_block_prefetch_results();
+    assert_eq!(resident(&app), vec![0]);
+    assert_eq!(app.block_prefetcher.pending_count(), 0);
+}
+
+#[test]
+fn plotting_after_the_abort_button_resumes_the_lookahead() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    app.abort_current_fetch();
+    // The shown step (a cache hit) while the aborted fetches hold every worker.
+    app.plot_selection();
+    poll_until(&mut app, |app| resident(app).len() > 1);
+}
+
+#[test]
+fn stepping_after_the_abort_button_resumes_the_lookahead() {
+    let mut app = store_app(Duration::from_millis(100), None);
+    app.prefetch_animated_ranges();
+    poll_until(&mut app, |app| app.layer_step_resident(LayerId::BASE, 1));
+    app.abort_current_fetch();
+    let before = resident(&app).len();
+    // A cached step while the aborted fetch holds the lookahead's worker.
+    app.step_next();
+    poll_until(&mut app, |app| resident(app).len() > before);
 }

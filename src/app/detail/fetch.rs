@@ -38,9 +38,11 @@ impl OctantApp {
         }
     }
 
-    /// Asks again for the tiles refused while every worker was busy; called
-    /// once fetches complete.
+    /// Asks again for the tiles refused while every worker was busy.
     pub(crate) fn retry_refused_details(&mut self) {
+        if !self.block_prefetcher.has_free_worker() {
+            return;
+        }
         let plans: Vec<TilePlan> = self
             .layers
             .iter_mut()
