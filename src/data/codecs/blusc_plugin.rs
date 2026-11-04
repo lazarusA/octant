@@ -84,7 +84,11 @@ impl CodecTraits for BluscCodec {
         _version: ZarrVersion,
         _options: &CodecMetadataOptions,
     ) -> Option<Configuration> {
-        None
+        let serde_json::Value::Object(map) = serde_json::json!({"cname": "lz4", "clevel": 5, "shuffle": "noshuffle", "blocksize": 0})
+        else {
+            return None;
+        };
+        Some(map.into())
     }
 
     fn partial_decoder_capability(&self) -> PartialDecoderCapability {

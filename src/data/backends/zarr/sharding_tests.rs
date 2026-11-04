@@ -157,3 +157,67 @@ fn sharded_blocks_read_back_exactly() {
     }
     assert_eq!(&block.values[..], &expected[..]);
 }
+
+type Codec = Arc<dyn zarrs_codec::BytesToBytesCodecTraits>;
+
+/// `v` written with `writer`, read back through the sharded reader with `reader`.
+fn read_back_with(writer: Codec, reader: Codec) {
+    use zarrs::array::codec::ShardingCodecBuilder;
+    let store = Arc::new(MemoryStore::new());
+    let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
+    let build = |codec: Codec| {
+        let inner = vec![std::num::NonZeroU64::new(16).expect("16"); 2];
+        let sharding = ShardingCodecBuilder::new(inner, &f32_dt)
+            .bytes_to_bytes_codecs(vec![codec])
+            .build_arc();
+        let mut builder = ArrayBuilder::new(
+            vec![64, 64],
+            vec![64, 64],
+            f32_dt.clone(),
+            FillValue::from(0f32),
+        );
+        builder.array_to_bytes_codec(sharding);
+        builder
+    };
+    let values: Vec<f32> = (0..64 * 64).map(|i| i as f32).collect();
+    let all = ArraySubset::new_with_shape(vec![64, 64]);
+    let written = build(writer).build(store.clone(), "/v").expect("build");
+    written.store_array_subset(&all, &values).expect("values");
+    let whole = shard_size(&store);
+
+    let recording = Arc::new(Recording {
+        inner: store,
+        reads: Mutex::default(),
+    });
+    let storage: Arc<dyn ReadableStorageTraits> = recording.clone();
+    let array = build(reader).build(storage, "/v").expect("reader");
+    let cache = ArrayShardedReadableExtCache::new(&array);
+    let read = super::retrieve_array_subset_as_f32(&array, ChunkReader::Sharded(&cache), &all)
+        .expect("read");
+    assert_eq!(read, values);
+    let sharded = recording.bytes_read(SHARD, whole);
+    assert!(
+        sharded <= whole,
+        "{sharded} bytes read of a {whole}-byte shard"
+    );
+}
+
+#[test]
+fn browser_codecs_read_sharded_inner_chunks() {
+    use crate::data::codecs::{BluscCodec, RuzstdCodec};
+    use zarrs::array::codec::{BloscCodec, BloscCompressor, BloscShuffleMode, ZstdCodec};
+    read_back_with(
+        Arc::new(ZstdCodec::new(0, false)),
+        Arc::new(RuzstdCodec::new()),
+    );
+    let level = 5u8.try_into().expect("level");
+    let blosc = BloscCodec::new(
+        BloscCompressor::LZ4,
+        level,
+        None,
+        BloscShuffleMode::NoShuffle,
+        None,
+    )
+    .expect("blosc");
+    read_back_with(Arc::new(blosc), Arc::new(BluscCodec::new()));
+}
