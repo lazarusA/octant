@@ -39,6 +39,9 @@ pub struct BlockPrefetcher {
     active_worker_threads: Arc<AtomicUsize>,
     max_concurrent_threads: usize,
     aborted: Arc<AtomicBool>,
+    /// The running fetches started while aborted ones still ran, whose
+    /// reads count into `progress` too: no figure until they all end.
+    strays: bool,
 }
 
 impl Default for BlockPrefetcher {
@@ -63,6 +66,7 @@ impl BlockPrefetcher {
             active_worker_threads: Arc::new(AtomicUsize::new(0)),
             max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
             aborted: Arc::new(AtomicBool::new(false)),
+            strays: false,
         }
     }
 
@@ -82,6 +86,8 @@ impl BlockPrefetcher {
 
         if self.pending.is_empty() {
             super::progress::reset();
+            // With nothing pending, any worker still busy is an aborted fetch.
+            self.strays = self.active_worker_threads() > 0;
         }
         self.pending.insert(key.clone());
         self.active_worker_threads.fetch_add(1, Ordering::Relaxed);
@@ -141,6 +147,12 @@ impl BlockPrefetcher {
 
     pub fn pending_count(&self) -> usize {
         self.pending.len()
+    }
+
+    /// Whether `progress` counts only the running fetches: false when they
+    /// started beside aborted ones.
+    pub fn progress_known(&self) -> bool {
+        !self.strays
     }
 
     pub fn active_worker_threads(&self) -> usize {

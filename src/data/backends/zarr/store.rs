@@ -4,7 +4,7 @@ use super::generic::GenericZarrBlockStore;
 use super::storage;
 use std::collections::HashMap;
 
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
@@ -61,13 +61,5 @@ impl BlockStore for ZarrBlockStore {
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.inner.fetch_block(request)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        self.inner.fetch_block_with_progress(request, on_progress)
     }
 }

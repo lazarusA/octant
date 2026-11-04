@@ -80,9 +80,7 @@ pub async fn load_one_geotiff_wasm_with_progress(
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn load_one_geotiff_wasm_with_progress(
     request: &BlockRequest,
-    on_progress: ProgressCallback<'_>,
+    _on_progress: ProgressCallback<'_>,
 ) -> Result<OctantBlock, BlockStoreError> {
-    request
-        .store
-        .fetch_with_progress(&request.slice, on_progress)
+    request.store.fetch(&request.slice)
 }

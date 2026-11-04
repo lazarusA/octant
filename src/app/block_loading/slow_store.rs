@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use crate::app::{OctantApp, StoreKind};
 use crate::data::backends::ProceduralBlockStore;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::{DataSource, Dataset, SliceRequest, StoreHandle};
 use crate::plots::PlotType;
@@ -35,18 +35,14 @@ impl BlockStore for SlowStore {
         self.inner.inspect()
     }
 
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         std::thread::sleep(self.delay);
         let start = request.selections.first().map_or(0, |s| s.bounds().0);
         if let Some(failed) = self.failed.as_ref().filter(|_| start > 0) {
             failed.lock().unwrap_or_else(|p| p.into_inner()).push(start);
             return Err("HTTP 403 Forbidden".into());
         }
-        self.inner.fetch_block_with_progress(request, on_progress)
+        self.inner.fetch_block(request)
     }
 }
 

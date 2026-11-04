@@ -8,7 +8,7 @@ use netcdf::{Extent, Extents};
 use super::attrs::{extract_variable_attributes, extract_variable_calibration};
 use super::desktop::NetCdfBlockStore;
 use super::inspect::inspect_netcdf_file;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
@@ -119,14 +119,6 @@ impl BlockStore for NetCdfBlockStore {
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        self.fetch_block_with_progress(request, None)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
         let file = netcdf::open(&self.file_path)
             .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
 

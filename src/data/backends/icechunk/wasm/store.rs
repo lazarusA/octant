@@ -11,7 +11,7 @@ use super::manifest_cache::ManifestCache;
 
 use crate::data::DatasetMetadata;
 use crate::data::backends::zarr::WasmZarrBlockStore;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
@@ -119,13 +119,5 @@ impl BlockStore for WasmIcechunkBlockStore {
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.inner.fetch_block(request)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        self.inner.fetch_block_with_progress(request, on_progress)
     }
 }

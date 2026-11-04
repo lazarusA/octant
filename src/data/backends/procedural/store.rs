@@ -5,7 +5,7 @@ use super::healpix::slice_healpix_block;
 use super::inspect::inspect_procedural;
 use super::slice_2d::slice_2d_grid_block;
 use super::slice_3d::{slice_gaussian_wave_packet_4d, slice_procedural_matrix_block};
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::procedural::{
@@ -52,11 +52,7 @@ impl BlockStore for ProceduralBlockStore {
         inspect_procedural(&self.uri)
     }
 
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         if self.uri.contains("healpix") {
             return slice_healpix_block(request);
         }

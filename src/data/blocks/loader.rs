@@ -32,9 +32,7 @@ impl BlockLoader {
             Kind::RemoteGeoTiff | Kind::LocalGeoTiff => {
                 geotiff::wasm::load_one_geotiff_wasm_with_progress(request, on_progress).await
             }
-            Kind::Procedural => request
-                .store
-                .fetch_with_progress(&request.slice, on_progress),
+            Kind::Procedural => request.store.fetch(&request.slice),
             _ => zarr::load_one_wasm_with_progress(request, on_progress).await,
         }
     }

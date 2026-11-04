@@ -18,20 +18,19 @@ type LabelBuf = [u8; 160];
 pub struct FetchProgress(Snapshot);
 
 impl FetchProgress {
-    /// Returns `None` when no fetch is in flight. While aborted fetches
-    /// still run their reads count without a plan, so no figure shows.
+    /// Returns `None` when no fetch is in flight. Fetches started beside
+    /// aborted ones show no figure (`BlockPrefetcher::progress_known`).
     pub fn from_app(app: &OctantApp) -> Option<Self> {
         let prefetcher = &app.block_prefetcher;
-        let pending = prefetcher.pending_count();
-        let strays = prefetcher.active_worker_threads() > pending;
-        (pending > 0).then(|| match strays {
-            true => Self(Snapshot::default()),
-            false => Self(progress::snapshot()),
+        (prefetcher.pending_count() > 0).then(|| match prefetcher.progress_known() {
+            true => Self(progress::snapshot()),
+            false => Self(Snapshot::default()),
         })
     }
 
     /// The percentage and bytes when a reader planned its chunks (remote
-    /// Zarr and Icechunk), else "Loading..." (compact: the spinner alone).
+    /// Zarr, and Icechunk in the browser), else "Loading..." (compact: the
+    /// spinner alone).
     fn label<'a>(&self, buf: &'a mut LabelBuf, compact: bool) -> &'a str {
         let Some(fraction) = self.0.fraction else {
             return if compact { "" } else { tr(CommonKey::Loading) };

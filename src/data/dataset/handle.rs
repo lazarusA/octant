@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use super::source::DataSource;
 use crate::data::{
-    blocks::{BlockStore, BlockStoreError, ProgressCallback},
+    blocks::{BlockStore, BlockStoreError},
     metadata::{CoordValues, DatasetMetadata, VariableInfo},
     octant_block::OctantBlock,
     slice_request::SliceRequest,
@@ -57,13 +57,5 @@ impl StoreHandle {
 
     pub fn fetch(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.backend.fetch_block(request)
-    }
-
-    pub fn fetch_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        self.backend.fetch_block_with_progress(request, on_progress)
     }
 }

@@ -8,7 +8,7 @@ use async_tiff::metadata::TiffMetadataReader;
 use async_tiff::metadata::cache::ReadaheadMetadataCache;
 use async_tiff::reader::AsyncFileReader;
 
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
@@ -177,11 +177,7 @@ impl BlockStore for GeoTiffBlockStore {
         Ok(self.metadata.clone())
     }
 
-    fn fetch_block_with_progress(
-        &self,
-        req: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
+    fn fetch_block(&self, req: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         let (ifd, bounds, scales) = self
             .resolve_ifd(&req.variable)
             .ok_or_else(|| format!("Variable '{}' not found in TIFF", req.variable))?;

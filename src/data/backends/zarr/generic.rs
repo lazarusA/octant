@@ -11,7 +11,7 @@ use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::quantization::{self, PixelScale, Quantization};
 use super::storage::open_raw_array;
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::{MetaCache, MetaReader};
 use crate::data::slice_request::SliceRequest;
@@ -200,14 +200,6 @@ impl BlockStore for GenericZarrBlockStore {
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        self.fetch_block_with_progress(request, None)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
         let cached = self.get_or_open_array(&request.variable)?;
         let scales = cached
             .quantization
@@ -220,8 +212,7 @@ impl BlockStore for GenericZarrBlockStore {
         let consolidated = self.consolidated.get().map(Option::as_ref);
         #[cfg(not(target_arch = "wasm32"))]
         if self.counted {
-            let chunks = super::counting::read_chunks(&cached.array, request);
-            crate::data::blocks::progress::plan(chunks);
+            super::counting::plan(&cached.array, request);
         }
         fetch_block_from_cached_array(
             &cached,

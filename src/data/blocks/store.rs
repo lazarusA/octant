@@ -75,14 +75,5 @@ pub trait BlockStore: MaybeSendSync {
     }
 
     /// Load one arbitrary N-dimensional block.
-    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        self.fetch_block_with_progress(request, None)
-    }
-
-    /// Load one arbitrary N-dimensional block with progressive byte reporting.
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError>;
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError>;
 }

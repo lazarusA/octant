@@ -78,7 +78,7 @@ pub async fn load_one_icechunk_wasm_with_progress(
     let _coords = store.preload_block_coordinates(&request.slice).await;
 
     // Decode slice synchronously from in-memory chunks
-    match store.fetch_block_with_progress(&request.slice, None) {
+    match store.fetch_block(&request.slice) {
         Ok(block) => {
             log::info!(
                 "[WASM Icechunk] Successfully decoded block for '{}' ({} values, shape: {:?})",
@@ -101,9 +101,7 @@ pub async fn load_one_icechunk_wasm_with_progress(
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn load_one_icechunk_wasm_with_progress(
     request: &BlockRequest,
-    on_progress: ProgressCallback<'_>,
+    _on_progress: ProgressCallback<'_>,
 ) -> Result<OctantBlock, BlockStoreError> {
-    request
-        .store
-        .fetch_with_progress(&request.slice, on_progress)
+    request.store.fetch(&request.slice)
 }

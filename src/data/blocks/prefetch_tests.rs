@@ -3,7 +3,7 @@
 
 use super::tests::test_block;
 use crate::data::blocks::BlockCache;
-use crate::data::blocks::{BlockPrefetcher, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockPrefetcher, BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::data::{BlockRequest, DataSource, DataSourceKind, StoreHandle};
@@ -25,11 +25,7 @@ impl BlockStore for Store {
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
         Ok(vec!["temperature".into()])
     }
-    fn fetch_block_with_progress(
-        &self,
-        _request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
+    fn fetch_block(&self, _request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.fetches.fetch_add(1, Ordering::SeqCst);
         if let Some(rx) = self.hold.as_ref().and_then(|rx| rx.lock().ok()) {
             let _ = rx.recv();
@@ -163,5 +159,41 @@ fn active_bytes_retire_on_drain() {
     assert_eq!(prefetcher.pending_count(), 0);
 
     let _ = release.send(());
+    let _ = release.send(());
+}
+
+#[test]
+fn fetches_started_beside_aborted_ones_show_no_progress() {
+    let (release, hold) = mpsc::channel();
+    let store = Store {
+        fetches: Arc::default(),
+        fail: false,
+        hold: Some(Mutex::new(hold)),
+    };
+    let (req, fetches) = request(store);
+    let other = || {
+        let mut r = req();
+        r.slice = SliceRequest::new("temperature", vec![DimensionSelection::range(10, 20)]);
+        r
+    };
+    let mut prefetcher = BlockPrefetcher::with_max_concurrent_threads(2);
+    let cache = BlockCache::new(1024 * 1024);
+
+    assert!(prefetcher.request_now(req(), &cache));
+    assert!(prefetcher.progress_known());
+    until(|| fetches.load(Ordering::SeqCst) == 1);
+    prefetcher.abort();
+    // The aborted fetch still runs: its reads would count into the new one's.
+    assert!(prefetcher.request_now(other(), &cache));
+    assert!(!prefetcher.progress_known());
+
+    let _ = release.send(());
+    let _ = release.send(());
+    until(|| {
+        prefetcher.poll();
+        prefetcher.pending_count() == 0 && prefetcher.active_worker_threads() == 0
+    });
+    assert!(prefetcher.request_now(other(), &cache));
+    assert!(prefetcher.progress_known(), "a new burst, nothing stray");
     let _ = release.send(());
 }
