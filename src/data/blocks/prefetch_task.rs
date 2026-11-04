@@ -1,8 +1,8 @@
 //! What one prefetch task shares with the [`BlockPrefetcher`](super::prefetch::BlockPrefetcher):
-//! its result channel, the progress counter, the abort flag and its worker slot.
+//! its result channel, the abort flag and its worker slot.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 
 use super::cache::BlockCacheKey;
@@ -12,7 +12,6 @@ use crate::data::octant_block::OctantBlock;
 pub(super) struct Task {
     pub(super) key: BlockCacheKey,
     pub(super) tx: Sender<PrefetchResult>,
-    pub(super) completed: Arc<AtomicU64>,
     pub(super) aborted: Arc<AtomicBool>,
     pub(super) active: Arc<AtomicUsize>,
 }
@@ -31,7 +30,7 @@ impl Task {
     /// Counts `bytes` downloaded, until an abort.
     pub(super) fn progress(&self, bytes: u64) {
         if !self.aborted.load(Ordering::Relaxed) {
-            self.completed.fetch_add(bytes, Ordering::Relaxed);
+            super::progress::bytes(bytes);
         }
     }
 

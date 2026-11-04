@@ -25,7 +25,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         }
         CommonKey::AboutOctantHover => "Sobre o Octant",
         CommonKey::ToggleVariableControlsHover => "Alternar o painel de controles da variável",
-        CommonKey::FetchingProgress => "Baixando {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Baixando {} ({}%)",
         CommonKey::Abort => "Abortar",
         CommonKey::AbortHover => "Interromper e abortar a transferência de dados em andamento",
         CommonKey::Voice => "Voz",

@@ -32,7 +32,10 @@ impl ZarrBlockStore {
 
     pub fn open_remote(url: &str) -> Result<Self, BlockStoreError> {
         let storage = storage::build_sync_store(url).map_err(|e| format!("{e}"))?;
-        Ok(Self::new(storage, url.trim_end_matches('/')))
+        let inner = GenericZarrBlockStore::new(storage, url.trim_end_matches('/'), "zarr", "Zarr");
+        Ok(Self {
+            inner: inner.counted(),
+        })
     }
 }
 

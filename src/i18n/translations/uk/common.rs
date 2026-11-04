@@ -25,7 +25,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         }
         CommonKey::AboutOctantHover => "Про Octant",
         CommonKey::ToggleVariableControlsHover => "Показати/сховати панель змінної",
-        CommonKey::FetchingProgress => "Отримання {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Отримання {} ({}%)",
         CommonKey::Abort => "Перервати",
         CommonKey::AbortHover => "Перервати поточне передавання даних",
         CommonKey::Voice => "Голос",

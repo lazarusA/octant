@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "切换首页视图（右键查看关于）",
         CommonKey::AboutOctantHover => "关于 Octant",
         CommonKey::ToggleVariableControlsHover => "显示/隐藏变量控制面板",
-        CommonKey::FetchingProgress => "正在获取 {} / {}（{}%）",
+        CommonKey::FetchingProgress => "正在获取 {}（{}%）",
         CommonKey::Abort => "中止",
         CommonKey::AbortHover => "中断并中止正在进行的数据传输",
         CommonKey::Voice => "语音",

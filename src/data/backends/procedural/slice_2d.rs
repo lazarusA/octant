@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use crate::data::blocks::ProgressCallback;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
@@ -12,7 +11,6 @@ pub fn slice_2d_grid_block(
     full_data: &[f32],
     coords: (&[f64], &[f64]),
     request: &SliceRequest,
-    on_progress: &mut ProgressCallback<'_>,
 ) -> OctantBlock {
     let (w_full, h_full) = shape;
     let (xs, ys) = coords;
@@ -42,10 +40,6 @@ pub fn slice_2d_grid_block(
             let idx = y * w_full + x;
             values.push(full_data.get(idx).copied().unwrap_or(0.0));
         }
-    }
-
-    if let Some(cb) = on_progress {
-        cb((values.len() * 4) as u64);
     }
 
     let mut coords_map = HashMap::new();

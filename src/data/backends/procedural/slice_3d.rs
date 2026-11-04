@@ -2,15 +2,11 @@
 
 use std::collections::HashMap;
 
-use crate::data::blocks::ProgressCallback;
 use crate::data::octant_block::OctantBlock;
 use crate::data::procedural::{eval_known_truth_4d, generate_procedural_matrix};
 use crate::data::slice_request::SliceRequest;
 
-pub fn slice_procedural_matrix_block(
-    request: &SliceRequest,
-    on_progress: &mut ProgressCallback<'_>,
-) -> OctantBlock {
+pub fn slice_procedural_matrix_block(request: &SliceRequest) -> OctantBlock {
     let (h_full, w_full) = (64, 64);
     let (y_start, y_end) = request
         .selections
@@ -38,10 +34,6 @@ pub fn slice_procedural_matrix_block(
             let idx = y * w_full + x;
             values.push(full_matrix.get(idx).copied().unwrap_or(0.0));
         }
-    }
-
-    if let Some(cb) = on_progress {
-        cb((values.len() * 4) as u64);
     }
 
     let mut coords = HashMap::new();
@@ -86,10 +78,7 @@ pub fn slice_procedural_matrix_block(
     )
 }
 
-pub fn slice_gaussian_wave_packet_4d(
-    request: &SliceRequest,
-    on_progress: &mut ProgressCallback<'_>,
-) -> OctantBlock {
+pub fn slice_gaussian_wave_packet_4d(request: &SliceRequest) -> OctantBlock {
     let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
 
     let (t_start, t_end) = request
@@ -140,10 +129,6 @@ pub fn slice_gaussian_wave_packet_4d(
                 }
             }
         }
-    }
-
-    if let Some(cb) = on_progress {
-        cb((values.len() * 4) as u64);
     }
 
     let mut coords = HashMap::new();

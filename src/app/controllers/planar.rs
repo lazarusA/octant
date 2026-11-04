@@ -18,14 +18,14 @@ impl PlotController for HeatmapController {
 
     /// No more cells than canvas pixels along x and y (each cell at least a
     /// pixel when the whole window shows), within one GPU buffer; other
-    /// dimensions whole.
+    /// dimensions as `base_demand`.
     fn resolution_demand(
         &self,
         var: &VariableInfo,
         dim_config: &[DimConfig],
         canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        let mut demand = ResolutionDemand::finest(var.shape.len());
+        let mut demand = super::traits::base_demand(var, dim_config);
         if let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(dim_config)
             && x != y
         {

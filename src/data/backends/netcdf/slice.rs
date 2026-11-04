@@ -125,7 +125,7 @@ impl BlockStore for NetCdfBlockStore {
     fn fetch_block_with_progress(
         &self,
         request: &SliceRequest,
-        mut on_progress: ProgressCallback,
+        _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let file = netcdf::open(&self.file_path)
             .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
@@ -133,10 +133,6 @@ impl BlockStore for NetCdfBlockStore {
         with_netcdf_variable(&file, &request.variable, |var| {
             let (extents, window) = selection_window(var, request)?;
             let raw_values = read_variable_hyperslab_as_f32(var, &extents)?;
-            if let Some(ref mut cb) = on_progress {
-                let bytes = raw_values.len().saturating_mul(std::mem::size_of::<f32>());
-                cb(bytes as u64);
-            }
             Ok(oriented_block(&file, request, var, raw_values, window))
         })
     }

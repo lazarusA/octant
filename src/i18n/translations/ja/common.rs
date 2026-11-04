@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "ホーム画面の表示切り替え (右クリックで情報)",
         CommonKey::AboutOctantHover => "Octantについて",
         CommonKey::ToggleVariableControlsHover => "変数コントロールパネルの表示切り替え",
-        CommonKey::FetchingProgress => "取得中 {} / {} ({}%)",
+        CommonKey::FetchingProgress => "取得中 {} ({}%)",
         CommonKey::Abort => "中止",
         CommonKey::AbortHover => "実行中のデータ転送を中断して中止します",
         CommonKey::Voice => "音声",

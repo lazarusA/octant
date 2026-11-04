@@ -2,14 +2,11 @@
 
 use std::collections::HashMap;
 
-use crate::data::blocks::{BlockStoreError, ProgressCallback};
+use crate::data::blocks::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
-pub fn slice_healpix_block(
-    request: &SliceRequest,
-    on_progress: &mut ProgressCallback<'_>,
-) -> Result<OctantBlock, BlockStoreError> {
+pub fn slice_healpix_block(request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
     let nside = 16;
     let npix = 3072;
     let angles: Vec<(f32, f32)> = (0..npix)
@@ -68,10 +65,6 @@ pub fn slice_healpix_block(
             })
             .collect(),
     };
-
-    if let Some(cb) = on_progress {
-        cb((values.len() * 4) as u64);
-    }
 
     Ok(OctantBlock::new(
         request.variable.clone(),

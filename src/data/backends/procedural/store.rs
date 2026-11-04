@@ -55,10 +55,10 @@ impl BlockStore for ProceduralBlockStore {
     fn fetch_block_with_progress(
         &self,
         request: &SliceRequest,
-        mut on_progress: ProgressCallback,
+        _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         if self.uri.contains("healpix") {
-            return slice_healpix_block(request, &mut on_progress);
+            return slice_healpix_block(request);
         }
 
         if request.variable == "clenshaw_curtis_2d" {
@@ -71,7 +71,6 @@ impl BlockStore for ProceduralBlockStore {
                 &full_data,
                 (&xs, &ys),
                 request,
-                &mut on_progress,
             ));
         }
 
@@ -85,7 +84,6 @@ impl BlockStore for ProceduralBlockStore {
                 &full_data,
                 (&xs, &ys),
                 request,
-                &mut on_progress,
             ));
         }
 
@@ -99,7 +97,6 @@ impl BlockStore for ProceduralBlockStore {
                 &full_data,
                 (&xs, &ys),
                 request,
-                &mut on_progress,
             ));
         }
 
@@ -113,15 +110,14 @@ impl BlockStore for ProceduralBlockStore {
                 &full_data,
                 (&xs, &ys),
                 request,
-                &mut on_progress,
             ));
         }
 
         if request.variable == "procedural_matrix_2d" {
-            return Ok(slice_procedural_matrix_block(request, &mut on_progress));
+            return Ok(slice_procedural_matrix_block(request));
         }
 
         // Default 4D Known-Truth Block slicing
-        Ok(slice_gaussian_wave_packet_4d(request, &mut on_progress))
+        Ok(slice_gaussian_wave_packet_4d(request))
     }
 }

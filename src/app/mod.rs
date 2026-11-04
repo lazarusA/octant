@@ -36,6 +36,7 @@ mod frame_cache_bench_tests;
 mod landing;
 pub mod layers;
 pub(crate) mod multiscale;
+pub mod multiscale_pins;
 #[cfg(test)]
 mod multiscale_tests;
 pub(crate) mod multiscale_window;
