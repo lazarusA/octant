@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use super::slow_store::store_app;
+use crate::app::test_support::poll_until;
 
 const NT: usize = 20;
 /// Bytes of one heatmap block (one step: the 32^3 depth, lat, lon slab).
@@ -147,16 +148,6 @@ fn a_failing_chunk_is_not_fetched_after_every_download() {
     );
 }
 
-/// Polls until `done`, failing after 10 s with `stuck`.
-fn poll_until(app: &mut OctantApp, stuck: &str, done: impl Fn(&OctantApp) -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !done(app) {
-        assert!(Instant::now() < deadline, "{stuck}");
-        app.poll_block_prefetch_results();
-        std::thread::sleep(Duration::from_millis(1));
-    }
-}
-
 #[test]
 fn plotting_again_resumes_the_lookahead_an_abort_left_running() {
     let mut app = store_app(Duration::from_millis(100), None);
@@ -164,9 +155,7 @@ fn plotting_again_resumes_the_lookahead_an_abort_left_running() {
     // The shown step again (a cache hit): the slow lookahead fetches keep
     // their workers, unread, and its new requests are refused.
     app.plot_selection();
-    poll_until(&mut app, "the lookahead stalled", |app| {
-        resident(app).len() > 1
-    });
+    poll_until(&mut app, |app| resident(app).len() > 1);
 }
 
 #[test]
@@ -174,7 +163,7 @@ fn the_abort_button_keeps_the_lookahead_stopped() {
     let mut app = store_app(Duration::from_millis(100), None);
     app.prefetch_animated_ranges();
     app.abort_current_fetch();
-    poll_until(&mut app, "the aborted fetches never ended", |app| {
+    poll_until(&mut app, |app| {
         app.block_prefetcher.active_worker_threads() == 0
     });
     app.poll_block_prefetch_results();
@@ -189,23 +178,17 @@ fn plotting_after_the_abort_button_resumes_the_lookahead() {
     app.abort_current_fetch();
     // The shown step (a cache hit) while the aborted fetches hold every worker.
     app.plot_selection();
-    poll_until(&mut app, "the lookahead stalled", |app| {
-        resident(app).len() > 1
-    });
+    poll_until(&mut app, |app| resident(app).len() > 1);
 }
 
 #[test]
 fn stepping_after_the_abort_button_resumes_the_lookahead() {
     let mut app = store_app(Duration::from_millis(100), None);
     app.prefetch_animated_ranges();
-    poll_until(&mut app, "step 1 never arrived", |app| {
-        app.layer_step_resident(LayerId::BASE, 1)
-    });
+    poll_until(&mut app, |app| app.layer_step_resident(LayerId::BASE, 1));
     app.abort_current_fetch();
     let before = resident(&app).len();
     // A cached step while the aborted fetch holds the lookahead's worker.
     app.step_next();
-    poll_until(&mut app, "the lookahead stalled", |app| {
-        resident(app).len() > before
-    });
+    poll_until(&mut app, |app| resident(app).len() > before);
 }

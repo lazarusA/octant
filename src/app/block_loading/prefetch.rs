@@ -196,8 +196,11 @@ impl OctantApp {
     fn dispatch_lookahead_chunks(&mut self, indices: &[usize], params: PrefetchDispatchParams<'_>) {
         let source_id = params.source_id;
         for &chunk_idx in indices {
-            if self.block_prefetcher.active_worker_threads() >= params.max_concurrent {
-                self.block_prefetcher.hear_strays();
+            // The prefetcher's own cap may be lower than the lookahead's.
+            if self.block_prefetcher.active_worker_threads() >= params.max_concurrent
+                || !self.block_prefetcher.has_free_worker()
+            {
+                self.block_prefetcher.hear_freed();
                 break;
             }
             let chunk_start = chunk_idx * params.cs;

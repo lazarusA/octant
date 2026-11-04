@@ -195,7 +195,7 @@ impl OctantApp {
     pub fn abort_current_fetch(&mut self) {
         self.block_prefetcher.abort();
         // What the aborted fetches free must not restart the lookahead.
-        self.block_prefetcher.ignore_strays();
+        self.block_prefetcher.mute_freed();
         self.playback.is_playing = false;
         for layer in self.layers.iter_mut() {
             layer.load.pending_target_step = None;

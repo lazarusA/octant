@@ -6,29 +6,30 @@ use super::tests::{frame_at, frame_with, plotted, rest_at, tile_level, view};
 use crate::app::OctantApp;
 use crate::app::pipeline::paint_layer::CanvasView;
 use crate::app::test_support::poll_until;
+use crate::data::blocks::{BlockStore, BlockStoreError};
+use crate::data::octant_block::OctantBlock;
+use crate::data::{BlockRequest, SliceRequest, StoreHandle};
 use crate::plots::PlotType;
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex};
 
 /// A store whose fetches say they started, then wait until the gate opens.
 struct Gated {
-    inner: crate::data::StoreHandle,
+    inner: StoreHandle,
     started: Sender<()>,
-    gate: std::sync::Mutex<Receiver<()>>,
+    gate: Mutex<Receiver<()>>,
 }
 
-impl crate::data::blocks::BlockStore for Gated {
+impl BlockStore for Gated {
     fn backend_name(&self) -> &str {
         "gated"
     }
 
-    fn variables(&self) -> Result<Vec<String>, crate::data::blocks::BlockStoreError> {
+    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
         self.inner.variables()
     }
 
-    fn fetch_block(
-        &self,
-        request: &crate::data::SliceRequest,
-    ) -> Result<crate::data::octant_block::OctantBlock, crate::data::blocks::BlockStoreError> {
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         let _ = self.started.send(());
         let _ = self.gate.lock().unwrap_or_else(|p| p.into_inner()).recv();
         self.inner.fetch(request)
@@ -36,7 +37,7 @@ impl crate::data::blocks::BlockStore for Gated {
 }
 
 /// Another block of the store, behind a gate, and its start signal.
-fn other_block(app: &OctantApp) -> (crate::data::BlockRequest, Sender<()>, Receiver<()>) {
+fn other_block(app: &OctantApp) -> (BlockRequest, Sender<()>, Receiver<()>) {
     let sel = app.plotted().clone();
     let source_id = app.selection_source_id(&sel);
     let handle = app
@@ -47,11 +48,11 @@ fn other_block(app: &OctantApp) -> (crate::data::BlockRequest, Sender<()>, Recei
     let gated = Gated {
         inner: handle.clone(),
         started,
-        gate: std::sync::Mutex::new(gate),
+        gate: Mutex::new(gate),
     };
-    let handle = crate::data::StoreHandle::new(handle.source().clone(), std::sync::Arc::new(gated));
-    let slice = crate::data::SliceRequest::full_range("2/sst", &[3, 16, 16]);
-    (crate::data::BlockRequest::new(handle, slice), open, starts)
+    let handle = StoreHandle::new(handle.source().clone(), Arc::new(gated));
+    let slice = SliceRequest::full_range("2/sst", &[3, 16, 16]);
+    (BlockRequest::new(handle, slice), open, starts)
 }
 
 #[test]
