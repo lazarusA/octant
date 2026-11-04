@@ -11,7 +11,7 @@ use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::quantization::{self, PixelScale, Quantization};
 use super::storage::open_raw_array;
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::{MetaCache, MetaReader};
 use crate::data::slice_request::SliceRequest;
@@ -37,6 +37,10 @@ pub struct GenericZarrBlockStore {
     /// Group and array metadata read by inspection and array opens, once
     /// per store.
     meta: MetaCache,
+    /// Whether its storage counts its reads (`counting::CountingStore`):
+    /// block fetches then plan their chunks for the progress (desktop).
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    counted: bool,
 }
 
 impl GenericZarrBlockStore {
@@ -54,6 +58,15 @@ impl GenericZarrBlockStore {
             open_arrays: OpenArrays::default(),
             consolidated: OnceLock::new(),
             meta: MetaCache::shared(),
+            counted: false,
+        }
+    }
+
+    /// A store over `counting::CountingStore`.
+    pub fn counted(self) -> Self {
+        Self {
+            counted: true,
+            ..self
         }
     }
 
@@ -187,14 +200,6 @@ impl BlockStore for GenericZarrBlockStore {
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        self.fetch_block_with_progress(request, None)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
         let cached = self.get_or_open_array(&request.variable)?;
         let scales = cached
             .quantization
@@ -205,12 +210,15 @@ impl BlockStore for GenericZarrBlockStore {
         // What is known: a root that keeps failing is retried by array opens
         // and inspection, never once per block.
         let consolidated = self.consolidated.get().map(Option::as_ref);
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.counted {
+            super::counting::plan(&cached.array, request);
+        }
         fetch_block_from_cached_array(
             &cached,
             scales.as_deref(),
             (&self.storage, &self.source_url, consolidated),
             request,
-            on_progress,
         )
     }
 }

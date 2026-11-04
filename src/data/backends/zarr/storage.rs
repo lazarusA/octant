@@ -42,7 +42,7 @@ pub fn build_sync_store(
         TokioBlockOn(rt),
     ));
 
-    Ok(sync_store)
+    Ok(Arc::new(super::counting::CountingStore(sync_store)))
 }
 
 #[cfg(not(target_arch = "wasm32"))]

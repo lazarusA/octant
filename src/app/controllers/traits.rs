@@ -92,14 +92,38 @@ pub trait PlotController: Send + Sync {
     }
 }
 
-/// `want` along `var`'s x, y and z, its other dimensions whole, within one
-/// GPU storage buffer.
+/// What a plot needs along `var`'s dimensions before its own (x, y, z):
+/// animated and channel dimensions whole (playback steps and channels are
+/// level-0 indices), any other at any level (a collapsed one reads the
+/// coarse cell holding its index).
+pub(super) fn base_demand(var: &VariableInfo, dim_config: &[DimConfig]) -> ResolutionDemand {
+    let channel = var.channel_axis();
+    let dims = (0..var.shape.len())
+        .map(|d| {
+            let animated = dim_config
+                .get(d)
+                .is_some_and(|c| c.animation == crate::app::AnimationRole::Animated);
+            if animated || Some(d) == channel {
+                DimDemand::Full
+            } else {
+                DimDemand::Any
+            }
+        })
+        .collect();
+    ResolutionDemand {
+        dims,
+        max_elements: None,
+    }
+}
+
+/// `want` along `var`'s x, y and z, its other dimensions as `base_demand`,
+/// within one GPU storage buffer.
 pub(super) fn spatial_demand(
     var: &VariableInfo,
     dim_config: &[DimConfig],
     want: DimDemand,
 ) -> ResolutionDemand {
-    let mut demand = ResolutionDemand::finest(var.shape.len());
+    let mut demand = base_demand(var, dim_config);
     let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
     for d in [x, y, z].into_iter().flatten() {
         if let Some(slot) = demand.dims.get_mut(d) {

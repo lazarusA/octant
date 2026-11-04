@@ -8,7 +8,7 @@ use super::block_coords::{BlockWindow, StoreSource, block_coordinates};
 use super::quantization::Quantization;
 use super::slice::{ChunkReader, retrieve_array_subset_as_f32, window_subset};
 use super::storage::ZarrArrayHandle;
-use crate::data::blocks::{BlockStoreError, ProgressCallback};
+use crate::data::blocks::BlockStoreError;
 use crate::data::coordinates::affine::GridAffine;
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::MetaReader;
@@ -165,7 +165,6 @@ pub(super) fn fetch_block_from_cached_array(
     scales: Option<&ArrayCachedState>,
     source: StoreSource<'_>,
     request: &SliceRequest,
-    mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
     let (origin, block_shape) = selection_window(request, cached.array.shape())?;
     let mut raw_values = read_window(
@@ -177,9 +176,6 @@ pub(super) fn fetch_block_from_cached_array(
     )?;
     if let Some(q) = &cached.quantization {
         q.apply(scales, (&origin, &block_shape), &mut raw_values)?;
-    }
-    if let Some(ref mut cb) = on_progress {
-        cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }
     if let Some(level) = &cached.ome {
         return Ok(OctantBlock::new(

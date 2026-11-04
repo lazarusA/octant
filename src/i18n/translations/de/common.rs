@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "Startansicht ein-/ausblenden (Rechtsklick für Über Octant)",
         CommonKey::AboutOctantHover => "Über Octant",
         CommonKey::ToggleVariableControlsHover => "Variablen-Bedienfeld ein-/ausblenden",
-        CommonKey::FetchingProgress => "Abruf {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Abruf {} ({}%)",
         CommonKey::Abort => "Abbrechen",
         CommonKey::AbortHover => "Laufende Datenübertragung unterbrechen und abbrechen",
         CommonKey::Voice => "Sprache",

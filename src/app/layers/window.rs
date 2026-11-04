@@ -30,6 +30,7 @@ pub fn overlay_selection(
         animated_dim: None,
         plot_type: PlotType::Heatmap,
         level: Default::default(),
+        level0: None,
     };
     follow_base_window(base, &mut selection);
     Some(selection)

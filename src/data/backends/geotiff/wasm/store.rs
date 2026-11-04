@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::{Mutex, OnceLock};
 
 use crate::data::DatasetMetadata;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
@@ -140,14 +140,10 @@ impl BlockStore for WasmGeoTiffBlockStore {
         .into())
     }
 
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         let guard = self.inner.read().unwrap_or_else(|p| p.into_inner());
         if let Some(ref store) = *guard {
-            store.fetch_block_with_progress(request, on_progress)
+            store.fetch_block(request)
         } else {
             Err("GeoTIFF dataset is still loading metadata...".into())
         }

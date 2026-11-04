@@ -15,6 +15,8 @@ pub mod coords;
 mod coords_numeric_tests;
 #[cfg(test)]
 mod coords_tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod counting;
 pub mod generic;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod metadata_network_tests;

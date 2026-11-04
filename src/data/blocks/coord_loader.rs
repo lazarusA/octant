@@ -135,7 +135,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+    use crate::data::blocks::{BlockStore, BlockStoreError};
     use crate::data::octant_block::OctantBlock;
     use crate::data::slice_request::SliceRequest;
 
@@ -148,11 +148,7 @@ mod tests {
         fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
             Ok(Vec::new())
         }
-        fn fetch_block_with_progress(
-            &self,
-            _request: &SliceRequest,
-            _on_progress: ProgressCallback,
-        ) -> Result<OctantBlock, BlockStoreError> {
+        fn fetch_block(&self, _request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
             Err("no blocks".into())
         }
     }

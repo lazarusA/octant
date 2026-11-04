@@ -4,7 +4,9 @@
 use crate::app::OctantApp;
 use crate::app::layers::{LayerId, LevelChoice};
 use crate::app::multiscale::{at_base, at_level, same_variable};
-use crate::app::test_support::{big_pyramid_app, poll_until, pyramid_app, selection_of};
+use crate::app::test_support::{
+    big_pyramid_app, iso_pyramid_app, poll_until, pyramid_app, selection_of,
+};
 use crate::data::DatasetMetadata;
 use crate::plots::PlotType;
 
@@ -70,7 +72,7 @@ fn a_pinned_level_is_read_as_chosen() {
 }
 
 #[test]
-fn three_d_plot_types_read_the_coarsest_level() {
+fn three_d_plot_types_read_the_finest_level_within_a_buffer() {
     let (mut app, meta) = pyramid_app();
     stage(&mut app, &meta, "0/t2m", 500);
     for plot_type in [
@@ -81,9 +83,9 @@ fn three_d_plot_types_read_the_coarsest_level() {
     ] {
         app.selected.plot_type = plot_type;
         app.selected.level = LevelChoice::Auto;
-        assert_eq!(app.selection_level(&app.selected), Some(2), "{plot_type:?}");
-        app.selected.level = LevelChoice::Pinned(0);
         assert_eq!(app.selection_level(&app.selected), Some(0), "{plot_type:?}");
+        app.selected.level = LevelChoice::Pinned(2);
+        assert_eq!(app.selection_level(&app.selected), Some(2), "{plot_type:?}");
     }
 }
 
@@ -115,7 +117,7 @@ fn line_plots_read_the_level_a_volume_reads() {
     stage(&mut app, &meta, "0/t2m", 20);
     app.selected.plot_type = PlotType::Line;
     let volume = app.selection_level_as(&app.selected, PlotType::Volume);
-    assert!(volume.is_some_and(|l| l > 0), "{volume:?}");
+    assert_eq!(volume, Some(0), "small: the finest");
     assert_eq!(app.selection_level(&app.selected), volume);
 }
 
@@ -131,7 +133,20 @@ fn levels_map_back_to_level_0() {
     assert_eq!(level.dim_indices[2], 1);
     let back = at_base(&level).expect("level 0");
     assert_eq!(back.variable_idx, app.selected.variable_idx);
-    assert_eq!(back.dim_ranges[1..], [(8, 23), (6, 6)]);
+    assert_eq!(
+        back.dim_ranges[1..],
+        [(8, 23), (5, 5)],
+        "the index it came from"
+    );
+    assert_eq!(back.dim_indices[2], 5);
+    let mut moved = level.clone();
+    (moved.dim_ranges[2], moved.dim_indices[2]) = ((2, 2), 2);
+    let back = at_base(&moved).expect("level 0");
+    assert_eq!(
+        back.dim_ranges[2],
+        (10, 10),
+        "a new index: the cell's center"
+    );
     assert!(at_base(&app.selected).is_none(), "already level 0");
     let level2 = level.variable_idx;
     assert!(same_variable(&meta, level2, app.selected.variable_idx));
@@ -176,4 +191,40 @@ fn a_block_arriving_after_a_resize_plots_its_own_level() {
     app.layout.canvas_px = [500, 500];
     poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
     assert_eq!(plotted_name(&app), "2/t2m");
+}
+
+#[test]
+fn a_collapsed_downsampled_dimension_reads_coarse_levels() {
+    let (mut app, meta) = iso_pyramid_app();
+    stage(&mut app, &meta, "0/t2m", 20);
+    assert_eq!(app.selected.dim_ranges[0].0, app.selected.dim_ranges[0].1);
+    assert_eq!(app.selection_level(&app.selected), Some(2));
+    // Animated, depth steps are level-0 indices: only level 0 keeps them.
+    app.selected.dim_config[0].animation = crate::app::AnimationRole::Animated;
+    assert_eq!(app.selection_level(&app.selected), Some(0));
+}
+
+#[test]
+fn a_plotted_slice_keeps_its_level_0_index() {
+    let (mut app, meta) = iso_pyramid_app();
+    stage(&mut app, &meta, "0/t2m", 20);
+    app.selected.dim_indices[0] = 13;
+    app.selected.dim_ranges[0] = (13, 13);
+    app.selected.dim_config[0].index = 13;
+    app.selected.dim_config[0].range = (13, 13);
+    app.plot_selection();
+    poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
+
+    assert_eq!(plotted_name(&app), "2/t2m");
+    assert_eq!(app.plotted().dim_ranges[0], (3, 3), "13 / 4");
+    app.copy_plotted_to_selected();
+    assert_eq!(app.selected.dim_indices[0], 13);
+    assert_eq!(app.selected.dim_ranges[0], (13, 13));
+    assert_eq!(app.selected.dim_config[0].index, 13);
+    let finer = crate::app::multiscale::to_level(app.plotted(), 1).expect("level 1");
+    assert_eq!(
+        finer.dim_ranges[0],
+        (6, 6),
+        "13 / 2, not the coarse cell's center"
+    );
 }

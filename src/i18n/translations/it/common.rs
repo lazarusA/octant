@@ -27,7 +27,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleVariableControlsHover => {
             "Mostra/nascondi il pannello dei controlli della variabile"
         }
-        CommonKey::FetchingProgress => "Recupero {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Recupero {} ({}%)",
         CommonKey::Abort => "Interrompi",
         CommonKey::AbortHover => "Interrompi il trasferimento di dati in corso",
         CommonKey::Voice => "Voce",

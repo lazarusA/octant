@@ -16,7 +16,7 @@ use super::store::WasmIcechunkBlockStore;
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_bytes};
 use crate::data::backends::zarr::wasm::CONCURRENT_FETCHES;
 use crate::data::backends::zarr::wasm::shard_plan::ShardIndexSpec;
-use crate::data::blocks::{BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStoreError, ProgressCallback, progress};
 use crate::utils::remote::s3_to_https;
 
 pub(super) type NodeId = ObjectId<8, NodeTag>;
@@ -58,6 +58,7 @@ impl WasmIcechunkBlockStore {
         let indices: Vec<ChunkIndices> = missing.iter().map(|(_, i)| i.clone()).collect();
         let (node_id, manifests) = self.manifests_holding(clean_var, &indices).await?;
         let (node_id, manifests) = (&node_id, &manifests);
+        progress::plan(missing.len() as u64);
         let mut fetches = futures::stream::iter(missing)
             .map(|(key, indices)| async move {
                 let bytes = fetch_chunk(manifests, node_id, &indices, &self.base_url).await;
@@ -65,7 +66,9 @@ impl WasmIcechunkBlockStore {
             })
             .buffer_unordered(CONCURRENT_FETCHES);
         while let Some((key, bytes)) = fetches.next().await {
-            match bytes? {
+            let bytes = bytes?;
+            progress::arrived(1);
+            match bytes {
                 Some(bytes) => {
                     let len = bytes.len() as u64;
                     self.inner.insert_chunk_bytes(&key, bytes)?;

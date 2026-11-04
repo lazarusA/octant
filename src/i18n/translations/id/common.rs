@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "Tampilkan/sembunyikan Layar Awal (klik kanan untuk Tentang)",
         CommonKey::AboutOctantHover => "Tentang Octant",
         CommonKey::ToggleVariableControlsHover => "Tampilkan/sembunyikan Panel Kontrol Variabel",
-        CommonKey::FetchingProgress => "Mengambil {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Mengambil {} ({}%)",
         CommonKey::Abort => "Hentikan",
         CommonKey::AbortHover => "Interupsi dan hentikan transfer data yang sedang berjalan",
         CommonKey::Voice => "Suara",

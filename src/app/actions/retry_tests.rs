@@ -10,7 +10,7 @@ use super::{Done, Failure};
 use crate::app::test_support::{write_array, write_coordinate};
 use crate::app::{OctantApp, StoreKind};
 use crate::data::backends::zarr::GenericZarrBlockStore;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::{
     CoordValues, DataSource, Dataset, DatasetMetadata, SliceRequest, StoreHandle, VariableInfo,
@@ -41,12 +41,8 @@ impl BlockStore for FailingCoords {
         Err("HTTP 404 Not Found".into())
     }
 
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        self.0.fetch_block_with_progress(request, on_progress)
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
+        self.0.fetch_block(request)
     }
 }
 

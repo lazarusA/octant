@@ -9,6 +9,7 @@ pub mod prefetch;
 mod prefetch_task;
 #[cfg(test)]
 mod prefetch_tests;
+pub mod progress;
 pub mod request;
 pub mod store;
 pub mod summary;

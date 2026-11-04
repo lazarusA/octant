@@ -2,7 +2,7 @@
 
 use super::WasmZarrBlockStore;
 use crate::data::DatasetMetadata;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
@@ -44,14 +44,5 @@ impl BlockStore for WasmZarrBlockStore {
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.generic_store.fetch_block(request)
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        self.generic_store
-            .fetch_block_with_progress(request, on_progress)
     }
 }

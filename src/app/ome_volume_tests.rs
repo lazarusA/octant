@@ -69,26 +69,27 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
 
     app.switch_plot_type(PlotType::Volume);
     assert_eq!(app.selected.dim_ranges[1], (10, 10), "z is not widened");
-    assert_eq!(app.selection_level(&app.selected), Some(2), "the coarsest");
-    // Lines read the volume's level too, even where level 0 fits a buffer.
+    assert_eq!(app.selection_level(&app.selected), Some(0), "fits a buffer");
+    // Lines read the volume's level too.
     app.selected.dim_ranges[1] = (0, 3);
     app.selected.dim_config[1].range = (0, 3);
     app.selected.plot_type = PlotType::Line;
     assert_eq!(
         app.selection_level(&app.selected),
-        Some(2),
+        Some(0),
         "lines as volumes"
     );
     app.selected.plot_type = PlotType::Volume;
     app.selected.dim_ranges[1] = (10, 10);
     app.selected.dim_config[1].range = (10, 10);
 
-    // The whole z stack: too big at the heatmap's level 0, fits at level 2.
+    // The whole z stack: too big at level 0; z is downsampled with the
+    // image, so the heatmap reads it at the level within one buffer.
     app.switch_plot_type(PlotType::Heatmap);
     app.selected.dim_ranges[1] = (0, 63);
     app.selected.dim_config[1].range = (0, 63);
     app.selected.dim_config[1].active = true;
-    assert_eq!(app.selection_level(&app.selected), Some(0));
+    assert_eq!(app.selection_level(&app.selected), Some(2));
     let blocked = |app: &mut OctantApp, plot_type: PlotType| {
         crate::ui::plot_type::options::plot_options(app)
             .into_iter()
@@ -101,12 +102,30 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
         "measured on its level"
     );
 
-    // Surfaces are measured on their (coarsest) level, not the heatmap's.
+    // Surfaces are measured on their own level, not the heatmap's.
     use crate::ui::variables_panel::{
         calculate_selected_2d_elements, calculate_selected_surface_elements,
     };
-    assert_eq!(calculate_selected_2d_elements(&app), 2048 * 2048);
+    assert_eq!(calculate_selected_2d_elements(&app), 512 * 512);
+    // One z plane on a small canvas: surfaces, thinned to the canvas, read
+    // the level of its pixels as the heatmap does.
+    app.selected.dim_ranges[1] = (10, 10);
+    app.selected.dim_config[1].range = (10, 10);
+    app.selected.dim_config[1].active = false;
+    app.layout.canvas_px = [512, 512];
+    assert_eq!(calculate_selected_2d_elements(&app), 512 * 512);
     assert_eq!(calculate_selected_surface_elements(&app), 512 * 512);
+    app.selected.plot_type = PlotType::Volume;
+    assert_eq!(
+        app.selection_level(&app.selected),
+        Some(0),
+        "volumes: every voxel"
+    );
+    app.selected.plot_type = PlotType::Heatmap;
+    app.layout.canvas_px = [4096, 4096];
+    app.selected.dim_ranges[1] = (0, 63);
+    app.selected.dim_config[1].range = (0, 63);
+    app.selected.dim_config[1].active = true;
 
     // A resampled heatmap blocks no 3D type of a multiscale variable: those
     // read their own level.

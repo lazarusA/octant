@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "Näytä/piilota aloitusnäkymä (oikea napsautus: Tietoja)",
         CommonKey::AboutOctantHover => "Tietoja Octantista",
         CommonKey::ToggleVariableControlsHover => "Näytä/piilota muuttujapaneeli",
-        CommonKey::FetchingProgress => "Haetaan {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Haetaan {} ({}%)",
         CommonKey::Abort => "Keskeytä",
         CommonKey::AbortHover => "Keskeytä käynnissä oleva tiedonsiirto",
         CommonKey::Voice => "Ääni",

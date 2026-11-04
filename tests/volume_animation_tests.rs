@@ -553,16 +553,14 @@ fn test_selected_volume_elements_and_limit() {
 }
 
 #[test]
-fn test_prefetcher_abort_and_pending_bytes() {
+fn test_prefetcher_abort() {
     use octant::data::BlockPrefetcher;
 
     let mut prefetcher = BlockPrefetcher::new();
     assert_eq!(prefetcher.pending_count(), 0);
-    assert_eq!(prefetcher.pending_bytes(), 0);
 
     prefetcher.abort();
     assert_eq!(prefetcher.pending_count(), 0);
-    assert_eq!(prefetcher.pending_bytes(), 0);
 }
 
 #[test]

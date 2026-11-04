@@ -4,9 +4,9 @@
 //! this is backend-agnostic and works across requests that target
 //! different `StoreHandle`s.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 use web_time::Instant;
@@ -29,7 +29,7 @@ pub struct PrefetchResult {
 pub struct BlockPrefetcher {
     tx: Sender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
-    pending: HashMap<BlockCacheKey, u64>,
+    pending: HashSet<BlockCacheKey>,
     /// Blocks whose last fetch failed, and when: the lookahead skips them
     /// for `retry_after` (`failed_recently`), or until Play, Plot, Abort.
     failed: HashMap<BlockCacheKey, Instant>,
@@ -38,9 +38,10 @@ pub struct BlockPrefetcher {
     /// own slot, so an abort never lets new fetches pile onto old ones.
     active_worker_threads: Arc<AtomicUsize>,
     max_concurrent_threads: usize,
-    completed_bytes: Arc<AtomicU64>,
-    total_bytes: Arc<AtomicU64>,
     aborted: Arc<AtomicBool>,
+    /// The running fetches started while aborted ones still ran, whose
+    /// reads count into `progress` too: no figure until they all end.
+    strays: bool,
 }
 
 impl Default for BlockPrefetcher {
@@ -59,14 +60,13 @@ impl BlockPrefetcher {
         Self {
             tx,
             rx,
-            pending: HashMap::new(),
+            pending: HashSet::new(),
             failed: HashMap::new(),
             retry_after: RETRY_AFTER,
             active_worker_threads: Arc::new(AtomicUsize::new(0)),
             max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
-            completed_bytes: Arc::new(AtomicU64::new(0)),
-            total_bytes: Arc::new(AtomicU64::new(0)),
             aborted: Arc::new(AtomicBool::new(false)),
+            strays: false,
         }
     }
 
@@ -80,20 +80,21 @@ impl BlockPrefetcher {
     /// waits for never queues behind lookahead prefetches.
     pub fn request_now(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
         let key = request.cache_key();
-        if cache.contains(&key) || self.pending.contains_key(&key) {
+        if cache.contains(&key) || self.pending.contains(&key) {
             return false;
         }
 
-        let estimated_bytes = (request.slice.estimated_elements() as u64) * 4;
-        self.pending.insert(key.clone(), estimated_bytes);
-        self.total_bytes
-            .fetch_add(estimated_bytes, Ordering::Relaxed);
+        if self.pending.is_empty() {
+            super::progress::reset();
+            // With nothing pending, any worker still busy is an aborted fetch.
+            self.strays = self.active_worker_threads() > 0;
+        }
+        self.pending.insert(key.clone());
         self.active_worker_threads.fetch_add(1, Ordering::Relaxed);
 
         let task = Task {
             key,
             tx: self.tx.clone(),
-            completed: self.completed_bytes.clone(),
             aborted: self.aborted.clone(),
             active: self.active_worker_threads.clone(),
         };
@@ -103,10 +104,8 @@ impl BlockPrefetcher {
             if task.cancelled() {
                 return;
             }
-            let mut on_progress = |bytes| task.progress(bytes);
             let result = crate::utils::executor::catch_panic(|| {
-                BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
-                    .map_err(|error| error.to_string())
+                BlockLoader::load_one(&request).map_err(|error| error.to_string())
             });
             task.finish(result);
         });
@@ -136,24 +135,12 @@ impl BlockPrefetcher {
             } else {
                 self.failed.remove(&result.key);
             }
-            if let Some(est) = self.pending.remove(&result.key) {
-                let _ = self
-                    .total_bytes
-                    .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
-                        Some(v.saturating_sub(est))
-                    });
-                let _ =
-                    self.completed_bytes
-                        .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
-                            Some(v.saturating_sub(est))
-                        });
-            }
+            self.pending.remove(&result.key);
             results.push(result);
         }
 
         if self.pending.is_empty() {
-            self.completed_bytes.store(0, Ordering::Relaxed);
-            self.total_bytes.store(0, Ordering::Relaxed);
+            super::progress::reset();
         }
         results
     }
@@ -162,18 +149,10 @@ impl BlockPrefetcher {
         self.pending.len()
     }
 
-    pub fn pending_bytes(&self) -> u64 {
-        self.pending.values().copied().sum()
-    }
-
-    pub fn completed_bytes(&self) -> u64 {
-        self.completed_bytes.load(Ordering::Relaxed)
-    }
-
-    pub fn total_bytes(&self) -> u64 {
-        self.total_bytes
-            .load(Ordering::Relaxed)
-            .max(self.pending_bytes())
+    /// Whether `progress` counts only the running fetches: false when they
+    /// started beside aborted ones.
+    pub fn progress_known(&self) -> bool {
+        !self.strays
     }
 
     pub fn active_worker_threads(&self) -> usize {
@@ -201,7 +180,7 @@ impl BlockPrefetcher {
     }
 
     pub fn is_pending(&self, key: &BlockCacheKey) -> bool {
-        self.pending.contains_key(key)
+        self.pending.contains(key)
     }
 
     /// Checks if any pending in-flight request already covers the given timestep and matching spatial selections.
@@ -213,7 +192,7 @@ impl BlockPrefetcher {
         anim_dim: Option<usize>,
         timestep: usize,
     ) -> bool {
-        self.pending.keys().any(|key| {
+        self.pending.iter().any(|key| {
             if key.source_id != source_id || key.variable_name != variable_name {
                 return false;
             }
@@ -242,8 +221,7 @@ impl BlockPrefetcher {
         let (tx, rx) = channel();
         (self.tx, self.rx) = (tx, rx);
         self.pending.clear();
-        self.completed_bytes.store(0, Ordering::Relaxed);
-        self.total_bytes.store(0, Ordering::Relaxed);
+        super::progress::reset();
         self.failed.clear();
     }
 }

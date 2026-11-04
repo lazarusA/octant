@@ -8,6 +8,9 @@ use crate::data::multiscale::{DimDemand, ResolutionDemand};
 use crate::plots::PlotType;
 use crate::plots::camera::{DEFAULT_DISTANCE, MAX_DISTANCE, OrbitCamera, TARGET_LIMIT};
 
+/// WebGPU's default `max_texture_dimension_3d`: volume textures larger than
+/// it may not be created (`plots/volume/textures.rs`).
+const MAX_TEXTURE_3D: u32 = 2048;
 /// Radians turned per screen point dragged, at the default view.
 const TURN_SPEED: f32 = 0.008;
 /// The sphere's default height above its unit globe, where dragging turns
@@ -62,28 +65,27 @@ impl PlotController for Orbit3DController {
         self.plot_type
     }
 
-    /// The coarsest level along x, y and z (3D plots do not pick levels by
-    /// view yet), other dimensions whole, within one GPU buffer. Volumes and
-    /// point clouds also stack any other window wider than one index (not
-    /// animated, not the channel axis), the Z a 2D selection takes in 3D, so
-    /// its size is measured on the level the volume will read.
+    /// The finest level whose window fits one GPU storage buffer. A volume
+    /// draws every voxel, so its x, y and z only stay within the 3D texture
+    /// size every WebGPU device offers; surfaces, spheres and point clouds
+    /// thin x and y to the canvas (`mesh_budget`), so they read no more
+    /// cells there than canvas pixels, as the heatmap does.
     fn resolution_demand(
         &self,
         var: &VariableInfo,
         dim_config: &[DimConfig],
-        _canvas_px: [u32; 2],
+        canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        let mut demand = super::traits::spatial_demand(var, dim_config, DimDemand::Coarsest);
-        if matches!(self.plot_type, PlotType::Volume | PlotType::PointCloud) {
-            let channel = var.channel_axis();
-            for (d, c) in dim_config.iter().enumerate() {
-                let stacked = c.range.0 != c.range.1
-                    && c.animation != crate::app::AnimationRole::Animated
-                    && Some(d) != channel;
-                if let Some(slot) = demand.dims.get_mut(d).filter(|_| stacked) {
-                    *slot = DimDemand::Coarsest;
-                }
-            }
+        if self.plot_type == PlotType::Volume {
+            let want = DimDemand::Pixels(MAX_TEXTURE_3D);
+            return super::traits::spatial_demand(var, dim_config, want);
+        }
+        let mut demand = super::traits::spatial_demand(var, dim_config, DimDemand::Any);
+        if let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(dim_config)
+            && x != y
+        {
+            demand.dims[x] = DimDemand::Pixels(canvas_px[0]);
+            demand.dims[y] = DimDemand::Pixels(canvas_px[1]);
         }
         demand
     }

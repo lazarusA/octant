@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> &'static str {
         CommonKey::ToggleHeroHover => "Toggle Hero / Landing View (right-click for About)",
         CommonKey::AboutOctantHover => "About Octant",
         CommonKey::ToggleVariableControlsHover => "Toggle Variable Controls Panel",
-        CommonKey::FetchingProgress => "Fetching {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Fetching {} ({}%)",
         CommonKey::Abort => "Abort",
         CommonKey::AbortHover => "Interrupt and abort ongoing data transfer",
         CommonKey::Voice => "Voice",

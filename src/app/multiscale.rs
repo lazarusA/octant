@@ -93,6 +93,7 @@ pub(crate) fn at_level(selection: &VariableSelection, level: usize) -> Option<Va
     let idx = variable_index(meta, &set.level(level)?.path)?;
     let mut moved = selection.clone();
     moved.variable_idx = idx;
+    moved.level0 = Some(super::multiscale_pins::Level0Indices::of(selection));
     let range = |d: usize, r: (usize, usize)| level_range(&set, level, d, r);
     let index = |d: usize, i: usize| {
         set.level_index(level, d, i as u64)
@@ -133,6 +134,8 @@ pub(crate) fn at_base(selection: &VariableSelection) -> Option<VariableSelection
     };
     let index = |d: usize, i: usize| set.base_index(level, d, i as u64).map_or(i, |i| i as usize);
     map_dims(&mut moved, range, index);
+    super::multiscale_pins::restore(&mut moved, selection, &set, level);
+    moved.level0 = None;
     Some(moved)
 }
 

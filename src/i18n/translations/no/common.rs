@@ -23,7 +23,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::ToggleHeroHover => "Vis/skjul startsiden (høyreklikk for Om)",
         CommonKey::AboutOctantHover => "Om Octant",
         CommonKey::ToggleVariableControlsHover => "Vis/skjul variabelpanelet",
-        CommonKey::FetchingProgress => "Henter {} / {} ({}%)",
+        CommonKey::FetchingProgress => "Henter {} ({}%)",
         CommonKey::Abort => "Stopp",
         CommonKey::AbortHover => "Avbryt pågående dataoverføring",
         CommonKey::Voice => "Tale",

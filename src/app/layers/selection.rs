@@ -41,6 +41,9 @@ pub struct VariableSelection {
     /// dimension indices and ranges stay on level 0 (the plotted copy holds
     /// the level's own, `app::multiscale`).
     pub level: LevelChoice,
+    /// On a copy moved onto a coarser level, the level-0 indices it came from
+    /// (`app::multiscale_pins`); `None` on level 0.
+    pub level0: Option<std::sync::Arc<crate::app::multiscale_pins::Level0Indices>>,
 }
 
 /// The store opened on first launch.
@@ -62,6 +65,7 @@ impl Default for VariableSelection {
             animated_dim: None,
             plot_type: PlotType::Heatmap,
             level: LevelChoice::Auto,
+            level0: None,
         }
     }
 }

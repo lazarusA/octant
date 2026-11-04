@@ -4,7 +4,7 @@ use super::WasmZarrBlockStore;
 use super::partial_store::{Lease, array_prefixes};
 use crate::data::backends::coord_bounds::CoordPreload;
 use crate::data::backends::http::{fetch_url_bytes, is_not_found};
-use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback};
+use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback, progress};
 use crate::data::octant_block::OctantBlock;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 use futures::StreamExt;
@@ -98,6 +98,7 @@ impl WasmZarrBlockStore {
         missing: &[(String, String)],
         on_progress: &mut ProgressCallback<'_>,
     ) -> Result<(), BlockStoreError> {
+        progress::plan(missing.len() as u64);
         let mut fetches = futures::stream::iter(missing)
             .map(|(key, url)| async move { (key, url, fetch_url_bytes(url).await) })
             .buffer_unordered(CONCURRENT_FETCHES);
@@ -106,11 +107,13 @@ impl WasmZarrBlockStore {
                 Ok(chunk_bytes) => {
                     let len = chunk_bytes.len() as u64;
                     self.insert_chunk_bytes(key, chunk_bytes)?;
+                    progress::arrived(1);
                     if let Some(cb) = on_progress.as_mut() {
                         cb(len);
                     }
                 }
                 Err(err) if is_not_found(&err) => {
+                    progress::arrived(1);
                     log::warn!("[WASM Zarr] Chunk not found (sparse chunk): {url}");
                 }
                 Err(err) => {
@@ -164,9 +167,7 @@ pub async fn load_one_wasm_with_progress(
 
     // If it's a procedural dataset or non-HTTP store, fetch directly
     if source_uri.starts_with("procedural://") || source_uri.starts_with("test://") {
-        return request
-            .store
-            .fetch_with_progress(&request.slice, on_progress);
+        return request.store.fetch(&request.slice);
     }
 
     let clean_url = source_uri.trim_end_matches('/');
@@ -228,7 +229,7 @@ pub async fn load_one_wasm_with_progress(
     let _coords = store.preload_block_coordinates(&request.slice).await;
 
     // Now decode the slice synchronously from in-memory chunks
-    match store.fetch_block_with_progress(&request.slice, None) {
+    match store.fetch_block(&request.slice) {
         Ok(block) => {
             log::info!(
                 "[WASM Zarr] Successfully decoded block for '{}' ({} values, shape: {:?})",
