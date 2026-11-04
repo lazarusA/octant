@@ -7,28 +7,61 @@ use crate::app::pipeline::paint_layer::CanvasView;
 use crate::app::test_support::poll_until;
 use crate::plots::PlotType;
 
-/// Another block of the store, fetched in the background.
-fn other_block(app: &OctantApp) -> crate::data::BlockRequest {
+/// A store whose fetches wait until the gate opens (its sender sends or
+/// drops), so a worker stays busy for as long as a test needs.
+struct Gated {
+    inner: crate::data::StoreHandle,
+    gate: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+}
+
+impl crate::data::blocks::BlockStore for Gated {
+    fn backend_name(&self) -> &str {
+        "gated"
+    }
+
+    fn variables(&self) -> Result<Vec<String>, crate::data::blocks::BlockStoreError> {
+        self.inner.variables()
+    }
+
+    fn fetch_block(
+        &self,
+        request: &crate::data::SliceRequest,
+    ) -> Result<crate::data::octant_block::OctantBlock, crate::data::blocks::BlockStoreError> {
+        let _ = self.gate.lock().unwrap_or_else(|p| p.into_inner()).recv();
+        self.inner.fetch(request)
+    }
+}
+
+/// Another block of the store, fetched in the background once the
+/// returned gate opens.
+fn other_block(app: &OctantApp) -> (crate::data::BlockRequest, std::sync::mpsc::Sender<()>) {
     let sel = app.plotted().clone();
     let source_id = app.selection_source_id(&sel);
     let handle = app
         .resolve_store_handle(&source_id, &sel.store_target, sel.store_kind)
         .expect("store");
+    let (open, gate) = std::sync::mpsc::channel();
+    let gated = Gated {
+        inner: handle.clone(),
+        gate: std::sync::Mutex::new(gate),
+    };
+    let handle = crate::data::StoreHandle::new(handle.source().clone(), std::sync::Arc::new(gated));
     let slice = crate::data::SliceRequest::full_range("2/sst", &[3, 16, 16]);
-    crate::data::BlockRequest::new(handle, slice)
+    (crate::data::BlockRequest::new(handle, slice), open)
 }
 
 #[test]
 fn a_tile_refused_by_busy_workers_is_asked_again_once_one_frees() {
     let mut app = plotted();
     app.block_prefetcher = crate::data::BlockPrefetcher::with_max_concurrent_threads(1);
-    let busy = other_block(&app);
+    let (busy, open) = other_block(&app);
     assert!(app.block_prefetcher.request(busy, &app.block_cache));
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     let state = &app.layers.base.data.detail;
     assert!(state.pending.is_none() && state.tile.is_none(), "refused");
     // The busy fetch completes; the tile is asked for again and arrives.
+    drop(open);
     poll_until(&mut app, |app| tile_level(app).is_some());
     assert_eq!(tile_level(&app), Some(0));
 }
