@@ -84,7 +84,11 @@ impl CodecTraits for RuzstdCodec {
         _version: ZarrVersion,
         _options: &CodecMetadataOptions,
     ) -> Option<Configuration> {
-        None
+        let serde_json::Value::Object(map) = serde_json::json!({"level": 0, "checksum": false})
+        else {
+            return None;
+        };
+        Some(map.into())
     }
 
     fn partial_decoder_capability(&self) -> PartialDecoderCapability {
