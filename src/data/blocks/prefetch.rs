@@ -85,7 +85,7 @@ impl BlockPrefetcher {
 
     /// Whether an aborted task freed its worker since the last call.
     pub fn take_freed(&self) -> bool {
-        self.freed.swap(false, Ordering::Relaxed)
+        self.freed.swap(false, Ordering::AcqRel)
     }
 
     /// Forgets the workers the running aborted tasks will free.

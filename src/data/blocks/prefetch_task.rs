@@ -24,7 +24,7 @@ impl Task {
         let aborted = self.aborted.load(Ordering::Relaxed);
         if aborted {
             self.active.fetch_sub(1, Ordering::Relaxed);
-            self.freed.store(true, Ordering::Relaxed);
+            self.freed.store(true, Ordering::Release);
         }
         aborted
     }
@@ -37,15 +37,16 @@ impl Task {
         }
     }
 
-    /// Releases the worker slot and sends `result`.
+    /// Releases the worker slot and sends `result`, else (an abort dropped
+    /// its receiver) raises `freed`.
     pub(super) fn finish(self, result: Result<OctantBlock, String>) {
         self.active.fetch_sub(1, Ordering::Relaxed);
-        if self.aborted.load(Ordering::Relaxed) {
-            self.freed.store(true, Ordering::Relaxed);
-        }
-        let _ = self.tx.send(PrefetchResult {
+        let sent = self.tx.send(PrefetchResult {
             key: self.key,
             result,
         });
+        if sent.is_err() {
+            self.freed.store(true, Ordering::Release);
+        }
     }
 }
