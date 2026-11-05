@@ -45,8 +45,9 @@ fn dither(frag: vec2<f32>) -> f32 {
     return (pixel_jitter(frag) + pixel_jitter(frag + vec2<f32>(17.0, 29.0)) - 1.0) / 255.0;
 }
 
-// Headlight above and left of the camera, so lighting follows the view.
-const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.35, 0.45, 1.0);
+// Headlight a little above and left of the camera, so lighting follows the
+// view and surfaces facing it stay lit.
+const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.2, 0.3, 1.0);
 
 // Samples for the segment p1..p2: `quality` per voxel crossed (8 to MAX_SAMPLES),
 // starting a jittered fraction of a step in. `face` is the world normal of the

@@ -77,7 +77,7 @@ fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
     return vec4<f32>(user.rgb, corrected_alpha(user.a, step_world));
 }
 
-// Samples this faint skip the lighting gradient.
+// Samples contributing less than this to the pixel skip the lighting gradient.
 const LIT_ALPHA_MIN: f32 = 0.002;
 
 // 0. Direct Volume Rendering (DVR) with front-to-back alpha compositing
@@ -98,7 +98,9 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
         let s = dvr_sample(d, ray.step_world);
         let a = s.a;
         if (a > 0.0) {
-            let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN && in_display_range(d);
+            // Only samples that still show through pay for the gradient.
+            let lit = uniforms.lighting != 0u && a * (1.0 - alpha_acc) > LIT_ALPHA_MIN
+                && in_display_range(d);
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, range), lit);
             accum += (1.0 - alpha_acc) * a * rgb;
             alpha_acc += a * (1.0 - alpha_acc);
@@ -123,7 +125,7 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
                 return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_BRIGHT, i == 0);
             }
             let a = corrected_alpha(dvr_opacity(s.a), ray.step_world);
-            let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN;
+            let lit = uniforms.lighting != 0u && a * (1.0 - alpha_acc) > LIT_ALPHA_MIN;
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, 1.0), lit);
             accum += (1.0 - alpha_acc) * a * rgb;
             alpha_acc += a * (1.0 - alpha_acc);

@@ -59,11 +59,20 @@ fn facing_normal(g: vec3<f32>, view: vec3<f32>) -> vec3<f32> {
     return select(n, -n, dot(n, view) < 0.0);
 }
 
+// DVR and surface lighting (the classic modes keep the uniforms' own):
+// two-sided diffuse under the headlight, so a surface facing the viewer
+// shows brighter than its colormap color and only grazing ones darken.
+const LIGHT_AMBIENT: f32 = 0.35;
+const LIGHT_DIFFUSE: f32 = 0.9;
+
+// Color lit by the headlight across normal `n` (either side), no highlight.
+fn lit_diffuse(n: vec3<f32>, light: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    return color * (LIGHT_AMBIENT + LIGHT_DIFFUSE * abs(dot(n, light)));
+}
+
 fn blinnphong(n: vec3<f32>, view: vec3<f32>, light: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
-    let diffuse = max(dot(n, light), 0.0);
     let specular = pow(max(dot(n, normalize(light + view)), 0.0), uniforms.shininess);
-    return color * (uniforms.ambient + uniforms.diffuse * diffuse)
-        + uniforms.light_color * uniforms.specular * specular;
+    return lit_diffuse(n, light, color) + uniforms.light_color * uniforms.specular * specular;
 }
 
 // Lit opaque surface color with normal `n`.
@@ -79,7 +88,6 @@ fn shade_surface(ray: Ray, n: vec3<f32>, color: vec3<f32>) -> vec4<f32> {
 fn lit_sample(ray: Ray, p: vec3<f32>, color: vec3<f32>, range: f32) -> vec3<f32> {
     let g = gradient_intensity(p);
     let m = length(g) / max(range, 1e-30);
-    let diffuse = max(dot(facing_normal(g, ray.view), ray.light), 0.0);
-    let lit = color * (uniforms.ambient + uniforms.diffuse * diffuse);
+    let lit = lit_diffuse(facing_normal(g, ray.view), ray.light, color);
     return mix(color, lit, m / (m + 1.0));
 }

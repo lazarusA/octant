@@ -193,3 +193,33 @@ fn gpu_frame_cache_rerenders_only_on_change() {
         "new data re-renders"
     );
 }
+
+/// Mean of the premultiplied color channels over the frame.
+fn mean_color(pixels: &[u8]) -> f32 {
+    let sum: u32 = pixels
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|p| u32::from(p[0]) + u32::from(p[1]) + u32::from(p[2]))
+        .sum();
+    sum as f32 / (3 * SIZE * SIZE) as f32 / 255.0
+}
+
+#[test]
+fn gpu_lighting_does_not_dim() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_lighting_does_not_dim: no GPU adapter, nothing was compared");
+        return;
+    };
+    let p = params(0, 1.0, 0);
+    // Lighting shades, it does not dim the volume.
+    let blob = renderer(&device, &queue, &blob(), false);
+    let lit = mean_color(&render(&device, &queue, &blob, &p));
+    let unlit_params = VolumeUniformParams {
+        lighting: false,
+        ..p
+    };
+    let unlit = mean_color(&render(&device, &queue, &blob, &unlit_params));
+    assert!(lit >= 0.9 * unlit, "lit {lit} vs unlit {unlit}");
+}
