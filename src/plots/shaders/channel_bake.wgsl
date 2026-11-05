@@ -52,5 +52,5 @@ fn bake_main(@builtin(global_invocation_id) id: vec3<u32>) {
         let y = sample_index((i % plane) / bake.width, bake.stride, bake.height, bake.full_height);
         cell = ((i / plane) * bake.full_height + y) * bake.full_width + x;
     }
-    baked[i] = channel_value(cell, bitcast<f32>(0x7FC00000u));
+    baked[i] = channel_value(cell, channel_nan());
 }
