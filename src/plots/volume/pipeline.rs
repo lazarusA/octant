@@ -15,6 +15,8 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
+            include_str!("../shaders/volume/walk.wgsl"),
+            "\n",
             include_str!("../shaders/volume/shading.wgsl"),
             "\n",
             include_str!("../shaders/volume/dvr.wgsl"),

@@ -50,6 +50,22 @@ impl VolumeSampler<'_> {
             && canvas_plot_type == PlotType::Volume
             && app.plot_configs.volume.algorithm == 4;
 
+        // MIP walks every voxel the ray crosses, as its shader does.
+        if is_mip && !app.layers.base.composite.enabled {
+            let texel = |t: f32| {
+                let p = [0, 1, 2].map(|i| ray.origin[i] + t * ray.dir[i]);
+                let u = p[0] / aspect_x.max(1e-4) + 0.5;
+                let v = p[1] / aspect_y.max(1e-4) + 0.5;
+                let w = p[2] / aspect_z.max(1e-4) + 0.5;
+                [
+                    u * self.width as f32,
+                    (1.0 - v) * self.height as f32,
+                    (1.0 - w) * self.depth as f32,
+                ]
+            };
+            return self.mip_hit(app, texel(t_start), texel(t_end));
+        }
+
         // Rays pick the cells of the grid drawn (a thinned cloud's).
         let (_, (gw, gh)) = self.drawn_cell(0, 0);
         for i in 0..num_steps {

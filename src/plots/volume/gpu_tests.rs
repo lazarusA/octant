@@ -1,7 +1,7 @@
 //! GPU tests: renders small volumes offscreen and compares the images.
 //! Skipped (with a note) when no adapter is available.
 
-use super::gpu_render::{atlas, camera, gpu, params, render_sized, renderer_n};
+use super::gpu_render::{atlas, camera, gpu, params, render_sized, renderer_n, renderer_wh};
 use super::{VolumeRenderer, VolumeUniformParams};
 use crate::utils::colormap::registry;
 
@@ -268,4 +268,41 @@ fn gpu_value_surface() {
     };
     let inner = mean_alpha(&render(&device, &queue, &blob, &inner));
     assert!(inner < 0.5 * mean_alpha(&render(&device, &queue, &blob, &value)));
+}
+
+#[test]
+fn gpu_mip_never_skips_a_voxel() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_mip_never_skips_a_voxel: no GPU adapter, nothing was compared");
+        return;
+    };
+    // Deeper than the 384 samples rays took: a one-voxel plane among 600
+    // must show on every ray, as a volume full of its value does.
+    const W: usize = 16;
+    const D: usize = 600;
+    let mut plane = vec![0.0f32; W * W * D];
+    plane[W * W * 301..W * W * 302].fill(1.0);
+    let full = vec![1.0f32; W * W * D];
+    let p = params(1, 1.0, 0);
+    let draw = |data: &[f32]| {
+        let r = renderer_wh(&device, &queue, data, [W, W], false);
+        render(&device, &queue, &r, &p)
+    };
+    let (plane, full) = (draw(&plane), draw(&full));
+    assert!(mean_alpha(&full) > 0.05, "the box must show");
+    // Rays through the frame's center cross the box's middle plane; those
+    // near its edges may enter after or leave before it.
+    let center = |pixels: &[u8]| -> Vec<u8> {
+        let rows = (SIZE / 2 - 6)..(SIZE / 2 + 6);
+        rows.flat_map(|y| {
+            let start = ((y * SIZE + SIZE / 2 - 6) * 4) as usize;
+            pixels[start..start + 48].to_vec()
+        })
+        .collect()
+    };
+    assert!(
+        max_diff(&center(&plane), &center(&full)) <= 2,
+        "a ray stepped over the plane"
+    );
 }
