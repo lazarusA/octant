@@ -64,7 +64,7 @@ fn opaque_surface(ray: Ray, prev: vec3<f32>, pos: vec3<f32>, kind: u32, first: b
     return shade_surface(ray, n, surface_color(hit, kind));
 }
 
-// DVR opacity at scale position `t` per REFERENCE_STEP: `t^(1/Density)`,
+// DVR opacity at scale position `t` per reference step: `t^(1/Density)`,
 // floored so every in-range sample stays faintly visible.
 fn dvr_opacity(t: f32) -> f32 {
     return clamp(pow(clamp(t, 0.001, 1.0), 1.0 / max(uniforms.absorption, 0.1)), 0.01, 1.0);
@@ -72,8 +72,8 @@ fn dvr_opacity(t: f32) -> f32 {
 
 // Straight color of a DVR sample and its opacity over one step: colormap
 // color and DVR opacity in range, enabled NaN or clip colors outside it,
-// transparent otherwise. Opacities are defined per REFERENCE_STEP.
-fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
+// transparent otherwise. Opacities are defined per reference step.
+fn dvr_sample(d: f32, step_refs: f32) -> vec4<f32> {
     let c = uniforms.color;
     var user = vec4<f32>(0.0);
     if (is_missing(d)) {
@@ -87,7 +87,7 @@ fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
         let e = evaluate_plot_color(d, c);
         user = vec4<f32>(e.rgb, dvr_opacity(t) * e.a);
     }
-    return vec4<f32>(user.rgb, corrected_alpha(user.a, step_world));
+    return vec4<f32>(user.rgb, corrected_alpha(user.a, step_refs));
 }
 
 // Samples contributing less than this to the pixel skip the lighting gradient.
@@ -124,7 +124,7 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
         if (uniforms.transparency == 0u && surface == SURFACE_VALUE) {
             continue;
         }
-        let s = dvr_sample(d, ray.step_world);
+        let s = dvr_sample(d, ray.step_refs);
         let a = s.a;
         if (a > 0.0) {
             // Only samples that still show through pay for the gradient.
@@ -153,7 +153,7 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
             if (uniforms.transparency == 0u) {
                 return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_BRIGHT, i == 0);
             }
-            let a = corrected_alpha(dvr_opacity(s.a), ray.step_world);
+            let a = corrected_alpha(dvr_opacity(s.a), ray.step_refs);
             let lit = uniforms.lighting != 0u && a * (1.0 - alpha_acc) > LIT_ALPHA_MIN;
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, 1.0), lit);
             accum += (1.0 - alpha_acc) * a * rgb;

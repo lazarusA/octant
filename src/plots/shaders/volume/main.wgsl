@@ -60,7 +60,8 @@ fn build_ray(p1: vec3<f32>, p2: vec3<f32>, face: vec3<f32>, frag: vec2<f32>) -> 
     let view = normalize(-segment * world_scale());
     let entry_normal = select(face, view, dot(face, face) < 0.5);
     let light = normalize(camera_to_object_dir(uniforms.camera, HEADLIGHT_CAMERA));
-    return Ray(p1 + pixel_jitter(frag) * step, step, count, length(step * world_scale()), p1, entry_normal, view, light);
+    let step_refs = length(step * world_scale()) / reference_step(view);
+    return Ray(p1 + pixel_jitter(frag) * step, step, count, step_refs, p1, entry_normal, view, light);
 }
 
 @fragment

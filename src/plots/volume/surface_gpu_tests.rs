@@ -2,8 +2,8 @@
 //! Skipped (with a note) when no adapter is available.
 
 use super::VolumeUniformParams;
-use super::gpu_render::{gpu, params};
-use super::gpu_tests::{SIZE, blob, mean_alpha, render, renderer};
+use super::gpu_render::{camera, gpu, params, renderer_wh};
+use super::gpu_tests::{N, SIZE, blob, mean_alpha, render, renderer};
 use crate::utils::colormap::registry;
 
 /// Mean of the premultiplied color channels over the frame.
@@ -80,4 +80,60 @@ fn gpu_value_surface() {
     };
     let inner = mean_alpha(&render(&device, &queue, &blob, &inner));
     assert!(inner < 0.5 * mean_alpha(&render(&device, &queue, &blob, &value)));
+}
+
+/// Mean alpha over the pixels a frame draws.
+fn covered_alpha(pixels: &[u8]) -> f32 {
+    let drawn: Vec<u8> = pixels
+        .iter()
+        .skip(3)
+        .step_by(4)
+        .copied()
+        .filter(|&a| a > 0)
+        .collect();
+    drawn.iter().map(|&a| f32::from(a)).sum::<f32>() / drawn.len().max(1) as f32 / 255.0
+}
+
+#[test]
+fn gpu_thin_volume_is_as_opaque_as_a_cube() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_thin_volume_is_as_opaque_as_a_cube: no GPU adapter");
+        return;
+    };
+    // A one-slice volume (a 2D map of a 1440-wide grid drawn as a volume)
+    // seen face-on shows as opaque as a cube of the same low value, not the
+    // canvas through it.
+    let cube = renderer(&device, &queue, &vec![0.1; N * N * N], false);
+    let slab = renderer_wh(&device, &queue, &vec![0.1; N * N], [N, N], false);
+    let p = params(0, 1.0, 0);
+    let thin = VolumeUniformParams {
+        aspect_z: 1.0 / 1440.0,
+        ..p
+    };
+    let cube = covered_alpha(&render(&device, &queue, &cube, &p));
+    let slab = covered_alpha(&render(&device, &queue, &slab, &thin));
+    assert!(cube > 0.9, "the cube is opaque: {cube}");
+    assert!(slab > 0.9 * cube, "slab {slab} vs cube {cube}");
+}
+
+#[test]
+fn gpu_flat_volume_stays_see_through_from_the_side() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_flat_volume_stays_see_through_from_the_side: no GPU adapter");
+        return;
+    };
+    // A box 16 times thinner in z, seen along x at the lowest Density: as
+    // see-through as a cube is (opacity per its long side, not per its
+    // thickness, which made it a solid block).
+    let flat = renderer(&device, &queue, &vec![0.1; N * N * N], false);
+    let side = VolumeUniformParams {
+        aspect_z: 1.0 / 16.0,
+        opacity_scale: 0.1,
+        camera: camera(std::f32::consts::FRAC_PI_2, [0.0; 3]),
+        ..params(0, 1.0, 0)
+    };
+    let alpha = covered_alpha(&render(&device, &queue, &flat, &side));
+    assert!(alpha < 0.8, "the side is opaque: {alpha}");
 }
