@@ -20,6 +20,8 @@ mod textures;
 mod uniforms;
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod bench_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_render;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_tests;
