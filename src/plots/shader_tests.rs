@@ -229,3 +229,38 @@ fn plot_shaders_compile_for_gl() {
         }
     }
 }
+
+/// No shader bitcasts a literal to a float: WGSL forbids constants that
+/// evaluate to NaN or infinity, which naga accepts but Safari hangs compiling
+/// (`channel_blend.wgsl` `channel_nan` loads its bits from a `var` instead).
+#[test]
+fn no_float_bitcast_of_literals() {
+    fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for path in entries.flatten().map(|e| e.path()) {
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "wgsl")
+                && let Ok(text) = std::fs::read_to_string(&path)
+            {
+                for (n, line) in text.lines().enumerate() {
+                    let rest = line.split("bitcast<f32>(").skip(1);
+                    if rest
+                        .clone()
+                        .any(|r| r.starts_with(|c: char| c.is_ascii_digit()))
+                    {
+                        out.push(format!("{}:{}", path.display(), n + 1));
+                    }
+                }
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/plots/shaders"),
+        &mut found,
+    );
+    assert!(found.is_empty(), "float bitcasts of literals: {found:?}");
+}

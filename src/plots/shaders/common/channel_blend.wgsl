@@ -40,6 +40,14 @@ var<uniform> channel_params: ChannelParams;
 @group(2) @binding(1)
 var<storage, read> channel_planes: array<f32>;
 
+// A quiet NaN, loaded from a `var` so it is no constant expression: WGSL
+// forbids constants that evaluate to NaN, and Safari hangs compiling one
+// (naga accepts it), even in a pipeline that never calls this.
+fn channel_nan() -> f32 {
+    var bits = 0x7FC00000u;
+    return bitcast<f32>(bits);
+}
+
 fn channel_is_nan(v: f32) -> bool {
     let bits = bitcast<u32>(v);
     return (bits & 0x7F800000u) == 0x7F800000u && (bits & 0x007FFFFFu) != 0u;
@@ -96,7 +104,7 @@ fn channel_value(cell: u32, raw: f32) -> f32 {
     }
     let color = blend_cell(cell);
     if (color.a == 0.0) {
-        return bitcast<f32>(0x7FC00000u);
+        return channel_nan();
     }
     let level = vec3<u32>(round(color.rgb * 255.0));
     return f32(level.r | (level.g << 8u) | (level.b << 16u));
