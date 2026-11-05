@@ -48,5 +48,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "屏幕的4倍",
         PlotOptionsKey::DetailFull => "每个单元格",
         PlotOptionsKey::Size => "大小",
+        PlotOptionsKey::Surface => "表面",
+        PlotOptionsKey::SurfaceRange => "颜色范围",
+        PlotOptionsKey::SurfaceValue => "值",
+        PlotOptionsKey::SurfaceHover => {
+            "不透明体绘制表面的位置：数值进入颜色范围处，或数值达到某一值处"
+        }
     })
 }

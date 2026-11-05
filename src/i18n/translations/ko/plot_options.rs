@@ -51,5 +51,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "화면의 4배",
         PlotOptionsKey::DetailFull => "모든 셀",
         PlotOptionsKey::Size => "크기",
+        PlotOptionsKey::Surface => "표면",
+        PlotOptionsKey::SurfaceRange => "색상 범위",
+        PlotOptionsKey::SurfaceValue => "값",
+        PlotOptionsKey::SurfaceHover => {
+            "불투명한 볼륨이 표면을 그리는 위치: 값이 색상 범위에 들어가는 곳 또는 한 값에 도달하는 곳"
+        }
     })
 }

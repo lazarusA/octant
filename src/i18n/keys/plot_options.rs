@@ -48,5 +48,10 @@ crate::i18n::keys::define_keys! {
     DetailQuadruple,
     DetailFull,
     Size,
+    // Volume surfaces
+    Surface,
+    SurfaceRange,
+    SurfaceValue,
+    SurfaceHover,
     }
 }

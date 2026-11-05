@@ -4,20 +4,33 @@
 // What makes a sample part of an opaque surface.
 const SURFACE_RANGE: u32 = 0u;  // scalar inside [cmin, cmax]
 const SURFACE_BRIGHT: u32 = 1u; // composite brightness above 0.001
+const SURFACE_VALUE: u32 = 2u;  // scalar at or above `isovalue`
 
 fn in_display_range(d: f32) -> bool {
     return !is_missing(d) && d >= uniforms.color.cmin && d <= uniforms.color.cmax;
 }
 
-fn is_inside(p: vec3<f32>, kind: u32) -> bool {
-    if (kind == SURFACE_RANGE) {
-        return in_display_range(sample_scalar(p));
+// The scalar surface opaque DVR draws: the color range, or `isovalue`.
+fn scalar_surface() -> u32 {
+    return select(SURFACE_RANGE, SURFACE_VALUE, uniforms.surface == 1u);
+}
+
+fn inside_scalar(d: f32, kind: u32) -> bool {
+    if (kind == SURFACE_VALUE) {
+        return !is_missing(d) && d >= uniforms.isovalue;
     }
-    return sample_composite(p).a > 0.001;
+    return in_display_range(d);
+}
+
+fn is_inside(p: vec3<f32>, kind: u32) -> bool {
+    if (kind == SURFACE_BRIGHT) {
+        return sample_composite(p).a > 0.001;
+    }
+    return inside_scalar(sample_scalar(p), kind);
 }
 
 fn surface_color(p: vec3<f32>, kind: u32) -> vec3<f32> {
-    if (kind == SURFACE_RANGE) {
+    if (kind != SURFACE_BRIGHT) {
         return evaluate_plot_color(sample_scalar(p), uniforms.color).rgb;
     }
     return sample_composite(p).rgb;
@@ -86,14 +99,20 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
         return dvr_composite(ray);
     }
     let range = uniforms.color.cmax - uniforms.color.cmin;
+    let surface = scalar_surface();
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
 
     for (var i = 0; i < ray.count; i = i + 1) {
         let pos = sample_pos(ray, i);
         let d = sample_scalar(pos);
-        if (uniforms.transparency == 0u && in_display_range(d)) {
-            return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_RANGE, i == 0);
+        if (uniforms.transparency == 0u && inside_scalar(d, surface)) {
+            return opaque_surface(ray, previous_pos(ray, i), pos, surface, i == 0);
+        }
+        // Outside the color range only clip and NaN colors show; below a
+        // value surface nothing does, so the surface alone is drawn.
+        if (uniforms.transparency == 0u && surface == SURFACE_VALUE) {
+            continue;
         }
         let s = dvr_sample(d, ray.step_world);
         let a = s.a;

@@ -52,5 +52,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x layar",
         PlotOptionsKey::DetailFull => "Setiap sel",
         PlotOptionsKey::Size => "Ukuran",
+        PlotOptionsKey::Surface => "Permukaan",
+        PlotOptionsKey::SurfaceRange => "Rentang warna",
+        PlotOptionsKey::SurfaceValue => "Nilai",
+        PlotOptionsKey::SurfaceHover => {
+            "Tempat volume buram menggambar permukaannya: tempat nilai memasuki rentang warna, atau tempat nilai mencapai satu nilai"
+        }
     })
 }

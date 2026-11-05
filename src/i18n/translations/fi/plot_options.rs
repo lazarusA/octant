@@ -51,5 +51,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x näyttö",
         PlotOptionsKey::DetailFull => "Jokainen solu",
         PlotOptionsKey::Size => "Koko",
+        PlotOptionsKey::Surface => "Pinta",
+        PlotOptionsKey::SurfaceRange => "Väriväli",
+        PlotOptionsKey::SurfaceValue => "Arvo",
+        PlotOptionsKey::SurfaceHover => {
+            "Mihin läpinäkymätön tilavuus piirtää pintansa: missä arvot tulevat väriväliin tai missä ne saavuttavat yhden arvon"
+        }
     })
 }

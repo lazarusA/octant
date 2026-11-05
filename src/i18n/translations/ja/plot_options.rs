@@ -50,5 +50,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "画面の4倍",
         PlotOptionsKey::DetailFull => "すべてのセル",
         PlotOptionsKey::Size => "サイズ",
+        PlotOptionsKey::Surface => "表面",
+        PlotOptionsKey::SurfaceRange => "色の範囲",
+        PlotOptionsKey::SurfaceValue => "値",
+        PlotOptionsKey::SurfaceHover => {
+            "不透明なボリュームが表面を描く位置：値が色の範囲に入る所、または一つの値に達する所"
+        }
     })
 }

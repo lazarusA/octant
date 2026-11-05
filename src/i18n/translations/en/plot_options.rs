@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> &'static str {
         PlotOptionsKey::DetailQuadruple => "4x screen",
         PlotOptionsKey::DetailFull => "Every cell",
         PlotOptionsKey::Size => "Size",
+        PlotOptionsKey::Surface => "Surface",
+        PlotOptionsKey::SurfaceRange => "Color range",
+        PlotOptionsKey::SurfaceValue => "Value",
+        PlotOptionsKey::SurfaceHover => {
+            "Where the opaque volume draws its surface: where values enter the color range, or where they reach one value"
+        }
     }
 }

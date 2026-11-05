@@ -55,5 +55,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x schermo",
         PlotOptionsKey::DetailFull => "Ogni cella",
         PlotOptionsKey::Size => "Dimensione",
+        PlotOptionsKey::Surface => "Superficie",
+        PlotOptionsKey::SurfaceRange => "Intervallo di colori",
+        PlotOptionsKey::SurfaceValue => "Valore",
+        PlotOptionsKey::SurfaceHover => {
+            "Dove il volume opaco disegna la sua superficie: dove i valori entrano nell'intervallo di colori, o dove raggiungono un valore"
+        }
     })
 }

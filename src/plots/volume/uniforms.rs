@@ -18,7 +18,8 @@ pub struct VolumeUniforms {
     pub light_direction: [f32; 3],
     pub algorithm: u32,
     pub isovalue: f32,
-    pub isorange: f32,
+    /// Where opaque DVR draws its surface: 0 the color range, 1 `isovalue`.
+    pub surface: u32,
     pub absorption: f32,
     /// Samples per voxel crossed by each ray.
     pub quality: f32,
@@ -55,8 +56,9 @@ pub struct VolumeUniformParams {
     /// Samples per voxel crossed by each ray.
     pub quality: f32,
     pub algorithm: u32,
+    /// Where opaque DVR draws its surface: 0 the color range, 1 `isovalue`.
+    pub surface: u32,
     pub isovalue: f32,
-    pub isorange: f32,
     pub attenuation: f32,
     pub shift_x: u32,
     pub shift_y: u32,
@@ -87,7 +89,7 @@ impl VolumeUniformParams {
             light_direction: [1.0, 1.0, 1.0],
             algorithm: self.algorithm,
             isovalue: self.isovalue,
-            isorange: self.isorange,
+            surface: self.surface,
             absorption: self.opacity_scale,
             quality: self.quality,
             diffuse: 0.8,

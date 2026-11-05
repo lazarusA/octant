@@ -29,6 +29,6 @@ pub use colormap_state::ColormapState;
 pub use dimension_state::{AnimationRole, DimConfig, SpatialRole};
 pub use navigation::NavigationState;
 pub use playback::PlaybackState;
-pub use plot_configs::{MeshDetail, PlotConfigs};
+pub use plot_configs::{MeshDetail, PlotConfigs, VolumeSurface};
 pub use store_kind::StoreKind;
 pub use ui_layout::UiLayoutState;

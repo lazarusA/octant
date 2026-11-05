@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x екран",
         PlotOptionsKey::DetailFull => "Кожна комірка",
         PlotOptionsKey::Size => "Розмір",
+        PlotOptionsKey::Surface => "Поверхня",
+        PlotOptionsKey::SurfaceRange => "Колірний діапазон",
+        PlotOptionsKey::SurfaceValue => "Значення",
+        PlotOptionsKey::SurfaceHover => {
+            "Де непрозорий об'єм малює поверхню: де значення входять у колірний діапазон або де вони досягають одного значення"
+        }
     })
 }

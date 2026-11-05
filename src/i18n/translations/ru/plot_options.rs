@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x экран",
         PlotOptionsKey::DetailFull => "Каждая ячейка",
         PlotOptionsKey::Size => "Размер",
+        PlotOptionsKey::Surface => "Поверхность",
+        PlotOptionsKey::SurfaceRange => "Цветовой диапазон",
+        PlotOptionsKey::SurfaceValue => "Значение",
+        PlotOptionsKey::SurfaceHover => {
+            "Где непрозрачный объём рисует поверхность: где значения входят в цветовой диапазон или где они достигают одного значения"
+        }
     })
 }

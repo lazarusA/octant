@@ -38,9 +38,22 @@ pub struct VolumePlotConfig {
     pub lighting: bool,
     pub attenuation: f32,
     pub algorithm: u32,
+    /// Where the opaque volume draws its surface.
+    pub surface: VolumeSurface,
+    /// The Value surface's value; NaN until Value is first chosen, which sets
+    /// it from the data.
     pub isovalue: f32,
-    pub isorange: f32,
     pub z_scale: f32,
+}
+
+/// Where an opaque DVR volume draws its surface (`VolumeUniforms::surface`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VolumeSurface {
+    /// Where values enter the color range.
+    #[default]
+    Range,
+    /// Where values reach `VolumePlotConfig::isovalue`.
+    Value,
 }
 
 impl Default for VolumePlotConfig {
@@ -52,8 +65,8 @@ impl Default for VolumePlotConfig {
             lighting: false,
             attenuation: 0.0,
             algorithm: 0,
-            isovalue: 50.0,
-            isorange: 5.0,
+            surface: VolumeSurface::Range,
+            isovalue: f32::NAN,
             z_scale: 1.0,
         }
     }

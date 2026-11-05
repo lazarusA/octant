@@ -19,7 +19,6 @@ pub struct PlotRenderParams {
     pub step_count: u32,
     pub algorithm: u32,
     pub isovalue: f32,
-    pub isorange: f32,
     pub attenuation: f32,
     pub transparency: bool,
     pub shift_x: u32,

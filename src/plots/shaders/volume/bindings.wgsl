@@ -25,7 +25,8 @@ struct Uniforms {
     light_direction: vec3<f32>,
     algorithm: u32,
     isovalue: f32,
-    isorange: f32,
+    // Opaque DVR surface: 0 where values enter [cmin, cmax], 1 at `isovalue`.
+    surface: u32,
     absorption: f32,
     quality: f32,
     diffuse: f32,
