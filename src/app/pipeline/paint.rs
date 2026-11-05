@@ -85,7 +85,7 @@ impl OctantApp {
             quality: self.plot_configs.volume.quality,
             algorithm: self.plot_configs.volume.algorithm,
             surface: self.plot_configs.volume.surface as u32,
-            isovalue: self.plot_configs.volume.isovalue,
+            isovalue: self.plot_configs.volume.isovalue_in(layer.color.extent()),
             attenuation: self.plot_configs.volume.attenuation,
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,

@@ -49,6 +49,12 @@ impl VolumeSampler<'_> {
         let is_label = is_half_scale
             && canvas_plot_type == PlotType::Volume
             && app.plot_configs.volume.algorithm == 4;
+        // A Value surface is drawn where values reach the isovalue.
+        let volume = &app.plot_configs.volume;
+        let isovalue = (is_half_scale
+            && canvas_plot_type == PlotType::Volume
+            && volume.draws_value_surface(app.layers.base.composite.enabled))
+        .then(|| volume.isovalue_in(app.layers.base.color.extent()));
 
         // MIP and label surfaces walk every voxel the ray crosses, as their
         // shaders do.
@@ -137,6 +143,11 @@ impl VolumeSampler<'_> {
                             min_val = raw_val;
                             min_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
+                    }
+                } else if let Some(iso) = isovalue {
+                    if !is_nan && raw_val >= iso {
+                        hit_point = Some((cx, cy, cz, raw_val));
+                        break;
                     }
                 } else if self.is_visible(app, raw_val) {
                     hit_point = Some((cx, cy, cz, raw_val));

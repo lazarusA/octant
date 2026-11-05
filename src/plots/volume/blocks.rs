@@ -23,8 +23,15 @@ pub struct Blocks {
     texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     grid: Dims,
-    /// Each block's own min, max and missing flag, before taking neighbors.
-    own: Mutex<Vec<[f32; 3]>>,
+    stats: Mutex<Stats>,
+}
+
+/// Min, max and missing flag per plane and block column (`planes`, so an
+/// upload scans only its own planes), and per block (`own`, the reduction of
+/// its planes), before taking neighbors.
+struct Stats {
+    planes: Vec<[f32; 3]>,
+    own: Vec<[f32; 3]>,
 }
 
 /// Blocks covering `dims` voxels.
@@ -56,11 +63,15 @@ impl Blocks {
             VolumeEncoding::Scalar => [EMPTY[0], EMPTY[1], 1.0],
             VolumeEncoding::PackedRgb => OPEN,
         };
+        let columns = grid.w * grid.h;
         let blocks = Self {
             view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
             texture,
             grid,
-            own: Mutex::new(vec![start; grid.w * grid.h * grid.d]),
+            stats: Mutex::new(Stats {
+                planes: vec![start; dims.d * columns],
+                own: vec![start; grid.d * columns],
+            }),
         };
         blocks.write_rows(queue, 0..grid.d);
         blocks
@@ -69,23 +80,32 @@ impl Blocks {
     /// Opens every block, so rays skip nothing (tests compare against it).
     #[cfg(test)]
     pub fn open_all(&self, queue: &wgpu::Queue) {
-        self.own
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .fill(OPEN);
+        self.lock().own.fill(OPEN);
         self.write_rows(queue, 0..self.grid.d);
     }
 
-    /// Takes scalar planes `z` of the full volume `values` into the blocks.
+    fn lock(&self) -> std::sync::MutexGuard<'_, Stats> {
+        self.stats.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Takes scalar planes `z` of the full volume `values` into the blocks:
+    /// scans those planes only, then reduces the block rows holding them.
     pub fn update(&self, queue: &wgpu::Queue, values: &[f32], dims: Dims, z: Range<usize>) {
+        let z = z.start..z.end.min(dims.d);
         if z.is_empty() || values.len() != dims.w * dims.h * dims.d {
             return;
         }
         let rows = z.start / BLOCK..z.end.div_ceil(BLOCK).min(self.grid.d);
         {
-            let mut own = self.own.lock().unwrap_or_else(|p| p.into_inner());
+            let mut stats = self.lock();
+            let Stats { planes, own } = &mut *stats;
+            let columns = self.grid.w * self.grid.h;
+            for zi in z {
+                let plane = &mut planes[zi * columns..(zi + 1) * columns];
+                plane_stats(values, dims, self.grid, zi, plane);
+            }
             for bz in rows.clone() {
-                own_row(values, dims, self.grid, bz, &mut own);
+                own_row(planes, dims, self.grid, bz, own);
             }
         }
         // Neighbors take each changed row too.
@@ -99,14 +119,14 @@ impl Blocks {
         if rows.is_empty() {
             return;
         }
-        let own = self.own.lock().unwrap_or_else(|p| p.into_inner());
+        let stats = self.lock();
         let texels: Vec<[f32; 4]> = rows
             .clone()
             .flat_map(|bz| (0..self.grid.h).map(move |by| (bz, by)))
             .flat_map(|(bz, by)| (0..self.grid.w).map(move |bx| [bx, by, bz]))
-            .map(|b| widened(&own, self.grid, b))
+            .map(|b| widened(&stats.own, self.grid, b))
             .collect();
-        drop(own);
+        drop(stats);
         let origin = wgpu::Origin3d {
             x: 0,
             y: 0,
@@ -129,25 +149,33 @@ impl Blocks {
     }
 }
 
-/// Recomputes every block of row `bz` from the voxels it holds.
-fn own_row(values: &[f32], dims: Dims, grid: Dims, bz: usize, own: &mut [[f32; 3]]) {
-    let row = bz * grid.h * grid.w;
-    own[row..row + grid.h * grid.w].fill(EMPTY);
-    for z in bz * BLOCK..((bz + 1) * BLOCK).min(dims.d) {
-        for y in 0..dims.h {
-            let line = &values[(z * dims.h + y) * dims.w..][..dims.w];
-            let blocks = &mut own[row + (y / BLOCK) * grid.w..][..grid.w];
-            for (bx, chunk) in line.chunks(BLOCK).enumerate() {
-                let b = &mut blocks[bx];
-                for &v in chunk {
-                    if is_valid(v) {
-                        b[0] = b[0].min(v);
-                        b[1] = b[1].max(v);
-                    } else {
-                        b[2] = 1.0;
-                    }
+/// Recomputes plane `z`'s block columns (`plane`) from its voxels.
+fn plane_stats(values: &[f32], dims: Dims, grid: Dims, z: usize, plane: &mut [[f32; 3]]) {
+    plane.fill(EMPTY);
+    for y in 0..dims.h {
+        let line = &values[(z * dims.h + y) * dims.w..][..dims.w];
+        let columns = &mut plane[(y / BLOCK) * grid.w..][..grid.w];
+        for (b, chunk) in columns.iter_mut().zip(line.chunks(BLOCK)) {
+            for &v in chunk {
+                if is_valid(v) {
+                    b[0] = b[0].min(v);
+                    b[1] = b[1].max(v);
+                } else {
+                    b[2] = 1.0;
                 }
             }
+        }
+    }
+}
+
+/// Recomputes block row `bz` (`own`) from the planes it holds.
+fn own_row(planes: &[[f32; 3]], dims: Dims, grid: Dims, bz: usize, own: &mut [[f32; 3]]) {
+    let columns = grid.w * grid.h;
+    let row = &mut own[bz * columns..(bz + 1) * columns];
+    row.fill(EMPTY);
+    for z in bz * BLOCK..((bz + 1) * BLOCK).min(dims.d) {
+        for (b, p) in row.iter_mut().zip(&planes[z * columns..(z + 1) * columns]) {
+            *b = [b[0].min(p[0]), b[1].max(p[1]), b[2].max(p[2])];
         }
     }
 }
@@ -170,43 +198,5 @@ fn widened(own: &[[f32; 3]], grid: Dims, b: [usize; 3]) -> [f32; 4] {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const DIMS: Dims = Dims { w: 20, h: 9, d: 17 };
-
-    fn own_of(values: &[f32]) -> Vec<[f32; 3]> {
-        let grid = grid_of(DIMS);
-        let mut own = vec![EMPTY; grid.w * grid.h * grid.d];
-        for bz in 0..grid.d {
-            own_row(values, DIMS, grid, bz, &mut own);
-        }
-        own
-    }
-
-    #[test]
-    fn blocks_hold_their_voxels_range() {
-        let n = DIMS.w * DIMS.h * DIMS.d;
-        let mut values = vec![0.0f32; n];
-        // Voxel (17, 8, 16): block (2, 1, 2), the partial last one on each axis.
-        values[(16 * DIMS.h + 8) * DIMS.w + 17] = 5.0;
-        values[0] = f32::NAN;
-        let grid = grid_of(DIMS);
-        assert_eq!((grid.w, grid.h, grid.d), (3, 2, 3));
-        let own = own_of(&values);
-        let at = |b: [usize; 3]| own[(b[2] * grid.h + b[1]) * grid.w + b[0]];
-        assert_eq!(at([2, 1, 2]), [0.0, 5.0, 0.0]);
-        assert_eq!(at([0, 0, 0]), [0.0, 0.0, 1.0]);
-        // Neighbors see the 5 and the missing voxel; far blocks do not.
-        assert_eq!(widened(&own, grid, [1, 0, 1])[..3], [0.0, 5.0, 1.0]);
-        assert_eq!(widened(&own, grid, [0, 0, 2])[1], 0.0);
-        assert_eq!(widened(&own, grid, [0, 1, 1])[2], 1.0);
-        assert_eq!(widened(&own, grid, [2, 1, 2])[2], 0.0);
-    }
-
-    #[test]
-    fn a_block_without_values_is_empty() {
-        let own = own_of(&vec![f32::NAN; DIMS.w * DIMS.h * DIMS.d]);
-        assert!(own.iter().all(|b| b[0] > b[1] && b[2] == 1.0));
-    }
-}
+#[path = "blocks_tests.rs"]
+mod tests;

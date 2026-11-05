@@ -127,6 +127,16 @@ impl ColorStyle {
         self.opacity.clamp(0.0, 1.0) * registry::curve_alpha(self.alpha_key, t)
     }
 
+    /// The data's extent, else the color range while it is unknown.
+    pub fn extent(&self) -> (f32, f32) {
+        let (lo, hi) = (self.global_min, self.global_max);
+        if lo.is_finite() && hi.is_finite() && lo < hi {
+            (lo, hi)
+        } else {
+            (self.range_min, self.range_max)
+        }
+    }
+
     /// Whether colormapped values may be drawn translucent.
     pub fn is_translucent(&self) -> bool {
         self.opacity < 1.0 || self.alpha_row().is_some()

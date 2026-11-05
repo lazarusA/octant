@@ -46,6 +46,28 @@ pub struct VolumePlotConfig {
     pub z_scale: f32,
 }
 
+impl VolumePlotConfig {
+    /// The Value surface's value within `(lo, hi)` (the data's extent): its
+    /// middle while `isovalue` lies outside (NaN until chosen, or left from
+    /// another variable).
+    pub fn isovalue_in(&self, (lo, hi): (f32, f32)) -> f32 {
+        if (lo..=hi).contains(&self.isovalue) {
+            self.isovalue
+        } else {
+            0.5 * (lo + hi)
+        }
+    }
+
+    /// Whether DVR draws its Value surface: opaque, Surface Value, not a
+    /// composite (`composite`), which draws its brightness.
+    pub fn draws_value_surface(&self, composite: bool) -> bool {
+        self.algorithm == 0
+            && !self.transparency
+            && self.surface == VolumeSurface::Value
+            && !composite
+    }
+}
+
 /// Where an opaque DVR volume draws its surface (`VolumeUniforms::surface`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum VolumeSurface {
@@ -179,5 +201,22 @@ impl Default for PlotConfigs {
             point_cloud: PointCloudPlotConfig::default(),
             plot_transparency: true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VolumePlotConfig;
+
+    #[test]
+    fn isovalue_stays_within_the_data() {
+        let at = |isovalue| VolumePlotConfig {
+            isovalue,
+            ..Default::default()
+        };
+        // Unset, or left from a variable with other values: the middle.
+        assert_eq!(at(f32::NAN).isovalue_in((200.0, 300.0)), 250.0);
+        assert_eq!(at(0.5).isovalue_in((200.0, 300.0)), 250.0);
+        assert_eq!(at(220.0).isovalue_in((200.0, 300.0)), 220.0);
     }
 }

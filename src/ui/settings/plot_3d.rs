@@ -66,11 +66,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 /// Where the opaque volume draws its surface, and the Value surface's value
 /// within the data's extent (its middle until one is chosen).
 fn surface_row(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let color = &app.layers.base.color;
-    let (lo, hi) = match (color.global_min, color.global_max) {
-        (lo, hi) if lo.is_finite() && hi.is_finite() && lo < hi => (lo, hi),
-        _ => (color.range_min, color.range_max),
-    };
+    let (lo, hi) = app.layers.base.color.extent();
     let config = &mut app.plot_configs.volume;
     ui.horizontal_wrapped(|ui| {
         ui.label(tr(K::Surface)).on_hover_text(tr(K::SurfaceHover));
@@ -90,9 +86,7 @@ fn surface_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     if config.surface != VolumeSurface::Value {
         return;
     }
-    if !(lo..=hi).contains(&config.isovalue) {
-        config.isovalue = 0.5 * (lo + hi);
-    }
+    config.isovalue = config.isovalue_in((lo, hi));
     labeled_slider(
         ui,
         "isovalue",
