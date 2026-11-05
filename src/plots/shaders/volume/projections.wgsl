@@ -47,7 +47,17 @@ fn mip(ray: Ray) -> vec4<f32> {
     let attenuate = uniforms.attenuation > 0.0;
 
     var w = walk_begin(ray);
+    var last = vec3<i32>(-1);
+    var open = true;
     for (var i = 0; i < walk_limit(w); i = i + 1) {
+        // Blocks no higher than the maximum change nothing (attenuation
+        // needs every voxel's density).
+        if (!attenuate && !walk_block_open(w, &last, &open, OPEN_ABOVE, maximum)) {
+            if (!walk_skip_block(&w)) {
+                break;
+            }
+            continue;
+        }
         if (!walk_missing(w)) {
             let density = walk_texel(w).r;
             var attenuated = density;

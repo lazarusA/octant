@@ -102,8 +102,18 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
     let surface = scalar_surface();
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
+    // Blocks drawing nothing are skipped; below a value surface, so are
+    // blocks under its value.
+    let value_surface = uniforms.transparency == 0u && surface == SURFACE_VALUE;
+    let ask = select(OPEN_DRAWN, OPEN_VALUE, value_surface);
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
+        let next = next_open_sample(&blocks, i, ask);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
         let pos = sample_pos(ray, i);
         let d = sample_scalar(pos);
         if (uniforms.transparency == 0u && inside_scalar(d, surface)) {

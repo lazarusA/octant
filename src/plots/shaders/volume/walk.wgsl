@@ -7,6 +7,9 @@
 const WALK_NEVER: f32 = 1e30;
 
 struct Walk {
+    // The segment, `a + t * span` in logical texel positions.
+    a: vec3<f32>,
+    span: vec3<f32>,
     // Logical voxel and its stored texel.
     cell: vec3<i32>,
     texel: vec3<i32>,
@@ -38,14 +41,16 @@ fn walk_begin(ray: Ray) -> Walk {
 // The walk over the segment `a + t * span` from parameter `t0` on.
 fn walk_from(a: vec3<f32>, span: vec3<f32>, t0: f32) -> Walk {
     var w: Walk;
+    w.a = a;
+    w.span = span;
     w.dims = vec3<i32>(textureDimensions(volume_values));
-    // Nudged along the ray, so a start on a face picks the voxel ahead.
-    let start = a + span * (t0 + 1e-6);
-    w.cell = clamp(vec3<i32>(floor(start)), vec3<i32>(0), w.dims - 1);
-    w.texel = (w.cell + vec3<i32>(volume_shift())) % w.dims;
     let parallel = span == vec3<f32>(0.0);
     let ahead = span > vec3<f32>(0.0);
     w.dir = select(select(vec3<i32>(-1), vec3<i32>(1), ahead), vec3<i32>(0), parallel);
+    // Nudged along the ray, so a start on a face picks the voxel ahead.
+    let start = a + span * t0 + vec3<f32>(w.dir) * 1e-3;
+    w.cell = clamp(vec3<i32>(floor(start)), vec3<i32>(0), w.dims - 1);
+    w.texel = (w.cell + vec3<i32>(volume_shift())) % w.dims;
     let safe = select(span, vec3<f32>(1.0), parallel);
     let face = vec3<f32>(w.cell) + select(vec3<f32>(0.0), vec3<f32>(1.0), ahead);
     w.t_max = select((face - a) / safe, vec3<f32>(WALK_NEVER), parallel);

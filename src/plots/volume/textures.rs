@@ -1,6 +1,8 @@
 //! Volume 3D textures: values (`R32Float`, or `Rgba8Unorm` for RGB composites),
-//! and validity (`R8Unorm`), uploaded as whole Z planes.
+//! validity (`R8Unorm`) and the blocks rays skip (`blocks.rs`), uploaded as
+//! whole Z planes.
 
+use super::blocks::Blocks;
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
 use super::texture_writes::{create_texture, region_3d, write_region, write_valid_planes};
 use crate::i18n::{NoticesKey as K, filled, tr};
@@ -20,6 +22,7 @@ pub struct VolumeTextures {
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
+    pub blocks: Blocks,
     invalid_per_plane: Vec<AtomicU32>,
     invalid_total: AtomicU64,
     /// Counts uploads, so cached frames know the data changed.
@@ -29,7 +32,12 @@ pub struct VolumeTextures {
 impl VolumeTextures {
     /// Creates empty textures, or `None` (logged) when `dims` exceed the device's
     /// 3D texture limit.
-    pub fn new(device: &wgpu::Device, dims: Dims, encoding: VolumeEncoding) -> Option<Self> {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        dims: Dims,
+        encoding: VolumeEncoding,
+    ) -> Option<Self> {
         let max = device.limits().max_texture_dimension_3d as usize;
         if dims.w > max || dims.h > max || dims.d > max {
             let detail = [&dims.w as &dyn std::fmt::Display, &dims.h, &dims.d, &max];
@@ -57,6 +65,7 @@ impl VolumeTextures {
             value,
             bake_id: crate::plots::BakeId::next(),
             validity,
+            blocks: Blocks::new(device, queue, dims, encoding),
             invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(plane as u32)).collect(),
             invalid_total: AtomicU64::new((dims.d * plane) as u64),
             version: AtomicU64::new(0),
@@ -116,6 +125,9 @@ impl VolumeTextures {
                 }
             }
             z0 = z1;
+        }
+        if self.encoding == VolumeEncoding::Scalar {
+            self.blocks.update(queue, values, self.dims, start..end);
         }
     }
 

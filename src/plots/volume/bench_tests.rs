@@ -77,6 +77,9 @@ fn volume_mode_timed() {
         ("categorical", categorical(), 4.0),
     ] {
         let renderer = renderer_n(&device, &queue, &data, N, filterable);
+        // The same volume with every block open: what skipping saves.
+        let open = renderer_n(&device, &queue, &data, N, filterable);
+        open.textures.blocks.open_all(&queue);
         for (mode, algorithm, transparency) in [
             ("dvr", 0, true),
             ("dvr opaque", 0, false),
@@ -88,7 +91,8 @@ fn volume_mode_timed() {
             p.color.cmin = if name == "sparse" { 0.1 } else { 0.0 };
             p.color.cmax = cmax;
             let t = timed(&device, &queue, &renderer, p, &resources);
-            eprintln!("{name:<12} {mode:<11} {t:>10.2?}");
+            let unskipped = timed(&device, &queue, &open, p, &resources);
+            eprintln!("{name:<12} {mode:<11} {t:>10.2?}  (no skipping {unskipped:>10.2?})");
         }
     }
 }

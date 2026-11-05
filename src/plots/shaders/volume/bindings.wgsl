@@ -65,6 +65,11 @@ var volume_validity: texture_3d<f32>;
 @group(0) @binding(3)
 var volume_sampler: sampler;
 
+// Per block of 8^3 stored voxels (and its neighbors): min and max of the
+// valid values, 1 where any is missing (`blocks.rs`); read with textureLoad.
+@group(0) @binding(4)
+var volume_blocks: texture_3d<f32>;
+
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) frag_vert: vec3<f32>,

@@ -31,7 +31,17 @@ fn label_iso(ray: Ray) -> vec4<f32> {
     var prev = vec4<f32>(0.0);
     var prev_drawn = false;
     var w = walk_begin(ray);
+    var last = vec3<i32>(-1);
+    var open = true;
     for (var i = 0; i < walk_limit(w); i = i + 1) {
+        // A block drawing nothing is background throughout.
+        if (!walk_block_open(w, &last, &open, OPEN_DRAWN, 0.0)) {
+            prev_drawn = false;
+            if (!walk_skip_block(&w)) {
+                break;
+            }
+            continue;
+        }
         let missing = walk_missing(w);
         let texel = select(walk_texel(w), vec4<f32>(MISSING), missing);
         let c = label_color(missing, texel);
