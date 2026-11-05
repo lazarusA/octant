@@ -12,9 +12,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonNotTranslucent => "Wirkt bei Deckkraft unter 1 oder einer Alphakurve.",
         SettingsKey::ReasonCompositeOpaque => "Komposite werden deckend gezeichnet.",
-        SettingsKey::ReasonLabelOpaque => {
-            "Kategorische Label-Oberfläche wird immer deckend gezeichnet."
-        }
         SettingsKey::ReasonAlwaysBlends => "Dieser Algorithmus mischt immer entlang des Strahls.",
         SettingsKey::CloseSettingsHover => "Einstellungen schließen",
         SettingsKey::CloseColorHover => "Farbeinstellungen schließen",

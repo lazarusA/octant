@@ -6,7 +6,7 @@
 //   1: Maximum Intensity (MIP)     - Maximum intensity projection with density-weighted attenuation
 //   2: Minimum Intensity (MinIP)   - Minimum intensity projection along the ray
 //   3: Average Projection (X-ray)  - Average column scalar intensity (radiographic transmission)
-//   4: Categorical Label Surface   - Binary foreground mask isosurface for segmented data
+//   4: Categorical Label Surface   - Surfaces where the drawn value changes, on the voxel walk
 //   5: Absorption RGBA             - Classical optical absorption model
 //   6: Additive RGBA               - Additive volume emission model
 //   7: Indexed Discrete RGBA       - Palette-indexed discrete material rendering

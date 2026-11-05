@@ -11,7 +11,6 @@ crate::i18n::keys::define_keys! {
     ReasonClassicOpaque,
     ReasonNotTranslucent,
     ReasonCompositeOpaque,
-    ReasonLabelOpaque,
     ReasonAlwaysBlends,
     // Panel and sections
     CloseSettingsHover,

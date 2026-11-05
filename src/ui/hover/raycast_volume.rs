@@ -50,8 +50,9 @@ impl VolumeSampler<'_> {
             && canvas_plot_type == PlotType::Volume
             && app.plot_configs.volume.algorithm == 4;
 
-        // MIP walks every voxel the ray crosses, as its shader does.
-        if is_mip && !app.layers.base.composite.enabled {
+        // MIP and label surfaces walk every voxel the ray crosses, as their
+        // shaders do.
+        if (is_mip && !app.layers.base.composite.enabled) || is_label {
             let texel = |t: f32| {
                 let p = [0, 1, 2].map(|i| ray.origin[i] + t * ray.dir[i]);
                 let u = p[0] / aspect_x.max(1e-4) + 0.5;
@@ -63,7 +64,12 @@ impl VolumeSampler<'_> {
                     (1.0 - w) * self.depth as f32,
                 ]
             };
-            return self.mip_hit(app, texel(t_start), texel(t_end));
+            let (a, b) = (texel(t_start), texel(t_end));
+            return if is_mip {
+                self.mip_hit(app, a, b)
+            } else {
+                self.label_hit(app, a, b)
+            };
         }
 
         // Rays pick the cells of the grid drawn (a thinned cloud's).
@@ -131,12 +137,6 @@ impl VolumeSampler<'_> {
                             min_val = raw_val;
                             min_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
-                    }
-                } else if is_label {
-                    // Categorical Label Surface mode
-                    if !is_nan && raw_val >= 0.5 {
-                        hit_point = Some((cx, cy, cz, raw_val));
-                        break;
                     }
                 } else if self.is_visible(app, raw_val) {
                     hit_point = Some((cx, cy, cz, raw_val));

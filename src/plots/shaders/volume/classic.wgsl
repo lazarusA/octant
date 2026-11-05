@@ -25,47 +25,6 @@ fn exact_intensity(p: vec3<f32>) -> f32 {
     return select(v.r, v.a, is_composite());
 }
 
-// 1 where the voxel holding `p` is label foreground, else 0.
-fn exact_foreground(p: vec3<f32>) -> f32 {
-    let t = exact_texel(p);
-    if (texel_missing(t)) {
-        return 0.0;
-    }
-    let v = textureLoad(volume_values, t, 0);
-    let inside = select(v.r >= 0.5, v.a >= 0.01, is_composite());
-    return select(0.0, 1.0, inside);
-}
-
-// 26-neighbor 3D Sobel-Feldman normal for binary segmentation foreground masks
-fn sobel_normal_mask(uvw: vec3<f32>) -> vec3<f32> {
-    let step = voxel_step();
-    var G = vec3<f32>(0.0);
-    for (var i = -1; i <= 1; i = i + 1) {
-        for (var j = -1; j <= 1; j = j + 1) {
-            for (var k = -1; k <= 1; k = k + 1) {
-                if (i == 0 && j == 0 && k == 0) { continue; }
-                let tap = clamp(uvw + vec3<f32>(f32(i), f32(j), f32(k)) * step, vec3<f32>(0.0), vec3<f32>(1.0));
-                let val = exact_foreground(tap);
-                let on_axis_x = f32(j == 0 && k == 0);
-                let face_x    = f32(j == 0 || k == 0);
-                let wx = f32(-i) * (1.0 + face_x + 2.0 * on_axis_x);
-                let on_axis_y = f32(i == 0 && k == 0);
-                let face_y    = f32(i == 0 || k == 0);
-                let wy = f32(-j) * (1.0 + face_y + 2.0 * on_axis_y);
-                let on_axis_z = f32(i == 0 && j == 0);
-                let face_z    = f32(i == 0 || j == 0);
-                let wz = f32(-k) * (1.0 + face_z + 2.0 * on_axis_z);
-                G += val * vec3<f32>(wx, wy, wz);
-            }
-        }
-    }
-    let len = length(G);
-    if (len < 0.00001) {
-        return vec3<f32>(0.0, 1.0, 0.0);
-    }
-    return normalize(G);
-}
-
 // Fast 6-tap central finite-difference gradient for normal estimation
 fn central_normal(uvw: vec3<f32>) -> vec3<f32> {
     let step = voxel_step();

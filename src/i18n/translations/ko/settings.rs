@@ -12,7 +12,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "불투명도가 1보다 작거나 알파 곡선이 있을 때 적용됩니다."
         }
         SettingsKey::ReasonCompositeOpaque => "합성은 불투명하게 그려집니다.",
-        SettingsKey::ReasonLabelOpaque => "범주형 레이블 표면은 항상 불투명하게 그려집니다.",
         SettingsKey::ReasonAlwaysBlends => "이 알고리즘은 항상 광선을 따라 혼합합니다.",
         SettingsKey::CloseSettingsHover => "설정 닫기",
         SettingsKey::CloseColorHover => "색상 설정 닫기",

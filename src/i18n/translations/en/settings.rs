@@ -12,7 +12,6 @@ pub fn text(key: SettingsKey) -> &'static str {
         }
         SettingsKey::ReasonNotTranslucent => "Takes effect with Opacity below 1 or an Alpha curve.",
         SettingsKey::ReasonCompositeOpaque => "Composites are drawn opaque.",
-        SettingsKey::ReasonLabelOpaque => "Categorical Label Surface is always drawn opaque.",
         SettingsKey::ReasonAlwaysBlends => "This algorithm always blends along the ray.",
         SettingsKey::CloseSettingsHover => "Close Settings",
         SettingsKey::CloseColorHover => "Close color settings",

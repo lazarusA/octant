@@ -1,5 +1,6 @@
 //! The voxels a hover ray crosses, in order: the CPU twin of the shaders'
-//! `walk.wgsl` (3D DDA), so the MIP hover names the voxel the shader draws.
+//! `walk.wgsl` (3D DDA), so MIP and label surface hovers name the voxel the
+//! shader draws.
 
 use crate::app::OctantApp;
 use crate::ui::hover::volume_sampler::VolumeSampler;
@@ -81,6 +82,21 @@ impl VolumeSampler<'_> {
             attenuation > 0.0 || best.is_none_or(|(_, _, _, top)| top <= cmax)
         });
         best
+    }
+
+    /// The voxel of the label surface the ray meets first along `a`..`b`:
+    /// the first one drawn (`label_color` in `rgba.wgsl`).
+    pub(super) fn label_hit(&self, app: &OctantApp, a: [f32; 3], b: [f32; 3]) -> Option<VoxelHit> {
+        let mut hit = None;
+        let dims = [self.width, self.height, self.depth];
+        walk_voxels(a, b, dims, |[x, y, z], _, _| {
+            let v = self.sample_cell(x, y, z);
+            if self.is_visible(app, v) {
+                hit = Some((x, y, z, v));
+            }
+            hit.is_none()
+        });
+        hit
     }
 }
 

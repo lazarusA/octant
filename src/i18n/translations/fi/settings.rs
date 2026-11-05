@@ -20,7 +20,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Vaikuttaa, kun 'Peittävyys' on alle 1 tai 'Alfakäyrä' on käytössä."
         }
         SettingsKey::ReasonCompositeOpaque => "Yhdistelmät piirretään peittävinä.",
-        SettingsKey::ReasonLabelOpaque => "'Kategorinen tunnistepinta' piirretään aina peittävänä.",
         SettingsKey::ReasonAlwaysBlends => "Tämä algoritmi sekoittaa aina säteen suuntaisesti.",
         SettingsKey::CloseSettingsHover => "Sulje asetukset",
         SettingsKey::CloseColorHover => "Sulje väriasetukset",

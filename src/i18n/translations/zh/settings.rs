@@ -10,7 +10,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ReasonClassicOpaque => "只有「体光线步进 (DVR)」会绘制半透明颜色。",
         SettingsKey::ReasonNotTranslucent => "在「不透明度」低于 1 或设置了「Alpha 曲线」时生效。",
         SettingsKey::ReasonCompositeOpaque => "合成图以不透明方式绘制。",
-        SettingsKey::ReasonLabelOpaque => "「分类标签表面」始终以不透明方式绘制。",
         SettingsKey::ReasonAlwaysBlends => "此算法始终沿光线混合。",
         SettingsKey::CloseSettingsHover => "关闭设置",
         SettingsKey::CloseColorHover => "关闭颜色设置",

@@ -12,7 +12,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonNotTranslucent => "Gäller med Opacitet under 1 eller en Alfakurva.",
         SettingsKey::ReasonCompositeOpaque => "Kompositer ritas ogenomskinliga.",
-        SettingsKey::ReasonLabelOpaque => "Kategorisk etikettyta ritas alltid ogenomskinlig.",
         SettingsKey::ReasonAlwaysBlends => "Den här algoritmen blandar alltid längs strålen.",
         SettingsKey::CloseSettingsHover => "Stäng inställningar",
         SettingsKey::CloseColorHover => "Stäng färginställningar",

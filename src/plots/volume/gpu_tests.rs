@@ -306,3 +306,88 @@ fn gpu_mip_never_skips_a_voxel() {
         "a ray stepped over the plane"
     );
 }
+
+/// Label surface parameters over classes in `cmin..=cmax`.
+fn label_params(cmin: f32, cmax: f32, transparency: bool, opacity: f32) -> VolumeUniformParams {
+    let mut p = params(4, 1.0, 0);
+    p.transparency = transparency;
+    p.color.cmin = cmin;
+    p.color.cmax = cmax;
+    p.color.opacity = opacity;
+    p
+}
+
+/// Colors of the opaque pixels, merged within `tolerance` (the dither).
+fn color_clusters(pixels: &[u8], tolerance: u8) -> Vec<[u8; 3]> {
+    let mut clusters: Vec<[u8; 3]> = vec![];
+    for p in pixels.as_chunks::<4>().0.iter().filter(|p| p[3] == 255) {
+        let c = [p[0], p[1], p[2]];
+        let near = |k: &[u8; 3]| (0..3).all(|i| k[i].abs_diff(c[i]) <= tolerance);
+        if !clusters.iter().any(near) {
+            clusters.push(c);
+        }
+    }
+    clusters
+}
+
+#[test]
+fn gpu_label_surfaces() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_label_surfaces: no GPU adapter, nothing was compared");
+        return;
+    };
+    let draw = |data: &[f32], dims: [usize; 2], p: &VolumeUniformParams| {
+        render(
+            &device,
+            &queue,
+            &renderer_wh(&device, &queue, data, dims, false),
+            p,
+        )
+    };
+
+    // One class filling the box: its faces shade flat, one color per face.
+    let one = vec![1.0f32; N * N * N];
+    let opaque = label_params(0.5, 2.5, false, 1.0);
+    let filled = draw(&one, [N, N], &opaque);
+    assert!(mean_alpha(&filled) > 0.05, "the box must show");
+    let faces = color_clusters(&filled, 6);
+    // Each face facing the camera lit by its own normal (the old mask
+    // normals collapsed to one where the class filled the box).
+    assert!(
+        (2..=3).contains(&faces.len()),
+        "{} colors on a box of flat faces",
+        faces.len()
+    );
+
+    // Two touching classes: with translucent surfaces their boundary shows.
+    let two: Vec<f32> = (0..N * N * N)
+        .map(|i| if i % N < N / 2 { 1.0 } else { 2.0 })
+        .collect();
+    let translucent = label_params(0.5, 2.5, true, 0.4);
+    let one_class = mean_alpha(&draw(&one, [N, N], &translucent));
+    let two_classes = mean_alpha(&draw(&two, [N, N], &translucent));
+    assert!(
+        two_classes > one_class + 0.005,
+        "{two_classes} vs {one_class}"
+    );
+
+    // Out of the color range is background; a one-voxel class among 600
+    // planes is never stepped over.
+    const W: usize = 16;
+    const D: usize = 600;
+    let mut plane = vec![0.0f32; W * W * D];
+    plane[W * W * 301..W * W * 302].fill(1.0);
+    let thin = draw(&plane, [W, W], &opaque);
+    let center = (SIZE / 2 - 6)..(SIZE / 2 + 6);
+    let missed = center.clone().any(|y| {
+        center
+            .clone()
+            .any(|x| thin[((y * SIZE + x) * 4 + 3) as usize] != 255)
+    });
+    assert!(!missed, "a ray missed the class");
+    assert!(
+        mean_alpha(&thin) < mean_alpha(&filled),
+        "background must not draw"
+    );
+}

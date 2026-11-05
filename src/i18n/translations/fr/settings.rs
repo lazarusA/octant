@@ -18,9 +18,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "S'applique avec une Opacité inférieure à 1 ou une Courbe alpha."
         }
         SettingsKey::ReasonCompositeOpaque => "Les compositions sont dessinées opaques.",
-        SettingsKey::ReasonLabelOpaque => {
-            "Surface d'étiquettes catégorielles est toujours dessinée opaque."
-        }
         SettingsKey::ReasonAlwaysBlends => "Cet algorithme mélange toujours le long du rayon.",
         SettingsKey::CloseSettingsHover => "Fermer les paramètres",
         SettingsKey::CloseColorHover => "Fermer les paramètres de couleur",

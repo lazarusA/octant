@@ -1,28 +1,61 @@
 // Classic surface and optical modes on nearest voxels (straight alpha):
-// label surface (4), absorption (5), additive emission (6), indexed palettes (7).
+// label surface (4, on the voxel walk), absorption (5), additive emission (6), indexed palettes (7).
 
-// 4. Categorical / Label Segmented Surface (Binary Mask Normals)
+// Straight color of a label voxel, alpha 0 where nothing is drawn: values
+// in the color range, outside it only with their clip color on, missing
+// voxels only with the NaN color on; composites wherever they are lit.
+fn label_color(missing: bool, v: vec4<f32>) -> vec4<f32> {
+    let c = uniforms.color;
+    if (missing) {
+        return select(vec4<f32>(0.0), c.nan_color, c.use_nan_color == 1u);
+    }
+    if (is_composite()) {
+        return select(vec4<f32>(0.0), vec4<f32>(v.rgb, 1.0), v.a > 0.001);
+    }
+    let d = v.r;
+    if ((d < c.cmin && c.use_lowclip == 0u) || (d > c.cmax && c.use_highclip == 0u)) {
+        return vec4<f32>(0.0);
+    }
+    return evaluate_plot_color(d, c);
+}
+
+// 4. Categorical label surface: every voxel the ray crosses (the walk), a
+// surface wherever the drawn value changes, class boundaries included, lit
+// by the face the ray crosses into it (the entry face at the volume's edge
+// or a cut). Opaque, or with Transparency on each surface at the layer's
+// opacity, so the boundaries inside show through.
 fn label_iso(ray: Ray) -> vec4<f32> {
-    for (var i = 0; i < ray.count; i = i + 1) {
-        let pos = sample_pos(ray, i);
-        if (exact_foreground(pos) >= 0.5) {
-            // Bisection on the foreground crossing
-            var lo = previous_pos(ray, i);
-            var hi = pos;
-            for (var step = 0; step < 3; step = step + 1) {
-                let mid = 0.5 * (lo + hi);
-                if (exact_foreground(mid) >= 0.5) {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
+    let opaque = uniforms.transparency == 0u;
+    var accum = vec3<f32>(0.0);
+    var alpha: f32 = 0.0;
+    var prev = vec4<f32>(0.0);
+    var prev_drawn = false;
+    var w = walk_begin(ray);
+    for (var i = 0; i < walk_limit(w); i = i + 1) {
+        let missing = walk_missing(w);
+        let texel = select(walk_texel(w), vec4<f32>(MISSING), missing);
+        let c = label_color(missing, texel);
+        let drawn = c.a > 0.0;
+        if (drawn && (!prev_drawn || any(texel != prev))) {
+            let n = walk_face_normal(w, ray.entry_normal);
+            let rgb = shade_surface(ray, n, c.rgb).rgb;
+            let a = select(c.a, 1.0, opaque);
+            accum += (1.0 - alpha) * a * rgb;
+            alpha += a * (1.0 - alpha);
+            if (alpha >= 0.99) {
+                break;
             }
-            let N = sobel_normal_mask(hi);
-            let shaded = classic_blinnphong(N, camera_dir(ray), uniforms.light_direction, exact_rgba(pos).rgb);
-            return vec4<f32>(shaded, 1.0);
+        }
+        prev = texel;
+        prev_drawn = drawn;
+        if (!walk_step(&w)) {
+            break;
         }
     }
-    return vec4<f32>(0.0);
+    if (alpha <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(accum / alpha, alpha);
 }
 
 // 5. Optical Absorption RGBA
