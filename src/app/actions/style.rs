@@ -112,18 +112,20 @@ impl OctantApp {
         };
         let composite = &mut layer.composite;
         let before = composite.clone();
-        composite.enabled = s.enabled;
-        if let Some(rgb) = rgb {
-            composite.rgb_channels = rgb;
-        }
+        // Rows applied to a copy first: a failing one changes nothing.
+        let mut configs = composite.channel_configs.clone();
         if let Some(channels) = channels {
-            let configs = &mut composite.channel_configs;
             configs.iter_mut().for_each(|cfg| cfg.visible = false);
             for (i, c) in channels {
                 if let Some(cfg) = configs.get_mut(i) {
                     apply_channel(cfg, c)?;
                 }
             }
+        }
+        composite.channel_configs = configs;
+        composite.enabled = s.enabled;
+        if let Some(rgb) = rgb {
+            composite.rgb_channels = rgb;
         }
         // As the Settings controls reload: the toggle and band selects the
         // layer, a channel row's display through `channel_display_changed`.

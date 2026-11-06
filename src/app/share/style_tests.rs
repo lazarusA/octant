@@ -159,3 +159,23 @@ fn a_label_holding_a_separator_is_written_as_its_position() {
     assert_eq!(separable("a,b".into(), 0), "#1");
     assert_eq!(separable("DAPI".into(), 0), "DAPI");
 }
+
+#[test]
+fn a_failing_channel_changes_nothing() {
+    let src = "https://share.test/failing.zarr";
+    let mut app = bands_app(src);
+    apply(&mut app, &format!("?src={src}&var=refl&band=443..665"));
+    let before = app.layers.base.composite.clone();
+    let bad = ChannelSetting {
+        channel: "490".into(),
+        curve: Some("sigmoid".into()),
+        ..ChannelSetting::default()
+    };
+    let composite = CompositeSetting {
+        enabled: true,
+        rgb: Vec::new(),
+        channels: Some(vec![bad]),
+    };
+    assert!(app.dispatch(AppAction::SetComposite { composite }).is_err());
+    assert_eq!(app.layers.base.composite, before);
+}
