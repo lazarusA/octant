@@ -86,3 +86,14 @@ fn a_link_replacing_one_whose_dataset_fails_still_runs() {
         std::thread::yield_now();
     }
 }
+
+#[test]
+fn a_plot_last_in_the_queue_leaves_nothing_waiting_on_it() {
+    let (mut app, _) = active_app();
+    app.queue_actions(plot_t2m(), Origin::Link);
+    app.run_commands(&egui::Context::default());
+    assert!(
+        !app.commands.plotting,
+        "a plot started by hand later must not hold questions"
+    );
+}

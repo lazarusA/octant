@@ -165,6 +165,8 @@ impl OctantApp {
                 done => outcomes.push((origin, done)),
             }
         }
+        // Nothing left waits on a plot: one started by hand holds nothing.
+        self.commands.plotting &= !self.commands.waiting.is_empty();
         outcomes
     }
 
