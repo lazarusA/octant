@@ -66,6 +66,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Kein Wert von {} passt zu '{}'",
         PlaybackKey::VoiceDidPlot => "{} als {} dargestellt",
         PlaybackKey::VoiceDidColormap => "Farbskala {}",
+        PlaybackKey::VoiceDidView => "Ansicht gesetzt",
         PlaybackKey::VoiceNotUnderstood => "Befehl nicht verstanden: {}",
         PlaybackKey::VoiceNoDataset => "Öffnen Sie zuerst einen Datensatz",
         PlaybackKey::VoiceNoVariable => "Keine Variable passt zu '{}'",

@@ -121,9 +121,7 @@ impl OctantApp {
             pair(q, &key, &value);
         }
     }
-}
 
-impl OctantApp {
     /// The heatmap's visible window as `x0..x1,y0..y1` on `sel` (level 0):
     /// the cells it touches, outward; `None` unless zoomed or panned.
     fn view_value(&self, sel: &VariableSelection) -> Option<String> {

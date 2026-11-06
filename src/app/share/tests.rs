@@ -126,7 +126,7 @@ fn a_link_typed_as_a_source_opens_its_store() {
 /// `tas(time, level, lat, lon)`, time in days since 2020-01-01, under a
 /// remote address (registered, so nothing is fetched).
 fn tas_app() -> crate::app::OctantApp {
-    use crate::app::test_support::{register_store, write_array, write_coordinate};
+    use crate::app::test_support::{write_array, write_coordinate};
     use serde_json::json;
     let store = std::sync::Arc::new(zarrs::storage::store::MemoryStore::new());
     let dims = ["time", "level", "lat", "lon"];
@@ -136,8 +136,17 @@ fn tas_app() -> crate::app::OctantApp {
     write_coordinate(&store, "level", &[500.0, 850.0], json!({ "units": "hPa" }));
     write_coordinate(&store, "lat", &[10.0, 20.0, 30.0, 40.0, 50.0], json!({}));
     write_coordinate(&store, "lon", &[0.0, 90.0, 180.0, 270.0], json!({}));
+    app_of(store, "https://share.test/tas.zarr")
+}
+
+/// An app holding `store` as the remote dataset `target` (a URL of its own
+/// per test: caches keyed by store URL are shared by tests running at once).
+fn app_of(
+    store: std::sync::Arc<zarrs::storage::store::MemoryStore>,
+    target: &str,
+) -> crate::app::OctantApp {
+    use crate::app::test_support::register_store;
     let mut app = crate::app::OctantApp::default();
-    let target = "https://share.test/tas.zarr";
     let meta = register_store(&mut app, store, target);
     let id = crate::app::StoreKind::make_source_id(crate::app::StoreKind::RemoteZarr, target);
     if let Some(dataset) = app.dataset_manager.get_mut(&id) {
@@ -193,6 +202,37 @@ fn a_plot_s_link_plots_the_same_again() {
     assert_eq!(second.share_link().unwrap_or_default(), link);
     assert_eq!(second.plotted().dim_config, first.plotted().dim_config);
     assert_eq!(second.playback.current_timestep, 1);
+}
+
+/// A link's step past the default time window moves the window to hold it
+/// (keeping its width), so plotting does not clamp the step away.
+#[test]
+fn a_step_past_the_time_window_moves_the_window() {
+    use crate::app::test_support::{write_array, write_coordinate};
+    use serde_json::json;
+    let store = std::sync::Arc::new(zarrs::storage::store::MemoryStore::new());
+    let steps = 400;
+    write_array(
+        &store,
+        "tas",
+        &["time", "lat", "lon"],
+        &[steps, 5, 4],
+        &[1, 5, 4],
+    );
+    let days: Vec<f32> = (0..steps).map(|d| d as f32).collect();
+    let units = json!({ "units": "days since 2020-01-01" });
+    write_coordinate(&store, "time", &days, units);
+    write_coordinate(&store, "lat", &[10.0, 20.0, 30.0, 40.0, 50.0], json!({}));
+    write_coordinate(&store, "lon", &[0.0, 90.0, 180.0, 270.0], json!({}));
+    for (date, step) in [("2021-02-03", 399), ("2020-07-19", 200)] {
+        let mut app = app_of(store.clone(), "https://share.test/long.zarr");
+        let src = "?src=https://share.test/long.zarr&var=tas&anim=time";
+        apply(&mut app, &format!("{src}&time={date}"));
+        assert_eq!(app.playback.current_timestep, step, "{date}");
+        let (start, end) = app.plotted().dim_ranges[0];
+        assert!((start..=end).contains(&step), "{date}: {start}..{end}");
+        assert!(end < steps as usize, "{date}: {start}..{end}");
+    }
 }
 
 #[test]

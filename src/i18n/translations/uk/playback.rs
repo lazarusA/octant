@@ -66,6 +66,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Жодне значення {} не відповідає '{}'",
         PlaybackKey::VoiceDidPlot => "{} побудовано як {}",
         PlaybackKey::VoiceDidColormap => "Колірна карта {}",
+        PlaybackKey::VoiceDidView => "Вигляд задано",
         PlaybackKey::VoiceNotUnderstood => "Команду не зрозуміло: {}",
         PlaybackKey::VoiceNoDataset => "Спочатку відкрийте набір даних",
         PlaybackKey::VoiceNoVariable => "Жодна змінна не відповідає '{}'",

@@ -65,6 +65,7 @@ crate::i18n::keys::define_keys! {
     VoiceNoValue,
     VoiceDidPlot,
     VoiceDidColormap,
+    VoiceDidView,
     VoiceNotUnderstood,
     VoiceNoDataset,
     VoiceNoVariable,

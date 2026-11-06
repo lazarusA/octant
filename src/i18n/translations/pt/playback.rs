@@ -66,6 +66,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Nenhum valor de {} corresponde a '{}'",
         PlaybackKey::VoiceDidPlot => "{} plotado como {}",
         PlaybackKey::VoiceDidColormap => "Mapa de cores {}",
+        PlaybackKey::VoiceDidView => "Vista definida",
         PlaybackKey::VoiceNotUnderstood => "Comando não entendido: {}",
         PlaybackKey::VoiceNoDataset => "Abra primeiro um conjunto de dados",
         PlaybackKey::VoiceNoVariable => "Nenhuma variável corresponde a '{}'",

@@ -87,7 +87,8 @@ impl CommandQueue {
 
 impl OctantApp {
     /// Queues what `utterance` says and runs what can run now: what each
-    /// did, or why one failed.
+    /// did, or why one failed (tests; the app queues through `run_commands`).
+    #[cfg(test)]
     pub fn run_utterance(&mut self, utterance: &str) -> Vec<Outcome> {
         self.queue_utterance(utterance);
         self.resume_commands()
@@ -112,7 +113,8 @@ impl OctantApp {
     }
 
     /// Runs the waiting commands until they are done, one fails, or one
-    /// waits for a dataset or coordinates still loading.
+    /// waits for a dataset or coordinates still loading (tests).
+    #[cfg(test)]
     pub fn resume_commands(&mut self) -> Vec<Outcome> {
         self.resume().into_iter().map(|(_, o)| o).collect()
     }
