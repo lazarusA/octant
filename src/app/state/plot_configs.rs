@@ -172,12 +172,13 @@ impl MeshDetail {
 /// Configuration for 3D point cloud billboard rendering.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointCloudPlotConfig {
+    /// Point width as a fraction of the closest gap between points (1 = touching).
     pub point_size: f32,
 }
 
 impl Default for PointCloudPlotConfig {
     fn default() -> Self {
-        Self { point_size: 0.02 }
+        Self { point_size: 0.8 }
     }
 }
 

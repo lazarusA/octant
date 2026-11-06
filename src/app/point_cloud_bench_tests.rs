@@ -27,7 +27,7 @@ const H: usize = 720;
 /// Planes of the stacks timed: 1 M to 46.7 M points.
 const DEPTHS: [usize; 6] = [1, 4, 8, 16, 32, 45];
 /// The default point size (`PointCloudPlotConfig`).
-const POINT_SIZE: f32 = 0.02;
+const POINT_SIZE: f32 = 0.8;
 
 /// `n` values in 0..1000, none missing (every point drawn).
 fn values(n: usize) -> Vec<f32> {

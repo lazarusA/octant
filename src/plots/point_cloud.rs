@@ -58,7 +58,7 @@ impl PointCloudRenderer {
             aspect_x: 1.0,
             aspect_y: 1.0,
             aspect_z: 1.0,
-            point_size: 0.02,
+            point_size: 0.8,
             width: width.max(1),
             height: height.max(1),
             depth,

@@ -90,7 +90,12 @@ fn vs_main(
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 
     // Offset square point billboard quad parallel to camera view plane
-    let p_size = clamp(uniforms.point_size, 0.002, 0.2);
+    // `point_size` is a fraction of the closest gap between points (1 = touching), so points never overlap.
+    let spacing = min(
+        min(uniforms.aspect_x / f32(grid_w), uniforms.aspect_y / f32(grid_h)),
+        uniforms.aspect_z / f32(grid_d),
+    );
+    let p_size = spacing * clamp(uniforms.point_size, 0.05, 1.0);
     let center_view = camera_view(uniforms.camera, center_3d);
     let corner_pos = center_view + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
     out.position = camera_project(uniforms.camera, corner_pos);
