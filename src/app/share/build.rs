@@ -32,7 +32,7 @@ impl OctantApp {
     /// link can open (never a local one). Allocates nothing, for the UI.
     pub fn can_share(&self) -> bool {
         let sel = self.plotted();
-        sel.metadata.is_some() && SCHEMES.iter().any(|p| sel.store_target.starts_with(p))
+        sel.variable_info().is_some() && SCHEMES.iter().any(|p| sel.store_target.starts_with(p))
     }
 
     /// The share link of the plot; `None` when `can_share` is false.
@@ -136,8 +136,10 @@ impl OctantApp {
         let mut ends = Vec::with_capacity(2);
         for (axis, t) in self.plotted_axes()?.iter().zip(uv) {
             let (lo, hi) = axis.visible(t);
-            let first = lo.floor().max(0.0) as usize;
-            let last = (hi.ceil() as usize).saturating_sub(1).max(first);
+            // A coarse level's last cell may end past an odd level 0.
+            let end = var.shape.get(axis.dim).map_or(1, |&n| n.max(1) as usize) - 1;
+            let first = (lo.floor().max(0.0) as usize).min(end);
+            let last = (hi.ceil() as usize).saturating_sub(1).clamp(first, end);
             let text = |idx, end| value_text(meta, var, store, axis.dim, (idx, end));
             ends.push(format!("{}..{}", text(first, false), text(last, true)));
         }

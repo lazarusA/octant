@@ -1,6 +1,8 @@
 //! The heatmap's zoom window through a link: written as level-0 cells,
 //! shown again on the receiver's canvas once its plot draws.
 
+use std::sync::Arc;
+
 use super::parse_share;
 use crate::app::OctantApp;
 use crate::app::actions::{AppAction, Origin};
@@ -94,4 +96,30 @@ fn a_view_waiting_for_a_replaced_plot_is_dropped() {
     app.apply_pending_view(CANVAS, PlotType::Heatmap);
     assert!(app.nav.pending_view.is_none());
     assert_eq!(app.nav.heatmap_zoom, 1.0, "nothing applied");
+}
+
+#[test]
+fn a_view_at_the_edge_of_an_odd_level_0_names_its_last_cell() {
+    let mut sender = plotted_pyramid();
+    let sel = sender.layers.base.selection_mut();
+    sel.store_target = "https://x.org/p.zarr".into();
+    // Level 0 one cell short of what the coarse level covers, as halving an
+    // odd length leaves it (63 cells, the coarse level's last ending at 64).
+    for var in sel.metadata.iter_mut().flat_map(|m| m.variables.iter_mut()) {
+        if var.name == "0/t2m" {
+            var.shape[2] = 63;
+        }
+        if let Some(r) = var.multiscale.as_mut() {
+            Arc::make_mut(&mut r.set).levels[0].shape[2] = 63;
+        }
+    }
+    sender.nav.heatmap_zoom = 4.0;
+    sender.nav.visible_uv = ((0.75, 1.0), (0.5, 0.75));
+    let link = sender.share_link().unwrap_or_default();
+    let actions = parse_share(&link).unwrap_or_default();
+    let Some(AppAction::SetView { x_to, .. }) = actions.last() else {
+        panic!("no view in {link}");
+    };
+    // No coordinates in this fixture: cells are named by position.
+    assert_eq!(x_to, "#63", "the last cell, not one past it: {link}");
 }
