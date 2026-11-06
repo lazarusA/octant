@@ -27,6 +27,24 @@ pub struct NavigationState {
     /// Whether the user is rotating or zooming this frame: volumes render
     /// at reduced resolution until it settles.
     pub view_interacting: bool,
+    /// The visible part of the heatmap's plotted quad as fractions, `u` left
+    /// to right and `v` top to bottom (recorded every frame by
+    /// `render_canvas`; share links write it).
+    pub visible_uv: QuadWindow,
+    /// A window the heatmap shows once it draws its plot (`SetView`), applied
+    /// by `render_canvas`, which knows the canvas.
+    pub pending_view: Option<PendingView>,
+}
+
+/// A part of the plotted quad: `u` and `v` fractions.
+pub type QuadWindow = ((f64, f64), (f64, f64));
+
+/// A window waiting for its plot: dropped when another plot shows first.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PendingView {
+    pub window: QuadWindow,
+    /// The plotted selection's `metadata_generation` and variable.
+    pub plot: (u64, usize),
 }
 
 impl Default for NavigationState {
@@ -43,6 +61,8 @@ impl Default for NavigationState {
             sphere_zoom: camera::DEFAULT_DISTANCE,
             orbit_target: [0.0; 3],
             view_interacting: false,
+            visible_uv: ((0.0, 1.0), (0.0, 1.0)),
+            pending_view: None,
         }
     }
 }

@@ -7,7 +7,8 @@
 //! dimensions (any other key, `dim.<name>` for one named like a key; `a..b`
 //! a range, since ISO times hold `:`), `plot`, `cmap`, `range`, `overlay`
 //! (repeatable). Values are what the actions take: ISO dates, numbers in
-//! the coordinate's units, labels.
+//! the coordinate's units, labels. `view=x0..x1,y0..y1` (after `range`) is
+//! the heatmap's visible window, x then y as `axes` names them.
 
 use percent_encoding::percent_decode_str;
 
@@ -16,10 +17,12 @@ use super::actions::{AppAction, DimRole};
 mod build;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod view_tests;
 
 /// Keys that are no dimension; `dim.<key>` names a dimension called so.
-const KEYS: [&str; 8] = [
-    "src", "var", "axes", "anim", "plot", "cmap", "range", "overlay",
+const KEYS: [&str; 9] = [
+    "src", "var", "axes", "anim", "plot", "cmap", "range", "view", "overlay",
 ];
 
 /// Stores a link may open: remote ones, never a local path (a link is
@@ -77,6 +80,9 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
             layer: None,
         });
     }
+    if let Some(view) = last("view").and_then(|v| view_action(v)) {
+        actions.push(view);
+    }
     for (_, path) in pairs.iter().filter(|(k, _)| k == "overlay") {
         actions.push(AppAction::SelectVariable { path: path.clone() });
         actions.push(AppAction::AddOverlay);
@@ -110,6 +116,18 @@ fn dimension_actions(pairs: &[(String, String)]) -> Vec<AppAction> {
         });
     }
     actions
+}
+
+/// `x0..x1,y0..y1` as `SetView`.
+fn view_action(view: &str) -> Option<AppAction> {
+    let (x, y) = view.split_once(',')?;
+    let ((x_from, x_to), (y_from, y_to)) = (x.split_once("..")?, y.split_once("..")?);
+    Some(AppAction::SetView {
+        x_from: x_from.into(),
+        x_to: x_to.into(),
+        y_from: y_from.into(),
+        y_to: y_to.into(),
+    })
 }
 
 /// `a..b` as two finite numbers.

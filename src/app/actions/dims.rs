@@ -75,7 +75,7 @@ impl OctantApp {
 
     /// The index `value` names along staged dimension `i`, once its
     /// coordinates are read (`await_coordinates`).
-    fn index_for(&self, i: usize, value: &str, last: bool) -> Result<usize, Failure> {
+    pub(super) fn index_for(&self, i: usize, value: &str, last: bool) -> Result<usize, Failure> {
         let dim = self.staged_dim_info(i)?;
         let coords = dim.meta.get_dim_coords(Some(&dim.var.name), dim.name);
         index_of(&dim, coords, value, last).ok_or_else(|| Failure::NoValue {
@@ -88,7 +88,7 @@ impl OctantApp {
     /// fails with `Reading` while they are read. A command asked again once
     /// they settled (`CommandQueue::retrying`) never asks twice: a read that
     /// failed leaves the dimension's positions.
-    fn await_coordinates(&mut self, i: usize) -> Result<(), Failure> {
+    pub(super) fn await_coordinates(&mut self, i: usize) -> Result<(), Failure> {
         let dim = self.staged_dim_info(i)?;
         if dim
             .meta

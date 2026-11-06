@@ -41,6 +41,7 @@ mod staging;
 #[cfg(test)]
 mod tests;
 mod text;
+mod view;
 
 use serde::{Deserialize, Serialize};
 
@@ -157,6 +158,15 @@ pub enum AppAction {
         field: Option<usize>,
     },
     ResetView,
+    /// Zooms the heatmap to show dimension x from `x_from` to `x_to` and y
+    /// from `y_from` to `y_to` (values as in `SetRange`); the plot then
+    /// reads the finest level the view needs.
+    SetView {
+        x_from: String,
+        x_to: String,
+        y_from: String,
+        y_to: String,
+    },
 }
 
 /// A dimension's role: a plot axis, animated, or neither.
@@ -202,6 +212,12 @@ impl OctantApp {
                 self.open_plate_well(well.as_deref(), field)
             }
             AppAction::SetColormap { name, layer } => self.set_colormap(&name, layer.as_deref()),
+            AppAction::SetView {
+                x_from,
+                x_to,
+                y_from,
+                y_to,
+            } => self.set_view((&x_from, &x_to), (&y_from, &y_to)),
             AppAction::ResetView => {
                 let plot_type = self.effective_canvas_plot_type();
                 crate::app::controllers::controller_for(plot_type).reset_view(&mut self.nav);

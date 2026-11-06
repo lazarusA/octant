@@ -74,6 +74,9 @@ impl OctantApp {
                 &format!("{}..{}", style.range_min, style.range_max),
             );
         }
+        if let Some(view) = self.view_value(sel) {
+            pair(&mut q, "view", &view);
+        }
         for overlay in self.layers.overlays() {
             let base = at_base(overlay.selection());
             let sel = base.as_ref().unwrap_or(overlay.selection());
@@ -117,6 +120,30 @@ impl OctantApp {
             };
             pair(q, &key, &value);
         }
+    }
+}
+
+impl OctantApp {
+    /// The heatmap's visible window as `x0..x1,y0..y1` on `sel` (level 0):
+    /// the cells it touches, outward; `None` unless zoomed or panned.
+    fn view_value(&self, sel: &VariableSelection) -> Option<String> {
+        let nav = &self.nav;
+        let moved = nav.heatmap_zoom != 1.0 || nav.heatmap_pan != egui::Vec2::ZERO;
+        if !moved || !self.heatmap_evenly_drawn() {
+            return None;
+        }
+        let (meta, var) = (sel.metadata.as_ref()?, sel.variable_info()?);
+        let store = sel.store_target.as_str();
+        let uv = [nav.visible_uv.0, nav.visible_uv.1];
+        let mut ends = Vec::with_capacity(2);
+        for (axis, t) in self.plotted_axes()?.iter().zip(uv) {
+            let (lo, hi) = axis.visible(t);
+            let first = lo.floor().max(0.0) as usize;
+            let last = (hi.ceil() as usize).saturating_sub(1).max(first);
+            let text = |idx, end| value_text(meta, var, store, axis.dim, (idx, end));
+            ends.push(format!("{}..{}", text(first, false), text(last, true)));
+        }
+        Some(ends.join(","))
     }
 }
 
