@@ -59,23 +59,7 @@ impl VolumeSampler<'_> {
         // MIP and label surfaces walk every voxel the ray crosses, as their
         // shaders do.
         if (is_mip && !app.layers.base.composite.enabled) || is_label {
-            let texel = |t: f32| {
-                let p = [0, 1, 2].map(|i| ray.origin[i] + t * ray.dir[i]);
-                let u = p[0] / aspect_x.max(1e-4) + 0.5;
-                let v = p[1] / aspect_y.max(1e-4) + 0.5;
-                let w = p[2] / aspect_z.max(1e-4) + 0.5;
-                [
-                    u * self.width as f32,
-                    (1.0 - v) * self.height as f32,
-                    (1.0 - w) * self.depth as f32,
-                ]
-            };
-            let (a, b) = (texel(t_start), texel(t_end));
-            return if is_mip {
-                self.mip_hit(app, a, b)
-            } else {
-                self.label_hit(app, a, b)
-            };
+            return self.walk_hit(app, ray, (t_start, t_end), aspects, is_mip);
         }
 
         // Rays pick the cells of the grid drawn (a thinned cloud's).

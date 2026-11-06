@@ -99,11 +99,18 @@ impl Blocks {
         {
             let mut stats = self.lock();
             let Stats { planes, own } = &mut *stats;
-            let columns = self.grid.w * self.grid.h;
-            for zi in z {
-                let plane = &mut planes[zi * columns..(zi + 1) * columns];
-                plane_stats(values, dims, self.grid, zi, plane);
+            let (grid, columns) = (self.grid, self.grid.w * self.grid.h);
+            let changed = &mut planes[z.start * columns..z.end * columns];
+            let scan = |(i, plane): (usize, &mut [[f32; 3]])| {
+                plane_stats(values, dims, grid, z.start + i, plane);
+            };
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                use rayon::prelude::*;
+                changed.par_chunks_mut(columns).enumerate().for_each(scan);
             }
+            #[cfg(target_arch = "wasm32")]
+            changed.chunks_mut(columns).enumerate().for_each(scan);
             for bz in rows.clone() {
                 own_row(planes, dims, self.grid, bz, own);
             }

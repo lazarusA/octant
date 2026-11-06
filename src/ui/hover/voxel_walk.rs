@@ -3,7 +3,9 @@
 //! shader draws.
 
 use crate::app::OctantApp;
+use crate::ui::hover::camera::Ray3D;
 use crate::ui::hover::volume_sampler::VolumeSampler;
+use crate::utils::colormap::evaluate_color_cpu;
 
 /// A hovered voxel: logical indices and its value.
 pub type VoxelHit = (usize, usize, usize, f32);
@@ -26,12 +28,15 @@ pub fn walk_voxels(
     let mut t_max = [f32::INFINITY; 3];
     let mut t_delta = [f32::INFINITY; 3];
     for i in 0..3 {
-        // Nudged along the ray, so a start on a face picks the voxel ahead.
-        let start = a[i] + span[i] * 1e-6;
+        let ahead = span[i] > 0.0;
+        if span[i] != 0.0 {
+            dir[i] = if ahead { 1 } else { -1 };
+        }
+        // Nudged along the ray, so a start on a face picks the voxel ahead
+        // (by the shader's `walk_begin` amount, so both pick the same one).
+        let start = a[i] + dir[i] as f32 * 1e-3;
         cell[i] = (start.floor().max(0.0) as usize).min(dims[i] - 1);
         if span[i] != 0.0 {
-            let ahead = span[i] > 0.0;
-            dir[i] = if ahead { 1 } else { -1 };
             let face = cell[i] as f32 + if ahead { 1.0 } else { 0.0 };
             t_max[i] = (face - a[i]) / span[i];
             t_delta[i] = (1.0 / span[i]).abs();
@@ -54,6 +59,34 @@ pub fn walk_voxels(
 }
 
 impl VolumeSampler<'_> {
+    /// The voxel MIP or the label surface (`is_mip` false) shows along the
+    /// ray's part `t` inside the box (half-extents `aspects`), on the walk
+    /// their shaders take.
+    pub(super) fn walk_hit(
+        &self,
+        app: &OctantApp,
+        ray: &Ray3D,
+        (t_start, t_end): (f32, f32),
+        (ax, ay, az): (f32, f32, f32),
+        is_mip: bool,
+    ) -> Option<VoxelHit> {
+        // Logical texel position: rows top-down, planes front to back.
+        let texel = |t: f32| {
+            let p = [0, 1, 2].map(|i| ray.origin[i] + t * ray.dir[i]);
+            [
+                (p[0] / ax.max(1e-4) + 0.5) * self.width as f32,
+                (0.5 - p[1] / ay.max(1e-4)) * self.height as f32,
+                (0.5 - p[2] / az.max(1e-4)) * self.depth as f32,
+            ]
+        };
+        let (a, b) = (texel(t_start), texel(t_end));
+        if is_mip {
+            self.mip_hit(app, a, b)
+        } else {
+            self.label_hit(app, a, b)
+        }
+    }
+
     /// The voxel the MIP shader shows along segment `a`..`b` (logical texel
     /// positions): the largest value it considers, attenuated as it is.
     pub(super) fn mip_hit(&self, app: &OctantApp, a: [f32; 3], b: [f32; 3]) -> Option<VoxelHit> {
@@ -85,13 +118,15 @@ impl VolumeSampler<'_> {
     }
 
     /// The voxel of the label surface the ray meets first along `a`..`b`:
-    /// the first one drawn (`label_color` in `rgba.wgsl`).
+    /// the first one drawn (`label_color` in `rgba.wgsl`): visible, and not
+    /// hidden by the layer's opacity, curve or a transparent clip color.
     pub(super) fn label_hit(&self, app: &OctantApp, a: [f32; 3], b: [f32; 3]) -> Option<VoxelHit> {
+        let params = app.get_color_params(&app.layers.base);
         let mut hit = None;
         let dims = [self.width, self.height, self.depth];
         walk_voxels(a, b, dims, |[x, y, z], _, _| {
             let v = self.sample_cell(x, y, z);
-            if self.is_visible(app, v) {
+            if self.is_visible(app, v) && evaluate_color_cpu(v, &params).a() > 0 {
                 hit = Some((x, y, z, v));
             }
             hit.is_none()

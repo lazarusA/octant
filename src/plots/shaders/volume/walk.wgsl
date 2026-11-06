@@ -35,11 +35,6 @@ fn walk_texel_pos(p: vec3<f32>) -> vec3<f32> {
 fn walk_begin(ray: Ray) -> Walk {
     let a = walk_texel_pos(ray.entry);
     let span = walk_texel_pos(ray.entry + ray.step * f32(ray.count)) - a;
-    return walk_from(a, span, 0.0);
-}
-
-// The walk over the segment `a + t * span` from parameter `t0` on.
-fn walk_from(a: vec3<f32>, span: vec3<f32>, t0: f32) -> Walk {
     var w: Walk;
     w.a = a;
     w.span = span;
@@ -47,15 +42,16 @@ fn walk_from(a: vec3<f32>, span: vec3<f32>, t0: f32) -> Walk {
     let parallel = span == vec3<f32>(0.0);
     let ahead = span > vec3<f32>(0.0);
     w.dir = select(select(vec3<i32>(-1), vec3<i32>(1), ahead), vec3<i32>(0), parallel);
-    // Nudged along the ray, so a start on a face picks the voxel ahead.
-    let start = a + span * t0 + vec3<f32>(w.dir) * 1e-3;
+    // Nudged along the ray, so a start on a face picks the voxel ahead
+    // (`voxel_walk.rs` `walk_voxels` nudges alike).
+    let start = a + vec3<f32>(w.dir) * 1e-3;
     w.cell = clamp(vec3<i32>(floor(start)), vec3<i32>(0), w.dims - 1);
     w.texel = (w.cell + vec3<i32>(volume_shift())) % w.dims;
     let safe = select(span, vec3<f32>(1.0), parallel);
     let face = vec3<f32>(w.cell) + select(vec3<f32>(0.0), vec3<f32>(1.0), ahead);
     w.t_max = select((face - a) / safe, vec3<f32>(WALK_NEVER), parallel);
     w.t_delta = select(abs(1.0 / safe), vec3<f32>(WALK_NEVER), parallel);
-    w.t = t0;
+    w.t = 0.0;
     w.axis = -1;
     return w;
 }
