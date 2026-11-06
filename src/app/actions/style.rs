@@ -29,9 +29,10 @@ pub struct CompositeSetting {
     /// dimension as in `SetDim`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rgb: Vec<String>,
-    /// The channels a multi-channel image draws (the others hidden).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub channels: Vec<ChannelSetting>,
+    /// The channels a multi-channel image draws, the others hidden (none
+    /// when empty); left out, the channels are kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channels: Option<Vec<ChannelSetting>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -99,10 +100,13 @@ impl OctantApp {
             [r, g, b] => Some([r, g, b]),
             _ => return Err(no_value("rgb", &s.rgb.join(","))),
         };
-        let mut channels = Vec::with_capacity(s.channels.len());
-        for c in &s.channels {
-            channels.push((self.channel_index(&c.channel)?, c));
-        }
+        let channels = s.channels.as_ref().map(|list| {
+            let found = list
+                .iter()
+                .map(|c| Ok((self.channel_index(&c.channel)?, c)));
+            found.collect::<Result<Vec<_>, Failure>>()
+        });
+        let channels = channels.transpose()?;
         let Some(layer) = self.layers.get_mut(id) else {
             return Err(Failure::NoDataset);
         };
@@ -112,7 +116,7 @@ impl OctantApp {
         if let Some(rgb) = rgb {
             composite.rgb_channels = rgb;
         }
-        if !channels.is_empty() {
+        if let Some(channels) = channels {
             let configs = &mut composite.channel_configs;
             configs.iter_mut().for_each(|cfg| cfg.visible = false);
             for (i, c) in channels {
@@ -226,7 +230,7 @@ fn switchable(text: Option<&str>, what: &str) -> Result<Option<Option<[f32; 4]>>
 }
 
 /// `rrggbb` or `rrggbbaa` as RGBA fractions.
-pub(crate) fn rgba(hex: &str) -> Option<[f32; 4]> {
+fn rgba(hex: &str) -> Option<[f32; 4]> {
     let hex = hex.trim().trim_start_matches('#');
     if !hex.is_ascii() || !matches!(hex.len(), 6 | 8) {
         return None;

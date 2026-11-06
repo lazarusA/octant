@@ -55,6 +55,7 @@ fn a_composite_and_its_colors_plot_the_same_again() {
         "band=443..665",
         "composite=on&rgb=443,490,560&channels=490:",
         "560:ff8000:0.5..2.5:exponential^2.5:inv",
+        ":linear,560:",
         "scale=symlog:0.5",
         "opacity=0.5",
         "reverse=on",
@@ -144,5 +145,17 @@ fn composite_keys_read_into_one_action_after_the_colormap() {
             ..ChannelSetting::default()
         },
     ];
-    assert_eq!(channels.map(|c| c.channels), Some(expected));
+    assert_eq!(channels.map(|c| c.channels), Some(Some(expected)));
+    let none = composite("?src=https://x/a.zarr&var=r&channels=none");
+    assert_eq!(none.map(|c| c.channels), Some(Some(Vec::new())));
+    let kept = composite("?src=https://x/a.zarr&var=r&composite=on");
+    assert_eq!(kept.map(|c| c.channels), Some(None));
+}
+
+#[test]
+fn a_label_holding_a_separator_is_written_as_its_position() {
+    use super::style::separable;
+    assert_eq!(separable("GFP: 488".into(), 2), "#3");
+    assert_eq!(separable("a,b".into(), 0), "#1");
+    assert_eq!(separable("DAPI".into(), 0), "DAPI");
 }

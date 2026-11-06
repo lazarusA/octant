@@ -20,6 +20,8 @@ use super::actions::{AppAction, DimRole};
 mod build;
 #[cfg(test)]
 mod network_tests;
+#[cfg(test)]
+mod step_tests;
 mod style;
 #[cfg(test)]
 mod style_tests;

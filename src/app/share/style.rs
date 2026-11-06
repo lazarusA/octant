@@ -1,7 +1,9 @@
 //! The base layer's composite and color settings in a link:
 //! `composite=on|off`, and while on `rgb=R,G,B` (its band slots) and
 //! `channels=label:rrggbb[:a..b][:curve[^k]][:inv],...` (its ticked channel
-//! rows), as the layer's `CompositeStyle` holds them whatever the dataset;
+//! rows, `none` when none is ticked; curves always written), as the layer's
+//! `CompositeStyle` holds them whatever the dataset; a label holding `:` or
+//! `,` is written as its `#n` position;
 //! `range=a..b`, `scale=name[:param]`, `opacity`, `reverse=on`, and the
 //! NaN and clip colors `nan`, `low`, `high` as `rrggbbaa` (left out: off).
 //! Channels and bands are named as `value_text` names any dimension value.
@@ -36,7 +38,7 @@ impl OctantApp {
         if !composite.enabled {
             return;
         }
-        let text = |i: usize| value_text(meta, var, &sel.store_target, c, (i, false));
+        let text = |i| separable(value_text(meta, var, &sel.store_target, c, (i, false)), i);
         // Slots past the bands (three slots, two channels) are no state to keep.
         let bands = self.layer_num_bands(id);
         if composite.rgb_channels.iter().all(|&b| b < bands) {
@@ -48,7 +50,14 @@ impl OctantApp {
             .filter(|cfg| cfg.visible)
             .map(|cfg| channel_item(&text(cfg.index), cfg))
             .collect();
-        pair(q, "channels", &ticked.join(","));
+        if !composite.channel_configs.is_empty() {
+            let ticked = if ticked.is_empty() {
+                "none".to_string()
+            } else {
+                ticked.join(",")
+            };
+            pair(q, "channels", &ticked);
+        }
     }
 
     /// `range` (none for a composite, which draws no colormap) and the color
@@ -87,18 +96,28 @@ impl OctantApp {
     }
 }
 
-/// `label:rrggbb[:a..b][:curve[^k]][:inv]`.
+/// `value` of index `i`, or its `#n` position when it holds a separator of
+/// `rgb` or `channels` (a label such as `GFP: 488`).
+pub(super) fn separable(value: String, i: usize) -> String {
+    if value.contains([':', ',']) {
+        format!("#{}", i + 1)
+    } else {
+        value
+    }
+}
+
+/// `label:rrggbb[:a..b]:curve[^k][:inv]`.
 fn channel_item(label: &str, cfg: &ChannelColorConfig) -> String {
     let [r, g, b] = cfg.color_rgb;
     let mut item = format!("{label}:{r:02x}{g:02x}{b:02x}");
     if let Some((a, b)) = cfg.window {
         item += &format!(":{a}..{b}");
     }
+    // Always written: the receiver's default may be another (OMERO's).
     let d = &cfg.display;
     let curve = CURVES.iter().find(|(f, _)| *f == d.family).map(|(_, n)| *n);
     match curve {
-        Some("linear") | None => {}
-        Some(name) if d.coefficient == 1.0 => item += &format!(":{name}"),
+        Some("linear") | None => item += ":linear",
         Some(name) => item += &format!(":{name}^{}", d.coefficient),
     }
     if d.inverted {
@@ -127,10 +146,13 @@ pub(super) fn composite_action(
     let composite = CompositeSetting {
         enabled: composite.is_none_or(|c| !c.trim().eq_ignore_ascii_case("off")),
         rgb: list(rgb),
-        channels: list(channels)
-            .iter()
-            .filter_map(|c| channel_setting(c))
-            .collect(),
+        channels: channels.map(|c| match c.trim() {
+            n if n.eq_ignore_ascii_case("none") => Vec::new(),
+            _ => list(Some(c))
+                .iter()
+                .filter_map(|c| channel_setting(c))
+                .collect(),
+        }),
     };
     Some(AppAction::SetComposite { composite })
 }
