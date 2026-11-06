@@ -201,3 +201,22 @@ fn a_local_store_has_no_link() {
     app.selected.store_target = "/home/me/a.zarr".into();
     assert_eq!(app.share_link(), None);
 }
+
+#[test]
+fn a_multiscale_plot_s_link_names_level_0() {
+    use crate::app::test_support::{poll_until, pyramid_app, selection_of};
+    let (mut app, meta) = pyramid_app();
+    app.layout.canvas_px = [20, 20];
+    app.selected = selection_of(&mut app, &meta, "0/t2m");
+    app.plot_selection();
+    poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
+    let sst = meta.variables.iter().position(|v| v.name == "0/sst");
+    app.add_overlay(sst.unwrap_or_default());
+    let shown = app.plotted().variable_info().map(|v| v.name.clone());
+    assert_eq!(shown.as_deref(), Some("2/t2m"), "Auto reads level 2");
+    app.layers.base.selection_mut().store_target = "https://x.org/p.zarr".into();
+    let link = app.share_link().unwrap_or_default();
+    assert!(link.contains("var=0/t2m&"), "{link}");
+    assert!(link.contains("overlay=0/sst"), "{link}");
+    assert!(!link.contains("lat="), "the whole extent: {link}");
+}

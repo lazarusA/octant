@@ -7,7 +7,8 @@ use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
 use super::{KEYS, SCHEMES};
 use crate::app::actions::{plot_type_id, value_text};
-use crate::app::{AnimationRole, OctantApp, SpatialRole};
+use crate::app::multiscale::at_base;
+use crate::app::{AnimationRole, OctantApp, SpatialRole, VariableSelection};
 
 /// Escaped in a key or value: what ends or splits one; `/` and `:` stay
 /// readable.
@@ -42,8 +43,12 @@ impl OctantApp {
         Some(format!("{}?{}", base(), self.share_query()?))
     }
 
+    /// A multiscale plot names level 0 with level-0 indices: its coarser
+    /// levels are no variables to select, and the opened link picks the
+    /// level for its own screen.
     fn share_query(&self) -> Option<String> {
-        let sel = self.plotted();
+        let base = at_base(self.plotted());
+        let sel = base.as_ref().unwrap_or(self.plotted());
         let var = sel.variable_info()?;
         let mut q = String::new();
         pair(&mut q, "src", &sel.store_target);
@@ -57,7 +62,7 @@ impl OctantApp {
             })
             .collect();
         pair(&mut q, "axes", &axes.join(","));
-        self.dimension_pairs(&mut q);
+        self.dimension_pairs(sel, &mut q);
         pair(&mut q, "plot", plot_type_id(sel.plot_type));
         let style = &self.layers.base.color;
         let cmap = crate::utils::colormap::registry::key_of(style.colormap);
@@ -70,16 +75,17 @@ impl OctantApp {
             );
         }
         for overlay in self.layers.overlays() {
-            let name = overlay.selection().variable_info().map(|v| v.name.as_str());
-            pair(&mut q, "overlay", name.unwrap_or("").trim_matches('/'));
+            let base = at_base(overlay.selection());
+            let sel = base.as_ref().unwrap_or(overlay.selection());
+            let name = sel.variable_info().map_or("", |v| v.name.as_str());
+            pair(&mut q, "overlay", name.trim_matches('/'));
         }
         Some(q)
     }
 
     /// Each dimension's `name=value` (the animated one's step, a range
     /// narrower than the dimension, a pinned index) and `anim`.
-    fn dimension_pairs(&self, q: &mut String) {
-        let sel = self.plotted();
+    fn dimension_pairs(&self, sel: &VariableSelection, q: &mut String) {
         let (Some(meta), Some(var)) = (sel.metadata.as_ref(), sel.variable_info()) else {
             return;
         };
