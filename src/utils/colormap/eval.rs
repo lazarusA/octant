@@ -28,20 +28,41 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
         let t = if val < params.cmin { 0.0 } else { 1.0 };
         sample(params, t)
     } else {
-        let mut t = super::scale::apply_color_scale_cpu(
-            val,
-            params.cmin,
-            params.cmax,
-            params.scale_type,
-            params.scale_param,
-        );
-        if params.is_categorical != 0 {
-            let num_cats = params.num_categories.max(1) as f32;
-            let bin_idx = (t.clamp(0.0, 0.999999) * num_cats).floor();
-            t = (bin_idx + 0.5) / num_cats;
-        }
-        sample(params, t)
+        sample(params, position(val, params))
     }
+}
+
+/// Colormap position of in-range `val`: scaled, then binned for categorical
+/// maps, as WGSL `evaluate_plot_color` does.
+fn position(val: f32, params: &PlotColorParams) -> f32 {
+    let t = super::scale::apply_color_scale_cpu(
+        val,
+        params.cmin,
+        params.cmax,
+        params.scale_type,
+        params.scale_param,
+    );
+    if params.is_categorical == 0 {
+        return t;
+    }
+    let num_cats = params.num_categories.max(1) as f32;
+    let bin_idx = (t.clamp(0.0, 0.999999) * num_cats).floor();
+    (bin_idx + 0.5) / num_cats
+}
+
+/// Alpha of in-range `val` before rounding to 8 bits: the global opacity
+/// times the opacity curve (WGSL `plot_alpha`).
+pub fn colormap_alpha(val: f32, params: &PlotColorParams) -> f32 {
+    alpha_at(params, position(val, params))
+}
+
+fn alpha_at(params: &PlotColorParams, t: f32) -> f32 {
+    let curve = if params.alpha_row == super::NO_ALPHA_ROW {
+        1.0
+    } else {
+        super::registry::row_curve_alpha(params.alpha_row, t)
+    };
+    params.opacity.clamp(0.0, 1.0) * curve
 }
 
 /// Samples the plot colormap at `t`, honoring the reversed and nearest flags,
@@ -53,12 +74,7 @@ fn sample(params: &PlotColorParams, t: f32) -> Color32 {
         params.nearest != 0,
     )
     .to_array();
-    let curve = if params.alpha_row == super::NO_ALPHA_ROW {
-        1.0
-    } else {
-        super::registry::row_curve_alpha(params.alpha_row, t)
-    };
-    let alpha = super::lut::unit_to_u8(params.opacity.clamp(0.0, 1.0) * curve);
+    let alpha = super::lut::unit_to_u8(alpha_at(params, t));
     Color32::from_rgba_unmultiplied(r, g, b, alpha)
 }
 

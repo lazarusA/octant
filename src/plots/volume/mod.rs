@@ -4,12 +4,14 @@
 //!
 //! - `encode.rs`: CPU plane encoding (missing-voxel fill, validity).
 //! - `textures.rs`: value and validity 3D textures, plane uploads.
+//! - `blocks.rs`: per-block value ranges for empty-space skipping.
 //! - `uniforms.rs`: uniform block and per-frame parameters.
 //! - `pipeline.rs`: shader variants, bind group layout, per-mode pipelines.
 //! - `frame.rs`: offscreen frame, its cache key and the blit.
 //! - `render.rs`: re-renders the frame when its key changes, blits it.
 //! - `callback.rs`: egui paint callback.
 
+mod blocks;
 mod callback;
 pub mod encode;
 mod frame;
@@ -20,11 +22,19 @@ mod textures;
 mod uniforms;
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod bench_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_render;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod label_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod surface_gpu_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod walk_gpu_tests;
 
 pub use callback::VolumeCallback;
 pub use encode::VolumeEncoding;
@@ -88,7 +98,7 @@ impl VolumeRenderer {
             h,
             d: (data.len() / plane).max(1),
         };
-        let textures = VolumeTextures::new(device, dims, encoding)?;
+        let textures = VolumeTextures::new(device, queue, dims, encoding)?;
         let layout = pipeline::bind_group_layout(device, hardware_filter);
         let sampler = pipeline::create_sampler(device);
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -106,6 +116,7 @@ impl VolumeRenderer {
                 },
                 view_entry(1, &textures.value_view),
                 view_entry(2, &textures.validity_view),
+                view_entry(4, &textures.blocks.view),
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&sampler),

@@ -89,9 +89,11 @@ fn lines_have_no_nan_color() {
 }
 
 #[test]
-fn only_dvr_volumes_draw_translucent_colors() {
-    assert_eq!(volume(0).support().opacity, Support::Yes);
-    for algorithm in 1..=7 {
+fn only_dvr_and_label_volumes_draw_translucent_colors() {
+    for algorithm in [0, 4] {
+        assert_eq!(volume(algorithm).support().opacity, Support::Yes);
+    }
+    for algorithm in [1, 2, 3, 5, 6, 7] {
         assert!(
             overridden(volume(algorithm).support().opacity),
             "{algorithm}"
@@ -112,14 +114,14 @@ fn indexed_volumes_ignore_the_colormap_range() {
 
 #[test]
 fn volume_transparency_follows_the_algorithm() {
-    for algorithm in [0, 1, 2, 3, 5] {
+    for algorithm in [0, 1, 2, 3, 4, 5] {
         assert_eq!(
             volume(algorithm).support().volume_transparency,
             Support::Yes,
             "{algorithm}"
         );
     }
-    for algorithm in [4, 6, 7] {
+    for algorithm in [6, 7] {
         assert!(
             overridden(volume(algorithm).support().volume_transparency),
             "{algorithm}"

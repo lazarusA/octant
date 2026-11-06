@@ -6,7 +6,7 @@
 //   1: Maximum Intensity (MIP)     - Maximum intensity projection with density-weighted attenuation
 //   2: Minimum Intensity (MinIP)   - Minimum intensity projection along the ray
 //   3: Average Projection (X-ray)  - Average column scalar intensity (radiographic transmission)
-//   4: Categorical Label Surface   - Binary foreground mask isosurface for segmented data
+//   4: Categorical Label Surface   - Surfaces where the drawn value changes, on the voxel walk
 //   5: Absorption RGBA             - Classical optical absorption model
 //   6: Additive RGBA               - Additive volume emission model
 //   7: Indexed Discrete RGBA       - Palette-indexed discrete material rendering
@@ -25,7 +25,8 @@ struct Uniforms {
     light_direction: vec3<f32>,
     algorithm: u32,
     isovalue: f32,
-    isorange: f32,
+    // Opaque DVR surface: 0 where values enter [cmin, cmax], 1 at `isovalue`.
+    surface: u32,
     absorption: f32,
     quality: f32,
     diffuse: f32,
@@ -63,6 +64,11 @@ var volume_validity: texture_3d<f32>;
 // Linear, Repeat on every axis (see `texture_coord`).
 @group(0) @binding(3)
 var volume_sampler: sampler;
+
+// Per block of 8^3 stored voxels (and its neighbors): min and max of the
+// valid values, 1 where any is missing (`blocks.rs`); read with textureLoad.
+@group(0) @binding(4)
+var volume_blocks: texture_3d<f32>;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,

@@ -5,11 +5,11 @@ use super::gpu_render::{atlas, camera, gpu, params, render_sized, renderer_n};
 use super::{VolumeRenderer, VolumeUniformParams};
 use crate::utils::colormap::registry;
 
-const SIZE: u32 = 64;
-const N: usize = 16;
+pub(super) const SIZE: u32 = 64;
+pub(super) const N: usize = 16;
 
 /// Smooth blob in [0, 1] with the corner octant missing.
-fn blob() -> Vec<f32> {
+pub(super) fn blob() -> Vec<f32> {
     let mut values = Vec::with_capacity(N * N * N);
     for z in 0..N {
         for y in 0..N {
@@ -28,7 +28,7 @@ fn blob() -> Vec<f32> {
     values
 }
 
-fn render(
+pub(super) fn render(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     renderer: &VolumeRenderer,
@@ -37,7 +37,7 @@ fn render(
     render_sized(device, queue, renderer, p, SIZE)
 }
 
-fn renderer(
+pub(super) fn renderer(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     data: &[f32],
@@ -46,7 +46,7 @@ fn renderer(
     renderer_n(device, queue, data, N, hardware)
 }
 
-fn max_diff(a: &[u8], b: &[u8]) -> u8 {
+pub(super) fn max_diff(a: &[u8], b: &[u8]) -> u8 {
     a.iter()
         .zip(b)
         .map(|(x, y)| x.abs_diff(*y))
@@ -54,7 +54,7 @@ fn max_diff(a: &[u8], b: &[u8]) -> u8 {
         .unwrap_or(0)
 }
 
-fn mean_alpha(pixels: &[u8]) -> f32 {
+pub(super) fn mean_alpha(pixels: &[u8]) -> f32 {
     let sum: u32 = pixels
         .as_chunks::<4>()
         .0

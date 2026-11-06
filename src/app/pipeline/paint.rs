@@ -65,8 +65,9 @@ impl OctantApp {
         screen_aspect: f32,
     ) -> crate::plots::VolumeUniformParams {
         let mut ctx = self.get_common_3d_spatial_context(layer);
-        // Classic modes (1-7) keep their original opacity.
-        if self.plot_configs.volume.algorithm != 0 {
+        // Classic modes (1-7) keep their original opacity; label surfaces
+        // take the layer's with Transparency on.
+        if !matches!(self.plot_configs.volume.algorithm, 0 | 4) {
             ctx.color.opacity = 1.0;
             ctx.color.alpha_row = crate::utils::colormap::NO_ALPHA_ROW;
         }
@@ -83,8 +84,8 @@ impl OctantApp {
             opacity_scale: self.plot_configs.volume.opacity,
             quality: self.plot_configs.volume.quality,
             algorithm: self.plot_configs.volume.algorithm,
-            isovalue: self.plot_configs.volume.isovalue,
-            isorange: self.plot_configs.volume.isorange,
+            surface: self.plot_configs.volume.surface as u32,
+            isovalue: self.plot_configs.volume.isovalue_in(layer.color.extent()),
             attenuation: self.plot_configs.volume.attenuation,
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,

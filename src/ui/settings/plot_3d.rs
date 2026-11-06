@@ -1,5 +1,5 @@
-use crate::app::MeshDetail;
 use crate::app::OctantApp;
+use crate::app::{MeshDetail, VolumeSurface};
 use crate::i18n::{PlotOptionsKey as K, tr};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::number_input::LocalizedInput;
@@ -18,6 +18,10 @@ const ALGORITHMS: [(u32, K); 8] = [
 
 pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     algorithm_row(app, ui);
+    let volume = &app.plot_configs.volume;
+    if volume.algorithm == 0 && !volume.transparency && !app.layers.base.composite.enabled {
+        surface_row(app, ui);
+    }
 
     ui.separator();
     labeled_slider(
@@ -56,6 +60,38 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
             .localized()
             .logarithmic(true),
+    );
+}
+
+/// Where the opaque volume draws its surface, and the Value surface's value
+/// within the data's extent (its middle until one is chosen).
+fn surface_row(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let (lo, hi) = app.layers.base.color.extent();
+    let config = &mut app.plot_configs.volume;
+    ui.horizontal_wrapped(|ui| {
+        ui.label(tr(K::Surface)).on_hover_text(tr(K::SurfaceHover));
+        let choices = [
+            (VolumeSurface::Range, K::SurfaceRange),
+            (VolumeSurface::Value, K::SurfaceValue),
+        ];
+        for (surface, label) in choices {
+            if ui
+                .selectable_label(config.surface == surface, tr(label))
+                .clicked()
+            {
+                config.surface = surface;
+            }
+        }
+    });
+    if config.surface != VolumeSurface::Value {
+        return;
+    }
+    config.isovalue = config.isovalue_in((lo, hi));
+    labeled_slider(
+        ui,
+        "isovalue",
+        SliderLabel::After(tr(K::SurfaceValue)),
+        egui::Slider::new(&mut config.isovalue, lo..=hi).localized(),
     );
 }
 

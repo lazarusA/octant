@@ -12,7 +12,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonNotTranslucent => "Berlaku dengan Opasitas di bawah 1 atau Kurva alfa.",
         SettingsKey::ReasonCompositeOpaque => "Komposit digambar buram.",
-        SettingsKey::ReasonLabelOpaque => "Permukaan Label Kategoris selalu digambar buram.",
         SettingsKey::ReasonAlwaysBlends => "Algoritma ini selalu memadukan sepanjang sinar.",
         SettingsKey::CloseSettingsHover => "Tutup Pengaturan",
         SettingsKey::CloseColorHover => "Tutup Pengaturan Warna",

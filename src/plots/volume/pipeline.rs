@@ -15,6 +15,10 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
+            include_str!("../shaders/volume/walk.wgsl"),
+            "\n",
+            include_str!("../shaders/volume/blocks.wgsl"),
+            "\n",
             include_str!("../shaders/volume/shading.wgsl"),
             "\n",
             include_str!("../shaders/volume/dvr.wgsl"),
@@ -61,7 +65,7 @@ fn texture_entry(
     }
 }
 
-/// `@group(0)`: uniforms, values, validity and the sampler.
+/// `@group(0)`: uniforms, values, validity, the sampler and the blocks.
 pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::D3;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -85,6 +89,7 @@ pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },
+            texture_entry(4, false, D3),
         ],
     })
 }

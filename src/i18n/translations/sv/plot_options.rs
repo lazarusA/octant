@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x skärm",
         PlotOptionsKey::DetailFull => "Varje cell",
         PlotOptionsKey::Size => "Storlek",
+        PlotOptionsKey::Surface => "Yta",
+        PlotOptionsKey::SurfaceRange => "Färgintervall",
+        PlotOptionsKey::SurfaceValue => "Värde",
+        PlotOptionsKey::SurfaceHover => {
+            "Var den ogenomskinliga volymen ritar sin yta: där värdena går in i färgintervallet eller där de når ett värde"
+        }
     })
 }

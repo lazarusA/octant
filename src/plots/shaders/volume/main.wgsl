@@ -45,8 +45,9 @@ fn dither(frag: vec2<f32>) -> f32 {
     return (pixel_jitter(frag) + pixel_jitter(frag + vec2<f32>(17.0, 29.0)) - 1.0) / 255.0;
 }
 
-// Headlight above and left of the camera, so lighting follows the view.
-const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.35, 0.45, 1.0);
+// Headlight a little above and left of the camera, so lighting follows the
+// view and surfaces facing it stay lit.
+const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.2, 0.3, 1.0);
 
 // Samples for the segment p1..p2: `quality` per voxel crossed (8 to MAX_SAMPLES),
 // starting a jittered fraction of a step in. `face` is the world normal of the
@@ -59,7 +60,8 @@ fn build_ray(p1: vec3<f32>, p2: vec3<f32>, face: vec3<f32>, frag: vec2<f32>) -> 
     let view = normalize(-segment * world_scale());
     let entry_normal = select(face, view, dot(face, face) < 0.5);
     let light = normalize(camera_to_object_dir(uniforms.camera, HEADLIGHT_CAMERA));
-    return Ray(p1 + pixel_jitter(frag) * step, step, count, length(step * world_scale()), p1, entry_normal, view, light);
+    let step_refs = length(step * world_scale()) / reference_step(view);
+    return Ray(p1 + pixel_jitter(frag) * step, step, count, step_refs, p1, entry_normal, view, light);
 }
 
 @fragment

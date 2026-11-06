@@ -14,7 +14,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "「不透明度」が1未満か「アルファカーブ」があるときに有効になります。"
         }
         SettingsKey::ReasonCompositeOpaque => "合成は不透明で描画されます。",
-        SettingsKey::ReasonLabelOpaque => "「カテゴリラベル表面」は常に不透明で描画されます。",
         SettingsKey::ReasonAlwaysBlends => "このアルゴリズムは常にレイに沿って合成します。",
         SettingsKey::CloseSettingsHover => "設定を閉じる",
         SettingsKey::CloseColorHover => "色の設定を閉じる",

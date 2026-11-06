@@ -49,6 +49,18 @@ impl VolumeSampler<'_> {
         let is_label = is_half_scale
             && canvas_plot_type == PlotType::Volume
             && app.plot_configs.volume.algorithm == 4;
+        // A Value surface is drawn where values reach the isovalue.
+        let volume = &app.plot_configs.volume;
+        let isovalue = (is_half_scale
+            && canvas_plot_type == PlotType::Volume
+            && volume.draws_value_surface(app.layers.base.composite.enabled))
+        .then(|| volume.isovalue_in(app.layers.base.color.extent()));
+
+        // MIP and label surfaces walk every voxel the ray crosses, as their
+        // shaders do.
+        if (is_mip && !app.layers.base.composite.enabled) || is_label {
+            return self.walk_hit(app, ray, (t_start, t_end), aspects, is_mip);
+        }
 
         // Rays pick the cells of the grid drawn (a thinned cloud's).
         let (_, (gw, gh)) = self.drawn_cell(0, 0);
@@ -116,9 +128,8 @@ impl VolumeSampler<'_> {
                             min_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
                     }
-                } else if is_label {
-                    // Categorical Label Surface mode
-                    if !is_nan && raw_val >= 0.5 {
+                } else if let Some(iso) = isovalue {
+                    if !is_nan && raw_val >= iso {
                         hit_point = Some((cx, cy, cz, raw_val));
                         break;
                     }

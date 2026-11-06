@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x skjerm",
         PlotOptionsKey::DetailFull => "Hver celle",
         PlotOptionsKey::Size => "Størrelse",
+        PlotOptionsKey::Surface => "Overflate",
+        PlotOptionsKey::SurfaceRange => "Fargeområde",
+        PlotOptionsKey::SurfaceValue => "Verdi",
+        PlotOptionsKey::SurfaceHover => {
+            "Hvor det ugjennomsiktige volumet tegner overflaten: der verdiene går inn i fargeområdet, eller der de når én verdi"
+        }
     })
 }

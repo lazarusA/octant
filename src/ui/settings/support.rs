@@ -198,7 +198,9 @@ impl PlotState {
     fn opacity(&self) -> Support {
         if self.composite {
             Support::Overridden(SettingsKey::ReasonComposite)
-        } else if self.plot_type == PlotType::Volume && self.volume_algorithm != VOLUME_DVR {
+        } else if self.plot_type == PlotType::Volume
+            && !matches!(self.volume_algorithm, VOLUME_DVR | VOLUME_LABEL_SURFACE)
+        {
             Support::Overridden(SettingsKey::ReasonClassicOpaque)
         } else {
             self.line_override().unwrap_or(Support::Yes)
@@ -225,7 +227,6 @@ impl PlotState {
             return Support::No;
         }
         match self.volume_algorithm {
-            VOLUME_LABEL_SURFACE => Support::Overridden(SettingsKey::ReasonLabelOpaque),
             VOLUME_ADDITIVE_RGBA | VOLUME_INDEXED_RGBA => {
                 Support::Overridden(SettingsKey::ReasonAlwaysBlends)
             }

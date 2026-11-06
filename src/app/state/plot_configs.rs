@@ -38,9 +38,44 @@ pub struct VolumePlotConfig {
     pub lighting: bool,
     pub attenuation: f32,
     pub algorithm: u32,
+    /// Where the opaque volume draws its surface.
+    pub surface: VolumeSurface,
+    /// The Value surface's value; NaN until Value is first chosen, which sets
+    /// it from the data.
     pub isovalue: f32,
-    pub isorange: f32,
     pub z_scale: f32,
+}
+
+impl VolumePlotConfig {
+    /// The Value surface's value within `(lo, hi)` (the data's extent): its
+    /// middle while `isovalue` lies outside (NaN until chosen, or left from
+    /// another variable).
+    pub fn isovalue_in(&self, (lo, hi): (f32, f32)) -> f32 {
+        if (lo..=hi).contains(&self.isovalue) {
+            self.isovalue
+        } else {
+            0.5 * (lo + hi)
+        }
+    }
+
+    /// Whether DVR draws its Value surface: opaque, Surface Value, not a
+    /// composite (`composite`), which draws its brightness.
+    pub fn draws_value_surface(&self, composite: bool) -> bool {
+        self.algorithm == 0
+            && !self.transparency
+            && self.surface == VolumeSurface::Value
+            && !composite
+    }
+}
+
+/// Where an opaque DVR volume draws its surface (`VolumeUniforms::surface`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VolumeSurface {
+    /// Where values enter the color range.
+    #[default]
+    Range,
+    /// Where values reach `VolumePlotConfig::isovalue`.
+    Value,
 }
 
 impl Default for VolumePlotConfig {
@@ -52,8 +87,8 @@ impl Default for VolumePlotConfig {
             lighting: false,
             attenuation: 0.0,
             algorithm: 0,
-            isovalue: 50.0,
-            isorange: 5.0,
+            surface: VolumeSurface::Range,
+            isovalue: f32::NAN,
             z_scale: 1.0,
         }
     }
@@ -166,5 +201,22 @@ impl Default for PlotConfigs {
             point_cloud: PointCloudPlotConfig::default(),
             plot_transparency: true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VolumePlotConfig;
+
+    #[test]
+    fn isovalue_stays_within_the_data() {
+        let at = |isovalue| VolumePlotConfig {
+            isovalue,
+            ..Default::default()
+        };
+        // Unset, or left from a variable with other values: the middle.
+        assert_eq!(at(f32::NAN).isovalue_in((200.0, 300.0)), 250.0);
+        assert_eq!(at(0.5).isovalue_in((200.0, 300.0)), 250.0);
+        assert_eq!(at(220.0).isovalue_in((200.0, 300.0)), 220.0);
     }
 }

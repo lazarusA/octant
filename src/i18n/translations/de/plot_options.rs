@@ -53,5 +53,11 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::DetailQuadruple => "4x Bildschirm",
         PlotOptionsKey::DetailFull => "Jede Zelle",
         PlotOptionsKey::Size => "Größe",
+        PlotOptionsKey::Surface => "Oberfläche",
+        PlotOptionsKey::SurfaceRange => "Farbbereich",
+        PlotOptionsKey::SurfaceValue => "Wert",
+        PlotOptionsKey::SurfaceHover => {
+            "Wo das undurchsichtige Volumen seine Oberfläche zeichnet: wo Werte in den Farbbereich eintreten oder wo sie einen Wert erreichen"
+        }
     })
 }

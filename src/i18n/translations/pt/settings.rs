@@ -16,9 +16,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Tem efeito com Opacidade abaixo de 1 ou uma Curva alfa."
         }
         SettingsKey::ReasonCompositeOpaque => "Composições são desenhadas opacas.",
-        SettingsKey::ReasonLabelOpaque => {
-            "Superfície de rótulos categóricos é sempre desenhada opaca."
-        }
         SettingsKey::ReasonAlwaysBlends => "Este algoritmo sempre mistura ao longo do raio.",
         SettingsKey::CloseSettingsHover => "Fechar configurações",
         SettingsKey::CloseColorHover => "Fechar configurações de cor",

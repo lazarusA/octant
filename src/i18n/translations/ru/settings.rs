@@ -16,9 +16,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Действует, если Непрозрачность ниже 1 или задана Кривая альфа."
         }
         SettingsKey::ReasonCompositeOpaque => "Композиты рисуются непрозрачными.",
-        SettingsKey::ReasonLabelOpaque => {
-            "Поверхность категориальных меток всегда рисуется непрозрачной."
-        }
         SettingsKey::ReasonAlwaysBlends => "Этот алгоритм всегда смешивает вдоль луча.",
         SettingsKey::CloseSettingsHover => "Закрыть настройки",
         SettingsKey::CloseColorHover => "Закрыть настройки цвета",
