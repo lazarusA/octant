@@ -77,7 +77,7 @@ fn walk_skip_block(w: ptr<function, Walk>) -> bool {
     let still = (*w).dir == vec3<i32>(0);
     var n = vec3<i32>(max(floor((e.x - (*w).t_max) / (*w).t_delta) + 1.0, vec3<f32>(0.0)));
     n = select(n, vec3<i32>(0), still);
-    n[axis] = max(n[axis], 1);
+    n = select(n, max(n, vec3<i32>(1)), axis_mask(axis));
     let dims = (*w).dims;
     let cell = (*w).cell + (*w).dir * n;
     if (any(cell < vec3<i32>(0)) || any(cell >= dims)) {

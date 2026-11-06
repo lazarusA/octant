@@ -66,33 +66,35 @@ fn walk_exit(w: Walk) -> f32 {
     return min(min(w.t_max.x, w.t_max.y), w.t_max.z);
 }
 
+// Lanes of `axis` (0, 1 or 2): writes go through `select` on it, since
+// Direct3D's FXC cannot assign a vector lane picked at run time.
+fn axis_mask(axis: i32) -> vec3<bool> {
+    return vec3<i32>(0, 1, 2) == vec3<i32>(axis);
+}
+
 // Moves to the next voxel; returns false once the segment ends.
 fn walk_step(w: ptr<function, Walk>) -> bool {
     let m = (*w).t_max;
-    var axis = 0;
-    if (m.y < m.x) {
-        axis = 1;
-    }
-    if (m.z < m[axis]) {
-        axis = 2;
-    }
-    let t = m[axis];
+    let t = min(min(m.x, m.y), m.z);
     if (t >= 1.0) {
         return false;
     }
+    // The first axis reaching `t`: x, then y, then z on ties.
+    let axis = select(select(2, 1, m.y == t), 0, m.x == t);
+    let on = axis_mask(axis);
     (*w).t = t;
-    (*w).t_max[axis] = t + (*w).t_delta[axis];
-    let d = (*w).dir[axis];
-    let cell = (*w).cell[axis] + d;
-    let n = (*w).dims[axis];
-    if (cell < 0 || cell >= n) {
+    (*w).t_max = select(m, m + (*w).t_delta, on);
+    let d = select(vec3<i32>(0), (*w).dir, on);
+    let n = (*w).dims;
+    let cell = (*w).cell + d;
+    if (any(cell < vec3<i32>(0)) || any(cell >= n)) {
         return false;
     }
-    (*w).cell[axis] = cell;
-    var tx = (*w).texel[axis] + d;
-    tx = select(tx, 0, tx >= n);
-    tx = select(tx, n - 1, tx < 0);
-    (*w).texel[axis] = tx;
+    (*w).cell = cell;
+    var tx = (*w).texel + d;
+    tx = select(tx, vec3<i32>(0), tx >= n);
+    tx = select(tx, n - 1, tx < vec3<i32>(0));
+    (*w).texel = tx;
     (*w).axis = axis;
     return true;
 }
@@ -113,8 +115,7 @@ fn walk_face_normal(w: Walk, entry_normal: vec3<f32>) -> vec3<f32> {
     if (w.axis < 0) {
         return entry_normal;
     }
-    var n = vec3<f32>(0.0);
-    n[w.axis] = -f32(w.dir[w.axis]);
+    let n = select(vec3<f32>(0.0), -vec3<f32>(w.dir), axis_mask(w.axis));
     // Logical rows run top-down and planes front to back (`logical_coord`).
     return n * vec3<f32>(1.0, -1.0, -1.0);
 }
