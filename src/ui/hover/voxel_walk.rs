@@ -3,9 +3,10 @@
 //! shader draws.
 
 use crate::app::OctantApp;
+use crate::plots::common::PlotColorParams;
 use crate::ui::hover::camera::Ray3D;
 use crate::ui::hover::volume_sampler::VolumeSampler;
-use crate::utils::colormap::evaluate_color_cpu;
+use crate::utils::colormap::eval::colormap_alpha;
 
 /// A hovered voxel: logical indices and its value.
 pub type VoxelHit = (usize, usize, usize, f32);
@@ -122,11 +123,12 @@ impl VolumeSampler<'_> {
     /// hidden by the layer's opacity, curve or a transparent clip color.
     pub(super) fn label_hit(&self, app: &OctantApp, a: [f32; 3], b: [f32; 3]) -> Option<VoxelHit> {
         let params = app.get_color_params(&app.layers.base);
+        let composite = app.layers.base.composite.enabled;
         let mut hit = None;
         let dims = [self.width, self.height, self.depth];
         walk_voxels(a, b, dims, |[x, y, z], _, _| {
             let v = self.sample_cell(x, y, z);
-            if self.is_visible(app, v) && evaluate_color_cpu(v, &params).a() > 0 {
+            if label_drawn(v, &params, composite) {
                 hit = Some((x, y, z, v));
             }
             hit.is_none()
@@ -135,9 +137,55 @@ impl VolumeSampler<'_> {
     }
 }
 
+/// Whether the label surface draws value `v` (`label_color` in `rgba.wgsl`):
+/// missing with a NaN color, a lit composite, in range at an alpha above 0,
+/// or outside it with a clip color that shows.
+fn label_drawn(v: f32, params: &PlotColorParams, composite: bool) -> bool {
+    let shows = |on: u32, color: [f32; 4]| on != 0 && color[3] > 0.0;
+    if v.is_nan() || v.abs() > 1e30 {
+        shows(params.use_nan_color, params.nan_color)
+    } else if composite {
+        (v.to_bits() & 0x00FF_FFFF) != 0
+    } else if v < params.cmin {
+        shows(params.use_lowclip, params.lowclip_color)
+    } else if v > params.cmax {
+        shows(params.use_highclip, params.highclip_color)
+    } else {
+        colormap_alpha(v, params) > 0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::walk_voxels;
+    use super::{label_drawn, walk_voxels};
+    use crate::plots::common::PlotColorParams;
+
+    #[test]
+    fn label_voxels_draw_as_the_shader_does() {
+        let mut p = PlotColorParams {
+            cmin: 1.0,
+            cmax: 5.0,
+            ..Default::default()
+        };
+        assert!(label_drawn(3.0, &p, false));
+        // Out of range without a clip color, or missing without a NaN color.
+        assert!(!label_drawn(0.0, &p, false));
+        assert!(!label_drawn(f32::NAN, &p, false));
+        p.use_nan_color = 1;
+        p.nan_color = [1.0, 0.0, 0.0, 1.0];
+        assert!(label_drawn(f32::NAN, &p, false));
+        // A clip color drawn only while it shows.
+        p.use_lowclip = 1;
+        p.lowclip_color = [0.0; 4];
+        assert!(!label_drawn(0.0, &p, false));
+        p.lowclip_color = [0.0, 0.0, 1.0, 1.0];
+        assert!(label_drawn(0.0, &p, false));
+        // Hidden by the opacity, however faint it is when not zero.
+        p.opacity = 0.001;
+        assert!(label_drawn(3.0, &p, false));
+        p.opacity = 0.0;
+        assert!(!label_drawn(3.0, &p, false));
+    }
 
     fn visited(a: [f32; 3], b: [f32; 3], dims: [usize; 3]) -> Vec<[usize; 3]> {
         let mut cells = vec![];
