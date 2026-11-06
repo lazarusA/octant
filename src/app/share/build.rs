@@ -67,13 +67,8 @@ impl OctantApp {
         let style = &self.layers.base.color;
         let cmap = crate::utils::colormap::registry::key_of(style.colormap);
         pair(&mut q, "cmap", &cmap);
-        if style.lock_bounds {
-            pair(
-                &mut q,
-                "range",
-                &format!("{}..{}", style.range_min, style.range_max),
-            );
-        }
+        self.composite_pairs(sel, &mut q);
+        self.style_pairs(&mut q);
         if let Some(view) = self.view_value(sel) {
             pair(&mut q, "view", &view);
         }
@@ -86,8 +81,9 @@ impl OctantApp {
         Some(q)
     }
 
-    /// Each dimension's `name=value` (the animated one's step, a range
-    /// narrower than the dimension, a pinned index) and `anim`.
+    /// Each dimension's `name=value` as its slider holds it (a range while
+    /// expanded, else its index; every dimension, as the receiver's defaults
+    /// may differ), and the animated one as `anim` with the plot's `step`.
     fn dimension_pairs(&self, sel: &VariableSelection, q: &mut String) {
         let (Some(meta), Some(var)) = (sel.metadata.as_ref(), sel.variable_info()) else {
             return;
@@ -97,21 +93,25 @@ impl OctantApp {
             let Some(name) = var.dimension_names.get(i) else {
                 continue;
             };
-            let len = var.shape.get(i).copied().unwrap_or(0) as usize;
             let text = |idx, last| value_text(meta, var, store, i, (idx, last));
-            let value = if config.animation == AnimationRole::Animated {
+            let animated = config.animation == AnimationRole::Animated;
+            if animated {
                 pair(q, "anim", name);
-                text(self.playback.current_timestep, false)
-            } else if !config.active || config.range.0 == config.range.1 {
+                pair(q, "step", &text(self.playback.current_timestep, false));
+            }
+            let value = if !config.active {
+                if animated {
+                    continue; // its index is the step
+                }
                 text(config.index, false)
-            } else if config.range != (0, len.saturating_sub(1)) {
+            } else if config.range.0 == config.range.1 {
+                text(config.range.0, false)
+            } else {
                 format!(
                     "{}..{}",
                     text(config.range.0, false),
                     text(config.range.1, true)
                 )
-            } else {
-                continue;
             };
             let key = if KEYS.contains(&name.as_str()) {
                 format!("dim.{name}")
@@ -146,7 +146,7 @@ impl OctantApp {
 }
 
 /// Appends `key=value` (none for an empty value), escaped.
-fn pair(query: &mut String, key: &str, value: &str) {
+pub(super) fn pair(query: &mut String, key: &str, value: &str) {
     if value.is_empty() {
         return;
     }

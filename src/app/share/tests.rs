@@ -141,7 +141,7 @@ fn tas_app() -> crate::app::OctantApp {
 
 /// An app holding `store` as the remote dataset `target` (a URL of its own
 /// per test: caches keyed by store URL are shared by tests running at once).
-fn app_of(
+pub(super) fn app_of(
     store: std::sync::Arc<zarrs::storage::store::MemoryStore>,
     target: &str,
 ) -> crate::app::OctantApp {
@@ -155,12 +155,13 @@ fn app_of(
     app
 }
 
-/// Types `link` as a source and runs its commands until it plots.
-fn apply(app: &mut crate::app::OctantApp, link: &str) {
+/// Types `link` as a source and runs its commands until it plots and none
+/// is left.
+pub(super) fn apply(app: &mut crate::app::OctantApp, link: &str) {
     let ctx = egui::Context::default();
     app.submit_or_activate_source(link, None);
     let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
-    while app.plotted().metadata.is_none() {
+    while app.plotted().metadata.is_none() || !app.commands_idle() {
         assert!(web_time::Instant::now() < deadline, "never plotted");
         app.poll_inspection(&ctx);
         app.poll_coordinate_results();
@@ -188,7 +189,7 @@ fn a_plot_s_link_plots_the_same_again() {
         "https://lazarusa.github.io/octant/?src=https://share.test/tas.zarr&var=tas",
         "axes=lon,lat",
         "anim=time",
-        "time=2020-02-01",
+        "step=2020-02-01",
         "level=850",
         "lat=20..40",
         "plot=heatmap",
@@ -258,5 +259,8 @@ fn a_multiscale_plot_s_link_names_level_0() {
     let link = app.share_link().unwrap_or_default();
     assert!(link.contains("var=0/t2m&"), "{link}");
     assert!(link.contains("overlay=0/sst"), "{link}");
-    assert!(!link.contains("lat="), "the whole extent: {link}");
+    assert!(
+        link.contains("lat=%231..%2364"),
+        "level 0's whole extent: {link}"
+    );
 }

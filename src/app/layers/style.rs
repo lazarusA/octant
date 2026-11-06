@@ -212,7 +212,7 @@ impl ColorStyle {
 }
 
 /// Channels drawn together as one color image.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompositeStyle {
     pub enabled: bool,
     pub rgb_channels: [usize; 3],

@@ -67,6 +67,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceDidPlot => "{}을(를) {}(으)로 표시함",
         PlaybackKey::VoiceDidColormap => "컬러맵 {}",
         PlaybackKey::VoiceDidView => "보기 설정됨",
+        PlaybackKey::VoiceDidComposite => "합성 설정됨",
+        PlaybackKey::VoiceDidColors => "색상 설정됨",
         PlaybackKey::VoiceNotUnderstood => "명령을 이해하지 못했습니다: {}",
         PlaybackKey::VoiceNoDataset => "먼저 데이터셋을 여세요",
         PlaybackKey::VoiceNoVariable => "'{}'와(과) 일치하는 변수가 없습니다",

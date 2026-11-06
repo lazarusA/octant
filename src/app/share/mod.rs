@@ -1,14 +1,17 @@
 //! Share links: a remote store, a variable, its dimensions, the plot type
-//! and colors as a readable query (`?src=https://x/a.zarr&var=t2m&time=2020-01-15
-//! &lat=30..60&plot=heatmap&cmap=cmocean:thermal&range=250..310`), replayed
-//! as `AppAction`s through the command queue (`Origin::Link`), so a link
-//! fails as a command does. Keys apply in a fixed order whatever their
-//! order: `src`, `var`, `axes` (x, y[, z] dimensions), `anim`, the
-//! dimensions (any other key, `dim.<name>` for one named like a key; `a..b`
-//! a range, since ISO times hold `:`), `plot`, `cmap`, `range`, `overlay`
-//! (repeatable). Values are what the actions take: ISO dates, numbers in
-//! the coordinate's units, labels. `view=x0..x1,y0..y1` (after `range`) is
-//! the heatmap's visible window, x then y as `axes` names them.
+//! and how it looks as a readable query (`?src=https://x/a.zarr&var=t2m
+//! &anim=time&step=2020-01-15&time=2020-01-01..2020-12-31&lat=30..60
+//! &plot=heatmap&cmap=cmocean:thermal&range=250..310`), replayed as
+//! `AppAction`s through the command queue (`Origin::Link`), so a link fails
+//! as a command does. Keys apply in a fixed order whatever their order:
+//! `src`, `var`, `axes` (x, y[, z] dimensions), `anim`, the dimensions (any
+//! other key, `dim.<name>` for one named like a key; `a..b` a range, since
+//! ISO times hold `:`), `step`, `plot`, then how it looks (`look_actions`):
+//! `cmap`, the composite (`style.rs`), `range` and the colors, `view` and
+//! `overlay` (repeatable). Values are what the actions take: ISO dates,
+//! numbers in the coordinate's units, labels, `#n` positions.
+//! `view=x0..x1,y0..y1` is the heatmap's visible window, x then y as `axes`
+//! names them.
 
 use percent_encoding::percent_decode_str;
 
@@ -16,13 +19,36 @@ use super::actions::{AppAction, DimRole};
 
 mod build;
 #[cfg(test)]
+mod network_tests;
+mod style;
+#[cfg(test)]
+mod style_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod view_tests;
 
 /// Keys that are no dimension; `dim.<key>` names a dimension called so.
-const KEYS: [&str; 9] = [
-    "src", "var", "axes", "anim", "plot", "cmap", "range", "view", "overlay",
+const KEYS: [&str; 19] = [
+    "src",
+    "var",
+    "axes",
+    "anim",
+    "step",
+    "plot",
+    "cmap",
+    "composite",
+    "rgb",
+    "channels",
+    "range",
+    "scale",
+    "opacity",
+    "reverse",
+    "nan",
+    "low",
+    "high",
+    "view",
+    "overlay",
 ];
 
 /// Stores a link may open: remote ones, never a local path (a link is
@@ -41,7 +67,7 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
         .map(|(k, v)| (decode(k), decode(v)))
         .filter(|(_, v)| !v.is_empty())
         .collect();
-    let last = |key: &str| pairs.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v);
+    let last = |key: &str| last_value(&pairs, key);
     let src = last("src").filter(|s| SCHEMES.iter().any(|p| s.starts_with(p)))?;
     let mut actions = vec![AppAction::OpenSource {
         source: src.clone(),
@@ -67,12 +93,30 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
         });
     }
     actions.extend(dimension_actions(&pairs));
+    // The plot's step, after the animated window it falls in.
+    if let (Some(dim), Some(value)) = (last("anim"), last("step")) {
+        let (dim, value) = (Some(dim.clone()), value.clone());
+        actions.push(AppAction::SetDim { dim, value });
+    }
     let plot_type = last("plot").cloned();
     actions.push(AppAction::Plot { plot_type });
+    actions.extend(look_actions(&pairs));
+    Some(actions)
+}
+
+/// How the plot looks once plotted: colormap, composite, colors, the zoom
+/// window and overlays.
+fn look_actions(pairs: &[(String, String)]) -> Vec<AppAction> {
+    let last = |key: &str| last_value(pairs, key);
+    let mut actions = Vec::new();
     if let Some(name) = last("cmap") {
         let (name, layer) = (name.clone(), None);
         actions.push(AppAction::SetColormap { name, layer });
     }
+    // After the colormap, which turns a composite off as its picker does.
+    let text = |key: &str| last(key).map(String::as_str);
+    let composite = style::composite_action(text("composite"), text("rgb"), text("channels"));
+    actions.extend(composite);
     if let Some((min, max)) = last("range").and_then(|r| numbers(r)) {
         actions.push(AppAction::SetColorRange {
             min,
@@ -80,6 +124,7 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
             layer: None,
         });
     }
+    actions.extend(style::style_action(|key| last(key).cloned()));
     if let Some(view) = last("view").and_then(|v| view_action(v)) {
         actions.push(view);
     }
@@ -87,7 +132,12 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
         actions.push(AppAction::SelectVariable { path: path.clone() });
         actions.push(AppAction::AddOverlay);
     }
-    Some(actions)
+    actions
+}
+
+/// The value of the last `key` in `pairs`.
+fn last_value<'a>(pairs: &'a [(String, String)], key: &str) -> Option<&'a String> {
+    pairs.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
 /// `SetDim`/`SetRange` for each dimension key, the last of a repeated one.

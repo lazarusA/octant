@@ -67,6 +67,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceDidPlot => "{} ritad som {}",
         PlaybackKey::VoiceDidColormap => "Färgskala {}",
         PlaybackKey::VoiceDidView => "Vy inställd",
+        PlaybackKey::VoiceDidComposite => "Komposit inställd",
+        PlaybackKey::VoiceDidColors => "Färger inställda",
         PlaybackKey::VoiceNotUnderstood => "Kommandot förstods inte: {}",
         PlaybackKey::VoiceNoDataset => "Öppna en datamängd först",
         PlaybackKey::VoiceNoVariable => "Ingen variabel matchar '{}'",

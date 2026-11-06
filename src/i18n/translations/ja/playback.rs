@@ -67,6 +67,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceDidPlot => "{} を{}で表示しました",
         PlaybackKey::VoiceDidColormap => "カラーマップ {}",
         PlaybackKey::VoiceDidView => "表示を設定",
+        PlaybackKey::VoiceDidComposite => "合成を設定",
+        PlaybackKey::VoiceDidColors => "色を設定",
         PlaybackKey::VoiceNotUnderstood => "コマンドを理解できませんでした：{}",
         PlaybackKey::VoiceNoDataset => "先にデータセットを開いてください",
         PlaybackKey::VoiceNoVariable => "「{}」に一致する変数はありません",

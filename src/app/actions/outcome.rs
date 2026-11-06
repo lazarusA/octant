@@ -78,6 +78,8 @@ pub enum Done {
     Colormap(String),
     /// The heatmap zoomed to a window (`SetView`).
     ViewSet,
+    CompositeSet,
+    ColorStyleSet,
     ViewReset,
 }
 

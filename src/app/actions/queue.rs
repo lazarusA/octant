@@ -112,6 +112,12 @@ impl OctantApp {
         self.commands.waiting.extend(items);
     }
 
+    /// Whether no command waits (tests).
+    #[cfg(test)]
+    pub(crate) fn commands_idle(&self) -> bool {
+        self.commands.waiting.is_empty()
+    }
+
     /// Runs the waiting commands until they are done, one fails, or one
     /// waits for a dataset or coordinates still loading (tests).
     #[cfg(test)]

@@ -38,6 +38,7 @@ pub mod schema;
 mod schema_tests;
 pub mod source_names;
 mod staging;
+mod style;
 #[cfg(test)]
 mod tests;
 mod text;
@@ -51,6 +52,8 @@ pub(crate) use coord_match::value_text;
 use outcome::resolved;
 pub use outcome::{Done, Failure, NameKind, Outcome};
 pub use queue::{CommandQueue, Origin};
+pub(crate) use style::{CURVES, SCALES, hex_rgba};
+pub use style::{ChannelSetting, ColorSetting, CompositeSetting};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]
@@ -157,6 +160,18 @@ pub enum AppAction {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         field: Option<usize>,
     },
+    /// The plotted variable's color composite: on or off, its R/G/B bands
+    /// or the channels it draws.
+    SetComposite {
+        #[serde(flatten)]
+        composite: CompositeSetting,
+    },
+    /// The plot's color scale, opacity, reversal and NaN and clip colors;
+    /// those left out are kept.
+    SetColorStyle {
+        #[serde(flatten)]
+        style: ColorSetting,
+    },
     ResetView,
     /// Zooms the heatmap to show dimension x from `x_from` to `x_to` and y
     /// from `y_from` to `y_to` (values as in `SetRange`); the plot then
@@ -212,6 +227,8 @@ impl OctantApp {
                 self.open_plate_well(well.as_deref(), field)
             }
             AppAction::SetColormap { name, layer } => self.set_colormap(&name, layer.as_deref()),
+            AppAction::SetComposite { composite } => self.set_composite(&composite),
+            AppAction::SetColorStyle { style } => self.set_color_style(&style),
             AppAction::SetView {
                 x_from,
                 x_to,

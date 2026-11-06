@@ -67,6 +67,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceDidPlot => "{} piirretty muodossa {}",
         PlaybackKey::VoiceDidColormap => "Väriskaala {}",
         PlaybackKey::VoiceDidView => "Näkymä asetettu",
+        PlaybackKey::VoiceDidComposite => "Yhdistelmä asetettu",
+        PlaybackKey::VoiceDidColors => "Värit asetettu",
         PlaybackKey::VoiceNotUnderstood => "Komentoa ei ymmärretty: {}",
         PlaybackKey::VoiceNoDataset => "Avaa ensin aineisto",
         PlaybackKey::VoiceNoVariable => "Mikään muuttuja ei vastaa kohdetta '{}'",
