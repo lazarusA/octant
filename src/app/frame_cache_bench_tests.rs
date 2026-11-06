@@ -107,7 +107,7 @@ fn frame_cache_timed() {
                     aspect_x: 1.0,
                     aspect_y: 1.0,
                     aspect_z: 1.0,
-                    point_size: 0.8,
+                    point_size: 1.05,
                     scale_by_value: false,
                     width: w as u32,
                     height: h as u32,
