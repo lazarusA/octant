@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::toast::Severity;
 
 /// Narrowest the export folder field gets beside its label; any narrower
 /// and it moves below the label.
@@ -37,6 +38,15 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.show_crop_overlay = !app.show_crop_overlay;
                 }
             });
+            let copy = ui.add_enabled_ui(app.can_share(), |ui| {
+                ui.icon_button(Icon::Clipboard, tr(K::CopyShareLink))
+            });
+            if copy.inner.clicked()
+                && let Some(link) = app.share_link()
+            {
+                ui.ctx().copy_text(link.clone());
+                app.notify(Severity::Success, tr(K::ShareLinkCopied), link);
+            }
         });
 }
 

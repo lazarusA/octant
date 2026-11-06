@@ -122,6 +122,8 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::ExportFolder => "Folder:",
         SettingsKey::OpenSaveDialog => "Open Save Dialog",
         SettingsKey::CropTool => "Crop Tool",
+        SettingsKey::CopyShareLink => "Copy Link",
+        SettingsKey::ShareLinkCopied => "Link copied",
         SettingsKey::Aggregation => "2D Aggregation",
         SettingsKey::AggregationMandatoryHover => {
             "Mandatory: Array exceeds single GPU buffer limit ({} MB). \

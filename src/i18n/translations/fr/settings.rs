@@ -136,6 +136,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Dossier :",
         SettingsKey::OpenSaveDialog => "Ouvrir la boîte d'enregistrement",
         SettingsKey::CropTool => "Outil de recadrage",
+        SettingsKey::CopyShareLink => "Copier le lien",
+        SettingsKey::ShareLinkCopied => "Lien copié",
         SettingsKey::Aggregation => "Agrégation 2D",
         SettingsKey::AggregationMandatoryHover => {
             "Obligatoire : le tableau dépasse la limite d'un tampon GPU ({} MB). \

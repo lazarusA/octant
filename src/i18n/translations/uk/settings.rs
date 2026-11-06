@@ -132,6 +132,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Папка:",
         SettingsKey::OpenSaveDialog => "Відкрити діалог збереження",
         SettingsKey::CropTool => "Обрізання",
+        SettingsKey::CopyShareLink => "Копіювати посилання",
+        SettingsKey::ShareLinkCopied => "Посилання скопійовано",
         SettingsKey::Aggregation => "2D-агрегація",
         SettingsKey::AggregationMandatoryHover => {
             "Обов'язково: масив перевищує ліміт одного буфера GPU ({} MB). \

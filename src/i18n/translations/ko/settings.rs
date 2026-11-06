@@ -118,6 +118,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "폴더:",
         SettingsKey::OpenSaveDialog => "저장 대화상자 열기",
         SettingsKey::CropTool => "자르기 도구",
+        SettingsKey::CopyShareLink => "링크 복사",
+        SettingsKey::ShareLinkCopied => "링크를 복사했습니다",
         SettingsKey::Aggregation => "2D 집계",
         SettingsKey::AggregationMandatoryHover => {
             "필수: 배열이 단일 GPU 버퍼 한도 ({} MB)를 넘습니다. \

@@ -45,9 +45,11 @@ mod text;
 use serde::{Deserialize, Serialize};
 
 use super::OctantApp;
+pub(crate) use candidates::plot_type_id;
+pub(crate) use coord_match::value_text;
 use outcome::resolved;
 pub use outcome::{Done, Failure, NameKind, Outcome};
-pub use queue::CommandQueue;
+pub use queue::{CommandQueue, Origin};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]

@@ -5,6 +5,7 @@
 
 use super::text::Name;
 use crate::data::{CoordValue, CoordValues, DatasetMetadata, VariableInfo};
+use crate::i18n::date::Date;
 use crate::ui::hover::format::{DimContext, format_dimension_coord};
 use crate::utils::units::days_from_civil;
 
@@ -130,4 +131,58 @@ fn iso_span(text: &str) -> Option<(f64, f64)> {
         (None, ..) => days_from_civil(y + 1, 1, 1) * 24,
     };
     Some((start as f64, end as f64))
+}
+
+/// Text for index `idx` of dimension `i` that `index_of` reads back to
+/// `idx` (with `last`, a range's end): its ISO date, label or number, else
+/// its 1-based position (share links, `app/share/`).
+pub(crate) fn value_text(
+    meta: &DatasetMetadata,
+    var: &VariableInfo,
+    store: &str,
+    i: usize,
+    (idx, last): (usize, bool),
+) -> String {
+    let name = var.dimension_names.get(i).map_or("", String::as_str);
+    let len = var.shape.get(i).copied().unwrap_or(0) as usize;
+    let dim = Dim {
+        meta,
+        var,
+        store,
+        name,
+        len,
+    };
+    let position = (idx + 1).to_string();
+    let Some(coords) = meta.get_dim_coords(Some(&var.name), name) else {
+        return position;
+    };
+    let number = coords.number_for(idx, len);
+    let date = number.and_then(|v| dim.context(idx).date(v)).map(iso);
+    let label = match coords.get(idx) {
+        Some(CoordValue::Label(label)) => Some(label.to_string()),
+        _ => None,
+    };
+    // shortcut: a coordinate none of these reads back to (repeated values, a
+    // middle missing from `Endpoints`) falls to its position, which a
+    // dimension with coordinates misreads; upgrade if such links show up.
+    [date, label, number.map(|n| n.to_string())]
+        .into_iter()
+        .flatten()
+        .find(|text| index_of(&dim, Some(coords), text, last) == Some(idx))
+        .unwrap_or(position)
+}
+
+/// `date` in ISO 8601, `T` before its hour.
+fn iso(date: Date) -> String {
+    let Date {
+        year,
+        month,
+        day,
+        hour,
+    } = date;
+    let day = format!("{year:04}-{month:02}-{day:02}");
+    match hour {
+        Some(h) if h > 0 => format!("{day}T{h:02}:00"),
+        _ => day,
+    }
 }

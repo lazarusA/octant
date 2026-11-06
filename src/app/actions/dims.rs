@@ -114,13 +114,25 @@ impl OctantApp {
     /// The step of the staged animated dimension: the plot's when it shows
     /// the staged variable (`request_step_or_load`, as the playback bar),
     /// else only the step the Dimensions panel's slider shows, as dragging
-    /// it does.
+    /// it does, its window moved to hold it (keeping its width, as OME's
+    /// default step does) so plotting does not clamp it away.
     fn go_to_step(&mut self, step: usize) {
         if self.plotted().metadata.is_some() && !self.is_exploring_unplotted_variable() {
             self.request_step_or_load(step);
-        } else {
-            self.playback.current_timestep = step;
+            return;
         }
+        let sel = &mut self.selected;
+        if let Some(a) = sel.animated_dim
+            && let Some(&(start, end)) = sel.dim_ranges.get(a)
+            && !(start..=end).contains(&step)
+        {
+            let len = sel.variable_info().and_then(|v| v.shape.get(a)).copied();
+            let last = len.unwrap_or(0).saturating_sub(1) as usize;
+            let width = end.saturating_sub(start);
+            let start = step.min(last.saturating_sub(width));
+            sel.set_range(a, (start, start + width), step);
+        }
+        self.playback.current_timestep = step;
     }
 
     pub(super) fn set_dim(&mut self, dim: Option<&str>, value: &str) -> Outcome {

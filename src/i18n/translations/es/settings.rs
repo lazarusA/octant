@@ -142,6 +142,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Carpeta:",
         SettingsKey::OpenSaveDialog => "Abrir diálogo de guardado",
         SettingsKey::CropTool => "Herramienta de recorte",
+        SettingsKey::CopyShareLink => "Copiar enlace",
+        SettingsKey::ShareLinkCopied => "Enlace copiado",
         SettingsKey::Aggregation => "Agregación 2D",
         SettingsKey::AggregationMandatoryHover => {
             "Obligatoria: el arreglo supera el límite de un búfer de GPU ({} MB). \
