@@ -113,6 +113,7 @@ impl OctantApp {
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
             point_size: self.plot_configs.point_cloud.point_size,
+            scale_by_value: self.plot_configs.point_cloud.scale_by_value,
             // A thinned cloud's own grid (`PointGrid`).
             width: layer.data.points.map_or(ctx.width, |g| g.width as u32),
             height: layer.data.points.map_or(ctx.height, |g| g.height as u32),

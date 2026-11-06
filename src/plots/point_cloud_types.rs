@@ -32,7 +32,7 @@ pub struct PointCloudUniforms {
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,
-    pub _pad0: u32,
+    pub scale_by_value: u32,
     pub _pad1: u32,
     pub color: super::common::PlotColorParams,
 }
@@ -45,6 +45,7 @@ pub struct PointCloudUniformParams {
     pub aspect_y: f32,
     pub aspect_z: f32,
     pub point_size: f32,
+    pub scale_by_value: bool,
     pub width: u32,
     pub height: u32,
     pub shift_x: u32,

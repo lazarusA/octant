@@ -130,6 +130,8 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/oit.wgsl"),
             "\n",
+            include_str!("shaders/common/height.wgsl"),
+            "\n",
             $plot_shader
         )
     };

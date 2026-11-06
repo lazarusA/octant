@@ -174,11 +174,16 @@ impl MeshDetail {
 pub struct PointCloudPlotConfig {
     /// Point width as a fraction of the closest gap between points (1 = touching).
     pub point_size: f32,
+    /// Each point sized by its value's place in the color range.
+    pub scale_by_value: bool,
 }
 
 impl Default for PointCloudPlotConfig {
     fn default() -> Self {
-        Self { point_size: 0.8 }
+        Self {
+            point_size: 1.05,
+            scale_by_value: false,
+        }
     }
 }
 

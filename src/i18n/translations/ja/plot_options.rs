@@ -38,6 +38,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "ボクセル",
         PlotOptionsKey::Height => "高さ",
         PlotOptionsKey::FlipHeights => "高さを反転",
+        PlotOptionsKey::ScaleByValue => "値でサイズ調整",
         PlotOptionsKey::FlipHeightsHover => {
             "最大値が平らに置かれ、それより小さい値がその上に盛り上がります"
         }

@@ -39,6 +39,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "Vokseli",
         PlotOptionsKey::Height => "Korkeus",
         PlotOptionsKey::FlipHeights => "Käännä korkeudet",
+        PlotOptionsKey::ScaleByValue => "Skaalaa arvon mukaan",
         PlotOptionsKey::FlipHeightsHover => {
             "Suurin arvo on tasainen ja pienemmät arvot nousevat sen yläpuolelle"
         }

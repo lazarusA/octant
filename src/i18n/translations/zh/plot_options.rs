@@ -38,6 +38,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "体素",
         PlotOptionsKey::Height => "高度",
         PlotOptionsKey::FlipHeights => "翻转高度",
+        PlotOptionsKey::ScaleByValue => "按数值缩放",
         PlotOptionsKey::FlipHeightsHover => "最大值平放，较小的值在其上方升起",
         PlotOptionsKey::MeshDetail => "细节",
         PlotOptionsKey::MeshDetailHover => {
