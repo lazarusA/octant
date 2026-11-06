@@ -134,6 +134,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Kansio:",
         SettingsKey::OpenSaveDialog => "Avaa tallennusikkuna",
         SettingsKey::CropTool => "Rajaustyökalu",
+        SettingsKey::CopyShareLink => "Kopioi linkki",
+        SettingsKey::ShareLinkCopied => "Linkki kopioitu",
         SettingsKey::Aggregation => "2D-aggregointi",
         SettingsKey::AggregationMandatoryHover => {
             "Pakollinen: taulukko ylittää yksittäisen GPU-puskurin rajan ({} MB). \

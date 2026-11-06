@@ -5,6 +5,7 @@
 
 use super::text::Name;
 use crate::data::{CoordValue, CoordValues, DatasetMetadata, VariableInfo};
+use crate::i18n::date::Date;
 use crate::ui::hover::format::{DimContext, format_dimension_coord};
 use crate::utils::units::days_from_civil;
 
@@ -33,13 +34,17 @@ impl Dim<'_> {
 /// The index `value` names along `dim`, read through `coords` (its own
 /// coordinates, if any). A date names the earliest coordinate within the
 /// year, month, day or hour it covers, or with `last` the latest (the end
-/// of a range); the nearest when none falls within it.
+/// of a range); the nearest when none falls within it. `#n` is the n-th
+/// position (1-based) whatever the coordinates.
 pub(super) fn index_of(
     dim: &Dim,
     coords: Option<&CoordValues>,
     value: &str,
     last: bool,
 ) -> Option<usize> {
+    if let Some(Ok(position)) = value.trim().strip_prefix('#').map(str::parse::<usize>) {
+        return (1..=dim.len).contains(&position).then(|| position - 1);
+    }
     let Some(coords) = coords else {
         // On a time axis a date is no position: "2020" is a year, not the
         // 2020th step.
@@ -130,4 +135,65 @@ fn iso_span(text: &str) -> Option<(f64, f64)> {
         (None, ..) => days_from_civil(y + 1, 1, 1) * 24,
     };
     Some((start as f64, end as f64))
+}
+
+/// Text for index `idx` of dimension `i` that `index_of` reads back to
+/// `idx` (with `last`, a range's end): its ISO date, label or number, else
+/// `#` and its 1-based position, which reads back with or without
+/// coordinates (share links, `app/share/`).
+pub(crate) fn value_text(
+    meta: &DatasetMetadata,
+    var: &VariableInfo,
+    store: &str,
+    i: usize,
+    (idx, last): (usize, bool),
+) -> String {
+    let name = var.dimension_names.get(i).map_or("", String::as_str);
+    let len = var.shape.get(i).copied().unwrap_or(0) as usize;
+    let dim = Dim {
+        meta,
+        var,
+        store,
+        name,
+        len,
+    };
+    let position = format!("#{}", idx + 1);
+    let Some(coords) = meta.get_dim_coords(Some(&var.name), name) else {
+        return position;
+    };
+    let number = coords.number_for(idx, len);
+    let date = number.and_then(|v| dim.context(idx).date(v)).map(iso);
+    let label = match coords.get(idx) {
+        Some(CoordValue::Label(label)) => Some(label.to_string()),
+        _ => None,
+    };
+    // The fewest decimals that still read back (`59` for 59.0238993...).
+    let numbers = number.into_iter().flat_map(|n| {
+        (0..=MAX_DECIMALS)
+            .map(move |p| format!("{n:.p$}"))
+            .chain(std::iter::once(n.to_string()))
+    });
+    date.into_iter()
+        .chain(label)
+        .chain(numbers)
+        .find(|text| index_of(&dim, Some(coords), text, last) == Some(idx))
+        .unwrap_or(position)
+}
+
+/// Decimals a number is shortened to at most before it is written whole.
+const MAX_DECIMALS: usize = 9;
+
+/// `date` in ISO 8601, `T` before its hour.
+fn iso(date: Date) -> String {
+    let Date {
+        year,
+        month,
+        day,
+        hour,
+    } = date;
+    let day = format!("{year:04}-{month:02}-{day:02}");
+    match hour {
+        Some(h) if h > 0 => format!("{day}T{h:02}:00"),
+        _ => day,
+    }
 }

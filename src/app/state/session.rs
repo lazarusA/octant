@@ -32,6 +32,14 @@ impl OctantApp {
         if let Some(target) = std::env::args().nth(1) {
             app.submit_or_activate_source(&target, None);
         }
+        // The page's own share link (`?src=...`); any other query is ignored.
+        #[cfg(target_arch = "wasm32")]
+        if let Some(window) = web_sys::window()
+            && let Ok(search) = window.location().search()
+            && let Some(actions) = crate::app::share::parse_share(&search)
+        {
+            app.queue_actions(actions, crate::app::actions::Origin::Link);
+        }
 
         app
     }

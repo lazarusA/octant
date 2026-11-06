@@ -5487,6 +5487,7 @@ dependencies = [
  "netcdf",
  "object_store",
  "ome_zarr_metadata",
+ "percent-encoding",
  "proj4rs",
  "proj4wkt",
  "quick-xml",

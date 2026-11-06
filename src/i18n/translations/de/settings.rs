@@ -130,6 +130,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Ordner:",
         SettingsKey::OpenSaveDialog => "Speicherdialog öffnen",
         SettingsKey::CropTool => "Zuschnitt",
+        SettingsKey::CopyShareLink => "Link kopieren",
+        SettingsKey::ShareLinkCopied => "Link kopiert",
         SettingsKey::Aggregation => "2D-Aggregation",
         SettingsKey::AggregationMandatoryHover => {
             "Erforderlich: Das Array überschreitet das Limit eines GPU-Puffers ({} MB). \

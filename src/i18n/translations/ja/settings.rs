@@ -118,6 +118,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "フォルダー:",
         SettingsKey::OpenSaveDialog => "保存ダイアログを開く",
         SettingsKey::CropTool => "切り抜きツール",
+        SettingsKey::CopyShareLink => "リンクをコピー",
+        SettingsKey::ShareLinkCopied => "リンクをコピーしました",
         SettingsKey::Aggregation => "2D集約",
         SettingsKey::AggregationMandatoryHover => {
             "必須: 配列が単一GPUバッファの上限 ({} MB) を超えています。集約は無効にできません。"

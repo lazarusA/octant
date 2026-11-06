@@ -9,7 +9,7 @@ use crate::data::{DatasetMetadata, SliceRequest, VariableInfo};
 use crate::plots::PlotType;
 
 /// The memory dataset active, nothing plotted, every block resident.
-fn active_app() -> (OctantApp, DatasetMetadata) {
+pub(super) fn active_app() -> (OctantApp, DatasetMetadata) {
     let (mut app, meta) = memory_app();
     for name in ["t2m", "sst"] {
         make_resident(&mut app, &SliceRequest::full_range(name, &[3, 5, 4]));

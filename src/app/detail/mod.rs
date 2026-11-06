@@ -36,6 +36,7 @@ mod follow;
 #[cfg(test)]
 mod follow_tests;
 mod geometry;
+pub(crate) use geometry::Axis;
 #[cfg(test)]
 mod geometry_tests;
 #[cfg(test)]
@@ -50,7 +51,7 @@ use crate::app::pipeline::paint_layer::CanvasView;
 use crate::data::BlockCacheKey;
 use crate::data::multiscale::Multiscale;
 use crate::plots::PlotType;
-use geometry::{Axis, covers};
+use geometry::covers;
 
 /// Share of the visible span a tile reads beyond each side, so small pans
 /// keep it.

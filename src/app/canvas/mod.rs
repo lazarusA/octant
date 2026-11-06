@@ -81,8 +81,16 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
     keys::handle_canvas_keys(app, ui, &response, canvas_rect, canvas_plot_type);
 
+    app.apply_pending_view(canvas_rect, canvas_plot_type);
     // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
     let uniforms = compute_viewport_uniforms(app, canvas_rect, canvas_plot_type);
+    if canvas_plot_type == crate::plots::PlotType::Heatmap {
+        app.nav.visible_uv = crate::data::ViewportResampler::compute_visible_data_bounds(
+            uniforms.gpu_pan,
+            uniforms.gpu_zoom,
+            uniforms.gpu_aspect_scale,
+        );
+    }
 
     // Volume planes changed since the last frame reach the shown renderer
     app.flush_volume_uploads();

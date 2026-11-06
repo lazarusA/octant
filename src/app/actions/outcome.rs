@@ -76,6 +76,10 @@ pub enum Done {
     Paused,
     Stepped(i32),
     Colormap(String),
+    /// The heatmap zoomed to a window (`SetView`).
+    ViewSet,
+    CompositeSet,
+    ColorStyleSet,
     ViewReset,
 }
 

@@ -74,6 +74,14 @@ pub(super) fn plot_type_ids() -> impl Iterator<Item = &'static str> {
     PLOT_TYPES.iter().map(|(_, _, ids)| ids[0])
 }
 
+/// `plot_type`'s English id (share links).
+pub(crate) fn plot_type_id(plot_type: PlotType) -> &'static str {
+    PLOT_TYPES
+        .iter()
+        .find(|(p, _, _)| *p == plot_type)
+        .map_or("heatmap", |(_, _, ids)| ids[0])
+}
+
 /// Plot types by their English ids and their names in every language.
 pub(super) fn plot_type_candidates() -> Vec<Candidate<PlotType>> {
     PLOT_TYPES

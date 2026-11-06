@@ -21,18 +21,8 @@ impl OctantApp {
         let plotted = self.plotted();
         let var = plotted.variable_info()?;
         let r = var.multiscale.as_ref()?;
-        let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(&plotted.dim_config) else {
-            return None;
-        };
-        let flipped = |d: usize| {
-            let name = var.dimension_names.get(d);
-            let flips = &self.layers.base.data.flipped_dims;
-            name.is_some_and(|n| flips.iter().any(|f| f.eq_ignore_ascii_case(n)))
-        };
-        let set = &r.set;
-        let axis =
-            |d: usize| Axis::plotted(set, r.level, d, *plotted.dim_ranges.get(d)?, flipped(d));
-        let axes = [axis(x)?, axis(y)?];
+        let axes = self.plotted_axes()?;
+        let (x, y, set) = (axes[0].dim, axes[1].dim, &r.set);
         let (u, v) = crate::data::ViewportResampler::compute_visible_data_bounds(
             view.pan,
             view.zoom,
@@ -55,6 +45,32 @@ impl OctantApp {
             axes,
             visible,
         })
+    }
+
+    /// The base layer's plotted x and y on level 0's index grid (its own grid
+    /// for a variable without levels), flipped as drawn.
+    pub(crate) fn plotted_axes(&self) -> Option<[Axis; 2]> {
+        let plotted = self.plotted();
+        let var = plotted.variable_info()?;
+        let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(&plotted.dim_config) else {
+            return None;
+        };
+        let flips = &self.layers.base.data.flipped_dims;
+        let axis = |d: usize| {
+            let name = var.dimension_names.get(d);
+            let flipped = name.is_some_and(|n| flips.iter().any(|f| f.eq_ignore_ascii_case(n)));
+            let (start, end) = *plotted.dim_ranges.get(d)?;
+            match &var.multiscale {
+                Some(r) => Axis::plotted(&r.set, r.level, d, (start, end), flipped),
+                None => Some(Axis {
+                    dim: d,
+                    lo: start.min(end) as f64,
+                    hi: start.max(end) as f64 + 1.0,
+                    flipped,
+                }),
+            }
+        };
+        Some([axis(x)?, axis(y)?])
     }
 
     /// How far the heatmap may zoom in: over a level of a multiscale variable

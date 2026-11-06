@@ -65,7 +65,8 @@ impl OctantApp {
     }
 
     /// Adds `coords` to the metadata of the dataset `source_id`: the selected copy, each
-    /// layer's and the stored one, whichever belong to it.
+    /// layer's (and the one its pending plot was requested from) and the stored one,
+    /// whichever belong to it.
     pub(crate) fn merge_variable_coordinates(
         &mut self,
         source_id: &str,
@@ -81,11 +82,15 @@ impl OctantApp {
             copies.push(meta);
         }
         for layer in self.layers.iter_mut() {
-            let selection = layer.selection_mut();
-            if super::layer_request::source_id_or(selection, &fallback) == source_id
-                && let Some(meta) = selection.metadata.as_mut()
-            {
-                copies.push(meta);
+            // The selection a pending plot was requested from becomes the
+            // layer's when its block arrives.
+            let selection = layer.source.selection_mut();
+            for selection in std::iter::once(selection).chain(layer.load.requested.as_mut()) {
+                if super::layer_request::source_id_or(selection, &fallback) == source_id
+                    && let Some(meta) = selection.metadata.as_mut()
+                {
+                    copies.push(meta);
+                }
             }
         }
         if let Some(meta) = self

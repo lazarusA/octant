@@ -105,9 +105,14 @@ impl OctantApp {
 
     /// Activates an existing dataset from the dataset manager if already loaded,
     /// or initiates store inspection in the background if not yet loaded.
+    /// A share link (`app/share/`) is queued as the commands it holds.
     pub fn submit_or_activate_source(&mut self, target: &str, explicit_kind: Option<StoreKind>) {
         let trimmed = target.trim();
         if trimmed.is_empty() {
+            return;
+        }
+        if let Some(actions) = super::share::parse_share(trimmed) {
+            self.queue_actions(actions, super::actions::Origin::Link);
             return;
         }
 

@@ -75,7 +75,7 @@ impl OctantApp {
 
     /// The index `value` names along staged dimension `i`, once its
     /// coordinates are read (`await_coordinates`).
-    fn index_for(&self, i: usize, value: &str, last: bool) -> Result<usize, Failure> {
+    pub(super) fn index_for(&self, i: usize, value: &str, last: bool) -> Result<usize, Failure> {
         let dim = self.staged_dim_info(i)?;
         let coords = dim.meta.get_dim_coords(Some(&dim.var.name), dim.name);
         index_of(&dim, coords, value, last).ok_or_else(|| Failure::NoValue {
@@ -88,7 +88,7 @@ impl OctantApp {
     /// fails with `Reading` while they are read. A command asked again once
     /// they settled (`CommandQueue::retrying`) never asks twice: a read that
     /// failed leaves the dimension's positions.
-    fn await_coordinates(&mut self, i: usize) -> Result<(), Failure> {
+    pub(super) fn await_coordinates(&mut self, i: usize) -> Result<(), Failure> {
         let dim = self.staged_dim_info(i)?;
         if dim
             .meta
@@ -114,13 +114,25 @@ impl OctantApp {
     /// The step of the staged animated dimension: the plot's when it shows
     /// the staged variable (`request_step_or_load`, as the playback bar),
     /// else only the step the Dimensions panel's slider shows, as dragging
-    /// it does.
+    /// it does, its window moved to hold it (keeping its width, as OME's
+    /// default step does) so plotting does not clamp it away.
     fn go_to_step(&mut self, step: usize) {
         if self.plotted().metadata.is_some() && !self.is_exploring_unplotted_variable() {
             self.request_step_or_load(step);
-        } else {
-            self.playback.current_timestep = step;
+            return;
         }
+        let sel = &mut self.selected;
+        if let Some(a) = sel.animated_dim
+            && let Some(&(start, end)) = sel.dim_ranges.get(a)
+            && !(start..=end).contains(&step)
+        {
+            let len = sel.variable_info().and_then(|v| v.shape.get(a)).copied();
+            let last = len.unwrap_or(0).saturating_sub(1) as usize;
+            let width = end.saturating_sub(start);
+            let start = step.min(last.saturating_sub(width));
+            sel.set_range(a, (start, start + width), step);
+        }
+        self.playback.current_timestep = step;
     }
 
     pub(super) fn set_dim(&mut self, dim: Option<&str>, value: &str) -> Outcome {

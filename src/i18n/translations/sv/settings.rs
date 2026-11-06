@@ -128,6 +128,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Mapp:",
         SettingsKey::OpenSaveDialog => "Öppna sparadialog",
         SettingsKey::CropTool => "Beskärningsverktyg",
+        SettingsKey::CopyShareLink => "Kopiera länk",
+        SettingsKey::ShareLinkCopied => "Länk kopierad",
         SettingsKey::Aggregation => "2D-aggregering",
         SettingsKey::AggregationMandatoryHover => {
             "Obligatorisk: matrisen överskrider gränsen för en enskild GPU-buffert ({} MB). \
