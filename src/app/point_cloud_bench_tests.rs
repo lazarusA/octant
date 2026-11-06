@@ -16,6 +16,7 @@ use super::channel_blend_bench_tests::{RUNS, device, median};
 use super::frame_cache_bench_tests::time;
 use super::surface_blend_bench_tests::orbit;
 use crate::app::layers::{LayerId, VariableSelection};
+use crate::app::state::plot_configs::PointCloudPlotConfig;
 use crate::app::{MeshDetail, OctantApp};
 use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
@@ -26,9 +27,6 @@ const W: usize = 1440;
 const H: usize = 720;
 /// Planes of the stacks timed: 1 M to 46.7 M points.
 const DEPTHS: [usize; 6] = [1, 4, 8, 16, 32, 45];
-/// The default point size (`PointCloudPlotConfig`).
-const POINT_SIZE: f32 = 1.05;
-
 /// `n` values in 0..1000, none missing (every point drawn).
 fn values(n: usize) -> Vec<f32> {
     (0..n)
@@ -112,7 +110,7 @@ fn frames(
             aspect_x: 1.0,
             aspect_y: 1.0,
             aspect_z: 1.0,
-            point_size: POINT_SIZE,
+            point_size: PointCloudPlotConfig::default().point_size,
             scale_by_value: false,
             width: w as u32,
             height: h as u32,
