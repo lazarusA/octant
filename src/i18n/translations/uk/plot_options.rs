@@ -41,6 +41,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "Воксель",
         PlotOptionsKey::Height => "Висота",
         PlotOptionsKey::FlipHeights => "Перевернути висоти",
+        PlotOptionsKey::ScaleByValue => "Розмір за значенням",
         PlotOptionsKey::FlipHeightsHover => {
             "Найбільше значення лежить пласко, а менші піднімаються над ним"
         }

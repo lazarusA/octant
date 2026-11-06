@@ -10,7 +10,7 @@ struct Uniforms {
     shift_x: u32,
     shift_y: u32,
     shift_z: u32,
-    _pad0: u32,
+    scale_by_value: u32,
     _pad1: u32,
     color: ColorUniforms,
 };
@@ -30,6 +30,22 @@ struct VertexOutput {
     @location(0) val: f32,
     @location(1) local_uv: vec2<f32>,
 };
+
+// Size factor of a point: 1, or with Scale by value its place in the color
+// range (a composite's brightness), floored at 0.1 so the smallest stay
+// visible; missing values drawn with the NaN color keep full size.
+fn value_scale(val: f32) -> f32 {
+    if (uniforms.scale_by_value == 0u || val != val || abs(val) > 1e30) {
+        return 1.0;
+    }
+    var t: f32;
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
+        t = length(unpack_composite_rgb(val)) / sqrt(3.0);
+    } else {
+        t = evaluate_scaled_norm(val, uniforms.color.cmin, uniforms.color.cmax, uniforms.color.scale_type, uniforms.color.scale_param);
+    }
+    return max(clamp(t, 0.0, 1.0), 0.1);
+}
 
 @vertex
 fn vs_main(
@@ -90,7 +106,14 @@ fn vs_main(
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 
     // Offset square point billboard quad parallel to camera view plane
-    let p_size = clamp(uniforms.point_size, 0.002, 0.2);
+    // `point_size` is a fraction of the gap between points in x and y (1 = touching).
+    // Z is left out: z neighbours sit behind each other, and a squashed Z would
+    // shrink the points seen from above. A single row or column has no gap there.
+    let gap_x = select(1e9, uniforms.aspect_x / f32(grid_w), grid_w > 1u);
+    let gap_y = select(1e9, uniforms.aspect_y / f32(grid_h), grid_h > 1u);
+    let gap_xy = min(gap_x, gap_y);
+    let spacing = select(gap_xy, uniforms.aspect_z / f32(grid_d), gap_xy >= 1e9);
+    let p_size = spacing * clamp(uniforms.point_size, 0.01, 5.0) * value_scale(raw_val);
     let center_view = camera_view(uniforms.camera, center_3d);
     let corner_pos = center_view + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
     out.position = camera_project(uniforms.camera, corner_pos);

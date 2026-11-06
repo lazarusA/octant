@@ -107,7 +107,9 @@ fn frame_cache_timed() {
                     aspect_x: 1.0,
                     aspect_y: 1.0,
                     aspect_z: 1.0,
-                    point_size: 0.01,
+                    point_size: crate::app::state::plot_configs::PointCloudPlotConfig::default()
+                        .point_size,
+                    scale_by_value: false,
                     width: w as u32,
                     height: h as u32,
                     shift_x: 0,

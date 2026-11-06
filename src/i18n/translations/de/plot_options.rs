@@ -41,6 +41,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "Voxel",
         PlotOptionsKey::Height => "Höhe",
         PlotOptionsKey::FlipHeights => "Höhen umkehren",
+        PlotOptionsKey::ScaleByValue => "Nach Wert skalieren",
         PlotOptionsKey::FlipHeightsHover => {
             "Der höchste Wert liegt flach, niedrigere Werte steigen darüber auf"
         }

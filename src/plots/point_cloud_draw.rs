@@ -58,7 +58,7 @@ impl PointCloudRenderer {
             shift_x: params.shift_x,
             shift_y: params.shift_y,
             shift_z: params.shift_z,
-            _pad0: 0,
+            scale_by_value: u32::from(params.scale_by_value),
             _pad1: 0,
             color: params.color,
         };

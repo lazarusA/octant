@@ -39,6 +39,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "복셀",
         PlotOptionsKey::Height => "높이",
         PlotOptionsKey::FlipHeights => "높이 뒤집기",
+        PlotOptionsKey::ScaleByValue => "값에 따라 크기 조정",
         PlotOptionsKey::FlipHeightsHover => {
             "가장 높은 값이 바닥에 놓이고 낮은 값일수록 위로 솟습니다"
         }

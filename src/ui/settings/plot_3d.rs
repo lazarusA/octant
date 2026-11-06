@@ -232,7 +232,11 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui,
         "point_size",
         SliderLabel::After(tr(K::Size)),
-        egui::Slider::new(&mut app.plot_configs.point_cloud.point_size, 0.002..=0.10).localized(),
+        egui::Slider::new(&mut app.plot_configs.point_cloud.point_size, 0.01..=5.0).localized(),
+    );
+    ui.checkbox(
+        &mut app.plot_configs.point_cloud.scale_by_value,
+        tr(K::ScaleByValue),
     );
     ui.separator();
     labeled_slider(

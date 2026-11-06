@@ -40,6 +40,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::ModeVoxel => "Voxel",
         PlotOptionsKey::Height => "Tinggi",
         PlotOptionsKey::FlipHeights => "Balik ketinggian",
+        PlotOptionsKey::ScaleByValue => "Skalakan menurut nilai",
         PlotOptionsKey::FlipHeightsHover => {
             "Nilai tertinggi terletak datar dan nilai yang lebih rendah naik di atasnya"
         }
