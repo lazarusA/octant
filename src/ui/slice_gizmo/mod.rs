@@ -81,7 +81,9 @@ pub fn is_hovered(ui: &egui::Ui, response: &egui::Response) -> bool {
 
 /// Hovers, drags and double-clicks the gizmo's handles, through the canvas
 /// `response`; whether the gizmo took the pointer this frame, so the canvas
-/// neither pans, orbits nor resets its view.
+/// neither pans, orbits nor resets its view. While a handle is dragged the
+/// view counts as interacting (`NavigationState::view_interacting`), so a
+/// volume previews the moving cut at half resolution as it does an orbit.
 pub fn interact(app: &mut OctantApp, ui: &egui::Ui, response: &egui::Response) -> bool {
     let mut state = state(ui, response);
     // A copy: the space borrows the app.
@@ -119,6 +121,9 @@ pub fn interact(app: &mut OctantApp, ui: &egui::Ui, response: &egui::Response) -
     }
     ui.data_mut(|d| d.insert_temp(state_id(response), state));
     app.plot_configs.slice = slice;
+    if took {
+        app.nav.view_interacting = state.held.is_some();
+    }
     took
 }
 

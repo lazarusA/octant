@@ -168,6 +168,12 @@ fn vs_main(
     // Heights back to normalized heights (the 0.6 or 0.8 of each mode).
     let height_scale = select(0.8, 0.6, uniforms.surface_mode == 1u) * uniforms.displacement_strength;
     out.slice_at = vec3<f32>(slice_xy, select(0.0, pos_3d.y / height_scale, height_scale > 0.0));
+    if (uniforms.surface_mode == 2u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
+        // Blocks are kept or cut whole, by their cell's center and value,
+        // so none is left open.
+        let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
+        out.slice_at = vec3<f32>(center, get_normalized_height(raw_val));
+    }
     out.normal = norm_rot;
     out.world_pos = pos_rot;
 

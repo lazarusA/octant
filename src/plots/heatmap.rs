@@ -123,17 +123,19 @@ impl HeatmapRenderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
         color: &super::common::PlotColorParams,
-        pan: [f32; 2],
-        zoom: f32,
-        aspect_scale: [f32; 2],
-        coord_mode: u32,
-        slice: super::common::SliceUniform,
+        view: &super::heatmap_draw::QuadView,
     ) {
+        let super::heatmap_draw::QuadView {
+            pan,
+            zoom,
+            aspect_scale,
+            coord_mode,
+            slice,
+        } = *view;
         let tile_bounds = self.tile_bounds.read().map(|b| *b).unwrap_or(FULL_TILE);
         let uniforms = HeatmapUniforms {
             pan,

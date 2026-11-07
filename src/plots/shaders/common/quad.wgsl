@@ -44,7 +44,8 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
 // Whether `uv` (over this quad, a tile's or the whole data's) falls outside
 // the data drawn: off the quad, or cut away by the slicer's box, read over
-// the whole data (`tile_bounds` places the quad in it).
+// the whole data (`tile_bounds` places the quad in it). Label outlines read
+// their neighbours through it too, so they trace the cut's edge.
 fn outside_quad(uv: vec2<f32>) -> bool {
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return true;

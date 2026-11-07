@@ -95,6 +95,8 @@ const SHADERS: [(&str, &str); 16] = [
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
             "\n",
+            include_str!("shaders/common/slice.wgsl"),
+            "\n",
             include_str!("shaders/common/healpix_scheme.wgsl"),
             "\n",
             include_str!("shaders/common/healpix_math.wgsl"),

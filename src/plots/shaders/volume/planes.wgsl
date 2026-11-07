@@ -1,20 +1,33 @@
 // The slicer's planes mode: orthoslices. Each shown plane (`uniforms.slice`,
 // unit-box positions in `lo.xyz`, negative when hidden) is drawn where the
 // ray crosses it inside the box, colored as the voxel there (exact, so
-// voxels stay crisp), opaque and shaded a little by how squarely it is seen;
-// the nearest plane with a color wins, so missing data shows the planes
-// behind.
+// voxels stay crisp), always opaque (the layer's opacity and alpha curve
+// left out) and shaded a little by how squarely it is seen; the nearest
+// plane with a color wins, so missing data shows the planes behind.
 
-// Color of the voxel at `p`, alpha 0 where nothing is drawn.
+// Color of the voxel at `p`, alpha 0 where nothing is drawn: missing voxels
+// without the NaN color, values outside the color range without their clip
+// color, black composites (as the hover's `VolumeSampler::is_visible`).
 fn plane_color(p: vec3<f32>) -> vec4<f32> {
     if (is_composite()) {
         let t = exact_texel(p);
-        if (texel_missing(t)) {
+        let c = textureLoad(volume_values, t, 0).rgb;
+        if (texel_missing(t) || all(c == vec3<f32>(0.0))) {
             return vec4<f32>(0.0);
         }
-        return vec4<f32>(textureLoad(volume_values, t, 0).rgb, 1.0);
+        return vec4<f32>(c, 1.0);
     }
-    return evaluate_plot_color(sample_exact(p), uniforms.color);
+    let d = sample_exact(p);
+    let c = uniforms.color;
+    let hidden = select(
+        (d < c.cmin && c.use_lowclip == 0u) || (d > c.cmax && c.use_highclip == 0u),
+        c.use_nan_color == 0u,
+        is_missing(d),
+    );
+    if (hidden) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(evaluate_plot_color(d, c).rgb, 1.0);
 }
 
 // The nearest drawn plane hit between `t_in` and `t_out` along `eye + t dir`,

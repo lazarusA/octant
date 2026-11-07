@@ -13,7 +13,7 @@
 use std::ops::Range;
 
 use crate::plots::PlotType;
-use crate::plots::common::SliceUniform;
+use crate::plots::slice::SliceUniform;
 use crate::utils::height::HeightScale;
 
 /// What the slicer does.
@@ -41,8 +41,8 @@ impl SliceMode {
 /// What a slicer axis cuts on a plot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SliceAxis {
-    /// The plot's x, y or z data dimension (cells).
-    Dim(usize),
+    /// One of the plot's x, y or z data dimensions, cut by cells.
+    Cells,
     /// The drawn heights of a surface or sphere: a value range
     /// (`Slicer::height_values`).
     Height,
@@ -54,9 +54,9 @@ impl SliceAxis {
     /// The axes u, v, w of `plot_type`.
     pub fn of(plot_type: PlotType) -> [Self; 3] {
         match plot_type {
-            PlotType::Volume | PlotType::PointCloud => [Self::Dim(0), Self::Dim(1), Self::Dim(2)],
-            PlotType::Surface | PlotType::Sphere => [Self::Dim(0), Self::Dim(1), Self::Height],
-            _ => [Self::Dim(0), Self::Dim(1), Self::None],
+            PlotType::Volume | PlotType::PointCloud => [Self::Cells; 3],
+            PlotType::Surface | PlotType::Sphere => [Self::Cells, Self::Cells, Self::Height],
+            _ => [Self::Cells, Self::Cells, Self::None],
         }
     }
 }
@@ -120,14 +120,33 @@ impl Slicer {
 
     /// The cut as the renderers read it (`SliceUniform`), in drawn order.
     pub fn uniform(&self) -> SliceUniform {
+        self.uniform_in([false; 3], None)
+    }
+
+    /// The cut for a renderer whose axes in `flip` run the other way
+    /// (fraction `f` read as `1 - f`), with the box's w range replaced by
+    /// `heights` (a surface's or sphere's normalized heights,
+    /// `height_range`) when given.
+    pub fn uniform_in(&self, flip: [bool; 3], heights: Option<(f32, f32)>) -> SliceUniform {
+        let turn = |k: usize, f: f32| if flip[k] { 1.0 - f } else { f };
         match self.mode {
             SliceMode::Off => SliceUniform::OFF,
-            SliceMode::Box => SliceUniform {
-                lo: [self.lo[0], self.lo[1], self.lo[2], SliceUniform::BOX],
-                hi: [self.hi[0], self.hi[1], self.hi[2], 0.0],
-            },
+            SliceMode::Box => {
+                let (mut lo, mut hi) = ([0.0; 3], [0.0; 3]);
+                for k in 0..3 {
+                    let (a, b) = (turn(k, self.lo[k]), turn(k, self.hi[k]));
+                    (lo[k], hi[k]) = (a.min(b), a.max(b));
+                }
+                if let Some((h_lo, h_hi)) = heights {
+                    (lo[2], hi[2]) = (h_lo, h_hi);
+                }
+                SliceUniform {
+                    lo: [lo[0], lo[1], lo[2], SliceUniform::BOX],
+                    hi: [hi[0], hi[1], hi[2], 0.0],
+                }
+            }
             SliceMode::Planes => {
-                let at = |k: usize| self.planes[k].unwrap_or(-1.0);
+                let at = |k: usize| self.planes[k].map_or(-1.0, |f| turn(k, f));
                 SliceUniform {
                     lo: [at(0), at(1), at(2), SliceUniform::PLANES],
                     hi: [1.0, 1.0, 1.0, 0.0],
@@ -150,16 +169,19 @@ impl Slicer {
     }
 
     /// The cells the box keeps along each axis of `cells` cells (whole
-    /// axes when not cutting): those whose centers lie in `[lo, hi)`. With
-    /// `flipped` an axis's range is in stored order (reversed).
+    /// axes when not cutting): those whose centers lie in `[lo, hi]`, as the
+    /// shaders keep them. With `flipped` an axis's range is in stored order
+    /// (reversed).
     pub fn index_ranges(&self, cells: [usize; 3], flipped: [bool; 3]) -> [Range<usize>; 3] {
         std::array::from_fn(|k| {
             let n = cells[k];
             if self.mode != SliceMode::Box {
                 return 0..n;
             }
-            let first = |f: f32| ((f * n as f32 - 0.5).ceil().max(0.0) as usize).min(n);
-            let kept = first(self.lo[k])..first(self.hi[k]);
+            // Cell i's center (i + 0.5) / n.
+            let first = (self.lo[k] * n as f32 - 0.5).ceil().max(0.0) as usize;
+            let end = ((self.hi[k] * n as f32 - 0.5).floor() + 1.0).max(0.0) as usize;
+            let kept = first.min(n)..end.clamp(first.min(n), n);
             if flipped[k] {
                 n - kept.end..n - kept.start
             } else {
@@ -182,8 +204,13 @@ impl Slicer {
     /// The normalized heights (`HeightScale::normalized`) the box keeps
     /// along a height axis (`SliceAxis::Height`): its w range over the drawn
     /// heights, `scale`'s bounds with the zero plane; open at the box's ends
-    /// so nothing drawn is lost to rounding there.
-    pub fn height_range(&self, scale: &HeightScale) -> (f32, f32) {
+    /// so nothing drawn is lost to rounding there, and wholly open on a plot
+    /// drawn without `relief` (a flat globe or surface, whose gizmo has no
+    /// height handles to undo a cut with).
+    pub fn height_range(&self, scale: &HeightScale, relief: bool) -> (f32, f32) {
+        if !relief {
+            return (f32::MIN, f32::MAX);
+        }
         let (low, high) = scale.bounds();
         let (low, high) = (low.min(0.0), high.max(0.0));
         let at = |w: f32| low + (high - low) * w;
@@ -204,7 +231,7 @@ impl Slicer {
     /// through `height_range`); `None` for composites, whose heights are
     /// colors, and the open ends at the data's extremes.
     pub fn height_values(&self, scale: &HeightScale) -> Option<(f32, f32)> {
-        let (lo, hi) = self.height_range(scale);
+        let (lo, hi) = self.height_range(scale, true);
         let (bl, bh) = scale.bounds();
         let at = |h: f32| scale.value_at(h.clamp(bl.min(0.0), bh.max(0.0)));
         let (a, b) = (at(lo)?, at(hi)?);

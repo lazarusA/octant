@@ -88,6 +88,7 @@ pub struct CoastlineUniforms {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Coastline3DUniforms {
     pub camera: crate::plots::camera::CameraUniform,
+    pub slice: crate::plots::slice::SliceUniform,
     pub displacement_strength: f32,
     pub plot_kind: u32,
     pub plot_mode: u32,
@@ -111,6 +112,8 @@ pub struct Coastline3DUniforms {
 #[derive(Copy, Clone, Debug)]
 pub struct Coastline3DParams {
     pub camera: crate::plots::camera::CameraUniform,
+    /// The slicer's box (u and v), as the surface or sphere under them.
+    pub slice: crate::plots::slice::SliceUniform,
     pub displacement_strength: f32,
     pub plot_kind: u32,
     pub plot_mode: u32,

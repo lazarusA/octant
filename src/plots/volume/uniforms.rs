@@ -2,7 +2,8 @@
 //! built from (zero-allocation `Copy` structs).
 
 use crate::plots::camera::CameraUniform;
-use crate::plots::common::{PlotColorParams, SliceUniform};
+use crate::plots::common::PlotColorParams;
+use crate::plots::slice::SliceUniform;
 use bytemuck::{Pod, Zeroable};
 
 /// Mirrors WGSL `Uniforms` in `shaders/volume/bindings.wgsl`.

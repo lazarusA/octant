@@ -147,6 +147,12 @@ fn vs_main(
     let height_scale = 0.4 * uniforms.displacement_strength;
     let h = select(0.0, (length(pos_3d) - 1.0) / height_scale, height_scale > 0.0);
     out.slice_at = vec3<f32>(slice_xy, h);
+    if (uniforms.sphere_mode == 3u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
+        // Blocks are kept or cut whole, by their cell's center and value,
+        // so none is left open.
+        let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
+        out.slice_at = vec3<f32>(center, select(0.0, get_normalized_radial_dr(raw_val) / height_scale, height_scale > 0.0));
+    }
     out.normal = norm_rot;
     out.world_pos = pos_rot;
 

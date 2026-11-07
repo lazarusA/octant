@@ -56,7 +56,7 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
             ..Default::default()
         },
         camera: camera(0.6, [0.0; 3]),
-        slice: crate::plots::common::SliceUniform::OFF,
+        slice: crate::plots::slice::SliceUniform::OFF,
         aspect_x: 1.0,
         aspect_y: 1.0,
         aspect_z: 1.0,

@@ -78,9 +78,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     let canvas_plot_type = app.effective_canvas_plot_type();
 
     // Handle Zoom, Pan, Orbit, and Reset interactions
-    if crate::ui::slice_gizmo::interact(app, ui, &response) {
-        app.nav.view_interacting = false;
-    } else {
+    if !crate::ui::slice_gizmo::interact(app, ui, &response) {
         handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
     }
     keys::handle_canvas_keys(app, ui, &response, canvas_rect, canvas_plot_type);

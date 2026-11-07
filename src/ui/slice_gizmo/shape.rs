@@ -9,15 +9,16 @@ use crate::data::MatrixData;
 use crate::ui::hover::raycast_sphere::SphereField;
 use crate::ui::hover::raycast_surface::SurfaceField;
 
-/// Thickness given to a flat w axis so faces keep a normal.
-pub(super) const THIN: f32 = 1e-3;
+/// Thickness given to a flat w axis so faces keep a normal (and below
+/// which relief is flat, as the shaders read it).
+pub(super) const THIN: f32 = crate::plots::slice::FLAT_HEIGHT;
 
 /// A 3D plot's shape.
 #[derive(Clone, Copy)]
 pub(super) enum Kind<'a> {
-    /// Volume and point cloud: a box centred on the origin, `half` its
-    /// half sizes (`get_3d_aspect_ratio` halves).
-    Box { half: [f32; 3] },
+    /// Volume and point cloud: a box centred on the origin, `size` its
+    /// sizes (`get_3d_aspect_ratio`), placed by `slice::volume_world`.
+    Box { size: [f32; 3] },
     /// Surface: u along x, v along z (`SurfaceField` cell placement), w
     /// along the drawn heights.
     Surface {
@@ -37,11 +38,7 @@ impl Kind<'_> {
     pub(super) fn world(&self, [u, v, w]: [f32; 3]) -> [f32; 3] {
         let lerp = |[a, b]: [f32; 2], t: f32| a + (b - a) * t;
         match self {
-            Kind::Box { half } => [
-                (2.0 * u - 1.0) * half[0],
-                (1.0 - 2.0 * v) * half[1],
-                (1.0 - 2.0 * w) * half[2],
-            ],
+            Kind::Box { size } => crate::plots::slice::volume_world([u, v, w], *size),
             Kind::Surface { field, y } => {
                 let su = field.uv_of_fraction(u, true);
                 let sv = field.uv_of_fraction(v, false);

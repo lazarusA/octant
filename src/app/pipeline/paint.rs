@@ -82,8 +82,7 @@ impl OctantApp {
             slice: self
                 .plot_configs
                 .slice
-                .uniform()
-                .flipped([false, true, true]),
+                .uniform_in(crate::plots::slice::VOLUME_FLIP, None),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
@@ -174,10 +173,14 @@ impl OctantApp {
             flip: flip_height,
         };
         let slicer = &self.plot_configs.slice;
+        let heights = slicer.height_range(
+            &scale,
+            crate::plots::slice::has_relief(&scale, sphere, mode, displacement_strength),
+        );
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
             camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
-            slice: slicer.uniform().with_w(slicer.height_range(&scale)),
+            slice: slicer.uniform_in([false; 3], Some(heights)),
             displacement_strength,
             mode,
             coord_mode,

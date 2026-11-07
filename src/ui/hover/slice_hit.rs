@@ -3,20 +3,24 @@
 //! the nearest plane drawing something there (`volume/planes.wgsl`).
 
 use crate::app::{OctantApp, SliceMode, Slicer};
+use crate::plots::slice::{volume_fraction, volume_world};
 use crate::ui::hover::camera::Ray3D;
 use crate::ui::hover::volume_sampler::VolumeSampler;
 
 /// The slicer's box (the whole box without one) in the world coordinates of
-/// a box centred on the origin, `aspects` its sizes: x right, y up, z toward
-/// the viewer.
+/// a box centred on the origin, `aspects` its sizes (`slice::volume_world`).
 pub fn cut_bounds(slice: &Slicer, (ax, ay, az): (f32, f32, f32)) -> ([f32; 3], [f32; 3]) {
     let (lo, hi) = match slice.mode {
         SliceMode::Box => (slice.lo, slice.hi),
         SliceMode::Off | SliceMode::Planes => ([0.0; 3], [1.0; 3]),
     };
+    let (a, b) = (
+        volume_world(lo, [ax, ay, az]),
+        volume_world(hi, [ax, ay, az]),
+    );
     (
-        [(lo[0] - 0.5) * ax, (0.5 - hi[1]) * ay, (0.5 - hi[2]) * az],
-        [(hi[0] - 0.5) * ax, (0.5 - lo[1]) * ay, (0.5 - lo[2]) * az],
+        std::array::from_fn(|k| a[k].min(b[k])),
+        std::array::from_fn(|k| a[k].max(b[k])),
     )
 }
 
@@ -31,10 +35,11 @@ impl VolumeSampler<'_> {
         (ax, ay, az): (f32, f32, f32),
     ) -> Option<(usize, usize, usize, f32)> {
         let slice = &app.plot_configs.slice;
+        let aspects = [ax, ay, az];
         let mut best: Option<(f32, (usize, usize, usize, f32))> = None;
         for k in 0..3 {
             let Some(at) = slice.planes[k] else { continue };
-            let world = [(at - 0.5) * ax, (0.5 - at) * ay, (0.5 - at) * az][k];
+            let world = volume_world([at; 3], aspects)[k];
             if ray.dir[k].abs() < 1e-6 {
                 continue;
             }
@@ -43,7 +48,7 @@ impl VolumeSampler<'_> {
                 continue;
             }
             let p = [0, 1, 2].map(|i| ray.origin[i] + t * ray.dir[i]);
-            let voxel = self.voxel_at([p[0] / ax + 0.5, 0.5 - p[1] / ay, 0.5 - p[2] / az]);
+            let voxel = self.voxel_at(volume_fraction(p, aspects));
             if self.is_visible(app, voxel.3) {
                 best = Some((t, voxel));
             }

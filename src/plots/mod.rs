@@ -60,6 +60,7 @@ pub use coastline::{
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::HeatmapRenderer;
 pub use heatmap_draw::HeatmapCallback;
+pub use heatmap_draw::QuadView;
 pub use labels::{LabelDraw, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;

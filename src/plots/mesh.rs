@@ -77,7 +77,7 @@ impl Mesh3DRenderer {
 
         let initial_uniforms = Mesh3DUniforms {
             camera: super::camera::OrbitCamera::default().uniform(),
-            slice: super::common::SliceUniform::OFF,
+            slice: super::slice::SliceUniform::OFF,
             displacement_strength: 0.5,
             mode: 0,
             width: width as u32,

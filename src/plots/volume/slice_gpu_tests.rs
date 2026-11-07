@@ -4,7 +4,7 @@
 
 use super::gpu_render::{gpu, params};
 use super::gpu_tests::{blob, mean_alpha, render, renderer};
-use crate::plots::common::SliceUniform;
+use crate::plots::slice::SliceUniform;
 use crate::utils::colormap::registry;
 
 fn boxed(lo: [f32; 3], hi: [f32; 3]) -> SliceUniform {

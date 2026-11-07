@@ -42,7 +42,7 @@ impl<'a> Space<'a> {
         let axes = SliceAxis::of(plot_type);
         let along = |sizes: [usize; 3]| {
             std::array::from_fn(|k| match axes[k] {
-                SliceAxis::Dim(_) => sizes[k],
+                SliceAxis::Cells => sizes[k],
                 SliceAxis::Height | SliceAxis::None => 0,
             })
         };
@@ -50,8 +50,11 @@ impl<'a> Space<'a> {
             PlotType::Volume | PlotType::PointCloud => {
                 let v = base.data.volume.as_ref()?;
                 let (x, y, z) = app.get_3d_aspect_ratio();
-                let half = [0.5 * x, 0.5 * y, 0.5 * z];
-                (Kind::Box { half }, 3, [v.width, v.height, v.depth])
+                (
+                    Kind::Box { size: [x, y, z] },
+                    3,
+                    [v.width, v.height, v.depth],
+                )
             }
             PlotType::Surface => surface(app)?,
             PlotType::Sphere => sphere(app)?,
@@ -75,7 +78,7 @@ impl<'a> Space<'a> {
     /// A unit box of 10 cells a side seen by `camera`, for tests.
     #[cfg(test)]
     pub fn test_box(camera: Camera3D) -> Self {
-        let kind = Kind::Box { half: [0.5; 3] };
+        let kind = Kind::Box { size: [1.0; 3] };
         let view = View::Orbit { camera, kind };
         Self {
             view,

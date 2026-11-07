@@ -48,6 +48,8 @@ impl Coastline3DRenderer {
                     "\n",
                     include_str!("../shaders/common/camera3d.wgsl"),
                     "\n",
+                    include_str!("../shaders/common/slice.wgsl"),
+                    "\n",
                     include_str!("../shaders/common/healpix_scheme.wgsl"),
                     "\n",
                     include_str!("../shaders/common/healpix_math.wgsl"),
@@ -64,6 +66,7 @@ impl Coastline3DRenderer {
 
         let uniforms = Coastline3DUniforms {
             camera: crate::plots::camera::OrbitCamera::default().uniform(),
+            slice: crate::plots::slice::SliceUniform::OFF,
             displacement_strength: 0.0,
             plot_kind: 0,
             plot_mode: 0,
@@ -317,6 +320,7 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         let p = self.params;
         let uniforms = Coastline3DUniforms {
             camera: p.camera,
+            slice: p.slice,
             displacement_strength: p.displacement_strength,
             plot_kind: p.plot_kind,
             plot_mode: p.plot_mode,

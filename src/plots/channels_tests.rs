@@ -101,15 +101,7 @@ fn channels_blend_as_the_cpu_does() {
             renderer.write_plane(&queue, i, plane);
         }
         let params = super::ChannelParams::of(&configs, &stretch, (0, 3), 64, None);
-        heatmap.update_uniforms(
-            &queue,
-            &Default::default(),
-            [0.0; 2],
-            1.0,
-            [1.0; 2],
-            0,
-            crate::plots::common::SliceUniform::OFF,
-        );
+        heatmap.update_uniforms(&queue, &Default::default(), &Default::default());
         renderer.update_params(&queue, &params);
         let usage = wgpu::TextureUsages::RENDER_ATTACHMENT;
         let target = texture(&device, format, usage | wgpu::TextureUsages::COPY_SRC);

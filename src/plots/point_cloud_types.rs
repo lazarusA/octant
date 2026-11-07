@@ -22,7 +22,7 @@ impl PointCloudVertex {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct PointCloudUniforms {
     pub camera: super::camera::CameraUniform,
-    pub slice: super::common::SliceUniform,
+    pub slice: super::slice::SliceUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
@@ -43,7 +43,7 @@ pub struct PointCloudUniformParams {
     pub color: super::common::PlotColorParams,
     pub camera: super::camera::CameraUniform,
     /// The slicer's cut, in the cloud's x, y, z order.
-    pub slice: super::common::SliceUniform,
+    pub slice: super::slice::SliceUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
