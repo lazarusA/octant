@@ -17,8 +17,15 @@ impl VolumeSampler<'_> {
     ) -> Option<(usize, usize, usize, f32)> {
         let (aspect_x, aspect_y, aspect_z) = aspects;
         let scale = if is_half_scale { 0.5 } else { 1.0 };
-        let min_b = [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z];
-        let max_b = [scale * aspect_x, scale * aspect_y, scale * aspect_z];
+        let (min_b, max_b) = if is_half_scale {
+            // The slicer's box, as the shaders cut.
+            super::slice_hit::cut_bounds(&app.plot_configs.slice, aspects)
+        } else {
+            (
+                [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z],
+                [scale * aspect_x, scale * aspect_y, scale * aspect_z],
+            )
+        };
 
         let (t_enter, t_exit) = intersect_aabb(ray, min_b, max_b)?;
         let t_start = t_enter.max(0.0);
@@ -26,6 +33,9 @@ impl VolumeSampler<'_> {
         let total_len = t_end - t_start;
         if total_len <= 0.0 {
             return None;
+        }
+        if is_half_scale && app.plot_configs.slice.mode == crate::app::SliceMode::Planes {
+            return self.plane_hit(app, ray, (t_start, t_end), aspects);
         }
 
         let max_dim = self.width.max(self.height).max(self.depth);
@@ -83,22 +93,11 @@ impl VolumeSampler<'_> {
             };
 
             if (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v) && (0.0..1.0).contains(&w) {
-                let cx = if is_half_scale {
-                    ((u * (gw - 1) as f32).round() as usize).min(gw - 1)
-                } else {
-                    ((u * gw as f32).floor() as usize).min(gw - 1)
-                };
-                let cy = if is_half_scale {
-                    ((v * (gh - 1) as f32).round() as usize).min(gh - 1)
-                } else {
-                    ((v * gh as f32).floor() as usize).min(gh - 1)
-                };
-                let (cx, cy) = self.drawn_voxel(cx, cy);
-                let cz = if is_half_scale {
-                    ((w * (self.depth - 1) as f32).round() as usize).min(self.depth - 1)
-                } else {
-                    ((w * self.depth as f32).floor() as usize).min(self.depth - 1)
-                };
+                // The voxel holding the sample, as the shaders read them
+                // (`exact_texel`, the point cloud's cells).
+                let index = |f: f32, n: usize| ((f * n as f32).floor() as usize).min(n - 1);
+                let (cx, cy) = self.drawn_voxel(index(u, gw), index(v, gh));
+                let cz = index(w, self.depth);
 
                 if last_cell == Some((cx, cy, cz)) {
                     continue;

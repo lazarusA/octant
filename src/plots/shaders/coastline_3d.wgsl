@@ -1,5 +1,7 @@
 struct Coastline3DUniforms {
     camera: Camera,
+    // The slicer's box, u and v over the coastlines' bounds (`common/slice.wgsl`).
+    slice: Slice,
     displacement_strength: f32,
     plot_kind: u32,
     plot_mode: u32,
@@ -255,6 +257,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
             discard;
         }
+    }
+    // The bounds are the plot's cell edges, so `uv` is the slicer's u and,
+    // north first, v.
+    if (!slice_box_keeps_uv(coastline_uniforms.slice, vec2<f32>(in.uv.x, 1.0 - in.uv.y))) {
+        discard;
     }
     return coastline_uniforms.color;
 }

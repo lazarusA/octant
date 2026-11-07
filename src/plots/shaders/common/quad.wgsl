@@ -15,6 +15,8 @@ struct QuadUniforms {
     lut_size_y: u32,
     _pad0: u32,
     _pad1: u32,
+    // The slicer's box over the whole data (`common/slice.wgsl`).
+    slice: Slice,
 };
 
 struct VertexInput {
@@ -40,8 +42,17 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     return out;
 }
 
+// Whether `uv` (over this quad, a tile's or the whole data's) falls outside
+// the data drawn: off the quad, or cut away by the slicer's box, read over
+// the whole data (`tile_bounds` places the quad in it). Label outlines read
+// their neighbours through it too, so they trace the cut's edge.
 fn outside_quad(uv: vec2<f32>) -> bool {
-    return uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return true;
+    }
+    let tb = uniforms.quad.tile_bounds;
+    let data = mix(tb.xy, tb.zw, uv);
+    return !slice_box_keeps(uniforms.quad.slice, vec3<f32>(data, 0.5));
 }
 
 // Index of the cell under `uv` in a buffer of `len` values: through the

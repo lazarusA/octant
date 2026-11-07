@@ -20,6 +20,8 @@ pub struct HeatmapUniforms {
     pub lut_size_y: u32,
     pub _pad0: u32,
     pub _pad1: u32,
+    /// The slicer's box over the whole data.
+    pub slice: super::slice::SliceUniform,
     pub color: super::common::PlotColorParams,
 }
 
@@ -40,6 +42,7 @@ impl Default for HeatmapUniforms {
             lut_size_y: 0,
             _pad0: 0,
             _pad1: 0,
+            slice: super::slice::SliceUniform::OFF,
             color: super::common::PlotColorParams::default(),
         }
     }

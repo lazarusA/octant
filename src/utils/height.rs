@@ -43,6 +43,25 @@ impl HeightScale {
         }
     }
 
+    /// The value whose height is `h` (inside `bounds`), the inverse of
+    /// `normalized`; `None` for composites, whose heights are colors.
+    pub fn value_at(&self, h: f32) -> Option<f32> {
+        if self.composite {
+            return None;
+        }
+        let (cmin, cmax) = (self.cmin, self.cmax);
+        let h = if self.flip {
+            self.range_height(cmax) - h
+        } else {
+            h
+        };
+        Some(if cmin < 0.0 && cmax > 0.0 {
+            h * cmin.abs().max(cmax.abs())
+        } else {
+            cmin + h * (cmax - cmin)
+        })
+    }
+
     fn range_height(&self, val: f32) -> f32 {
         let (cmin, cmax) = (self.cmin, self.cmax);
         if cmin < 0.0 && cmax > 0.0 {
@@ -54,22 +73,63 @@ impl HeightScale {
     }
 }
 
+/// World height per unit of normalized height (`HeightScale::normalized`)
+/// of the surface (`sphere` false) or the sphere drawn in `mode`, before the
+/// displacement strength, as surface.wgsl and sphere.wgsl draw them (pinned
+/// by `shaders_use_the_same_height_factors`): the surface's steps 0.6, its
+/// other modes 0.8, the sphere 0.4 of the radius, none in its mode 0.
+pub fn height_factor(sphere: bool, mode: u32) -> f32 {
+    match (sphere, mode) {
+        (true, 0) => 0.0,
+        (true, _) => 0.4,
+        (false, 1) => 0.6,
+        (false, _) => 0.8,
+    }
+}
+
 /// Height of `val` on the surface mesh, matching surface.wgsl.
 #[inline]
 pub fn surface_height(val: f32, scale: &HeightScale, surface_mode: u32, disp: f32) -> f32 {
     if !val.is_finite() {
         return 0.0;
     }
-    let mult = match surface_mode {
-        1 => 0.6, // Flat Steps
-        _ => 0.8, // Smooth Terrain (0) and 3D Lego Cubes (2)
-    };
-    scale.normalized(val) * mult * disp
+    scale.normalized(val) * height_factor(false, surface_mode) * disp
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shaders_use_the_same_height_factors() {
+        let surface = include_str!("../plots/shaders/surface.wgsl");
+        let sphere = include_str!("../plots/shaders/sphere.wgsl");
+        let coastline = include_str!("../plots/shaders/coastline_3d.wgsl");
+        for text in [surface, coastline] {
+            assert!(
+                text.contains("* 0.6 * uniforms.displacement_strength")
+                    || text.contains("* 0.6 * coastline_uniforms.displacement_strength")
+            );
+            assert!(
+                text.contains("* 0.8 * uniforms.displacement_strength")
+                    || text.contains("* 0.8 * coastline_uniforms.displacement_strength")
+            );
+        }
+        assert!(sphere.contains("h * 0.4 * uniforms.displacement_strength"));
+        assert!(coastline.contains("* 0.4 * coastline_uniforms.displacement_strength"));
+        assert!(surface.contains("select(0.8, 0.6, uniforms.surface_mode == 1u)"));
+        assert!(sphere.contains("let height_scale = 0.4 * uniforms.displacement_strength;"));
+        let factors = [
+            (false, 0),
+            (false, 1),
+            (false, 2),
+            (true, 0),
+            (true, 1),
+            (true, 3),
+        ];
+        let got = factors.map(|(s, m)| height_factor(s, m));
+        assert_eq!(got, [0.8, 0.6, 0.8, 0.0, 0.4, 0.4]);
+    }
     use crate::data::slicing::composite::pack_rgb;
 
     fn scale(cmin: f32, cmax: f32, composite: bool, flip: bool) -> HeightScale {

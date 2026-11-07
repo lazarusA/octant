@@ -21,6 +21,9 @@ pub mod plot_type;
 #[cfg(test)]
 mod plot_type_tests;
 pub mod session;
+pub mod slicer;
+#[cfg(test)]
+mod slicer_tests;
 pub mod store_kind;
 pub mod ui_layout;
 
@@ -30,5 +33,6 @@ pub use dimension_state::{AnimationRole, DimConfig, SpatialRole};
 pub use navigation::NavigationState;
 pub use playback::PlaybackState;
 pub use plot_configs::{MeshDetail, PlotConfigs, VolumeSurface};
+pub use slicer::{SliceAxis, SliceMode, Slicer};
 pub use store_kind::StoreKind;
 pub use ui_layout::UiLayoutState;

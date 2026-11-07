@@ -101,7 +101,7 @@ pub fn draw_crop_handles(
     painter: &egui::Painter,
     box_rect: Rect,
     accent_color: Color32,
-    dark_mode: bool,
+    outline: Color32,
 ) {
     let corner_arm_len = 16.0;
     let corner_stroke = egui::Stroke::new(3.0, accent_color);
@@ -124,41 +124,38 @@ pub fn draw_crop_handles(
     }
 
     // 4 Elongated Thin Side Edge Pills
-    let edge_pill_stroke = egui::Stroke::new(
-        1.0,
-        if dark_mode {
-            Color32::WHITE
-        } else {
-            Color32::BLACK
-        },
-    );
-
-    let edge_pills = [
-        (
-            egui::pos2(box_rect.center().x, box_rect.top()),
-            egui::vec2(28.0, 4.0),
-        ),
-        (
-            egui::pos2(box_rect.center().x, box_rect.bottom()),
-            egui::vec2(28.0, 4.0),
-        ),
-        (
-            egui::pos2(box_rect.left(), box_rect.center().y),
-            egui::vec2(4.0, 28.0),
-        ),
-        (
-            egui::pos2(box_rect.right(), box_rect.center().y),
-            egui::vec2(4.0, 28.0),
-        ),
-    ];
-
-    for (pos, size) in edge_pills {
-        painter.rect(
-            egui::Rect::from_center_size(pos, size),
-            2.0,
-            accent_color,
-            edge_pill_stroke,
-            egui::StrokeKind::Outside,
-        );
+    let quarter = std::f32::consts::FRAC_PI_2;
+    for (pos, angle) in [
+        (egui::pos2(box_rect.center().x, box_rect.top()), 0.0),
+        (egui::pos2(box_rect.center().x, box_rect.bottom()), 0.0),
+        (egui::pos2(box_rect.left(), box_rect.center().y), quarter),
+        (egui::pos2(box_rect.right(), box_rect.center().y), quarter),
+    ] {
+        draw_edge_pill(painter, pos, angle, accent_color, outline);
     }
+}
+
+/// The edge pill's length and thickness (points).
+pub const PILL_LEN: f32 = 28.0;
+pub const PILL_W: f32 = 4.0;
+
+/// The rounded pill marking a draggable edge, centred at `pos` and turned
+/// `angle` radians clockwise from horizontal (the slicer's gizmo lays it
+/// along its edges).
+pub fn draw_edge_pill(
+    painter: &egui::Painter,
+    pos: egui::Pos2,
+    angle: f32,
+    accent: Color32,
+    outline: Color32,
+) {
+    let rect = Rect::from_center_size(pos, egui::vec2(PILL_LEN, PILL_W));
+    let pill = egui::epaint::RectShape::new(
+        rect,
+        2.0,
+        accent,
+        egui::Stroke::new(1.0, outline),
+        egui::StrokeKind::Outside,
+    );
+    painter.add(pill.with_angle(angle));
 }

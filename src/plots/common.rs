@@ -100,6 +100,7 @@ impl MeshVertex3D {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Mesh3DUniforms {
     pub camera: super::camera::CameraUniform,
+    pub slice: super::slice::SliceUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub width: u32,
@@ -119,6 +120,8 @@ pub struct Mesh3DUniforms {
 pub struct Mesh3DUniformParams {
     pub color: PlotColorParams,
     pub camera: super::camera::CameraUniform,
+    /// The slicer's box, w as normalized heights.
+    pub slice: super::slice::SliceUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub coord_mode: u32,

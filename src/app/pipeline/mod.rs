@@ -18,5 +18,6 @@ mod point_grid_tests;
 pub mod rebuild;
 mod rebuild_2d;
 mod shown;
+mod slice_params;
 
 pub(crate) use shown::needs_pyramid;

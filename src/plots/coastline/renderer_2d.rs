@@ -12,6 +12,13 @@ struct CoastlineGpuResources {
     bind_group: wgpu::BindGroup,
 }
 
+/// The 2D coastline shader, with the slicer's box test.
+pub(crate) const COASTLINE_WGSL: &str = concat!(
+    include_str!("../shaders/common/slice.wgsl"),
+    "\n",
+    include_str!("../shaders/coastline.wgsl"),
+);
+
 pub struct CoastlineRenderer {
     render_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -24,7 +31,7 @@ impl CoastlineRenderer {
     pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat, verts: &[f32]) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Coastline 2D Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/coastline.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(COASTLINE_WGSL.into()),
         });
 
         let initial_uniforms = CoastlineUniforms {
@@ -39,6 +46,7 @@ impl CoastlineRenderer {
             lon_max: 180.0,
             lat_min: -90.0,
             lat_max: 90.0,
+            slice: crate::plots::slice::SliceUniform::OFF,
         };
 
         let uniform_buffer = crate::plots::common::create_uniform_buffer(
@@ -139,6 +147,7 @@ impl CoastlineRenderer {
         lon_max: f32,
         lat_min: f32,
         lat_max: f32,
+        slice: crate::plots::slice::SliceUniform,
     ) {
         let uniforms = CoastlineUniforms {
             pan,
@@ -152,6 +161,7 @@ impl CoastlineRenderer {
             lon_max,
             lat_min,
             lat_max,
+            slice,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -209,6 +219,8 @@ pub struct CoastlineCallback {
     pub lon_max: f32,
     pub lat_min: f32,
     pub lat_max: f32,
+    /// The slicer's box when it cuts coastlines.
+    pub slice: crate::plots::slice::SliceUniform,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for CoastlineCallback {
@@ -232,6 +244,7 @@ impl eframe::egui_wgpu::CallbackTrait for CoastlineCallback {
             self.lon_max,
             self.lat_min,
             self.lat_max,
+            self.slice,
         );
         Vec::new()
     }

@@ -3,6 +3,7 @@
 
 use crate::plots::camera::CameraUniform;
 use crate::plots::common::PlotColorParams;
+use crate::plots::slice::SliceUniform;
 use bytemuck::{Pod, Zeroable};
 
 /// Mirrors WGSL `Uniforms` in `shaders/volume/bindings.wgsl`.
@@ -10,9 +11,9 @@ use bytemuck::{Pod, Zeroable};
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct VolumeUniforms {
     pub camera: CameraUniform,
-    pub clip_planes: [[f32; 4]; 8],
+    pub slice: SliceUniform,
     pub light_color: [f32; 3],
-    pub num_clip_planes: u32,
+    pub _pad0: u32,
     pub ambient: [f32; 3],
     pub shininess: f32,
     pub light_direction: [f32; 3],
@@ -49,6 +50,8 @@ pub struct VolumeUniforms {
 pub struct VolumeUniformParams {
     pub color: PlotColorParams,
     pub camera: CameraUniform,
+    /// The slicer's cut in unit-box axes (y up, z toward the viewer).
+    pub slice: SliceUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
@@ -81,9 +84,9 @@ impl VolumeUniformParams {
         let [width, height, depth] = state.dims;
         VolumeUniforms {
             camera: self.camera,
-            clip_planes: [[0.0; 4]; 8],
+            slice: self.slice,
             light_color: [1.0, 1.0, 1.0],
-            num_clip_planes: 0,
+            _pad0: 0,
             ambient: [0.2, 0.2, 0.2],
             shininess: 32.0,
             light_direction: [1.0, 1.0, 1.0],

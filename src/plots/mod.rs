@@ -38,6 +38,11 @@ mod point_cloud_types;
 mod quad;
 #[cfg(test)]
 mod shader_tests;
+pub mod slice;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod slice_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+pub(crate) mod test_frame;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
 pub mod traits;
@@ -59,6 +64,7 @@ pub use coastline::{
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::HeatmapRenderer;
 pub use heatmap_draw::HeatmapCallback;
+pub use heatmap_draw::QuadView;
 pub use labels::{LabelDraw, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;
@@ -126,6 +132,8 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
             "\n",
+            include_str!("shaders/common/slice.wgsl"),
+            "\n",
             include_str!("shaders/common/lighting.wgsl"),
             "\n",
             include_str!("shaders/common/oit.wgsl"),
@@ -147,6 +155,8 @@ macro_rules! assemble_plot_with_coords_shader {
             include_str!("shaders/common/coords.wgsl"),
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
+            "\n",
+            include_str!("shaders/common/slice.wgsl"),
             "\n",
             include_str!("shaders/common/lighting.wgsl"),
             "\n",

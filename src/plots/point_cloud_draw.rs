@@ -48,6 +48,7 @@ impl PointCloudRenderer {
             super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
         let uniforms = PointCloudUniforms {
             camera: params.camera,
+            slice: params.slice,
             aspect_x: params.aspect_x,
             aspect_y: params.aspect_y,
             aspect_z: params.aspect_z,

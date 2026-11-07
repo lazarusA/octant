@@ -17,6 +17,7 @@ mod plot_3d;
 mod plot_options;
 mod resampling;
 mod scale;
+mod slicer;
 mod support;
 #[cfg(test)]
 mod support_tests;

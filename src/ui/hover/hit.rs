@@ -148,7 +148,8 @@ fn hit_2d_grid(
         return HitResult::invalid();
     };
     let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
-    let is_inside = rect.contains(hover_pos);
+    // Nothing is read where the slicer cuts the heatmap away.
+    let is_inside = rect.contains(hover_pos) && app.plot_configs.slice.keeps_uv(nx, ny);
     let (orig_w, orig_h) = if let Some(pyr) = &app.layers.base.data.pyramid {
         (pyr.original_width, pyr.original_height)
     } else {

@@ -1,5 +1,6 @@
 struct Uniforms {
     camera: Camera,
+    slice: Slice,
     displacement_strength: f32,
     sphere_mode: u32,
     width: u32,
@@ -34,6 +35,9 @@ struct VertexOutput {
     // RGB composite color, interpolated per channel: the packed value in
     // `val` must never be blended between vertices.
     @location(4) rgb: vec3<f32>,
+    // Where the slicer reads the fragment: fractions of the grid's cells
+    // along x and y, and its normalized height (`common/slice.wgsl`).
+    @location(5) slice_at: vec3<f32>,
 };
 
 fn get_normalized_radial_dr(val: f32) -> f32 {
@@ -70,6 +74,12 @@ fn vs_main(
     );
     var lon = coords.x;
     var lat = coords.y;
+    let grid = vec2<f32>(f32(grid_w), f32(grid_h));
+    var slice_xy = (vec2<f32>(f32(cell_x), f32(cell_y)) + model.position.xy) / grid;
+    if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
+        // HEALPix pixels have no rows: fractions of the globe.
+        slice_xy = vec2<f32>(lon / 6.2831853 + 0.5, 0.5 - lat / 3.14159265);
+    }
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
@@ -95,6 +105,7 @@ fn vs_main(
             );
             lon = corner.x;
             lat = corner.y;
+            slice_xy = (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid;
         }
 
         let dr = get_normalized_radial_dr(raw_val);
@@ -132,6 +143,16 @@ fn vs_main(
     out.uv = model.uv;
     out.val = raw_val;
     out.rgb = unpack_composite_rgb(raw_val);
+    // Radii back to normalized heights (`get_normalized_radial_dr`).
+    let height_scale = 0.4 * uniforms.displacement_strength;
+    let h = select(0.0, (length(pos_3d) - 1.0) / height_scale, height_scale > 0.0);
+    out.slice_at = vec3<f32>(slice_xy, h);
+    if (uniforms.sphere_mode == 3u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
+        // Blocks are kept or cut whole, by their cell's center and value,
+        // so none is left open.
+        let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
+        out.slice_at = vec3<f32>(center, select(0.0, get_normalized_radial_dr(raw_val) / height_scale, height_scale > 0.0));
+    }
     out.normal = norm_rot;
     out.world_pos = pos_rot;
 
@@ -140,6 +161,9 @@ fn vs_main(
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
+    if (!slice_box_keeps(uniforms.slice, in.slice_at)) {
+        discard;
+    }
     var eval_color = evaluate_plot_color(in.val, uniforms.color);
     if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE && eval_color.a > 0.0) {
         eval_color = vec4<f32>(in.rgb, eval_color.a);

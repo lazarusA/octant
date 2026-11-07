@@ -14,6 +14,8 @@ impl OctantApp {
         }
         let prev_plot_type = self.selected.plot_type;
         self.selected.plot_type = new_plot_type;
+        // The slicer's axes mean other things on another plot type.
+        self.plot_configs.slice.adapt_to(new_plot_type);
 
         let was_3d = prev_plot_type == PlotType::Volume || prev_plot_type == PlotType::PointCloud;
         let is_3d = new_plot_type == PlotType::Volume || new_plot_type == PlotType::PointCloud;

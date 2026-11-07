@@ -184,6 +184,27 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barre d'échelle",
         SettingsKey::ShowScaleBarHover => "Afficher la barre d'échelle",
         SettingsKey::HideScaleBarHover => "Masquer la barre d'échelle",
+        SettingsKey::Slicer => "Coupe",
+        SettingsKey::SlicerOff => "Désactivé",
+        SettingsKey::SlicerOffHover => "Aucune coupe",
+        SettingsKey::SlicerBox => "Boîte",
+        SettingsKey::SlicerBoxHover => {
+            "Garder la partie dans une boîte : faites glisser ses arêtes et ses coins"
+        }
+        SettingsKey::SlicerPlanes => "Plans",
+        SettingsKey::SlicerPlanesHover => {
+            "Montrer les données sur des plans : faites glisser chacun le long de son axe"
+        }
+        SettingsKey::SlicerPlaneV => "V",
+        SettingsKey::SlicerPlaneH => "H",
+        SettingsKey::SlicerPlaneD => "P",
+        SettingsKey::SlicerPlaneVHover => "Afficher ou masquer le plan vertical à travers {}",
+        SettingsKey::SlicerPlaneHHover => "Afficher ou masquer le plan horizontal à travers {}",
+        SettingsKey::SlicerPlaneDHover => "Afficher ou masquer le plan de profondeur à travers {}",
+        SettingsKey::SlicerHideGuidesHover => "Masquer les guides de la coupe (la coupe reste)",
+        SettingsKey::SlicerShowGuidesHover => "Afficher les guides de la coupe",
+        SettingsKey::SlicerCutCoastlines => "Couper les côtes",
+        SettingsKey::SlicerCutCoastlinesHover => "Couper les traits de côte avec le graphique",
         SettingsKey::AxisMajor => "Principales",
         SettingsKey::AxisMinor => "Secondaires",
         SettingsKey::AxisTicks => "Graduations",

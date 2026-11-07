@@ -78,6 +78,11 @@ impl OctantApp {
                 .nav
                 .orbit_camera(PlotType::Volume, screen_aspect)
                 .uniform(),
+            // The unit box's y runs up and z toward the viewer.
+            slice: self
+                .plot_configs
+                .slice
+                .uniform_in(crate::plots::slice::VOLUME_FLIP, None),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
@@ -109,6 +114,7 @@ impl OctantApp {
                 .nav
                 .orbit_camera(PlotType::PointCloud, screen_aspect)
                 .uniform(),
+            slice: self.plot_configs.slice.uniform(),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
@@ -163,6 +169,7 @@ impl OctantApp {
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
             camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
+            slice: self.mesh_slice(layer, sphere, (mode, displacement_strength, flip_height)),
             displacement_strength,
             mode,
             coord_mode,
@@ -268,6 +275,11 @@ impl OctantApp {
                             lon_max,
                             lat_min,
                             lat_max,
+                            // Cut with the heatmap only when the user asks.
+                            slice: self
+                                .plot_configs
+                                .slice
+                                .for_coastlines(self.plot_configs.slice.uniform()),
                         },
                     );
                     ui.painter().add(cb);

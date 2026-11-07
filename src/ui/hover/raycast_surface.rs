@@ -23,31 +23,36 @@ pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
 /// The surface as surface.wgsl draws it, in normalized surface coordinates
 /// `(u, v)` (`get_cell_normalized_bounds_*`; irregular grids reach past
 /// `[0, 1]` by half a cell).
+#[derive(Clone, Copy)]
 pub struct SurfaceField<'a> {
-    layer: &'a Layer,
-    matrix: &'a MatrixData,
-    scale: HeightScale,
-    mode: u32,
-    disp: f32,
+    pub(super) layer: &'a Layer,
+    pub(super) matrix: &'a MatrixData,
+    pub(super) scale: HeightScale,
+    pub(super) mode: u32,
+    pub(super) disp: f32,
     /// Half the world width, as surface.wgsl computes it.
     aspect: f32,
+    /// The slicer: cells its box cuts away are not drawn.
+    pub(super) slice: crate::app::Slicer,
+    /// Whether the surface draws relief (`slice::has_relief`), for the cut.
+    pub(super) relief: bool,
 }
 
 impl<'a> SurfaceField<'a> {
     pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
-        let (w, h) = (matrix.width.max(1), matrix.height.max(1));
-        let aspect = if matrix.grid.is_healpix() {
-            2.0
-        } else {
-            (w as f32 / h as f32).max(0.1)
-        };
+        let (w, h) = (matrix.width.max(1) as f32, matrix.height.max(1) as f32);
+        let healpix = matrix.grid.is_healpix();
+        let (scale, mesh) = (height_scale(app, false), &app.plot_configs.mesh);
+        let (mode, disp) = (mesh.surface_mode, mesh.surface_displacement);
         Self {
             layer: &app.layers.base,
             matrix,
-            scale: height_scale(app, false),
-            mode: app.plot_configs.mesh.surface_mode,
-            disp: app.plot_configs.mesh.surface_displacement,
-            aspect,
+            scale,
+            mode,
+            disp,
+            aspect: if healpix { 2.0 } else { (w / h).max(0.1) },
+            slice: app.plot_configs.slice,
+            relief: crate::plots::slice::has_relief(&scale, false, mode, disp),
         }
     }
 
@@ -56,7 +61,7 @@ impl<'a> SurfaceField<'a> {
         surface_height(val, &self.scale, self.mode, self.disp)
     }
 
-    fn center(&self, k: usize, along_x: bool) -> f32 {
+    pub(super) fn center(&self, k: usize, along_x: bool) -> f32 {
         let (w, h) = (self.matrix.width, self.matrix.height);
         if along_x {
             self.matrix.grid.cell_center_norm(k, 0, w, h).0
@@ -67,7 +72,7 @@ impl<'a> SurfaceField<'a> {
 
     /// Smooth vertex `j` along x or y: its cell's center, or the outer edge
     /// for the first and last (`smooth_corner`).
-    fn sample(&self, j: usize, along_x: bool) -> f32 {
+    pub(super) fn sample(&self, j: usize, along_x: bool) -> f32 {
         let n = if along_x {
             self.matrix.width
         } else {
@@ -156,6 +161,9 @@ impl<'a> SurfaceField<'a> {
             return Probe::OFF_GRID;
         }
         let (px, py) = self.cell(u, v);
+        if !self.kept((px, py)) {
+            return Probe::OFF_GRID;
+        }
         let (lo, hi) = self.span(px, py, u, v);
         Probe {
             cell: Some((px, py)),
@@ -169,9 +177,8 @@ impl<'a> SurfaceField<'a> {
         let margin = 1e-3;
         let ([u0, u1], [v0, v1]) = (self.edges(true), self.edges(false));
         let (us, vs) = ([u0 - margin, u1 + margin], [v0 - margin, v1 + margin]);
-        let (low, high) = self.scale.bounds();
-        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
-        let (y0, y1) = (k * low.min(0.0) - margin, k * high.max(0.0) + margin);
+        let (y0, y1) = self.height_span();
+        let (y0, y1) = (y0 - margin, y1 + margin);
         let (x0, z0) = self.uv_to_world(us[0], vs[0]);
         let (x1, z1) = self.uv_to_world(us[1], vs[1]);
         let (w, h) = (self.matrix.width.max(1), self.matrix.height.max(1));
@@ -193,7 +200,9 @@ impl<'a> SurfaceField<'a> {
                 .filter(|t| *t > 0.0)
         };
         let (u, v, _) = self.point(ray, marched.or_else(plane)?);
-        ((us[0]..=us[1]).contains(&u) && (vs[0]..=vs[1]).contains(&v)).then(|| self.cell(u, v))
+        ((us[0]..=us[1]).contains(&u) && (vs[0]..=vs[1]).contains(&v))
+            .then(|| self.cell(u, v))
+            .filter(|&cell| self.kept(cell))
     }
 }
 

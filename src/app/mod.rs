@@ -83,5 +83,6 @@ pub use state::line_profile::LineLayout;
 pub use state::line_series::{LineColoring, series_line_at, series_t};
 pub use state::plate::{PlateState, WellFields};
 pub use state::{
-    AnimationRole, DimConfig, MeshDetail, OctantApp, SpatialRole, StoreKind, VolumeSurface,
+    AnimationRole, DimConfig, MeshDetail, OctantApp, SliceAxis, SliceMode, Slicer, SpatialRole,
+    StoreKind, VolumeSurface,
 };

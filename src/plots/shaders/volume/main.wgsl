@@ -1,4 +1,5 @@
-// Fragment stage: ray setup against the box and clip planes, then mode dispatch.
+// Fragment stage: ray setup against the box (the slicer's cut box when
+// set), then the slicer's planes or the mode dispatch.
 
 // Rendering mode, fixed per pipeline so each mode compiles with only the
 // registers it needs.
@@ -7,32 +8,6 @@ override ALGORITHM: u32 = 0u;
 // Upper bound on samples per ray: large volumes sample coarser than one per
 // voxel (opacity stays step-corrected) instead of costing thousands of taps.
 const MAX_SAMPLES: i32 = 384;
-
-struct ClipResult {
-    clipped: bool,
-    p1: vec3<f32>,
-    p2: vec3<f32>,
-};
-
-fn process_clip_planes(p1_in: vec3<f32>, p2_in: vec3<f32>) -> ClipResult {
-    var p1 = p1_in;
-    var p2 = p2_in;
-    let count = min(uniforms.num_clip_planes, 8u);
-
-    for (var i = 0u; i < count; i = i + 1u) {
-        let plane = uniforms.clip_planes[i];
-        let d1 = dot(p1, plane.xyz) - plane.w;
-        let d2 = dot(p2, plane.xyz) - plane.w;
-        if (d1 < 0.0 && d2 < 0.0) {
-            return ClipResult(true, p1, p1);
-        } else if (d1 < 0.0) {
-            p1 = p1 - d1 * (p2 - p1) / (d2 - d1);
-        } else if (d2 < 0.0) {
-            p2 = p2 - d2 * (p1 - p2) / (d1 - d2);
-        }
-    }
-    return ClipResult(false, p1, p2);
-}
 
 // Interleaved gradient noise in [0, 1): a per-pixel start offset that turns
 // wood-grain banding into fine, unstructured grain.
@@ -78,10 +53,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // Branchless slab intersection with [0, 1]^3 unit bounding box
+    // Branchless slab intersection with the unit box, or the slicer's box
+    // within it, so a cut face is an entry face and shades as one.
+    let boxed = uniforms.slice.lo.w == SLICE_BOX;
+    let box_lo = select(vec3<f32>(0.0), clamp(uniforms.slice.lo.xyz, vec3<f32>(0.0), vec3<f32>(1.0)), boxed);
+    let box_hi = select(vec3<f32>(1.0), clamp(uniforms.slice.hi.xyz, vec3<f32>(0.0), vec3<f32>(1.0)), boxed);
     let inv_dir = 1.0 / dir;
-    let t0 = (vec3<f32>(0.0) - eye_unit) * inv_dir;
-    let t1 = (vec3<f32>(1.0) - eye_unit) * inv_dir;
+    let t0 = (box_lo - eye_unit) * inv_dir;
+    let t1 = (box_hi - eye_unit) * inv_dir;
     let tmin = min(t0, t1);
     let tmax = max(t0, t1);
     let t_enter = max(max(tmin.x, tmin.y), tmin.z);
@@ -90,15 +69,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    let clip_res = process_clip_planes(eye_unit + max(t_enter, 0.0) * dir, eye_unit + t_exit * dir);
-    if (clip_res.clipped) {
-        discard;
+    if (uniforms.slice.lo.w == SLICE_PLANES) {
+        let slices = orthoslices(eye_unit, dir, max(t_enter, 0.0), t_exit);
+        if (slices.a <= 0.0) {
+            discard;
+        }
+        return vec4<f32>(clamp(slices.rgb + dither(in.position.xy), vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
     }
 
     // Entry face: the slab axis that entered last, facing against the ray.
     let entered_on = vec3<f32>(tmin == vec3<f32>(t_enter));
     let face = select(-sign(dir) * entered_on, vec3<f32>(0.0), t_enter <= 0.0);
-    let ray = build_ray(clip_res.p1, clip_res.p2, face, in.position.xy);
+    let ray = build_ray(eye_unit + max(t_enter, 0.0) * dir, eye_unit + t_exit * dir, face, in.position.xy);
     let algo = ALGORITHM;
     var color: vec4<f32>;
     if (algo == 0u) {

@@ -5,30 +5,38 @@ use std::f32::consts::PI;
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::data::MatrixData;
+use crate::plots::slice::has_relief;
 use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
-use crate::utils::height::HeightScale;
+use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
 
 /// The globe as sphere.wgsl draws it, by longitude and latitude (radians).
 pub struct SphereField<'a> {
-    layer: &'a Layer,
-    matrix: &'a MatrixData,
-    scale: HeightScale,
+    pub(super) layer: &'a Layer,
+    pub(super) matrix: &'a MatrixData,
+    pub(super) scale: HeightScale,
     mode: u32,
     disp: f32,
+    /// The slicer: cells its box cuts away are not drawn.
+    pub(super) slice: crate::app::Slicer,
+    /// Whether the globe draws relief (`slice::has_relief`), for the cut.
+    pub(super) relief: bool,
 }
 
 impl<'a> SphereField<'a> {
     pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+        let (scale, mesh) = (height_scale(app, true), &app.plot_configs.mesh);
         Self {
             layer: &app.layers.base,
             matrix,
-            scale: height_scale(app, true),
-            mode: app.plot_configs.mesh.sphere_mode,
-            disp: app.plot_configs.mesh.sphere_displacement,
+            scale,
+            mode: mesh.sphere_mode,
+            disp: mesh.sphere_displacement,
+            slice: app.plot_configs.slice,
+            relief: has_relief(&scale, true, mesh.sphere_mode, mesh.sphere_displacement),
         }
     }
 
@@ -57,8 +65,14 @@ impl<'a> SphereField<'a> {
     }
 
     /// The cell drawn toward `(lon, lat)`, including the half-cell border
-    /// strips regional grids draw past their bounds.
+    /// strips regional grids draw past their bounds; none where the slicer
+    /// cuts (`kept`).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
+        self.grid_cell(lon, lat)
+            .filter(|&cell| self.kept(cell, lon, lat))
+    }
+
+    fn grid_cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
         let (w, h) = (self.matrix.width, self.matrix.height);
         let Some((fx, fy, wrap)) = self.cell_coords(lon, lat) else {
             return self.matrix.grid.find_cell_from_lon_lat_rad(lon, lat, w, h);
@@ -74,10 +88,10 @@ impl<'a> SphereField<'a> {
     /// Radial displacement of cell `(px, py)` (`get_normalized_radial_dr`).
     fn dr_at(&self, px: usize, py: usize) -> f32 {
         let val = value_at(self.layer, self.matrix, px, py);
-        if self.mode == 0 || !val.is_finite() {
+        if !val.is_finite() {
             return 0.0;
         }
-        self.scale.normalized(val) * 0.4 * self.disp
+        self.scale.normalized(val) * height_factor(true, self.mode) * self.disp
     }
 
     /// Smooth-mode displacement toward `(lon, lat)`, between the vertices
@@ -146,15 +160,22 @@ impl<'a> SphereField<'a> {
         })
     }
 
+    /// Radii the drawn globe spans, the unit sphere included (mode 0 draws
+    /// no relief).
+    pub fn radius_span(&self) -> (f32, f32) {
+        let k = height_factor(true, self.mode) * self.disp;
+        let (low, high) = self.scale.bounds();
+        (1.0 + k * low.min(0.0), 1.0 + k * high.max(0.0))
+    }
+
     /// The cell where `ray` first meets the drawn globe, or crosses the unit
     /// sphere when it meets nothing.
     pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
         let marched = (self.mode != 0).then(|| {
             // Between the outermost and innermost drawn radii; below the
             // innermost the ray only sees the inside of the globe.
-            let (low, high) = self.scale.bounds();
-            let r_in = 1.0 + 0.4 * self.disp * low.min(0.0) - 1e-3;
-            let r_out = 1.0 + 0.4 * self.disp * high.max(0.0) + 1e-3;
+            let (r_in, r_out) = self.radius_span();
+            let (r_in, r_out) = (r_in - 1e-3, r_out + 1e-3);
             let (t_in, t_out) = sphere_span(ray, r_out)?;
             let t_stop = sphere_span(ray, r_in).map_or(t_out, |(t, _)| t);
             let (w, h) = (self.matrix.width, self.matrix.height);

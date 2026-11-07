@@ -95,7 +95,7 @@ fn label_pipeline_validates_against_heatmap_data() {
     let depth = texture(&device, wgpu::TextureFormat::Depth32Float, usage);
     let view = target.create_view(&Default::default());
     let depth_view = depth.create_view(&Default::default());
-    heatmap.update_uniforms(&queue, &Default::default(), [0.0; 2], 1.0, [1.0; 2], 0);
+    heatmap.update_uniforms(&queue, &Default::default(), &Default::default());
     labels.update_params(&queue, false, 1.0);
     let mut encoder = device.create_command_encoder(&Default::default());
     {

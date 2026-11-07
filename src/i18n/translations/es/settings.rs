@@ -190,6 +190,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barra de escala",
         SettingsKey::ShowScaleBarHover => "Mostrar la barra de escala",
         SettingsKey::HideScaleBarHover => "Ocultar la barra de escala",
+        SettingsKey::Slicer => "Corte",
+        SettingsKey::SlicerOff => "Desactivado",
+        SettingsKey::SlicerOffHover => "Sin corte",
+        SettingsKey::SlicerBox => "Caja",
+        SettingsKey::SlicerBoxHover => {
+            "Conservar la parte dentro de una caja: arrastra sus aristas y esquinas"
+        }
+        SettingsKey::SlicerPlanes => "Planos",
+        SettingsKey::SlicerPlanesHover => {
+            "Mostrar los datos sobre planos: arrastra cada uno por su eje"
+        }
+        SettingsKey::SlicerPlaneV => "V",
+        SettingsKey::SlicerPlaneH => "H",
+        SettingsKey::SlicerPlaneD => "P",
+        SettingsKey::SlicerPlaneVHover => "Mostrar u ocultar el plano vertical a través de {}",
+        SettingsKey::SlicerPlaneHHover => "Mostrar u ocultar el plano horizontal a través de {}",
+        SettingsKey::SlicerPlaneDHover => {
+            "Mostrar u ocultar el plano de profundidad a través de {}"
+        }
+        SettingsKey::SlicerHideGuidesHover => "Ocultar las guías del corte (el corte se mantiene)",
+        SettingsKey::SlicerShowGuidesHover => "Mostrar las guías del corte",
+        SettingsKey::SlicerCutCoastlines => "Cortar costas",
+        SettingsKey::SlicerCutCoastlinesHover => "Cortar las líneas de costa con el gráfico",
         SettingsKey::AxisMajor => "Principales",
         SettingsKey::AxisMinor => "Secundarias",
         SettingsKey::AxisTicks => "Marcas",

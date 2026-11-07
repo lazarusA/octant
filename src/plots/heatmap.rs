@@ -127,11 +127,15 @@ impl HeatmapRenderer {
         &self,
         queue: &wgpu::Queue,
         color: &super::common::PlotColorParams,
-        pan: [f32; 2],
-        zoom: f32,
-        aspect_scale: [f32; 2],
-        coord_mode: u32,
+        view: &super::heatmap_draw::QuadView,
     ) {
+        let super::heatmap_draw::QuadView {
+            pan,
+            zoom,
+            aspect_scale,
+            coord_mode,
+            slice,
+        } = *view;
         let tile_bounds = self.tile_bounds.read().map(|b| *b).unwrap_or(FULL_TILE);
         let uniforms = HeatmapUniforms {
             pan,
@@ -145,6 +149,7 @@ impl HeatmapRenderer {
             lut_size_y: self.lut_size_y.load(Ordering::Relaxed),
             _pad0: 0,
             _pad1: 0,
+            slice,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

@@ -77,6 +77,7 @@ impl Mesh3DRenderer {
 
         let initial_uniforms = Mesh3DUniforms {
             camera: super::camera::OrbitCamera::default().uniform(),
+            slice: super::slice::SliceUniform::OFF,
             displacement_strength: 0.5,
             mode: 0,
             width: width as u32,
@@ -192,6 +193,7 @@ impl Mesh3DRenderer {
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &Mesh3DUniformParams) {
         let uniforms = Mesh3DUniforms {
             camera: params.camera,
+            slice: params.slice,
             displacement_strength: params.displacement_strength,
             mode: params.mode,
             width: self.width as u32,

@@ -78,7 +78,9 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     let canvas_plot_type = app.effective_canvas_plot_type();
 
     // Handle Zoom, Pan, Orbit, and Reset interactions
-    handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
+    if !crate::ui::slice_gizmo::interact(app, ui, &response) {
+        handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
+    }
     keys::handle_canvas_keys(app, ui, &response, canvas_rect, canvas_plot_type);
 
     app.apply_pending_view(canvas_rect, canvas_plot_type);
@@ -118,10 +120,14 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
 
     // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
     if app.pending_export.is_none() {
-        crate::ui::hover_tooltip::show_hover_tooltip(app, &ctx, ui, &response, canvas_rect);
+        // Not over the slicer's handles, which the card would cover.
+        if !crate::ui::slice_gizmo::is_hovered(ui, &response) {
+            crate::ui::hover_tooltip::show_hover_tooltip(app, &ctx, ui, &response, canvas_rect);
+        }
         focus::paint_ring(ui, &response, 0.0);
     }
 
+    crate::ui::slice_gizmo::draw(app, ui, &response);
     // Render interactive ROI crop box, capture flash, and drag cue
     draw_canvas_overlays(app, ui, canvas_rect);
 }

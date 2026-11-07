@@ -26,6 +26,8 @@ struct LabelParams {
 pub(crate) const LABELS_WGSL: &str = concat!(
     include_str!("shaders/common/coords.wgsl"),
     "\n",
+    include_str!("shaders/common/slice.wgsl"),
+    "\n",
     include_str!("shaders/common/quad.wgsl"),
     "\n",
     include_str!("shaders/labels.wgsl"),
