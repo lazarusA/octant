@@ -21,6 +21,8 @@ use crate::data::slicing::CompositeStretch;
 pub(crate) const CHANNELS_WGSL: &str = concat!(
     include_str!("shaders/common/coords.wgsl"),
     "\n",
+    include_str!("shaders/common/slice.wgsl"),
+    "\n",
     include_str!("shaders/common/quad.wgsl"),
     "\n",
     include_str!("shaders/common/channel_blend.wgsl"),

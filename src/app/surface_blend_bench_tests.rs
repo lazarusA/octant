@@ -55,6 +55,7 @@ pub(super) fn surface_callback(
     Mesh3DCallback {
         renderer: surface.clone(),
         params: crate::plots::common::Mesh3DUniformParams {
+            slice: crate::plots::common::SliceUniform::OFF,
             color,
             camera: orbit(0),
             displacement_strength: 0.5,

@@ -78,6 +78,12 @@ impl OctantApp {
                 .nav
                 .orbit_camera(PlotType::Volume, screen_aspect)
                 .uniform(),
+            // The unit box's y runs up and z toward the viewer.
+            slice: self
+                .plot_configs
+                .slice
+                .uniform()
+                .flipped([false, true, true]),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
@@ -109,6 +115,7 @@ impl OctantApp {
                 .nav
                 .orbit_camera(PlotType::PointCloud, screen_aspect)
                 .uniform(),
+            slice: self.plot_configs.slice.uniform(),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
@@ -160,9 +167,17 @@ impl OctantApp {
                 [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             ));
 
+        let scale = crate::utils::height::HeightScale {
+            cmin: layer.color.range_min,
+            cmax: layer.color.range_max,
+            composite: layer.composite.enabled,
+            flip: flip_height,
+        };
+        let slicer = &self.plot_configs.slice;
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
             camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
+            slice: slicer.uniform().with_w(slicer.height_range(&scale)),
             displacement_strength,
             mode,
             coord_mode,

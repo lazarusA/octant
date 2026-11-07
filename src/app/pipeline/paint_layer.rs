@@ -184,6 +184,7 @@ impl OctantApp {
                     zoom: view.zoom,
                     aspect_scale: view.aspect_scale,
                     coord_mode,
+                    slice: self.plot_configs.slice.uniform(),
                     labels,
                     channels,
                 },

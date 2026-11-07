@@ -26,12 +26,14 @@ pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
 #[derive(Clone, Copy)]
 pub struct SurfaceField<'a> {
     layer: &'a Layer,
-    matrix: &'a MatrixData,
-    scale: HeightScale,
-    mode: u32,
-    disp: f32,
+    pub(super) matrix: &'a MatrixData,
+    pub(super) scale: HeightScale,
+    pub(super) mode: u32,
+    pub(super) disp: f32,
     /// Half the world width, as surface.wgsl computes it.
     aspect: f32,
+    /// The slicer: cells its box cuts away are not drawn.
+    pub(super) slice: crate::app::Slicer,
 }
 
 impl<'a> SurfaceField<'a> {
@@ -49,6 +51,7 @@ impl<'a> SurfaceField<'a> {
             mode: app.plot_configs.mesh.surface_mode,
             disp: app.plot_configs.mesh.surface_displacement,
             aspect,
+            slice: app.plot_configs.slice,
         }
     }
 
@@ -57,7 +60,7 @@ impl<'a> SurfaceField<'a> {
         surface_height(val, &self.scale, self.mode, self.disp)
     }
 
-    fn center(&self, k: usize, along_x: bool) -> f32 {
+    pub(super) fn center(&self, k: usize, along_x: bool) -> f32 {
         let (w, h) = (self.matrix.width, self.matrix.height);
         if along_x {
             self.matrix.grid.cell_center_norm(k, 0, w, h).0
@@ -68,7 +71,7 @@ impl<'a> SurfaceField<'a> {
 
     /// Smooth vertex `j` along x or y: its cell's center, or the outer edge
     /// for the first and last (`smooth_corner`).
-    fn sample(&self, j: usize, along_x: bool) -> f32 {
+    pub(super) fn sample(&self, j: usize, along_x: bool) -> f32 {
         let n = if along_x {
             self.matrix.width
         } else {
@@ -140,42 +143,6 @@ impl<'a> SurfaceField<'a> {
         }
     }
 
-    /// Surface coordinate along x or y of `f`, a fraction of the grid's
-    /// cells (cell `k` of `n` spans `[k/n, (k+1)/n)`): within cell `k`
-    /// between its edges, midway between neighbouring centers (the outer
-    /// ones `sample`'s), so irregular grids place it where their cells are.
-    pub fn uv_of_fraction(&self, f: f32, along_x: bool) -> f32 {
-        let n = if along_x {
-            self.matrix.width
-        } else {
-            self.matrix.height
-        };
-        if n < 2 || self.matrix.grid.is_healpix() {
-            return f;
-        }
-        let x = f.clamp(0.0, 1.0) * n as f32;
-        let k = (x as usize).min(n - 1);
-        let c = |j| self.center(j, along_x);
-        let left = if k == 0 {
-            self.sample(0, along_x)
-        } else {
-            0.5 * (c(k - 1) + c(k))
-        };
-        let right = if k + 1 == n {
-            self.sample(n - 1, along_x)
-        } else {
-            0.5 * (c(k) + c(k + 1))
-        };
-        left + (right - left) * (x - k as f32)
-    }
-
-    /// World heights the drawn surface spans, the zero plane included.
-    pub fn height_span(&self) -> (f32, f32) {
-        let (low, high) = self.scale.bounds();
-        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
-        (k * low.min(0.0), k * high.max(0.0))
-    }
-
     pub fn uv_to_world(&self, u: f32, v: f32) -> (f32, f32) {
         ((2.0 * u - 1.0) * self.aspect, 2.0 * v - 1.0)
     }
@@ -193,6 +160,9 @@ impl<'a> SurfaceField<'a> {
             return Probe::OFF_GRID;
         }
         let (px, py) = self.cell(u, v);
+        if !self.kept((px, py)) {
+            return Probe::OFF_GRID;
+        }
         let (lo, hi) = self.span(px, py, u, v);
         Probe {
             cell: Some((px, py)),
@@ -229,7 +199,9 @@ impl<'a> SurfaceField<'a> {
                 .filter(|t| *t > 0.0)
         };
         let (u, v, _) = self.point(ray, marched.or_else(plane)?);
-        ((us[0]..=us[1]).contains(&u) && (vs[0]..=vs[1]).contains(&v)).then(|| self.cell(u, v))
+        ((us[0]..=us[1]).contains(&u) && (vs[0]..=vs[1]).contains(&v))
+            .then(|| self.cell(u, v))
+            .filter(|&cell| self.kept(cell))
     }
 }
 

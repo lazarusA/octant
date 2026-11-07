@@ -24,7 +24,11 @@ pub mod raycast_surface;
 pub mod raycast_volume;
 pub mod sample_1d;
 pub mod sample_2d;
+mod slice_hit;
+#[cfg(test)]
+mod slice_hit_tests;
 pub(crate) mod smooth;
+mod surface_slice;
 mod volume_sampler;
 mod voxel_walk;
 

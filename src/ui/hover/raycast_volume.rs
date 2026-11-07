@@ -17,8 +17,15 @@ impl VolumeSampler<'_> {
     ) -> Option<(usize, usize, usize, f32)> {
         let (aspect_x, aspect_y, aspect_z) = aspects;
         let scale = if is_half_scale { 0.5 } else { 1.0 };
-        let min_b = [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z];
-        let max_b = [scale * aspect_x, scale * aspect_y, scale * aspect_z];
+        let (min_b, max_b) = if is_half_scale {
+            // The slicer's box, as the shaders cut.
+            super::slice_hit::cut_bounds(&app.plot_configs.slice, aspects)
+        } else {
+            (
+                [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z],
+                [scale * aspect_x, scale * aspect_y, scale * aspect_z],
+            )
+        };
 
         let (t_enter, t_exit) = intersect_aabb(ray, min_b, max_b)?;
         let t_start = t_enter.max(0.0);
@@ -26,6 +33,9 @@ impl VolumeSampler<'_> {
         let total_len = t_end - t_start;
         if total_len <= 0.0 {
             return None;
+        }
+        if is_half_scale && app.plot_configs.slice.mode == crate::app::SliceMode::Planes {
+            return self.plane_hit(app, ray, (t_start, t_end), aspects);
         }
 
         let max_dim = self.width.max(self.height).max(self.depth);

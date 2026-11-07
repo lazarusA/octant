@@ -19,6 +19,8 @@ pub struct SphereField<'a> {
     scale: HeightScale,
     mode: u32,
     disp: f32,
+    /// The slicer: cells its box cuts away are not drawn.
+    slice: crate::app::Slicer,
 }
 
 impl<'a> SphereField<'a> {
@@ -29,6 +31,7 @@ impl<'a> SphereField<'a> {
             scale: height_scale(app, true),
             mode: app.plot_configs.mesh.sphere_mode,
             disp: app.plot_configs.mesh.sphere_displacement,
+            slice: app.plot_configs.slice,
         }
     }
 
@@ -58,7 +61,19 @@ impl<'a> SphereField<'a> {
 
     /// The cell drawn toward `(lon, lat)`, including the half-cell border
     /// strips regional grids draw past their bounds.
+    /// The drawn cell toward `(lon, lat)`, none where the slicer cuts (by
+    /// cell, as sphere.wgsl; HEALPix pixels, which have no rows, by where
+    /// they lie on the globe).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
+        let grid = (self.matrix.width, self.matrix.height);
+        let kept = |cell| match self.matrix.grid.is_healpix() {
+            true => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
+            false => self.slice.keeps_cell(cell, grid),
+        };
+        self.grid_cell(lon, lat).filter(|&cell| kept(cell))
+    }
+
+    fn grid_cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
         let (w, h) = (self.matrix.width, self.matrix.height);
         let Some((fx, fy, wrap)) = self.cell_coords(lon, lat) else {
             return self.matrix.grid.find_cell_from_lon_lat_rad(lon, lat, w, h);

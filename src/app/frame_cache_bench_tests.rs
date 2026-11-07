@@ -99,6 +99,7 @@ fn frame_cache_timed() {
             let at = |step| PointCloudCallback {
                 renderer: points.clone(),
                 params: crate::plots::PointCloudUniformParams {
+                    slice: crate::plots::common::SliceUniform::OFF,
                     color: crate::plots::common::PlotColorParams {
                         cmax: 1000.0,
                         ..Default::default()

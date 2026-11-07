@@ -30,6 +30,8 @@ mod gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod label_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod slice_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod surface_gpu_tests;
 #[cfg(test)]
 mod tests;

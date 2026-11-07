@@ -123,6 +123,7 @@ impl HeatmapRenderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
@@ -131,6 +132,7 @@ impl HeatmapRenderer {
         zoom: f32,
         aspect_scale: [f32; 2],
         coord_mode: u32,
+        slice: super::common::SliceUniform,
     ) {
         let tile_bounds = self.tile_bounds.read().map(|b| *b).unwrap_or(FULL_TILE);
         let uniforms = HeatmapUniforms {
@@ -145,6 +147,7 @@ impl HeatmapRenderer {
             lut_size_y: self.lut_size_y.load(Ordering::Relaxed),
             _pad0: 0,
             _pad1: 0,
+            slice,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

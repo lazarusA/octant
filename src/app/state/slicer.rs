@@ -13,6 +13,7 @@
 use std::ops::Range;
 
 use crate::plots::PlotType;
+use crate::plots::common::SliceUniform;
 use crate::utils::height::HeightScale;
 
 /// What the slicer does.
@@ -117,20 +118,35 @@ impl Slicer {
         self.set_mode(mode);
     }
 
-    /// The cut as the renderers read it: the box's `lo` (w the mode: 0 off,
-    /// 1 box, 2 planes) and `hi`, or the planes' positions (-1 none) in `lo`.
-    pub fn uniform(&self) -> [[f32; 4]; 2] {
+    /// The cut as the renderers read it (`SliceUniform`), in drawn order.
+    pub fn uniform(&self) -> SliceUniform {
         match self.mode {
-            SliceMode::Off => [[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 0.0]],
-            SliceMode::Box => [
-                [self.lo[0], self.lo[1], self.lo[2], 1.0],
-                [self.hi[0], self.hi[1], self.hi[2], 0.0],
-            ],
+            SliceMode::Off => SliceUniform::OFF,
+            SliceMode::Box => SliceUniform {
+                lo: [self.lo[0], self.lo[1], self.lo[2], SliceUniform::BOX],
+                hi: [self.hi[0], self.hi[1], self.hi[2], 0.0],
+            },
             SliceMode::Planes => {
                 let at = |k: usize| self.planes[k].unwrap_or(-1.0);
-                [[at(0), at(1), at(2), 2.0], [1.0, 1.0, 1.0, 0.0]]
+                SliceUniform {
+                    lo: [at(0), at(1), at(2), SliceUniform::PLANES],
+                    hi: [1.0, 1.0, 1.0, 0.0],
+                }
             }
         }
+    }
+
+    /// Whether the box keeps the point at fractions `fx`, `fy` along u and v
+    /// (the CPU twin of `slice_box_keeps`; always without a box).
+    pub fn keeps_uv(&self, fx: f32, fy: f32) -> bool {
+        self.mode != SliceMode::Box
+            || ((self.lo[0]..=self.hi[0]).contains(&fx) && (self.lo[1]..=self.hi[1]).contains(&fy))
+    }
+
+    /// Whether the box keeps cell `(x, y)` of a `w` x `h` grid, by its center.
+    pub fn keeps_cell(&self, (x, y): (usize, usize), (w, h): (usize, usize)) -> bool {
+        let center = |i: usize, n: usize| (i as f32 + 0.5) / n.max(1) as f32;
+        self.keeps_uv(center(x, w), center(y, h))
     }
 
     /// The cells the box keeps along each axis of `cells` cells (whole
@@ -163,13 +179,35 @@ impl Slicer {
         })
     }
 
-    /// The data values the box keeps along a height axis (`SliceAxis::Height`),
-    /// the w range read through the drawn heights `span` (their lowest and
-    /// highest, as `HeightScale::bounds` with the zero plane) and `scale`;
-    /// `None` for composites, whose heights are colors.
-    pub fn height_values(&self, span: (f32, f32), scale: &HeightScale) -> Option<(f32, f32)> {
-        let at = |w: f32| scale.value_at(span.0 + (span.1 - span.0) * w);
-        let (a, b) = (at(self.lo[2])?, at(self.hi[2])?);
+    /// The normalized heights (`HeightScale::normalized`) the box keeps
+    /// along a height axis (`SliceAxis::Height`): its w range over the drawn
+    /// heights, `scale`'s bounds with the zero plane; open at the box's ends
+    /// so nothing drawn is lost to rounding there.
+    pub fn height_range(&self, scale: &HeightScale) -> (f32, f32) {
+        let (low, high) = scale.bounds();
+        let (low, high) = (low.min(0.0), high.max(0.0));
+        let at = |w: f32| low + (high - low) * w;
+        let lo = if self.lo[2] <= 0.0 {
+            f32::MIN
+        } else {
+            at(self.lo[2])
+        };
+        let hi = if self.hi[2] >= 1.0 {
+            f32::MAX
+        } else {
+            at(self.hi[2])
+        };
+        (lo, hi)
+    }
+
+    /// The data values the box keeps along a height axis (`SliceAxis::Height`,
+    /// through `height_range`); `None` for composites, whose heights are
+    /// colors, and the open ends at the data's extremes.
+    pub fn height_values(&self, scale: &HeightScale) -> Option<(f32, f32)> {
+        let (lo, hi) = self.height_range(scale);
+        let (bl, bh) = scale.bounds();
+        let at = |h: f32| scale.value_at(h.clamp(bl.min(0.0), bh.max(0.0)));
+        let (a, b) = (at(lo)?, at(hi)?);
         Some((a.min(b), a.max(b)))
     }
 }

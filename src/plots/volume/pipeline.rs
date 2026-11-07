@@ -9,6 +9,8 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/common/camera3d.wgsl"),
             "\n",
+            include_str!("../shaders/common/slice.wgsl"),
+            "\n",
             include_str!("../shaders/volume/bindings.wgsl"),
             "\n",
             $filter,
@@ -28,6 +30,8 @@ macro_rules! volume_shader {
             include_str!("../shaders/volume/projections.wgsl"),
             "\n",
             include_str!("../shaders/volume/rgba.wgsl"),
+            "\n",
+            include_str!("../shaders/volume/planes.wgsl"),
             "\n",
             include_str!("../shaders/volume/main.wgsl"),
         )

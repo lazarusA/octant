@@ -16,7 +16,25 @@ fn hidden_guides_still_cut() {
     let mut s = boxed([0.2; 3], [0.8; 3]);
     s.guides = false;
     assert!(s.cutting() && !s.guides_shown());
-    assert_eq!(s.uniform()[0][3], 1.0);
+    assert_eq!(s.uniform().lo[3], 1.0);
+}
+
+#[test]
+fn uniforms_flip_axes_and_take_heights() {
+    let s = boxed([0.1, 0.2, 0.3], [0.6, 0.7, 0.8]);
+    let u = s.uniform().flipped([false, true, true]);
+    let near = |a: [f32; 4], b: [f32; 4]| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6);
+    assert!(near(u.lo, [0.1, 0.3, 0.2, 1.0]) && near(u.hi, [0.6, 0.8, 0.7, 0.0]));
+    assert_eq!(s.uniform().with_w((-1.0, 2.0)).hi[2], 2.0);
+    let mut p = Slicer::default();
+    p.set_mode(SliceMode::Planes);
+    p.planes = [Some(0.25), None, Some(0.5)];
+    let u = p.uniform().flipped([false, true, true]);
+    assert_eq!(u.lo, [0.25, -1.0, 0.5, 2.0]);
+    assert_eq!(
+        Slicer::default().uniform(),
+        crate::plots::common::SliceUniform::OFF
+    );
 }
 
 #[test]
@@ -70,12 +88,13 @@ fn height_cuts_read_back_as_data_values() {
         flip: false,
     };
     let s = boxed([0.0; 3], [1.0, 1.0, 0.5]);
-    assert_eq!(s.height_values((0.0, 1.0), &scale), Some((200.0, 250.0)));
+    assert_eq!(s.height_range(&scale), (f32::MIN, 0.5));
+    assert_eq!(s.height_values(&scale), Some((200.0, 250.0)));
     let flipped = HeightScale {
         flip: true,
         ..scale
     };
-    assert_eq!(s.height_values((0.0, 1.0), &flipped), Some((250.0, 300.0)));
+    assert_eq!(s.height_values(&flipped), Some((250.0, 300.0)));
     for v in [200.0, 237.5, 300.0] {
         assert_eq!(scale.value_at(scale.normalized(v)), Some(v));
     }

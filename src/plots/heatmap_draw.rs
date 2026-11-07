@@ -57,6 +57,8 @@ pub struct HeatmapCallback {
     pub zoom: f32,
     pub aspect_scale: [f32; 2],
     pub coord_mode: u32,
+    /// The slicer's box over the whole data.
+    pub slice: super::common::SliceUniform,
     pub labels: Option<super::labels::LabelDraw>,
     /// A multi-channel composite blended as drawn, in place of the colormap.
     pub channels: Option<super::channels::ChannelDraw>,
@@ -79,6 +81,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
             self.zoom,
             self.aspect_scale,
             self.coord_mode,
+            self.slice,
         );
         if let Some(labels) = &self.labels {
             labels

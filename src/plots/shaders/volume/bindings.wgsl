@@ -17,9 +17,10 @@
 
 struct Uniforms {
     camera: Camera,
-    clip_planes: array<vec4<f32>, 8>,
+    // The slicer's cut in unit-box axes (`common/slice.wgsl`).
+    slice: Slice,
     light_color: vec3<f32>,
-    num_clip_planes: u32,
+    _pad0: u32,
     ambient: vec3<f32>,
     shininess: f32,
     light_direction: vec3<f32>,

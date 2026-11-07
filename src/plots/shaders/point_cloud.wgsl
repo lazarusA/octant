@@ -1,5 +1,6 @@
 struct Uniforms {
     camera: Camera,
+    slice: Slice,
     aspect_x: f32,
     aspect_y: f32,
     aspect_z: f32,
@@ -73,6 +74,15 @@ fn vs_main(
     let raw_val = data_buffer[data_idx];
     out.val = raw_val;
     out.local_uv = model.position;
+
+    // The slicer: points whose cell center is outside its box, or whose
+    // cell no shown plane crosses.
+    let grid = vec3<f32>(f32(grid_w), f32(grid_h), f32(grid_d));
+    let center = (vec3<f32>(f32(cell_x), f32(cell_y), f32(cell_z)) + 0.5) / grid;
+    if (!slice_box_keeps(uniforms.slice, center) || !slice_planes_keep(uniforms.slice, center, 0.5 / grid)) {
+        out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        return out;
+    }
 
     // Fast-cull invisible points (NaNs, empty TrueColor background, or clipped values) in vertex shader
     let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;

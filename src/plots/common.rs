@@ -95,11 +95,14 @@ impl MeshVertex3D {
     }
 }
 
+pub use super::slice::SliceUniform;
+
 /// Standard 3D uniform buffer layout for heightfields (Sphere & Surface).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Mesh3DUniforms {
     pub camera: super::camera::CameraUniform,
+    pub slice: SliceUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub width: u32,
@@ -119,6 +122,8 @@ pub struct Mesh3DUniforms {
 pub struct Mesh3DUniformParams {
     pub color: PlotColorParams,
     pub camera: super::camera::CameraUniform,
+    /// The slicer's box, w as normalized heights.
+    pub slice: SliceUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub coord_mode: u32,

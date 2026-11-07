@@ -1,5 +1,6 @@
 struct Uniforms {
     camera: Camera,
+    slice: Slice,
     displacement_strength: f32,
     surface_mode: u32,
     width: u32,
@@ -34,6 +35,9 @@ struct VertexOutput {
     // RGB composite color, interpolated per channel: the packed value in
     // `val` must never be blended between vertices.
     @location(4) rgb: vec3<f32>,
+    // Where the slicer reads the fragment: fractions of the grid's cells
+    // along x and y, and its normalized height (`common/slice.wgsl`).
+    @location(5) slice_at: vec3<f32>,
 };
 
 fn get_normalized_height(val: f32) -> f32 {
@@ -62,6 +66,8 @@ fn vs_main(
     let safe_idx = min(instance_idx, max_idx);
 
     var raw_val = data_buffer[safe_idx];
+    let grid = vec2<f32>(f32(grid_w), f32(grid_h));
+    var slice_xy = (vec2<f32>(f32(cell_x), f32(cell_y)) + model.position.xy) / grid;
 
     var world_x: f32;
     var world_z: f32;
@@ -89,6 +95,7 @@ fn vs_main(
 
         world_x = (u * 2.0 - 1.0) * 2.0;
         world_z = v * 2.0 - 1.0;
+        slice_xy = vec2<f32>(u, v);
     } else {
         let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
         let scale_x = 2.0 * data_aspect;
@@ -125,6 +132,7 @@ fn vs_main(
             let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
             world_x = -data_aspect + mix(bounds_u.x, bounds_u.y, sx.frac) * 2.0 * data_aspect;
             world_z = -1.0 + mix(bounds_v.x, bounds_v.y, sy.frac) * 2.0;
+            slice_xy = (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid;
         }
 
         let norm_h = get_normalized_height(raw_val);
@@ -157,6 +165,9 @@ fn vs_main(
     out.uv = model.uv;
     out.val = raw_val;
     out.rgb = unpack_composite_rgb(raw_val);
+    // Heights back to normalized heights (the 0.6 or 0.8 of each mode).
+    let height_scale = select(0.8, 0.6, uniforms.surface_mode == 1u) * uniforms.displacement_strength;
+    out.slice_at = vec3<f32>(slice_xy, select(0.0, pos_3d.y / height_scale, height_scale > 0.0));
     out.normal = norm_rot;
     out.world_pos = pos_rot;
 
@@ -165,6 +176,9 @@ fn vs_main(
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
+    if (!slice_box_keeps(uniforms.slice, in.slice_at)) {
+        discard;
+    }
     var eval_color = evaluate_plot_color(in.val, uniforms.color);
     if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE && eval_color.a > 0.0) {
         eval_color = vec4<f32>(in.rgb, eval_color.a);
