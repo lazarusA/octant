@@ -69,3 +69,29 @@ fn the_gizmo_places_cells_where_the_hover_does() {
         }
     }
 }
+
+#[test]
+fn the_gizmo_has_a_height_axis_where_the_shaders_cut_heights() {
+    let scale = crate::utils::height::HeightScale {
+        cmin: 0.0,
+        cmax: 100.0,
+        composite: false,
+        flip: false,
+    };
+    for (plot_type, modes) in [(PlotType::Surface, 0..3), (PlotType::Sphere, 0..4)] {
+        let sphere = plot_type == PlotType::Sphere;
+        for mode in modes {
+            for disp in [0.0, 0.001, 0.3] {
+                let mut app =
+                    app_with(plot_type, grid_matrix(12, 8, CoordinateGrid::GlobalRegular));
+                let mesh = &mut app.plot_configs.mesh;
+                (mesh.surface_mode, mesh.sphere_mode) = (mode, mode);
+                (mesh.surface_displacement, mesh.sphere_displacement) = (disp, disp);
+                let dims = Space::of(&app, rect()).map(|s| s.dims);
+                let relief = crate::plots::slice::has_relief(&scale, sphere, mode, disp);
+                let what = format!("{plot_type:?} mode {mode} displacement {disp}");
+                assert_eq!(dims, Some(if relief { 3 } else { 2 }), "{what}");
+            }
+        }
+    }
+}

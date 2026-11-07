@@ -3,6 +3,8 @@
 //! which cells the box keeps.
 
 use super::raycast_surface::SurfaceField;
+use super::smooth::value_at;
+use crate::plots::slice::has_relief;
 
 impl SurfaceField<'_> {
     /// Surface coordinate along x or y of `f`, a fraction of the grid's
@@ -37,13 +39,19 @@ impl SurfaceField<'_> {
     /// World heights the drawn surface spans, the zero plane included.
     pub fn height_span(&self) -> (f32, f32) {
         let (low, high) = self.scale.bounds();
-        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
+        let k = crate::utils::height::height_factor(false, self.mode) * self.disp;
         (k * low.min(0.0), k * high.max(0.0))
     }
 
-    /// Whether the slicer keeps cell `(px, py)`.
+    /// Whether the slicer keeps cell `(px, py)`: by its center, and by its
+    /// value's height, as blocks are cut (smooth and step surfaces, cut
+    /// between their vertices, closely).
     pub(super) fn kept(&self, cell: (usize, usize)) -> bool {
         let grid = (self.matrix.width, self.matrix.height);
-        self.slice.keeps_cell(cell, grid)
+        let h = self
+            .scale
+            .normalized(value_at(self.layer, self.matrix, cell.0, cell.1));
+        let relief = has_relief(&self.scale, false, self.mode, self.disp);
+        self.slice.keeps_cell(cell, grid) && self.slice.keeps_height(h, &self.scale, relief)
     }
 }

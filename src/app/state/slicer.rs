@@ -227,6 +227,13 @@ impl Slicer {
         (lo, hi)
     }
 
+    /// Whether the box keeps normalized height `h` (the CPU twin of the
+    /// surface's and sphere's height test; always without a box).
+    pub fn keeps_height(&self, h: f32, scale: &HeightScale, relief: bool) -> bool {
+        let (lo, hi) = self.height_range(scale, relief);
+        self.mode != SliceMode::Box || (lo..=hi).contains(&h)
+    }
+
     /// The data values the box keeps along a height axis (`SliceAxis::Height`,
     /// through `height_range`); `None` for composites, whose heights are
     /// colors, and the open ends at the data's extremes.

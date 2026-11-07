@@ -25,7 +25,7 @@ pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
 /// `[0, 1]` by half a cell).
 #[derive(Clone, Copy)]
 pub struct SurfaceField<'a> {
-    layer: &'a Layer,
+    pub(super) layer: &'a Layer,
     pub(super) matrix: &'a MatrixData,
     pub(super) scale: HeightScale,
     pub(super) mode: u32,

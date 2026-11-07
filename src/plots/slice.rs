@@ -60,12 +60,7 @@ pub fn has_relief(
     mode: u32,
     disp: f32,
 ) -> bool {
-    let k = match (sphere, mode) {
-        (true, 0) => return false,
-        (true, _) => 0.4,
-        (false, 1) => 0.6,
-        (false, _) => 0.8,
-    };
+    let k = crate::utils::height::height_factor(sphere, mode) * disp;
     let (low, high) = scale.bounds();
-    k * disp * (high.max(0.0) - low.min(0.0)) >= FLAT_HEIGHT
+    k * (high.max(0.0) - low.min(0.0)) >= FLAT_HEIGHT
 }

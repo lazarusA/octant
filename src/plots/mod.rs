@@ -40,6 +40,8 @@ mod quad;
 mod shader_tests;
 pub mod slice;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod slice_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
 pub mod traits;
 pub mod volume;

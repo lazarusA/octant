@@ -9,7 +9,7 @@ use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
-use crate::utils::height::HeightScale;
+use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
 
 /// The globe as sphere.wgsl draws it, by longitude and latitude (radians).
@@ -62,13 +62,19 @@ impl<'a> SphereField<'a> {
     /// The cell drawn toward `(lon, lat)`, including the half-cell border
     /// strips regional grids draw past their bounds.
     /// The drawn cell toward `(lon, lat)`, none where the slicer cuts (by
-    /// cell, as sphere.wgsl; HEALPix pixels, which have no rows, by where
-    /// they lie on the globe).
+    /// cell and its value's height, as sphere.wgsl cuts blocks; HEALPix
+    /// pixels, which have no rows, by where they lie on the globe).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
         let grid = (self.matrix.width, self.matrix.height);
-        let kept = |cell| match self.matrix.grid.is_healpix() {
-            true => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
-            false => self.slice.keeps_cell(cell, grid),
+        let relief = crate::plots::slice::has_relief(&self.scale, true, self.mode, self.disp);
+        let kept = |cell: (usize, usize)| {
+            let value = value_at(self.layer, self.matrix, cell.0, cell.1);
+            let h = self.scale.normalized(value);
+            let placed = match self.matrix.grid.is_healpix() {
+                true => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
+                false => self.slice.keeps_cell(cell, grid),
+            };
+            placed && self.slice.keeps_height(h, &self.scale, relief)
         };
         self.grid_cell(lon, lat).filter(|&cell| kept(cell))
     }
@@ -89,10 +95,10 @@ impl<'a> SphereField<'a> {
     /// Radial displacement of cell `(px, py)` (`get_normalized_radial_dr`).
     fn dr_at(&self, px: usize, py: usize) -> f32 {
         let val = value_at(self.layer, self.matrix, px, py);
-        if self.mode == 0 || !val.is_finite() {
+        if !val.is_finite() {
             return 0.0;
         }
-        self.scale.normalized(val) * 0.4 * self.disp
+        self.scale.normalized(val) * height_factor(true, self.mode) * self.disp
     }
 
     /// Smooth-mode displacement toward `(lon, lat)`, between the vertices
@@ -164,14 +170,9 @@ impl<'a> SphereField<'a> {
     /// Radii the drawn globe spans, the unit sphere included (mode 0 draws
     /// no relief).
     pub fn radius_span(&self) -> (f32, f32) {
-        if self.mode == 0 {
-            return (1.0, 1.0);
-        }
+        let k = height_factor(true, self.mode) * self.disp;
         let (low, high) = self.scale.bounds();
-        (
-            1.0 + 0.4 * self.disp * low.min(0.0),
-            1.0 + 0.4 * self.disp * high.max(0.0),
-        )
+        (1.0 + k * low.min(0.0), 1.0 + k * high.max(0.0))
     }
 
     /// The cell where `ray` first meets the drawn globe, or crosses the unit

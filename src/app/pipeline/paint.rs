@@ -166,21 +166,10 @@ impl OctantApp {
                 [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             ));
 
-        let scale = crate::utils::height::HeightScale {
-            cmin: layer.color.range_min,
-            cmax: layer.color.range_max,
-            composite: layer.composite.enabled,
-            flip: flip_height,
-        };
-        let slicer = &self.plot_configs.slice;
-        let heights = slicer.height_range(
-            &scale,
-            crate::plots::slice::has_relief(&scale, sphere, mode, displacement_strength),
-        );
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
             camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
-            slice: slicer.uniform_in([false; 3], Some(heights)),
+            slice: self.mesh_slice(layer, sphere, (mode, displacement_strength, flip_height)),
             displacement_strength,
             mode,
             coord_mode,
