@@ -87,7 +87,7 @@ const SHADERS: [(&str, &str); 16] = [
         "point_cloud",
         crate::assemble_plot_shader!(include_str!("shaders/point_cloud.wgsl")),
     ),
-    ("coastline", include_str!("shaders/coastline.wgsl")),
+    ("coastline", super::coastline::renderer_2d::COASTLINE_WGSL),
     (
         "coastline_3d",
         concat!(
@@ -160,6 +160,11 @@ fn uniform_layouts_match_wgsl() {
             "point_cloud",
             "Uniforms",
             size_of::<super::point_cloud_types::PointCloudUniforms>(),
+        ),
+        (
+            "coastline",
+            "CoastlineUniforms",
+            size_of::<super::coastline::types::CoastlineUniforms>(),
         ),
         (
             "coastline_3d",

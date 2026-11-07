@@ -17,7 +17,7 @@ use crate::plots::slice::SliceUniform;
 use crate::utils::height::HeightScale;
 
 /// What the slicer does.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum SliceMode {
     #[default]
     Off,
@@ -72,6 +72,9 @@ pub struct Slicer {
     pub planes: [Option<f32>; 3],
     /// Whether the gizmo's guides show (the cut stays when hidden).
     pub guides: bool,
+    /// Whether the box cuts the coastlines too (off: they stay whole over
+    /// a cut heatmap, surface or sphere).
+    pub cut_coastlines: bool,
 }
 
 impl Default for Slicer {
@@ -82,6 +85,7 @@ impl Default for Slicer {
             hi: [1.0; 3],
             planes: [Some(0.5), Some(0.5), None],
             guides: true,
+            cut_coastlines: false,
         }
     }
 }
@@ -98,13 +102,33 @@ impl Slicer {
     }
 
     /// Switches mode, starting it over (nothing cut, the planes across x
-    /// and y through the middle), the guides as they were.
+    /// and y through the middle), the guides and coastline choice as they
+    /// were.
     pub fn set_mode(&mut self, mode: SliceMode) {
         *self = Self {
             mode,
             guides: self.guides,
+            cut_coastlines: self.cut_coastlines,
             ..Self::default()
         };
+    }
+
+    /// `cut` for the coastlines: as is when they are cut, else nothing.
+    pub fn for_coastlines(&self, cut: SliceUniform) -> SliceUniform {
+        if self.cut_coastlines {
+            cut
+        } else {
+            SliceUniform::OFF
+        }
+    }
+
+    /// What the cut is, for caches of what it changes.
+    pub fn hash_into(&self, h: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        self.mode.hash(h);
+        self.lo.map(f32::to_bits).hash(h);
+        self.hi.map(f32::to_bits).hash(h);
+        self.planes.map(|p| p.map(f32::to_bits)).hash(h);
     }
 
     /// Starts over on a new plot type, whose axes mean other things; off

@@ -155,6 +155,8 @@ crate::i18n::keys::define_keys! {
     SlicerPlaneDHover,
     SlicerHideGuidesHover,
     SlicerShowGuidesHover,
+    SlicerCutCoastlines,
+    SlicerCutCoastlinesHover,
     // Axis ticks and grid lines
     AxisMajor,
     AxisMinor,

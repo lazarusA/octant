@@ -15,6 +15,8 @@ struct CoastlineUniforms {
     lon_max:        f32,
     lat_min:        f32,
     lat_max:        f32,
+    // The slicer's box when it cuts coastlines (`common/slice.wgsl`).
+    slice:          Slice,
 };
 
 @group(0) @binding(0)
@@ -127,6 +129,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
             discard;
         }
+    }
+    // The bounds are the heatmap's cell edges, so `uv` is the slicer's u
+    // and, north first, v.
+    if (!slice_box_keeps_uv(u.slice, vec2<f32>(in.uv.x, 1.0 - in.uv.y))) {
+        discard;
     }
     return u.line_color;
 }

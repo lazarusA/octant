@@ -4,7 +4,6 @@
 
 use super::raycast_surface::SurfaceField;
 use super::smooth::value_at;
-use crate::plots::slice::has_relief;
 
 impl SurfaceField<'_> {
     /// Surface coordinate along x or y of `f`, a fraction of the grid's
@@ -51,7 +50,6 @@ impl SurfaceField<'_> {
         let h = self
             .scale
             .normalized(value_at(self.layer, self.matrix, cell.0, cell.1));
-        let relief = has_relief(&self.scale, false, self.mode, self.disp);
-        self.slice.keeps_cell(cell, grid) && self.slice.keeps_height(h, &self.scale, relief)
+        self.slice.keeps_cell(cell, grid) && self.slice.keeps_height(h, &self.scale, self.relief)
     }
 }

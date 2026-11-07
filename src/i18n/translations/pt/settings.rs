@@ -199,6 +199,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::SlicerHideGuidesHover => "Ocultar as guias do corte (o corte permanece)",
         SettingsKey::SlicerShowGuidesHover => "Mostrar as guias do corte",
+        SettingsKey::SlicerCutCoastlines => "Cortar costas",
+        SettingsKey::SlicerCutCoastlinesHover => "Cortar as linhas de costa com o gráfico",
         SettingsKey::AxisMajor => "Principais",
         SettingsKey::AxisMinor => "Secundárias",
         SettingsKey::AxisTicks => "Marcas",

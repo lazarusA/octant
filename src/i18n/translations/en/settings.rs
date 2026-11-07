@@ -179,6 +179,8 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::SlicerPlaneDHover => "Show or hide the depth plane across {}",
         SettingsKey::SlicerHideGuidesHover => "Hide the slicer's guides (the cut stays)",
         SettingsKey::SlicerShowGuidesHover => "Show the slicer's guides",
+        SettingsKey::SlicerCutCoastlines => "Cut coastlines",
+        SettingsKey::SlicerCutCoastlinesHover => "Cut the coastlines with the plot",
         SettingsKey::AxisMajor => "Major",
         SettingsKey::AxisMinor => "Minor",
         SettingsKey::AxisTicks => "Ticks",

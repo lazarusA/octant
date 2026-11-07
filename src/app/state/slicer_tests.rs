@@ -107,3 +107,17 @@ fn height_cuts_read_back_as_data_values() {
         assert_eq!(scale.value_at(scale.normalized(v)), Some(v));
     }
 }
+
+#[test]
+fn coastlines_are_cut_only_when_asked_and_keep_the_choice() {
+    let mut s = boxed([0.2; 3], [0.8; 3]);
+    assert_eq!(
+        s.for_coastlines(s.uniform()),
+        SliceUniform::OFF,
+        "off by default"
+    );
+    s.cut_coastlines = true;
+    assert_eq!(s.for_coastlines(s.uniform()), s.uniform());
+    s.set_mode(SliceMode::Planes);
+    assert!(s.cut_coastlines, "kept across modes");
+}

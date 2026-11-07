@@ -152,6 +152,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "显示或隐藏与 {} 正交的深度平面",
         SettingsKey::SlicerHideGuidesHover => "隐藏切片的辅助线（剖切保留）",
         SettingsKey::SlicerShowGuidesHover => "显示切片的辅助线",
+        SettingsKey::SlicerCutCoastlines => "剖切海岸线",
+        SettingsKey::SlicerCutCoastlinesHover => "与图形一起剖切海岸线",
         SettingsKey::AxisMajor => "主刻度",
         SettingsKey::AxisMinor => "次刻度",
         SettingsKey::AxisTicks => "刻度",

@@ -40,7 +40,7 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
         }
     });
     if support.slice.is_yes() {
-        super::slicer::show_slicer(app, ui);
+        super::slicer::show_slicer(app, ui, support.coastlines.is_yes());
     }
     if support.axes.is_yes() {
         axis_controls(&mut app.layout.axis_style, ui);

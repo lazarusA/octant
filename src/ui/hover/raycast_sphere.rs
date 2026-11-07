@@ -5,6 +5,7 @@ use std::f32::consts::PI;
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::data::MatrixData;
+use crate::plots::slice::has_relief;
 use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
@@ -14,24 +15,28 @@ use egui::Pos2;
 
 /// The globe as sphere.wgsl draws it, by longitude and latitude (radians).
 pub struct SphereField<'a> {
-    layer: &'a Layer,
-    matrix: &'a MatrixData,
-    scale: HeightScale,
+    pub(super) layer: &'a Layer,
+    pub(super) matrix: &'a MatrixData,
+    pub(super) scale: HeightScale,
     mode: u32,
     disp: f32,
     /// The slicer: cells its box cuts away are not drawn.
-    slice: crate::app::Slicer,
+    pub(super) slice: crate::app::Slicer,
+    /// Whether the globe draws relief (`slice::has_relief`), for the cut.
+    pub(super) relief: bool,
 }
 
 impl<'a> SphereField<'a> {
     pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+        let (scale, mesh) = (height_scale(app, true), &app.plot_configs.mesh);
         Self {
             layer: &app.layers.base,
             matrix,
-            scale: height_scale(app, true),
-            mode: app.plot_configs.mesh.sphere_mode,
-            disp: app.plot_configs.mesh.sphere_displacement,
+            scale,
+            mode: mesh.sphere_mode,
+            disp: mesh.sphere_displacement,
             slice: app.plot_configs.slice,
+            relief: has_relief(&scale, true, mesh.sphere_mode, mesh.sphere_displacement),
         }
     }
 
@@ -60,23 +65,11 @@ impl<'a> SphereField<'a> {
     }
 
     /// The cell drawn toward `(lon, lat)`, including the half-cell border
-    /// strips regional grids draw past their bounds.
-    /// The drawn cell toward `(lon, lat)`, none where the slicer cuts (by
-    /// cell and its value's height, as sphere.wgsl cuts blocks; HEALPix
-    /// pixels, which have no rows, by where they lie on the globe).
+    /// strips regional grids draw past their bounds; none where the slicer
+    /// cuts (`kept`).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
-        let grid = (self.matrix.width, self.matrix.height);
-        let relief = crate::plots::slice::has_relief(&self.scale, true, self.mode, self.disp);
-        let kept = |cell: (usize, usize)| {
-            let value = value_at(self.layer, self.matrix, cell.0, cell.1);
-            let h = self.scale.normalized(value);
-            let placed = match self.matrix.grid.is_healpix() {
-                true => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
-                false => self.slice.keeps_cell(cell, grid),
-            };
-            placed && self.slice.keeps_height(h, &self.scale, relief)
-        };
-        self.grid_cell(lon, lat).filter(|&cell| kept(cell))
+        self.grid_cell(lon, lat)
+            .filter(|&cell| self.kept(cell, lon, lat))
     }
 
     fn grid_cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {

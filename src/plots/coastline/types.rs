@@ -82,6 +82,8 @@ pub struct CoastlineUniforms {
     pub lon_max: f32,
     pub lat_min: f32,
     pub lat_max: f32,
+    /// The slicer's box when it cuts coastlines.
+    pub slice: crate::plots::slice::SliceUniform,
 }
 
 #[repr(C)]

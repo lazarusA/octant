@@ -191,6 +191,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "Показать или скрыть плоскость глубины поперёк {}",
         SettingsKey::SlicerHideGuidesHover => "Скрыть направляющие среза (срез остаётся)",
         SettingsKey::SlicerShowGuidesHover => "Показать направляющие среза",
+        SettingsKey::SlicerCutCoastlines => "Резать береговые линии",
+        SettingsKey::SlicerCutCoastlinesHover => "Резать береговые линии вместе с графиком",
         SettingsKey::AxisMajor => "Основные",
         SettingsKey::AxisMinor => "Дополнительные",
         SettingsKey::AxisTicks => "Деления",

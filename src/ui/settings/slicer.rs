@@ -6,7 +6,9 @@ use crate::app::{OctantApp, SliceMode};
 use crate::i18n::{self, SettingsKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 
-pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// The Slicer row; `coastlines` whether the plot draws coastlines, which
+/// the box may cut too.
+pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui, coastlines: bool) {
     let plot_type = app.effective_canvas_plot_type();
     let name = |m| match m {
         SliceMode::Off => (K::SlicerOff, K::SlicerOffHover),
@@ -35,6 +37,13 @@ pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
         if mode == SliceMode::Planes {
             plane_toggles(app, ui);
+        }
+        if mode == SliceMode::Box && coastlines {
+            let cut = &mut app.plot_configs.slice.cut_coastlines;
+            ui.selectable_label(*cut, tr(K::SlicerCutCoastlines))
+                .on_hover_text(tr(K::SlicerCutCoastlinesHover))
+                .clicked()
+                .then(|| *cut = !*cut);
         }
     });
 }

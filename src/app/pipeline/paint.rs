@@ -275,6 +275,11 @@ impl OctantApp {
                             lon_max,
                             lat_min,
                             lat_max,
+                            // Cut with the heatmap only when the user asks.
+                            slice: self
+                                .plot_configs
+                                .slice
+                                .for_coastlines(self.plot_configs.slice.uniform()),
                         },
                     );
                     ui.painter().add(cb);

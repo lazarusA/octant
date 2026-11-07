@@ -65,7 +65,8 @@ impl OctantApp {
         });
         crate::plots::Coastline3DParams {
             camera: mesh_params.camera,
-            slice: mesh_params.slice,
+            // Cut with the plot only when the user asks.
+            slice: self.plot_configs.slice.for_coastlines(mesh_params.slice),
             displacement_strength: mesh_params.displacement_strength,
             plot_kind: u32::from(sphere),
             plot_mode: mesh_params.mode,

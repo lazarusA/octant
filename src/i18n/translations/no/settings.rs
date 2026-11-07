@@ -187,6 +187,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "Vis eller skjul dybdeplanet på tvers av {}",
         SettingsKey::SlicerHideGuidesHover => "Skjul snittets hjelpelinjer (snittet blir)",
         SettingsKey::SlicerShowGuidesHover => "Vis snittets hjelpelinjer",
+        SettingsKey::SlicerCutCoastlines => "Skjær kystlinjer",
+        SettingsKey::SlicerCutCoastlinesHover => "Skjær kystlinjene sammen med plottet",
         SettingsKey::AxisMajor => "Hovedinndeling",
         SettingsKey::AxisMinor => "Underinndeling",
         SettingsKey::AxisTicks => "Streker",

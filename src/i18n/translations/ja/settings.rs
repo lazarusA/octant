@@ -174,6 +174,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "{}を横切る深さの平面を表示または非表示",
         SettingsKey::SlicerHideGuidesHover => "スライサーのガイドを隠す（切断はそのまま）",
         SettingsKey::SlicerShowGuidesHover => "スライサーのガイドを表示",
+        SettingsKey::SlicerCutCoastlines => "海岸線も切断",
+        SettingsKey::SlicerCutCoastlinesHover => "プロットとともに海岸線も切断",
         SettingsKey::AxisMajor => "主目盛",
         SettingsKey::AxisMinor => "副目盛",
         SettingsKey::AxisTicks => "目盛",

@@ -191,6 +191,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Die Hilfslinien des Schnitts ausblenden (der Schnitt bleibt)"
         }
         SettingsKey::SlicerShowGuidesHover => "Die Hilfslinien des Schnitts einblenden",
+        SettingsKey::SlicerCutCoastlines => "Küstenlinien schneiden",
+        SettingsKey::SlicerCutCoastlinesHover => "Die Küstenlinien mit dem Plot schneiden",
         SettingsKey::AxisMajor => "Haupteinteilung",
         SettingsKey::AxisMinor => "Nebeneinteilung",
         SettingsKey::AxisTicks => "Striche",

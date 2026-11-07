@@ -51,6 +51,12 @@ pub fn mesh_hit_key(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> Option<u64>
         base.composite.hash_into(&mut h);
         std::hash::Hasher::finish(&h)
     });
+    // The slicer hides cells: a moved cut changes the hit.
+    let slice = {
+        let mut h = std::hash::DefaultHasher::new();
+        app.plot_configs.slice.hash_into(&mut h);
+        std::hash::Hasher::finish(&h)
+    };
     Some(hash_key((
         plot_type,
         floats,
@@ -58,6 +64,7 @@ pub fn mesh_hit_key(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> Option<u64>
         modes,
         base.data.matrix_version,
         channels,
+        slice,
     )))
 }
 

@@ -203,6 +203,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "Afficher ou masquer le plan de profondeur à travers {}",
         SettingsKey::SlicerHideGuidesHover => "Masquer les guides de la coupe (la coupe reste)",
         SettingsKey::SlicerShowGuidesHover => "Afficher les guides de la coupe",
+        SettingsKey::SlicerCutCoastlines => "Couper les côtes",
+        SettingsKey::SlicerCutCoastlinesHover => "Couper les traits de côte avec le graphique",
         SettingsKey::AxisMajor => "Principales",
         SettingsKey::AxisMinor => "Secondaires",
         SettingsKey::AxisTicks => "Graduations",

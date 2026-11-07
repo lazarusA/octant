@@ -191,6 +191,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "Показати або сховати площину глибини поперек {}",
         SettingsKey::SlicerHideGuidesHover => "Сховати напрямні зрізу (зріз лишається)",
         SettingsKey::SlicerShowGuidesHover => "Показати напрямні зрізу",
+        SettingsKey::SlicerCutCoastlines => "Різати берегові лінії",
+        SettingsKey::SlicerCutCoastlinesHover => "Різати берегові лінії разом із графіком",
         SettingsKey::AxisMajor => "Основні",
         SettingsKey::AxisMinor => "Додаткові",
         SettingsKey::AxisTicks => "Поділки",

@@ -195,6 +195,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "Näytä tai piilota syvyystaso {}-akselin poikki",
         SettingsKey::SlicerHideGuidesHover => "Piilota leikkauksen apuviivat (leikkaus säilyy)",
         SettingsKey::SlicerShowGuidesHover => "Näytä leikkauksen apuviivat",
+        SettingsKey::SlicerCutCoastlines => "Leikkaa rantaviivat",
+        SettingsKey::SlicerCutCoastlinesHover => "Leikkaa rantaviivat kuvaajan mukana",
         SettingsKey::AxisMajor => "Pääjako",
         SettingsKey::AxisMinor => "Apujako",
         SettingsKey::AxisTicks => "Merkit",

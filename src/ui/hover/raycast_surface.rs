@@ -34,24 +34,25 @@ pub struct SurfaceField<'a> {
     aspect: f32,
     /// The slicer: cells its box cuts away are not drawn.
     pub(super) slice: crate::app::Slicer,
+    /// Whether the surface draws relief (`slice::has_relief`), for the cut.
+    pub(super) relief: bool,
 }
 
 impl<'a> SurfaceField<'a> {
     pub fn new(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
-        let (w, h) = (matrix.width.max(1), matrix.height.max(1));
-        let aspect = if matrix.grid.is_healpix() {
-            2.0
-        } else {
-            (w as f32 / h as f32).max(0.1)
-        };
+        let (w, h) = (matrix.width.max(1) as f32, matrix.height.max(1) as f32);
+        let healpix = matrix.grid.is_healpix();
+        let (scale, mesh) = (height_scale(app, false), &app.plot_configs.mesh);
+        let (mode, disp) = (mesh.surface_mode, mesh.surface_displacement);
         Self {
             layer: &app.layers.base,
             matrix,
-            scale: height_scale(app, false),
-            mode: app.plot_configs.mesh.surface_mode,
-            disp: app.plot_configs.mesh.surface_displacement,
-            aspect,
+            scale,
+            mode,
+            disp,
+            aspect: if healpix { 2.0 } else { (w / h).max(0.1) },
             slice: app.plot_configs.slice,
+            relief: crate::plots::slice::has_relief(&scale, false, mode, disp),
         }
     }
 

@@ -184,6 +184,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::SlicerHideGuidesHover => "Sembunyikan panduan pemotong (potongan tetap)",
         SettingsKey::SlicerShowGuidesHover => "Tampilkan panduan pemotong",
+        SettingsKey::SlicerCutCoastlines => "Potong garis pantai",
+        SettingsKey::SlicerCutCoastlinesHover => "Potong garis pantai bersama plot",
         SettingsKey::AxisMajor => "Utama",
         SettingsKey::AxisMinor => "Sekunder",
         SettingsKey::AxisTicks => "Tanda",

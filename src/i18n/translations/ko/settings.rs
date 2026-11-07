@@ -173,6 +173,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::SlicerPlaneDHover => "{}을(를) 가로지르는 깊이 평면 표시 또는 숨기기",
         SettingsKey::SlicerHideGuidesHover => "슬라이서 안내선 숨기기(자르기는 유지)",
         SettingsKey::SlicerShowGuidesHover => "슬라이서 안내선 표시",
+        SettingsKey::SlicerCutCoastlines => "해안선도 자르기",
+        SettingsKey::SlicerCutCoastlinesHover => "플롯과 함께 해안선도 자르기",
         SettingsKey::AxisMajor => "주 눈금",
         SettingsKey::AxisMinor => "보조 눈금",
         SettingsKey::AxisTicks => "눈금",
