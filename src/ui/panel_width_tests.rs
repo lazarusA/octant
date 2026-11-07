@@ -184,7 +184,7 @@ fn share_link_leaves_the_settings_title_room_in_every_language() {
             FontEngine::on_language_changed(&h.ctx, lang);
             let shapes = h.settle(SETTLE, &mut run);
             let title = text_rect(&shapes, translate(lang, CommonKey::Settings));
-            let share = text_rect(&shapes, translate(lang, SettingsKey::CopyShareLink));
+            let share = text_rect(&shapes, translate(lang, SettingsKey::Share));
             // No label drawn: the button shows its icon alone.
             match (title, share) {
                 (Some(t), Some(s)) if t.max.x > s.min.x => {

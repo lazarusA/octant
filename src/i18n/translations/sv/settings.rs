@@ -128,7 +128,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Mapp:",
         SettingsKey::OpenSaveDialog => "Öppna sparadialog",
         SettingsKey::CropTool => "Beskärningsverktyg",
-        SettingsKey::CopyShareLink => "Dela",
+        SettingsKey::Share => "Dela",
         SettingsKey::ShareLinkHover => "Dela länk",
         SettingsKey::ShareLinkCopied => "Länk kopierad",
         SettingsKey::Aggregation => "2D-aggregering",

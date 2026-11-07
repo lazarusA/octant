@@ -106,7 +106,7 @@ crate::i18n::keys::define_keys! {
     ExportFolder,
     OpenSaveDialog,
     CropTool,
-    CopyShareLink,
+    Share,
     ShareLinkHover,
     ShareLinkCopied,
     // 2D aggregation

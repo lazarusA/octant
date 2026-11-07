@@ -1,3 +1,4 @@
+use super::GROUP_GAP;
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
@@ -79,7 +80,7 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    ui.add_space(4.0);
+    ui.add_space(GROUP_GAP);
     ui.label(egui::RichText::new(tr(K::LineProfile)).small().weak());
 
     let label_x = app.get_spatial_dim_label(0);

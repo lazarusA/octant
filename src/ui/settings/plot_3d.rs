@@ -1,11 +1,9 @@
+use super::GROUP_GAP;
 use crate::app::OctantApp;
 use crate::app::{MeshDetail, VolumeSurface};
 use crate::i18n::{PlotOptionsKey as K, tr};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::number_input::LocalizedInput;
-
-/// Room between groups of rows within the plot's options.
-const GROUP_GAP: f32 = 4.0;
 
 /// Each volume algorithm's id and name.
 const ALGORITHMS: [(u32, K); 8] = [

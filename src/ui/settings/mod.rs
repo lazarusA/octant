@@ -31,6 +31,9 @@ use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 use support::{PlotState, Support};
 
+/// Room between groups of rows within a section.
+const GROUP_GAP: f32 = 4.0;
+
 /// Shortest the scrolled settings body gets on a very short canvas.
 const MIN_BODY_HEIGHT: f32 = 120.0;
 

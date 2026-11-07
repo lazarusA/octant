@@ -1,3 +1,4 @@
+use super::GROUP_GAP;
 use super::support::OptionSupport;
 use crate::app::OctantApp;
 use crate::i18n::{ColormapKey, Key, PlotOptionsKey, SettingsKey as K, tr};
@@ -5,9 +6,6 @@ use crate::ui::axes::{AxisStyle, MinorPlacement};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::number_input::LocalizedInput;
-
-/// Room between the View section's groups of rows.
-const GROUP_GAP: f32 = 4.0;
 
 /// One row of toggles (the heatmap's aspect ratio, the 3D camera, hover
 /// card and scale bar), the slicer's mode row and its options' row, the axes

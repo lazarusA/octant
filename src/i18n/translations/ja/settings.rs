@@ -118,7 +118,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "フォルダー:",
         SettingsKey::OpenSaveDialog => "保存ダイアログを開く",
         SettingsKey::CropTool => "切り抜きツール",
-        SettingsKey::CopyShareLink => "共有",
+        SettingsKey::Share => "共有",
         SettingsKey::ShareLinkHover => "リンクを共有",
         SettingsKey::ShareLinkCopied => "リンクをコピーしました",
         SettingsKey::Aggregation => "2D集約",

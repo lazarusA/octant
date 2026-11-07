@@ -49,7 +49,7 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
 /// Its icon alone when the label would reach the panel title; either way
 /// its tooltip reads "Share Link" in full.
 pub(crate) fn copy_link_button(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let label = tr(K::CopyShareLink);
+    let label = tr(K::Share);
     // The label is one word; the tooltip names the link in full.
     let button = ToolbarButton::new(Icon::Clipboard, label)
         .icon_size(IconSize::Sm)
