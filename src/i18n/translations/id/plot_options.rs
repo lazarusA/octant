@@ -21,6 +21,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
             "Jika dicentang, plot 2D mempertahankan rasio aspek data matriks (lebar/tinggi). Jika tidak dicentang, plot 2D melebar memenuhi seluruh kanvas."
         }
         PlotOptionsKey::Algorithm => "Algoritma",
+        PlotOptionsKey::Mode => "Mode",
         PlotOptionsKey::AlgoDvr => "Raymarching Volume (DVR)",
         PlotOptionsKey::AlgoMip => "Intensitas Maksimum (MIP)",
         PlotOptionsKey::AlgoMinIp => "Intensitas Minimum (MinIP)",

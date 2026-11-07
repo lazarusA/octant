@@ -79,7 +79,7 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    ui.separator();
+    ui.add_space(4.0);
     ui.label(egui::RichText::new(tr(K::LineProfile)).small().weak());
 
     let label_x = app.get_spatial_dim_label(0);

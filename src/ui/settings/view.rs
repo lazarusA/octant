@@ -1,59 +1,24 @@
 use super::support::OptionSupport;
 use crate::app::OctantApp;
-use crate::i18n::{ColormapKey, PlotOptionsKey, SettingsKey as K, tr};
+use crate::i18n::{ColormapKey, Key, PlotOptionsKey, SettingsKey as K, tr};
 use crate::ui::axes::{AxisStyle, MinorPlacement};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::number_input::LocalizedInput;
 
-/// The heatmap's aspect ratio, camera controls for 3D plots and the hover
-/// card and scale bar toggles, for every plot, then the slicer, the axes and
-/// the colorbars' box transparency while one shows.
+/// Room between the View section's groups of rows.
+const GROUP_GAP: f32 = 4.0;
+
+/// One row of toggles (the heatmap's aspect ratio, the 3D camera, hover
+/// card, scale bar and the slicer's mode), the slicer's own row, the axes and
+/// the colorbars' box transparency while one shows, each group set apart.
 pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
-    if support.aspect_ratio.is_yes() {
-        ui.checkbox(
-            &mut app.layout.enforce_data_aspect_ratio,
-            tr(PlotOptionsKey::AspectRatio),
-        )
-        .on_hover_text(tr(PlotOptionsKey::AspectRatioHover));
-    }
-    ui.horizontal_wrapped(|ui| {
-        if support.camera.is_yes() {
-            ui.checkbox(&mut app.nav.sphere_auto_rotate, tr(K::AutoRotate));
-            if ui
-                .icon_button(Icon::Reset, tr(K::ResetView))
-                .on_hover_text(tr(K::ResetViewHover))
-                .clicked()
-            {
-                app.nav.reset_3d_camera();
-            }
-        }
-        ui.selectable_label(app.layout.show_hover_card, tr(K::HoverCard))
-            .on_hover_text(tr(if app.layout.show_hover_card {
-                K::HideHoverCardHover
-            } else {
-                K::ShowHoverCardHover
-            }))
-            .clicked()
-            .then(|| app.layout.show_hover_card = !app.layout.show_hover_card);
-        if support.scale_bar.is_yes() {
-            ui.selectable_label(app.layout.show_scale_bar, tr(K::ScaleBar))
-                .on_hover_text(tr(if app.layout.show_scale_bar {
-                    K::HideScaleBarHover
-                } else {
-                    K::ShowScaleBarHover
-                }))
-                .clicked()
-                .then(|| app.layout.show_scale_bar = !app.layout.show_scale_bar);
-        }
-        if support.slice.is_yes() {
-            super::slicer::show_slicer(app, ui);
-        }
-    });
+    toggles_row(app, ui, support);
     if support.slice.is_yes() {
         super::slicer::show_slicer_options(app, ui, support.coastlines.is_yes());
     }
     if support.axes.is_yes() {
+        ui.add_space(GROUP_GAP);
         axis_controls(&mut app.layout.axis_style, ui);
     }
     let colorbars = app
@@ -61,6 +26,7 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
         .iter()
         .any(|l| l.colorbar.shown && crate::ui::colorbar::can_show(app, l.id()));
     if colorbars {
+        ui.add_space(GROUP_GAP);
         labeled_slider(
             ui,
             "colorbar_transparency",
@@ -72,8 +38,63 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
     }
 }
 
+/// The aspect ratio, 3D camera, hover card, scale bar and slicer mode, as
+/// far as the plot uses them, wrapping within the panel.
+fn toggles_row(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
+    ui.horizontal_wrapped(|ui| {
+        if support.aspect_ratio.is_yes() {
+            toggle(
+                ui,
+                &mut app.layout.enforce_data_aspect_ratio,
+                PlotOptionsKey::AspectRatio,
+                PlotOptionsKey::AspectRatioHover,
+            );
+        }
+        if support.camera.is_yes() {
+            let rotate = &mut app.nav.sphere_auto_rotate;
+            ui.selectable_label(*rotate, tr(K::AutoRotate))
+                .clicked()
+                .then(|| *rotate = !*rotate);
+            if ui
+                .icon_button(Icon::Reset, tr(K::ResetView))
+                .on_hover_text(tr(K::ResetViewHover))
+                .clicked()
+            {
+                app.nav.reset_3d_camera();
+            }
+        }
+        let hover_card = app.layout.show_hover_card;
+        toggle(
+            ui,
+            &mut app.layout.show_hover_card,
+            K::HoverCard,
+            if hover_card {
+                K::HideHoverCardHover
+            } else {
+                K::ShowHoverCardHover
+            },
+        );
+        if support.scale_bar.is_yes() {
+            let shown = app.layout.show_scale_bar;
+            toggle(
+                ui,
+                &mut app.layout.show_scale_bar,
+                K::ScaleBar,
+                if shown {
+                    K::HideScaleBarHover
+                } else {
+                    K::ShowScaleBarHover
+                },
+            );
+        }
+        if support.slice.is_yes() {
+            super::slicer::show_slicer(app, ui);
+        }
+    });
+}
+
 /// The axes' major and minor rows: ticks and grid lines each on or off, and
-/// where minors go.
+/// on the minor row where minors go.
 fn axis_controls(style: &mut AxisStyle, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
         ui.label(tr(K::AxisMajor));
@@ -84,10 +105,10 @@ fn axis_controls(style: &mut AxisStyle, ui: &mut egui::Ui) {
         ui.label(tr(K::AxisMinor));
         toggle(ui, &mut style.minor_ticks, K::AxisTicks, K::AxisTicksHover);
         toggle(ui, &mut style.minor_grid, K::AxisGrid, K::AxisGridHover);
+        if style.minors().is_some() {
+            minor_placement(style, ui);
+        }
     });
-    if style.minors().is_some() {
-        minor_placement(style, ui);
-    }
 }
 
 /// Where minor ticks and grid lines go: cell centers or round values.
@@ -108,7 +129,7 @@ fn minor_placement(style: &mut AxisStyle, ui: &mut egui::Ui) {
 }
 
 /// A selectable label flipping `on`.
-fn toggle(ui: &mut egui::Ui, on: &mut bool, label: K, hover: K) {
+fn toggle(ui: &mut egui::Ui, on: &mut bool, label: impl Into<Key>, hover: impl Into<Key>) {
     if ui
         .selectable_label(*on, tr(label))
         .on_hover_text(tr(hover))

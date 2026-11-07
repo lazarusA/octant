@@ -20,6 +20,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Kun ei valittu, 2D-kuvaajat täyttävät koko piirtoalueen."
         }
         PlotOptionsKey::Algorithm => "Algoritmi",
+        PlotOptionsKey::Mode => "Tila",
         PlotOptionsKey::AlgoDvr => "Tilavuuden säteenseuranta (DVR)",
         PlotOptionsKey::AlgoMip => "Maksimi-intensiteetti (MIP)",
         PlotOptionsKey::AlgoMinIp => "Minimi-intensiteetti (MinIP)",

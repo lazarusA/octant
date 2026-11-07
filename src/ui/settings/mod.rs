@@ -103,16 +103,23 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
 /// Sections and settings the plot has no use for are left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
-    ui.label(egui::RichText::new(tr(K::SectionView)).small().weak());
-    view::show_view_controls(app, ui, &PlotState::of(app).support());
+    egui::CollapsingHeader::new(tr(K::SectionView))
+        .id_salt("settings_view_section")
+        .default_open(true)
+        .show(ui, |ui| {
+            view::show_view_controls(app, ui, &PlotState::of(app).support());
+        });
     if plot_options::has_plot_options(plot_type) {
-        section(ui, plot_type.display_name());
-        plot_options::show_plot_options(app, ui, plot_type);
+        ui.separator();
+        // One salt for every plot type: folded, it stays folded across them.
+        egui::CollapsingHeader::new(plot_type.display_name())
+            .id_salt("settings_plot_section")
+            .default_open(true)
+            .show(ui, |ui| plot_options::show_plot_options(app, ui, plot_type));
     }
     // After the plot options, which may switch the volume algorithm or the
     // composite this frame.
     let support = PlotState::of(app).support();
-    ui.add_space(4.0);
     ui.separator();
     layers::show_layers_menu(app, ui);
     if support.coastlines != Support::No {

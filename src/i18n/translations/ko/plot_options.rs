@@ -20,6 +20,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              선택하지 않으면 2D 플롯이 캔버스 전체를 채웁니다."
         }
         PlotOptionsKey::Algorithm => "알고리즘",
+        PlotOptionsKey::Mode => "모드",
         PlotOptionsKey::AlgoDvr => "볼륨 레이마칭 (DVR)",
         PlotOptionsKey::AlgoMip => "최대 강도 (MIP)",
         PlotOptionsKey::AlgoMinIp => "최소 강도 (MinIP)",

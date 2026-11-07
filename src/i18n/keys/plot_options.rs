@@ -20,6 +20,7 @@ crate::i18n::keys::define_keys! {
     AspectRatioHover,
     // Volumes
     Algorithm,
+    Mode,
     AlgoDvr,
     AlgoMip,
     AlgoMinIp,

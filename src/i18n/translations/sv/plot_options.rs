@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Om omarkerad fyller 2D-diagram hela ytan."
         }
         PlotOptionsKey::Algorithm => "Algoritm",
+        PlotOptionsKey::Mode => "Läge",
         PlotOptionsKey::AlgoDvr => "Volymstrålföljning (DVR)",
         PlotOptionsKey::AlgoMip => "Maximal intensitet (MIP)",
         PlotOptionsKey::AlgoMinIp => "Minimal intensitet (MinIP)",

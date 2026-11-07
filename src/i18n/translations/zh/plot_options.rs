@@ -19,6 +19,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
             "勾选时，2D 图保持矩阵数据的宽高比（宽/高）。未勾选时，2D 图扩展以填满整个画布。"
         }
         PlotOptionsKey::Algorithm => "算法",
+        PlotOptionsKey::Mode => "模式",
         PlotOptionsKey::AlgoDvr => "体光线步进 (DVR)",
         PlotOptionsKey::AlgoMip => "最大密度投影 (MIP)",
         PlotOptionsKey::AlgoMinIp => "最小密度投影 (MinIP)",

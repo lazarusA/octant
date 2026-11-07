@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> &'static str {
              If unchecked, 2D plots expand to fill full canvas."
         }
         PlotOptionsKey::Algorithm => "Algorithm",
+        PlotOptionsKey::Mode => "Mode",
         PlotOptionsKey::AlgoDvr => "Volume Raymarching (DVR)",
         PlotOptionsKey::AlgoMip => "Maximum Intensity (MIP)",
         PlotOptionsKey::AlgoMinIp => "Minimum Intensity (MinIP)",

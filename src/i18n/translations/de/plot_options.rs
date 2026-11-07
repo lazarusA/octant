@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Wenn deaktiviert, füllen 2D-Plots die gesamte Zeichenfläche."
         }
         PlotOptionsKey::Algorithm => "Algorithmus",
+        PlotOptionsKey::Mode => "Modus",
         PlotOptionsKey::AlgoDvr => "Volumen-Raymarching (DVR)",
         PlotOptionsKey::AlgoMip => "Maximale Intensität (MIP)",
         PlotOptionsKey::AlgoMinIp => "Minimale Intensität (MinIP)",

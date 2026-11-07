@@ -24,6 +24,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Si no, los gráficos 2D se expanden hasta llenar el lienzo."
         }
         PlotOptionsKey::Algorithm => "Algoritmo",
+        PlotOptionsKey::Mode => "Modo",
         PlotOptionsKey::AlgoDvr => "Raymarching volumétrico (DVR)",
         PlotOptionsKey::AlgoMip => "Intensidad máxima (MIP)",
         PlotOptionsKey::AlgoMinIp => "Intensidad mínima (MinIP)",
