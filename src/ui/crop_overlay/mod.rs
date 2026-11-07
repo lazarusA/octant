@@ -11,6 +11,12 @@ use egui::Rect;
 use handles::{draw_crop_handles, handle_crop_interaction};
 use toolbar::render_crop_toolbar;
 
+/// The edge pills' outline: the theme's strongest text color (off-white on
+/// dark, near black on light).
+pub fn pill_outline(visuals: &egui::Visuals) -> egui::Color32 {
+    visuals.strong_text_color()
+}
+
 /// Renders the interactive Region of Interest (ROI) crop box and guiding lines on top of the canvas.
 pub fn show_crop_overlay(
     ui: &mut egui::Ui,
@@ -131,7 +137,7 @@ pub fn show_crop_overlay(
     handle_crop_interaction(ui, canvas_rect, box_rect, crop_box);
 
     // 5. Handles
-    draw_crop_handles(&painter, box_rect, accent_color, dark_mode);
+    draw_crop_handles(&painter, box_rect, accent_color, pill_outline(ui.visuals()));
 
     // 6. Floating Toolbar
     render_crop_toolbar(ui, canvas_rect, box_rect, crop_box, is_open, accent_color)

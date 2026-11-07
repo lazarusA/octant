@@ -23,6 +23,7 @@ pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
 /// The surface as surface.wgsl draws it, in normalized surface coordinates
 /// `(u, v)` (`get_cell_normalized_bounds_*`; irregular grids reach past
 /// `[0, 1]` by half a cell).
+#[derive(Clone, Copy)]
 pub struct SurfaceField<'a> {
     layer: &'a Layer,
     matrix: &'a MatrixData,
@@ -139,6 +140,42 @@ impl<'a> SurfaceField<'a> {
         }
     }
 
+    /// Surface coordinate along x or y of `f`, a fraction of the grid's
+    /// cells (cell `k` of `n` spans `[k/n, (k+1)/n)`): within cell `k`
+    /// between its edges, midway between neighbouring centers (the outer
+    /// ones `sample`'s), so irregular grids place it where their cells are.
+    pub fn uv_of_fraction(&self, f: f32, along_x: bool) -> f32 {
+        let n = if along_x {
+            self.matrix.width
+        } else {
+            self.matrix.height
+        };
+        if n < 2 || self.matrix.grid.is_healpix() {
+            return f;
+        }
+        let x = f.clamp(0.0, 1.0) * n as f32;
+        let k = (x as usize).min(n - 1);
+        let c = |j| self.center(j, along_x);
+        let left = if k == 0 {
+            self.sample(0, along_x)
+        } else {
+            0.5 * (c(k - 1) + c(k))
+        };
+        let right = if k + 1 == n {
+            self.sample(n - 1, along_x)
+        } else {
+            0.5 * (c(k) + c(k + 1))
+        };
+        left + (right - left) * (x - k as f32)
+    }
+
+    /// World heights the drawn surface spans, the zero plane included.
+    pub fn height_span(&self) -> (f32, f32) {
+        let (low, high) = self.scale.bounds();
+        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
+        (k * low.min(0.0), k * high.max(0.0))
+    }
+
     pub fn uv_to_world(&self, u: f32, v: f32) -> (f32, f32) {
         ((2.0 * u - 1.0) * self.aspect, 2.0 * v - 1.0)
     }
@@ -169,9 +206,8 @@ impl<'a> SurfaceField<'a> {
         let margin = 1e-3;
         let ([u0, u1], [v0, v1]) = (self.edges(true), self.edges(false));
         let (us, vs) = ([u0 - margin, u1 + margin], [v0 - margin, v1 + margin]);
-        let (low, high) = self.scale.bounds();
-        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
-        let (y0, y1) = (k * low.min(0.0) - margin, k * high.max(0.0) + margin);
+        let (y0, y1) = self.height_span();
+        let (y0, y1) = (y0 - margin, y1 + margin);
         let (x0, z0) = self.uv_to_world(us[0], vs[0]);
         let (x1, z1) = self.uv_to_world(us[1], vs[1]);
         let (w, h) = (self.matrix.width.max(1), self.matrix.height.max(1));

@@ -39,6 +39,9 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
                 .then(|| app.layout.show_scale_bar = !app.layout.show_scale_bar);
         }
     });
+    if support.slice.is_yes() {
+        super::slicer::show_slicer(app, ui);
+    }
     if support.axes.is_yes() {
         axis_controls(&mut app.layout.axis_style, ui);
     }

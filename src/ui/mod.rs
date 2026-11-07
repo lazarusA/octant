@@ -36,6 +36,7 @@ pub mod plate;
 pub mod plot_type;
 pub mod scale_bar;
 pub mod settings;
+pub mod slice_gizmo;
 pub mod status;
 pub mod temp_cache;
 #[cfg(test)]

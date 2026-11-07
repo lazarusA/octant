@@ -78,6 +78,8 @@ pub(crate) struct OptionSupport {
     pub scale_bar: Support,
     /// Ticks and grid lines of the axes 2D plots draw.
     pub axes: Support,
+    /// The slicer's toggle and gizmo.
+    pub slice: Support,
 }
 
 impl PlotState {
@@ -134,6 +136,7 @@ impl PlotState {
             camera: support_if(self.plot_type.is_3d()),
             scale_bar: support_if(self.physical && self.plot_type == PlotType::Heatmap),
             axes: support_if(!self.plot_type.is_3d()),
+            slice: support_if(crate::app::SliceMode::Box.offered_for(self.plot_type)),
         }
     }
 

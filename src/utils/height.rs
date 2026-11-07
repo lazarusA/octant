@@ -43,6 +43,25 @@ impl HeightScale {
         }
     }
 
+    /// The value whose height is `h` (inside `bounds`), the inverse of
+    /// `normalized`; `None` for composites, whose heights are colors.
+    pub fn value_at(&self, h: f32) -> Option<f32> {
+        if self.composite {
+            return None;
+        }
+        let (cmin, cmax) = (self.cmin, self.cmax);
+        let h = if self.flip {
+            self.range_height(cmax) - h
+        } else {
+            h
+        };
+        Some(if cmin < 0.0 && cmax > 0.0 {
+            h * cmin.abs().max(cmax.abs())
+        } else {
+            cmin + h * (cmax - cmin)
+        })
+    }
+
     fn range_height(&self, val: f32) -> f32 {
         let (cmin, cmax) = (self.cmin, self.cmax);
         if cmin < 0.0 && cmax > 0.0 {

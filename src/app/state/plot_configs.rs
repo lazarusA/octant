@@ -196,6 +196,8 @@ pub struct PlotConfigs {
     pub point_cloud: PointCloudPlotConfig,
     /// Whether 3D translucent plots draw without depth writes (OIT/NoDepthWrite).
     pub plot_transparency: bool,
+    /// The slicer's cut (Settings > View), dragged on the canvas.
+    pub slice: super::slicer::Slicer,
 }
 
 impl Default for PlotConfigs {
@@ -206,6 +208,7 @@ impl Default for PlotConfigs {
             mesh: MeshPlotConfig::default(),
             point_cloud: PointCloudPlotConfig::default(),
             plot_transparency: true,
+            slice: super::slicer::Slicer::default(),
         }
     }
 }

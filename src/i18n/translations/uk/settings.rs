@@ -174,6 +174,23 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Шкала масштабу",
         SettingsKey::ShowScaleBarHover => "Показати шкалу масштабу",
         SettingsKey::HideScaleBarHover => "Сховати шкалу масштабу",
+        SettingsKey::Slicer => "Зріз",
+        SettingsKey::SlicerOff => "Вимк.",
+        SettingsKey::SlicerOffHover => "Без зрізу",
+        SettingsKey::SlicerBox => "Блок",
+        SettingsKey::SlicerBoxHover => "Залишити частину всередині блока: перетягуйте ребра й кути",
+        SettingsKey::SlicerPlanes => "Площини",
+        SettingsKey::SlicerPlanesHover => {
+            "Показати дані на площинах: перетягуйте кожну вздовж її осі"
+        }
+        SettingsKey::SlicerPlaneV => "В",
+        SettingsKey::SlicerPlaneH => "Г",
+        SettingsKey::SlicerPlaneD => "Гл",
+        SettingsKey::SlicerPlaneVHover => "Показати або сховати вертикальну площину поперек {}",
+        SettingsKey::SlicerPlaneHHover => "Показати або сховати горизонтальну площину поперек {}",
+        SettingsKey::SlicerPlaneDHover => "Показати або сховати площину глибини поперек {}",
+        SettingsKey::SlicerHideGuidesHover => "Сховати напрямні зрізу (зріз лишається)",
+        SettingsKey::SlicerShowGuidesHover => "Показати напрямні зрізу",
         SettingsKey::AxisMajor => "Основні",
         SettingsKey::AxisMinor => "Додаткові",
         SettingsKey::AxisTicks => "Поділки",

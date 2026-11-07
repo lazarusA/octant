@@ -146,15 +146,27 @@ impl<'a> SphereField<'a> {
         })
     }
 
+    /// Radii the drawn globe spans, the unit sphere included (mode 0 draws
+    /// no relief).
+    pub fn radius_span(&self) -> (f32, f32) {
+        if self.mode == 0 {
+            return (1.0, 1.0);
+        }
+        let (low, high) = self.scale.bounds();
+        (
+            1.0 + 0.4 * self.disp * low.min(0.0),
+            1.0 + 0.4 * self.disp * high.max(0.0),
+        )
+    }
+
     /// The cell where `ray` first meets the drawn globe, or crosses the unit
     /// sphere when it meets nothing.
     pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
         let marched = (self.mode != 0).then(|| {
             // Between the outermost and innermost drawn radii; below the
             // innermost the ray only sees the inside of the globe.
-            let (low, high) = self.scale.bounds();
-            let r_in = 1.0 + 0.4 * self.disp * low.min(0.0) - 1e-3;
-            let r_out = 1.0 + 0.4 * self.disp * high.max(0.0) + 1e-3;
+            let (r_in, r_out) = self.radius_span();
+            let (r_in, r_out) = (r_in - 1e-3, r_out + 1e-3);
             let (t_in, t_out) = sphere_span(ray, r_out)?;
             let t_stop = sphere_span(ray, r_in).map_or(t_out, |(t, _)| t);
             let (w, h) = (self.matrix.width, self.matrix.height);

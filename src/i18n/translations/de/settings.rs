@@ -172,6 +172,25 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Maßstabsleiste",
         SettingsKey::ShowScaleBarHover => "Maßstabsleiste einblenden",
         SettingsKey::HideScaleBarHover => "Maßstabsleiste ausblenden",
+        SettingsKey::Slicer => "Schnitt",
+        SettingsKey::SlicerOff => "Aus",
+        SettingsKey::SlicerOffHover => "Kein Schnitt",
+        SettingsKey::SlicerBox => "Quader",
+        SettingsKey::SlicerBoxHover => "Den Teil in einem Quader behalten: Kanten und Ecken ziehen",
+        SettingsKey::SlicerPlanes => "Ebenen",
+        SettingsKey::SlicerPlanesHover => {
+            "Die Daten auf Ebenen zeigen: jede entlang ihrer Achse ziehen"
+        }
+        SettingsKey::SlicerPlaneV => "V",
+        SettingsKey::SlicerPlaneH => "H",
+        SettingsKey::SlicerPlaneD => "T",
+        SettingsKey::SlicerPlaneVHover => "Die senkrechte Ebene quer zu {} ein- oder ausblenden",
+        SettingsKey::SlicerPlaneHHover => "Die waagerechte Ebene quer zu {} ein- oder ausblenden",
+        SettingsKey::SlicerPlaneDHover => "Die Tiefenebene quer zu {} ein- oder ausblenden",
+        SettingsKey::SlicerHideGuidesHover => {
+            "Die Hilfslinien des Schnitts ausblenden (der Schnitt bleibt)"
+        }
+        SettingsKey::SlicerShowGuidesHover => "Die Hilfslinien des Schnitts einblenden",
         SettingsKey::AxisMajor => "Haupteinteilung",
         SettingsKey::AxisMinor => "Nebeneinteilung",
         SettingsKey::AxisTicks => "Striche",

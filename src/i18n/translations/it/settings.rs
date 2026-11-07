@@ -182,6 +182,25 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Barra di scala",
         SettingsKey::ShowScaleBarHover => "Mostra la barra di scala",
         SettingsKey::HideScaleBarHover => "Nascondi la barra di scala",
+        SettingsKey::Slicer => "Taglio",
+        SettingsKey::SlicerOff => "Disattivato",
+        SettingsKey::SlicerOffHover => "Nessun taglio",
+        SettingsKey::SlicerBox => "Scatola",
+        SettingsKey::SlicerBoxHover => {
+            "Mantieni la parte dentro una scatola: trascina spigoli e angoli"
+        }
+        SettingsKey::SlicerPlanes => "Piani",
+        SettingsKey::SlicerPlanesHover => {
+            "Mostra i dati sui piani: trascina ciascuno lungo il suo asse"
+        }
+        SettingsKey::SlicerPlaneV => "V",
+        SettingsKey::SlicerPlaneH => "O",
+        SettingsKey::SlicerPlaneD => "P",
+        SettingsKey::SlicerPlaneVHover => "Mostra o nascondi il piano verticale attraverso {}",
+        SettingsKey::SlicerPlaneHHover => "Mostra o nascondi il piano orizzontale attraverso {}",
+        SettingsKey::SlicerPlaneDHover => "Mostra o nascondi il piano di profondità attraverso {}",
+        SettingsKey::SlicerHideGuidesHover => "Nascondi le guide del taglio (il taglio resta)",
+        SettingsKey::SlicerShowGuidesHover => "Mostra le guide del taglio",
         SettingsKey::AxisMajor => "Principali",
         SettingsKey::AxisMinor => "Secondarie",
         SettingsKey::AxisTicks => "Tacche",

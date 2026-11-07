@@ -161,6 +161,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleBar => "Bilah skala",
         SettingsKey::ShowScaleBarHover => "Tampilkan bilah skala",
         SettingsKey::HideScaleBarHover => "Sembunyikan bilah skala",
+        SettingsKey::Slicer => "Pemotong",
+        SettingsKey::SlicerOff => "Mati",
+        SettingsKey::SlicerOffHover => "Tanpa pemotong",
+        SettingsKey::SlicerBox => "Kotak",
+        SettingsKey::SlicerBoxHover => "Simpan bagian di dalam kotak: seret tepi dan sudutnya",
+        SettingsKey::SlicerPlanes => "Bidang",
+        SettingsKey::SlicerPlanesHover => {
+            "Tampilkan data pada bidang: seret masing-masing di sepanjang sumbunya"
+        }
+        SettingsKey::SlicerPlaneV => "V",
+        SettingsKey::SlicerPlaneH => "H",
+        SettingsKey::SlicerPlaneD => "K",
+        SettingsKey::SlicerPlaneVHover => {
+            "Tampilkan atau sembunyikan bidang vertikal yang melintasi {}"
+        }
+        SettingsKey::SlicerPlaneHHover => {
+            "Tampilkan atau sembunyikan bidang horizontal yang melintasi {}"
+        }
+        SettingsKey::SlicerPlaneDHover => {
+            "Tampilkan atau sembunyikan bidang kedalaman yang melintasi {}"
+        }
+        SettingsKey::SlicerHideGuidesHover => "Sembunyikan panduan pemotong (potongan tetap)",
+        SettingsKey::SlicerShowGuidesHover => "Tampilkan panduan pemotong",
         SettingsKey::AxisMajor => "Utama",
         SettingsKey::AxisMinor => "Sekunder",
         SettingsKey::AxisTicks => "Tanda",
