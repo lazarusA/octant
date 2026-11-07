@@ -74,6 +74,8 @@ pub(crate) struct OptionSupport {
     pub aggregation: Support,
     /// Auto rotate and reset view.
     pub camera: Support,
+    /// Keeping the data's aspect ratio (only the heatmap sizes its plot by it).
+    pub aspect_ratio: Support,
     /// The scale bar of 2D images with a physical pixel size.
     pub scale_bar: Support,
     /// Ticks and grid lines of the axes 2D plots draw.
@@ -134,6 +136,7 @@ impl PlotState {
             // while it is on, the plot type menu keeps to the heatmap.
             aggregation: support_if(self.plot_type == PlotType::Heatmap),
             camera: support_if(self.plot_type.is_3d()),
+            aspect_ratio: support_if(self.plot_type == PlotType::Heatmap),
             scale_bar: support_if(self.physical && self.plot_type == PlotType::Heatmap),
             axes: support_if(!self.plot_type.is_3d()),
             slice: support_if(crate::app::SliceMode::Box.offered_for(self.plot_type)),

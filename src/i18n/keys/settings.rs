@@ -107,6 +107,7 @@ crate::i18n::keys::define_keys! {
     OpenSaveDialog,
     CropTool,
     CopyShareLink,
+    ShareLinkHover,
     ShareLinkCopied,
     // 2D aggregation
     Aggregation,

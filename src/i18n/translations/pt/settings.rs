@@ -132,7 +132,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Pasta:",
         SettingsKey::OpenSaveDialog => "Abrir caixa de salvamento",
         SettingsKey::CropTool => "Ferramenta de recorte",
-        SettingsKey::CopyShareLink => "Copiar link",
+        SettingsKey::CopyShareLink => "Compartilhar",
+        SettingsKey::ShareLinkHover => "Compartilhar link",
         SettingsKey::ShareLinkCopied => "Link copiado",
         SettingsKey::Aggregation => "Agregação 2D",
         SettingsKey::AggregationMandatoryHover => {

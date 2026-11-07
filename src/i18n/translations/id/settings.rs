@@ -120,7 +120,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Folder:",
         SettingsKey::OpenSaveDialog => "Buka Dialog Simpan",
         SettingsKey::CropTool => "Alat Potong",
-        SettingsKey::CopyShareLink => "Salin tautan",
+        SettingsKey::CopyShareLink => "Bagikan",
+        SettingsKey::ShareLinkHover => "Bagikan tautan",
         SettingsKey::ShareLinkCopied => "Tautan disalin",
         SettingsKey::Aggregation => "Agregasi 2D",
         SettingsKey::AggregationMandatoryHover => {

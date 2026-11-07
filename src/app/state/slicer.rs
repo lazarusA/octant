@@ -83,7 +83,7 @@ impl Default for Slicer {
             mode: SliceMode::Off,
             lo: [0.0; 3],
             hi: [1.0; 3],
-            planes: [Some(0.5), Some(0.5), None],
+            planes: [Some(0.5); 3],
             guides: true,
             cut_coastlines: false,
         }
@@ -101,8 +101,8 @@ impl Slicer {
         self.cutting() && self.guides
     }
 
-    /// Switches mode, starting it over (nothing cut, the planes across x
-    /// and y through the middle), the guides and coastline choice as they
+    /// Switches mode, starting it over (nothing cut, the planes across
+    /// every axis through the middle), the guides and coastline choice as they
     /// were.
     pub fn set_mode(&mut self, mode: SliceMode) {
         *self = Self {

@@ -174,12 +174,3 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
         ui.label(tr(K::SingleProfile));
     }
 }
-
-pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.add_space(2.0);
-    ui.checkbox(
-        &mut app.layout.enforce_data_aspect_ratio,
-        tr(K::AspectRatio),
-    )
-    .on_hover_text(tr(K::AspectRatioHover));
-}

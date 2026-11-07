@@ -26,7 +26,7 @@ mod view;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{CommonKey, SettingsKey as K, tr};
-use crate::ui::icons::Icon;
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 use support::{PlotState, Support};
@@ -74,13 +74,14 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            let title = panel_header::show(
-                ui,
-                Icon::Settings,
-                tr(CommonKey::Settings),
-                tr(K::CloseSettingsHover),
-            );
-            header = Some(title.entering_body());
+            ui.icon(Icon::Settings, IconSize::Sm);
+            ui.label(egui::RichText::new(tr(CommonKey::Settings)).strong());
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let title = panel_header::buttons(ui, tr(K::CloseSettingsHover));
+                // Left of the grip, so Tab from the grip reaches it first.
+                export::copy_link_button(app, ui);
+                header = Some(title.entering_body());
+            });
         })
         .body(|ui| {
             // Scroll the body rather than run past the canvas bottom.
@@ -96,14 +97,18 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     header
 }
 
-/// The plot's own options, then the Layers menu (each layer's composite, and
-/// the Color menu of layers without a colorbar), overlays, resolution, view
-/// and export sections. Sections and settings the plot has no use for are
-/// left out (`support`).
+/// The view section (aspect ratio, camera, hover card, slicer, axes), the
+/// plot's own options, then the Layers menu (each layer's composite, and the
+/// Color menu of layers without a colorbar), overlays, resolution and export.
+/// Sections and settings the plot has no use for are left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
-    ui.label(egui::RichText::new(plot_type.display_name()).small().weak());
-    plot_options::show_plot_options(app, ui, plot_type);
+    ui.label(egui::RichText::new(tr(K::SectionView)).small().weak());
+    view::show_view_controls(app, ui, &PlotState::of(app).support());
+    if plot_options::has_plot_options(plot_type) {
+        section(ui, plot_type.display_name());
+        plot_options::show_plot_options(app, ui, plot_type);
+    }
     // After the plot options, which may switch the volume algorithm or the
     // composite this frame.
     let support = PlotState::of(app).support();
@@ -121,8 +126,6 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
             resampling::show_resampling_controls(app, ui);
         });
     }
-    section(ui, tr(K::SectionView));
-    view::show_view_controls(app, ui, &support);
     ui.separator();
     export::show_export_preferences(app, ui);
 }

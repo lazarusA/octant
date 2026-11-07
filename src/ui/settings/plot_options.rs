@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use crate::ui::settings::plot_2d::{show_heatmap_options, show_line_options};
+use crate::ui::settings::plot_2d::show_line_options;
 use crate::ui::settings::plot_3d::{
     show_point_cloud_options, show_sphere_options, show_surface_options, show_volume_options,
 };
@@ -14,6 +14,11 @@ pub(crate) fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui, plot_typ
         PlotType::Surface => show_surface_options(app, ui),
         PlotType::PointCloud => show_point_cloud_options(app, ui),
         PlotType::Line => show_line_options(app, ui),
-        PlotType::Heatmap => show_heatmap_options(app, ui),
+        PlotType::Heatmap => {}
     }
+}
+
+/// Whether `plot_type` has options of its own (the heatmap's are all in View).
+pub(crate) fn has_plot_options(plot_type: PlotType) -> bool {
+    plot_type != PlotType::Heatmap
 }

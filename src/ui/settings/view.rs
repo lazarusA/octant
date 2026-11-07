@@ -1,14 +1,22 @@
 use super::support::OptionSupport;
 use crate::app::OctantApp;
-use crate::i18n::{ColormapKey, SettingsKey as K, tr};
+use crate::i18n::{ColormapKey, PlotOptionsKey, SettingsKey as K, tr};
 use crate::ui::axes::{AxisStyle, MinorPlacement};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::number_input::LocalizedInput;
 
-/// Camera controls for 3D plots and the hover card and scale bar toggles,
-/// for every plot, then the colorbars' box transparency while one shows.
+/// The heatmap's aspect ratio, camera controls for 3D plots and the hover
+/// card and scale bar toggles, for every plot, then the slicer, the axes and
+/// the colorbars' box transparency while one shows.
 pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
+    if support.aspect_ratio.is_yes() {
+        ui.checkbox(
+            &mut app.layout.enforce_data_aspect_ratio,
+            tr(PlotOptionsKey::AspectRatio),
+        )
+        .on_hover_text(tr(PlotOptionsKey::AspectRatioHover));
+    }
     ui.horizontal_wrapped(|ui| {
         if support.camera.is_yes() {
             ui.checkbox(&mut app.nav.sphere_auto_rotate, tr(K::AutoRotate));
@@ -38,9 +46,12 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
                 .clicked()
                 .then(|| app.layout.show_scale_bar = !app.layout.show_scale_bar);
         }
+        if support.slice.is_yes() {
+            super::slicer::show_slicer(app, ui);
+        }
     });
     if support.slice.is_yes() {
-        super::slicer::show_slicer(app, ui, support.coastlines.is_yes());
+        super::slicer::show_slicer_options(app, ui, support.coastlines.is_yes());
     }
     if support.axes.is_yes() {
         axis_controls(&mut app.layout.axis_style, ui);
