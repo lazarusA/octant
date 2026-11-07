@@ -1,14 +1,14 @@
-//! The slicer's one Settings row: its mode (Off, Box, Planes, the last for
-//! volumes and point clouds) and, for planes, which axes they cross. The cut
-//! itself is dragged on the canvas (`ui::slice_gizmo`).
+//! The slicer's Settings rows: its mode (Off, Box, Planes, the last for
+//! volumes and point clouds) on a row of its own, then, for planes, which
+//! axes they cross. The cut itself is dragged on the canvas
+//! (`ui::slice_gizmo`).
 
 use crate::app::{OctantApp, SliceMode};
 use crate::i18n::{self, SettingsKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 
-/// The Slicer row; `coastlines` whether the plot draws coastlines, which
-/// the box may cut too.
-pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui, coastlines: bool) {
+/// The Slicer's label, mode select and guides eye, in a horizontal `ui`.
+pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
     let name = |m| match m {
         SliceMode::Off => (K::SlicerOff, K::SlicerOffHover),
@@ -16,36 +16,42 @@ pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui, coastlines: bo
         SliceMode::Planes => (K::SlicerPlanes, K::SlicerPlanesHover),
     };
     let mut mode = app.plot_configs.slice.mode;
-    ui.horizontal_wrapped(|ui| {
-        ui.label(tr(K::Slicer));
-        egui::ComboBox::from_id_salt("slicer_mode")
-            .selected_text(tr(name(mode).0))
-            .show_ui(ui, |ui| {
-                for m in [SliceMode::Off, SliceMode::Box, SliceMode::Planes] {
-                    if m.offered_for(plot_type) {
-                        let (label, hover) = name(m);
-                        ui.selectable_value(&mut mode, m, tr(label))
-                            .on_hover_text(tr(hover));
-                    }
+    ui.label(tr(K::Slicer));
+    egui::ComboBox::from_id_salt("slicer_mode")
+        .selected_text(tr(name(mode).0))
+        .show_ui(ui, |ui| {
+            for m in [SliceMode::Off, SliceMode::Box, SliceMode::Planes] {
+                if m.offered_for(plot_type) {
+                    let (label, hover) = name(m);
+                    ui.selectable_value(&mut mode, m, tr(label))
+                        .on_hover_text(tr(hover));
                 }
-            });
-        if mode != app.plot_configs.slice.mode {
-            app.plot_configs.slice.set_mode(mode);
+            }
+        });
+    if mode != app.plot_configs.slice.mode {
+        app.plot_configs.slice.set_mode(mode);
+    }
+    if mode != SliceMode::Off {
+        guides_toggle(&mut app.plot_configs.slice.guides, ui);
+    }
+}
+
+/// The mode's own row: the V, H and D planes, or whether the box cuts the
+/// coastlines (`coastlines`: the plot draws them).
+pub(crate) fn show_slicer_options(app: &mut OctantApp, ui: &mut egui::Ui, coastlines: bool) {
+    match app.plot_configs.slice.mode {
+        SliceMode::Planes => {
+            ui.horizontal_wrapped(|ui| plane_toggles(app, ui));
         }
-        if mode != SliceMode::Off {
-            guides_toggle(&mut app.plot_configs.slice.guides, ui);
-        }
-        if mode == SliceMode::Planes {
-            plane_toggles(app, ui);
-        }
-        if mode == SliceMode::Box && coastlines {
+        SliceMode::Box if coastlines => {
             let cut = &mut app.plot_configs.slice.cut_coastlines;
             ui.selectable_label(*cut, tr(K::SlicerCutCoastlines))
                 .on_hover_text(tr(K::SlicerCutCoastlinesHover))
                 .clicked()
                 .then(|| *cut = !*cut);
         }
-    });
+        _ => {}
+    }
 }
 
 /// The eye showing or hiding the gizmo's guides; the cut stays.

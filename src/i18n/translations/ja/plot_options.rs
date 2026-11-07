@@ -19,6 +19,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
             "オンにすると、2Dプロットは行列データの縦横比 (幅/高さ) を保ちます。オフにすると、2Dプロットはキャンバス全体に広がります。"
         }
         PlotOptionsKey::Algorithm => "アルゴリズム",
+        PlotOptionsKey::Mode => "モード",
         PlotOptionsKey::AlgoDvr => "ボリュームレイマーチング (DVR)",
         PlotOptionsKey::AlgoMip => "最大値投影 (MIP)",
         PlotOptionsKey::AlgoMinIp => "最小値投影 (MinIP)",

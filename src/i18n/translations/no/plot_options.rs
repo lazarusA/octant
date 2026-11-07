@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Ellers fyller 2D-plott hele lerretet."
         }
         PlotOptionsKey::Algorithm => "Algoritme",
+        PlotOptionsKey::Mode => "Modus",
         PlotOptionsKey::AlgoDvr => "Volum-raymarching (DVR)",
         PlotOptionsKey::AlgoMip => "Maksimal intensitet (MIP)",
         PlotOptionsKey::AlgoMinIp => "Minimal intensitet (MinIP)",

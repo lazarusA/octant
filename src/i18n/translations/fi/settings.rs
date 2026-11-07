@@ -134,7 +134,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Kansio:",
         SettingsKey::OpenSaveDialog => "Avaa tallennusikkuna",
         SettingsKey::CropTool => "Rajaustyökalu",
-        SettingsKey::CopyShareLink => "Kopioi linkki",
+        SettingsKey::Share => "Jaa",
+        SettingsKey::ShareLinkHover => "Jaa linkki",
         SettingsKey::ShareLinkCopied => "Linkki kopioitu",
         SettingsKey::Aggregation => "2D-aggregointi",
         SettingsKey::AggregationMandatoryHover => {

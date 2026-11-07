@@ -194,6 +194,17 @@ fn camera_controls_are_for_3d_plots() {
 }
 
 #[test]
+fn aspect_ratio_is_for_the_heatmap() {
+    for plot_type in ALL_TYPES {
+        assert_eq!(
+            state(plot_type).support().aspect_ratio.is_yes(),
+            plot_type == PlotType::Heatmap,
+            "{plot_type:?}"
+        );
+    }
+}
+
+#[test]
 fn an_overlay_menu_follows_its_own_heatmap_layer() {
     let mut app = crate::app::OctantApp::default();
     app.selected.plot_type = PlotType::Volume;

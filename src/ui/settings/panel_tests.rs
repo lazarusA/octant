@@ -33,19 +33,19 @@ fn panel_grows_when_its_body_gets_taller() {
     let canvas = SCREEN;
     let fresh = settled_height(
         &egui::Context::default(),
-        &mut app(PlotType::Heatmap),
+        &mut app(PlotType::Volume),
         canvas,
     );
 
     let ctx = egui::Context::default();
-    let mut app = app(PlotType::PointCloud);
+    let mut app = app(PlotType::Line);
     let short = settled_height(&ctx, &mut app, canvas);
-    app.selected.plot_type = PlotType::Heatmap;
+    app.selected.plot_type = PlotType::Volume;
     let grown = settled_height(&ctx, &mut app, canvas);
 
     assert!(
         fresh > short,
-        "heatmap settings are taller: {fresh} vs {short}"
+        "volume settings are taller: {fresh} vs {short}"
     );
     assert!(
         (grown - fresh).abs() < 1.0,

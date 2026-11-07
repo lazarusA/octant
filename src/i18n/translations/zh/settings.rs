@@ -102,7 +102,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "文件夹：",
         SettingsKey::OpenSaveDialog => "打开保存对话框",
         SettingsKey::CropTool => "裁剪工具",
-        SettingsKey::CopyShareLink => "复制链接",
+        SettingsKey::Share => "共享",
+        SettingsKey::ShareLinkHover => "共享链接",
         SettingsKey::ShareLinkCopied => "已复制链接",
         SettingsKey::Aggregation => "2D 聚合",
         SettingsKey::AggregationMandatoryHover => {

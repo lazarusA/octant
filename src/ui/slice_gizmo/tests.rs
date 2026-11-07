@@ -159,7 +159,9 @@ fn a_dragged_plane_moves_along_its_axis_only_and_snaps_to_a_cell() {
     let space = Space::test_box(camera(0.4, 0.6));
     let mut slice = Slicer::default();
     slice.set_mode(SliceMode::Planes);
-    assert_eq!(slice.planes, [Some(0.5), Some(0.5), None]);
+    assert_eq!(slice.planes, [Some(0.5); 3]);
+    // Without the depth plane, whose edges cross the top face too.
+    slice.planes[2] = None;
     let (edges, n) = planes::edges(&slice.planes);
     assert_eq!(n, 8);
     // The x plane's edge on the top face (v = 0), grabbed at its middle.

@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Якщо ні, 2D-графіки розтягуються на все полотно."
         }
         PlotOptionsKey::Algorithm => "Алгоритм",
+        PlotOptionsKey::Mode => "Режим",
         PlotOptionsKey::AlgoDvr => "Об'ємне трасування (DVR)",
         PlotOptionsKey::AlgoMip => "Максимальна інтенсивність (MIP)",
         PlotOptionsKey::AlgoMinIp => "Мінімальна інтенсивність (MinIP)",

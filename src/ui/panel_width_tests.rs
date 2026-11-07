@@ -6,7 +6,7 @@
 use crate::app::OctantApp;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::data::SliceRequest;
-use crate::i18n::{DatasetKey, Key, Language, SettingsKey, translate, with_language};
+use crate::i18n::{CommonKey, DatasetKey, Key, Language, SettingsKey, translate, with_language};
 use crate::plots::PlotType;
 use crate::ui::dataset::show_dataset_window;
 use crate::ui::fonts::FontEngine;
@@ -160,6 +160,42 @@ fn settings_panel_keeps_its_width_in_every_language() {
         "settings wider than {limit}: {}",
         wide.join(", ")
     );
+}
+
+/// The painted rect of the text `label` in `shapes`, if any.
+fn text_rect(shapes: &[ClippedShape], label: &str) -> Option<Rect> {
+    shapes.iter().find_map(|clipped| match &clipped.shape {
+        egui::Shape::Text(text) if text.galley.text() == label => {
+            Some(text.galley.rect.translate(text.pos.to_vec2()))
+        }
+        _ => None,
+    })
+}
+
+#[test]
+fn share_link_leaves_the_settings_title_room_in_every_language() {
+    let mut overlapping = Vec::new();
+    for &lang in Language::ALL {
+        let _fonts = crate::ui::fonts::test_lock();
+        let mut app = plotted(PlotType::Heatmap);
+        let mut run = |ui: &mut Ui| show_settings_window(&mut app, ui.ctx(), SCREEN);
+        with_language(lang, || {
+            let mut h = Harness::new(SCREEN);
+            FontEngine::on_language_changed(&h.ctx, lang);
+            let shapes = h.settle(SETTLE, &mut run);
+            let title = text_rect(&shapes, translate(lang, CommonKey::Settings));
+            let share = text_rect(&shapes, translate(lang, SettingsKey::Share));
+            // No label drawn: the button shows its icon alone.
+            match (title, share) {
+                (Some(t), Some(s)) if t.max.x > s.min.x => {
+                    overlapping.push(format!("{lang:?}: {t:?} {s:?}"));
+                }
+                (None, _) => overlapping.push(format!("{lang:?}: no title")),
+                _ => {}
+            }
+        });
+    }
+    assert!(overlapping.is_empty(), "{}", overlapping.join(", "));
 }
 
 #[test]

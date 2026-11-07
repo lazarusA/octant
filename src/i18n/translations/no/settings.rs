@@ -128,7 +128,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Mappe:",
         SettingsKey::OpenSaveDialog => "Åpne lagringsdialog",
         SettingsKey::CropTool => "Beskjæringsverktøy",
-        SettingsKey::CopyShareLink => "Kopier lenke",
+        SettingsKey::Share => "Del",
+        SettingsKey::ShareLinkHover => "Del lenke",
         SettingsKey::ShareLinkCopied => "Lenke kopiert",
         SettingsKey::Aggregation => "2D-aggregering",
         SettingsKey::AggregationMandatoryHover => {

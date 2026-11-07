@@ -1,3 +1,4 @@
+use super::GROUP_GAP;
 use crate::app::OctantApp;
 use crate::app::{MeshDetail, VolumeSurface};
 use crate::i18n::{PlotOptionsKey as K, tr};
@@ -23,7 +24,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         surface_row(app, ui);
     }
 
-    ui.separator();
+    ui.add_space(GROUP_GAP);
     labeled_slider(
         ui,
         "quality",
@@ -52,7 +53,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
     }
 
-    ui.separator();
+    ui.add_space(GROUP_GAP);
     labeled_slider(
         ui,
         "volume_z_scale",
@@ -95,29 +96,33 @@ fn surface_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     );
 }
 
-/// The volume algorithm's name, opening the menu of algorithms.
+/// The volume algorithm's select.
 fn algorithm_row(app: &mut OctantApp, ui: &mut egui::Ui) {
+    choice_row(
+        ui,
+        "volume_algorithm",
+        K::Algorithm,
+        &mut app.plot_configs.volume.algorithm,
+        &ALGORITHMS,
+    );
+}
+
+/// `label`, then a select of `choices` (each an id and its name) setting
+/// `current`.
+fn choice_row(ui: &mut egui::Ui, salt: &str, label: K, current: &mut u32, choices: &[(u32, K)]) {
+    let name = choices
+        .iter()
+        .find(|(id, _)| id == current)
+        .map_or("", |&(_, k)| tr(k));
     ui.horizontal_wrapped(|ui| {
-        ui.label(
-            egui::RichText::new(tr(K::Algorithm))
-                .small()
-                .color(ui.visuals().weak_text_color()),
-        );
-        let algo_label = match app.plot_configs.volume.algorithm {
-            id @ 0..=6 => ALGORITHMS[id as usize].1,
-            _ => K::AlgoIndexed,
-        };
-        ui.menu_button(egui::RichText::new(tr(algo_label)).small(), |ui| {
-            for (id, label) in ALGORITHMS {
-                if ui
-                    .selectable_label(app.plot_configs.volume.algorithm == id, tr(label))
-                    .clicked()
-                {
-                    app.plot_configs.volume.algorithm = id;
-                    ui.close();
+        ui.label(tr(label));
+        egui::ComboBox::from_id_salt(salt)
+            .selected_text(name)
+            .show_ui(ui, |ui| {
+                for &(id, k) in choices {
+                    ui.selectable_value(current, id, tr(k));
                 }
-            }
-        });
+            });
     });
 }
 
@@ -129,23 +134,16 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         (3, K::ModeVoxel),
     ];
 
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        for (id, label) in modes {
-            if ui
-                .selectable_label(
-                    app.plot_configs.mesh.sphere_mode == id,
-                    egui::RichText::new(tr(label)),
-                )
-                .clicked()
-            {
-                app.plot_configs.mesh.sphere_mode = id;
-            }
-        }
-    });
+    choice_row(
+        ui,
+        "sphere_mode",
+        K::Mode,
+        &mut app.plot_configs.mesh.sphere_mode,
+        &modes,
+    );
 
     if app.plot_configs.mesh.sphere_mode > 0 {
-        ui.separator();
+        ui.add_space(GROUP_GAP);
         labeled_slider(
             ui,
             "sphere_height",
@@ -161,22 +159,15 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     let modes = [(0, K::ModeBumpy), (1, K::ModeSteps), (2, K::ModeVoxel)];
 
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        for (id, label) in modes {
-            if ui
-                .selectable_label(
-                    app.plot_configs.mesh.surface_mode == id,
-                    egui::RichText::new(tr(label)),
-                )
-                .clicked()
-            {
-                app.plot_configs.mesh.surface_mode = id;
-            }
-        }
-    });
+    choice_row(
+        ui,
+        "surface_mode",
+        K::Mode,
+        &mut app.plot_configs.mesh.surface_mode,
+        &modes,
+    );
 
-    ui.separator();
+    ui.add_space(GROUP_GAP);
     labeled_slider(
         ui,
         "surface_height",
@@ -238,7 +229,7 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         &mut app.plot_configs.point_cloud.scale_by_value,
         tr(K::ScaleByValue),
     );
-    ui.separator();
+    ui.add_space(GROUP_GAP);
     labeled_slider(
         ui,
         "point_cloud_z_scale",

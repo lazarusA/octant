@@ -1,3 +1,4 @@
+use super::GROUP_GAP;
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
 use crate::ui::flow_row::{SliderLabel, labeled_slider};
@@ -79,7 +80,7 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    ui.separator();
+    ui.add_space(GROUP_GAP);
     ui.label(egui::RichText::new(tr(K::LineProfile)).small().weak());
 
     let label_x = app.get_spatial_dim_label(0);
@@ -173,13 +174,4 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
     } else {
         ui.label(tr(K::SingleProfile));
     }
-}
-
-pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.add_space(2.0);
-    ui.checkbox(
-        &mut app.layout.enforce_data_aspect_ratio,
-        tr(K::AspectRatio),
-    )
-    .on_hover_text(tr(K::AspectRatioHover));
 }

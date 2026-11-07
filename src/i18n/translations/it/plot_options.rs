@@ -24,6 +24,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Se disattivo, i grafici 2D si espandono per riempire tutta l'area di disegno."
         }
         PlotOptionsKey::Algorithm => "Algoritmo",
+        PlotOptionsKey::Mode => "Modalità",
         PlotOptionsKey::AlgoDvr => "Raymarching del volume (DVR)",
         PlotOptionsKey::AlgoMip => "Intensità massima (MIP)",
         PlotOptionsKey::AlgoMinIp => "Intensità minima (MinIP)",

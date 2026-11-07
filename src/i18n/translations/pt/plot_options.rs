@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Se desmarcado, os gráficos 2D se expandem para preencher toda a tela."
         }
         PlotOptionsKey::Algorithm => "Algoritmo",
+        PlotOptionsKey::Mode => "Modo",
         PlotOptionsKey::AlgoDvr => "Raymarching de volume (DVR)",
         PlotOptionsKey::AlgoMip => "Intensidade máxima (MIP)",
         PlotOptionsKey::AlgoMinIp => "Intensidade mínima (MinIP)",

@@ -24,6 +24,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Décoché, les graphiques 2D occupent tout le canevas."
         }
         PlotOptionsKey::Algorithm => "Algorithme",
+        PlotOptionsKey::Mode => "Mode",
         PlotOptionsKey::AlgoDvr => "Lancer de rayons volumique (DVR)",
         PlotOptionsKey::AlgoMip => "Intensité maximale (MIP)",
         PlotOptionsKey::AlgoMinIp => "Intensité minimale (MinIP)",

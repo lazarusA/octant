@@ -132,7 +132,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ExportFolder => "Папка:",
         SettingsKey::OpenSaveDialog => "Відкрити діалог збереження",
         SettingsKey::CropTool => "Обрізання",
-        SettingsKey::CopyShareLink => "Копіювати посилання",
+        SettingsKey::Share => "Поділитися",
+        SettingsKey::ShareLinkHover => "Поділитися посиланням",
         SettingsKey::ShareLinkCopied => "Посилання скопійовано",
         SettingsKey::Aggregation => "2D-агрегація",
         SettingsKey::AggregationMandatoryHover => {

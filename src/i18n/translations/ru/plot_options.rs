@@ -22,6 +22,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
              Если не отмечено, 2D-графики занимают весь холст."
         }
         PlotOptionsKey::Algorithm => "Алгоритм",
+        PlotOptionsKey::Mode => "Режим",
         PlotOptionsKey::AlgoDvr => "Объёмная трассировка (DVR)",
         PlotOptionsKey::AlgoMip => "Максимальная интенсивность (MIP)",
         PlotOptionsKey::AlgoMinIp => "Минимальная интенсивность (MinIP)",
