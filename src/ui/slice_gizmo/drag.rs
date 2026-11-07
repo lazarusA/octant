@@ -44,8 +44,10 @@ pub fn apply(space: &Space, slice: &mut Slicer, handle: Handle, t: f32, motion: 
     for (k, d) in moves.iter().enumerate() {
         let gap = space.min_gap(k);
         match handle.sides[k] {
-            Some(false) => slice.lo[k] = (slice.lo[k] + d).clamp(0.0, slice.hi[k] - gap),
-            Some(true) => slice.hi[k] = (slice.hi[k] + d).clamp(slice.lo[k] + gap, 1.0),
+            // Bounds kept ordered: a cut thinner than a cell (fewer cells
+            // than when it was made) must not make `clamp` panic.
+            Some(false) => slice.lo[k] = (slice.lo[k] + d).clamp(0.0, (slice.hi[k] - gap).max(0.0)),
+            Some(true) => slice.hi[k] = (slice.hi[k] + d).clamp((slice.lo[k] + gap).min(1.0), 1.0),
             None => {}
         }
     }
@@ -57,8 +59,18 @@ pub fn snap(space: &Space, slice: &mut Slicer, handle: Handle) {
     for k in 0..space.dims {
         let gap = space.min_gap(k);
         match handle.sides[k] {
-            Some(false) => slice.lo[k] = space.snap_edge(k, slice.lo[k]).min(slice.hi[k] - gap),
-            Some(true) => slice.hi[k] = space.snap_edge(k, slice.hi[k]).max(slice.lo[k] + gap),
+            Some(false) => {
+                slice.lo[k] = space
+                    .snap_edge(k, slice.lo[k])
+                    .min(slice.hi[k] - gap)
+                    .max(0.0);
+            }
+            Some(true) => {
+                slice.hi[k] = space
+                    .snap_edge(k, slice.hi[k])
+                    .max(slice.lo[k] + gap)
+                    .min(1.0);
+            }
             None => {}
         }
     }

@@ -193,3 +193,20 @@ fn resize_cursors_point_the_way_a_grip_moves() {
     assert_eq!(resize_icon(vec2(1.0, -1.0)), C::ResizeNeSw);
     assert_eq!(resize_icon(Vec2::ZERO), C::Grab);
 }
+
+#[test]
+fn a_cut_thinner_than_a_cell_drags_without_panicking() {
+    // Cut on a finer grid (100 cells), dragged on a 10-cell one.
+    let space = Space::test_box(camera(0.4, 0.6));
+    for (lo, hi) in [([0.0; 3], [0.01; 3]), ([0.99; 3], [1.0; 3])] {
+        let mut slice = boxed(lo, hi);
+        for sides in [[Some(false); 3], [Some(true); 3]] {
+            let handle = Handle { sides };
+            apply(&space, &mut slice, handle, 0.0, vec2(5.0, -5.0));
+            snap(&space, &mut slice, handle);
+            assert!((0..3).all(|k| (0.0..=1.0).contains(&slice.lo[k])
+                && (0.0..=1.0).contains(&slice.hi[k])
+                && slice.lo[k] <= slice.hi[k]));
+        }
+    }
+}
