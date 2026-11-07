@@ -1,5 +1,5 @@
 //! The slicer's Settings rows: its mode (Off, Box, Planes, the last for
-//! volumes and point clouds) beside the hover card, then, for planes, which
+//! volumes and point clouds) on a row of its own, then, for planes, which
 //! axes they cross. The cut itself is dragged on the canvas
 //! (`ui::slice_gizmo`).
 
@@ -7,8 +7,7 @@ use crate::app::{OctantApp, SliceMode};
 use crate::i18n::{self, SettingsKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 
-/// The Slicer's label, mode select and guides eye, drawn into the View
-/// section's first row.
+/// The Slicer's label, mode select and guides eye, in a horizontal `ui`.
 pub(crate) fn show_slicer(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
     let name = |m| match m {

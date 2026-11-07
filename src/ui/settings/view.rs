@@ -10,11 +10,13 @@ use crate::ui::number_input::LocalizedInput;
 const GROUP_GAP: f32 = 4.0;
 
 /// One row of toggles (the heatmap's aspect ratio, the 3D camera, hover
-/// card, scale bar and the slicer's mode), the slicer's own row, the axes and
-/// the colorbars' box transparency while one shows, each group set apart.
+/// card and scale bar), the slicer's mode row and its options' row, the axes
+/// and the colorbars' box transparency while one shows, each group set apart.
 pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
     toggles_row(app, ui, support);
     if support.slice.is_yes() {
+        ui.add_space(GROUP_GAP);
+        ui.horizontal_wrapped(|ui| super::slicer::show_slicer(app, ui));
         super::slicer::show_slicer_options(app, ui, support.coastlines.is_yes());
     }
     if support.axes.is_yes() {
@@ -38,7 +40,7 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
     }
 }
 
-/// The aspect ratio, 3D camera, hover card, scale bar and slicer mode, as
+/// The aspect ratio, 3D camera, hover card and scale bar, as
 /// far as the plot uses them, wrapping within the panel.
 fn toggles_row(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
     ui.horizontal_wrapped(|ui| {
@@ -86,9 +88,6 @@ fn toggles_row(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) 
                     K::ShowScaleBarHover
                 },
             );
-        }
-        if support.slice.is_yes() {
-            super::slicer::show_slicer(app, ui);
         }
     });
 }
