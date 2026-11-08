@@ -5,8 +5,9 @@
 //! overlays load in parallel. Messages wait until a worker says hello. When
 //! the first workers never start (missing, blocked, too slow to load), loads
 //! stay on the page for the session ([`Outcome::Unavailable`]); a worker that
-//! stops later fails the loads it ran (those it never started go to the
-//! page) and is started again on the next load.
+//! stops later fails the loads it ran and is started again on the next load,
+//! and one that does not start while others did leaves its loads to the
+//! page. Messages from an earlier start of a worker are ignored.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -43,6 +44,9 @@ pub(super) struct Pool {
     /// Some worker said hello: workers can run here, so one that does not
     /// start later never turns them all off.
     any_ready: bool,
+    /// Places whose worker did not start although others did: their loads
+    /// run on the page, never starting it again.
+    page_only: HashSet<usize>,
 }
 
 thread_local! {
@@ -85,6 +89,9 @@ impl Pool {
         let mut hasher = std::hash::DefaultHasher::new();
         (&request.store.source().uri, &request.slice.variable).hash(&mut hasher);
         let index = (hasher.finish() % self.slots.len() as u64) as usize;
+        if self.page_only.contains(&index) {
+            return None;
+        }
         let id = self.next_id;
         let slot = self.slot(index)?;
         slot.jobs.insert(id);
@@ -109,7 +116,11 @@ impl Pool {
                 Ok(slot) => self.slots[index] = Some(slot),
                 Err(e) => {
                     log::warn!("[data worker] Not started, loading on the page: {e}");
-                    self.broken = true;
+                    if self.any_ready {
+                        self.page_only.insert(index);
+                    } else {
+                        self.broken = true;
+                    }
                     return None;
                 }
             }
@@ -117,7 +128,19 @@ impl Pool {
         self.slots[index].as_mut()
     }
 
-    pub(super) fn receive(&mut self, index: usize, message: FromWorker, parts: &Array) {
+    /// Takes `message` from the worker at `index`, unless it comes from an
+    /// earlier start (`serial`) of it.
+    pub(super) fn receive(
+        &mut self,
+        index: usize,
+        serial: u64,
+        message: FromWorker,
+        parts: &Array,
+    ) {
+        let current = matches!(&self.slots[index], Some(s) if s.serial == serial && !s.dead);
+        if !current {
+            return;
+        }
         match message {
             FromWorker::Hello => self.hello(index),
             FromWorker::Block { id, header } => {
@@ -150,7 +173,9 @@ impl Pool {
 
     fn hello(&mut self, index: usize) {
         self.any_ready = true;
-        let share = DOWNLOAD_BUDGET / self.slots.len() as u64;
+        // Half the budget each: one variable's chunks stay on one worker, and
+        // several workers fill theirs only when several variables load.
+        let share = DOWNLOAD_BUDGET / 2;
         let Some(slot) = self.slots[index].as_mut() else {
             return;
         };
@@ -185,6 +210,9 @@ impl Pool {
         slot.dead = true;
         slot.worker.terminate();
         let jobs: Vec<u64> = slot.jobs.drain().collect();
+        if !started && self.any_ready {
+            self.page_only.insert(index);
+        }
         if started || self.any_ready {
             log::error!("[data worker] Stopped: {why}");
             for id in jobs {

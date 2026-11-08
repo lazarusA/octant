@@ -39,7 +39,10 @@ pub async fn read_all(url: &str) -> Result<Vec<u8>, String> {
             super::consolidate::v3_root(&source, bytes).await
         }
     };
-    BUILT.with_borrow_mut(|b| b.insert(url.to_owned(), built.clone()));
+    // Kept only while its source is: one released during the build is not.
+    if source_of(url).is_some() {
+        BUILT.with_borrow_mut(|b| b.insert(url.to_owned(), built.clone()));
+    }
     Ok(built)
 }
 

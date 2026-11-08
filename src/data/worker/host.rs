@@ -30,7 +30,9 @@ thread_local! {
     /// Stores being opened, with the loads waiting for them.
     static OPENING: RefCell<HashMap<DataSource, Vec<oneshot::Sender<Opened>>>> =
         RefCell::default();
-    /// Stores released while they opened: let go again once open.
+    /// The loads running per store URL: a store is let go once none runs.
+    static RUNNING: RefCell<HashMap<String, usize>> = RefCell::default();
+    /// Store URLs released while loads ran on them: let go when the last ends.
     static RELEASED: RefCell<HashSet<String>> = RefCell::default();
     static READS: RefCell<HashMap<u64, oneshot::Sender<ReadAnswer>>> = RefCell::default();
     static NEXT_READ: Cell<u64> = const { Cell::new(0) };
@@ -73,16 +75,20 @@ fn receive(data: &JsValue) {
             language,
         } => {
             crate::i18n::set_language(language);
+            // Loaded again after a release: its dataset was opened again.
+            let uri = source.uri.trim_end_matches('/');
+            RELEASED.with_borrow_mut(|r| r.remove(uri));
             wasm_bindgen_futures::spawn_local(load(id, source, slice));
         }
         ToWorker::Release { uri } => {
             let uri = uri.trim_end_matches('/');
-            let opening = OPENING.with_borrow(|o| o.keys().any(|s| same_uri(s, uri)));
-            if opening {
-                RELEASED.with_borrow_mut(|r| r.insert(uri.to_owned()));
-            }
             STORES.with_borrow_mut(|s| s.retain(|source, _| !same_uri(source, uri)));
-            release(uri);
+            // The loads running read the store's registry by URL: kept until they end.
+            if RUNNING.with_borrow(|r| r.contains_key(uri)) {
+                RELEASED.with_borrow_mut(|r| r.insert(uri.to_owned()));
+            } else {
+                release(uri);
+            }
         }
         ToWorker::ReadDone { id, error } => {
             let answer = match error {
@@ -97,6 +103,8 @@ fn receive(data: &JsValue) {
 }
 
 async fn load(id: u64, source: DataSource, slice: SliceRequest) {
+    let uri = source.uri.trim_end_matches('/').to_owned();
+    RUNNING.with_borrow_mut(|r| *r.entry(uri.clone()).or_default() += 1);
     let result = match open(&source).await {
         Ok(store) => {
             let request = BlockRequest::new(store, slice);
@@ -107,6 +115,7 @@ async fn load(id: u64, source: DataSource, slice: SliceRequest) {
         }
         Err(e) => Err(e),
     };
+    ended(&uri);
     // Counts and toasts reach the page before the block they came with.
     report();
     match result {
@@ -147,11 +156,9 @@ async fn open(source: &DataSource) -> Opened {
         Some(Err(e)) => Err(e),
         _ => SourceFactory::open(source.clone()).map_err(|e| e.to_string()),
     };
-    let uri = source.uri.trim_end_matches('/');
-    if RELEASED.with_borrow_mut(|r| r.remove(uri)) {
-        // Its dataset closed meanwhile: this load still runs, nothing is kept.
-        release(uri);
-    } else if let Ok(store) = &opened {
+    // A store released while it opened is not kept: the last load lets it go.
+    let released = RELEASED.with_borrow(|r| r.contains(source.uri.trim_end_matches('/')));
+    if let (Ok(store), false) = (&opened, released) {
         STORES.with_borrow_mut(|s| s.insert(source.clone(), store.clone()));
     }
     let waiting = OPENING
@@ -161,6 +168,23 @@ async fn open(source: &DataSource) -> Opened {
         let _ = tx.send(opened.clone());
     }
     opened
+}
+
+/// A load on `uri` ended: the store goes when it was released and none runs.
+fn ended(uri: &str) {
+    let last = RUNNING.with_borrow_mut(|r| {
+        let count = r.get_mut(uri).map(|n| {
+            *n = n.saturating_sub(1);
+            *n
+        });
+        if count == Some(0) {
+            r.remove(uri);
+        }
+        count == Some(0)
+    });
+    if last && RELEASED.with_borrow_mut(|r| r.remove(uri)) {
+        release(uri);
+    }
 }
 
 fn same_uri(source: &DataSource, uri: &str) -> bool {

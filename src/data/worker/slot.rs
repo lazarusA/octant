@@ -51,7 +51,7 @@ impl Slot {
         let worker = Worker::new(SCRIPT).map_err(|e| format!("{e:?}"))?;
         let on_message = Closure::<dyn FnMut(MessageEvent)>::new(move |e: MessageEvent| {
             if let Some((message, parts)) = js::receive::<FromWorker>(&e.data()) {
-                POOL.with_borrow_mut(|pool| pool.receive(index, message, &parts));
+                POOL.with_borrow_mut(|pool| pool.receive(index, serial, message, &parts));
             }
         });
         // A script that fails to load may raise a plain `Event`, without a message.
