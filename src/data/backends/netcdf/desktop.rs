@@ -2,10 +2,8 @@
 //! and remote (`http(s)://`) NetCDF-4/HDF5 files through `hdf5-pure`, the remote ones read
 //! by ranged requests.
 
-use std::sync::Arc;
-
 use super::c_reader::CReader;
-use super::pure::PureReader;
+use super::open::{Shared, open_path, open_source};
 use super::pure::read_ahead::ReadAhead;
 use super::reader::NcReader;
 use crate::data::blocks::BlockStoreError;
@@ -15,7 +13,7 @@ pub struct NetCdfBlockStore {
     pub(crate) file_path: String,
     /// The file open in `hdf5-pure` (`.mat` files); netCDF files are opened by netCDF-C
     /// per read.
-    pure: Option<Arc<PureReader>>,
+    pure: Option<Shared>,
 }
 
 impl std::fmt::Debug for NetCdfBlockStore {
@@ -27,7 +25,7 @@ impl std::fmt::Debug for NetCdfBlockStore {
 }
 
 /// Whether the file at `path` starts as a MATLAB file does (`MATLAB 7.3 MAT-file`, or an
-/// older one, which `PureReader` refuses with its reason).
+/// older one, which `hdf5-pure`'s reader refuses with its reason).
 fn is_matlab(path: &std::path::Path) -> bool {
     use std::io::Read;
     let mut head = [0; 6];
@@ -40,10 +38,10 @@ impl NetCdfBlockStore {
     /// NetCDF-4/HDF5 one from an `http(s)` URL.
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
         if path.starts_with("https://") || path.starts_with("http://") {
-            let reader = PureReader::open(HttpSource::open(path)?, path)?;
+            let reader = open_source(HttpSource::open(path)?, path)?;
             return Ok(Self {
                 file_path: path.to_owned(),
-                pure: Some(Arc::new(reader)),
+                pure: Some(reader),
             });
         }
         let clean_path = path
@@ -67,7 +65,7 @@ impl NetCdfBlockStore {
         }
         let file_path = p.to_string_lossy().to_string();
         let pure = match is_matlab(&p) {
-            true => Some(Arc::new(PureReader::open_path(&file_path)?)),
+            true => Some(open_path(&file_path)?),
             false => {
                 // Verify that the file can be opened and parsed by netcdf
                 CReader::open(&file_path)?;
@@ -80,7 +78,7 @@ impl NetCdfBlockStore {
     /// The file at `path` read by `hdf5-pure`, whatever it holds, for the parity tests.
     #[cfg(test)]
     pub(super) fn open_pure(path: &str) -> Result<Self, BlockStoreError> {
-        let pure = Some(Arc::new(PureReader::open_path(path)?));
+        let pure = Some(open_path(path)?);
         Ok(Self {
             file_path: path.to_owned(),
             pure,

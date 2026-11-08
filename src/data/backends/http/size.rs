@@ -53,7 +53,23 @@ pub async fn fetch_url_size(url: &str) -> Result<u64, String> {
         ));
     }
     let length = resp.headers().get(reqwest::header::CONTENT_LENGTH);
-    length
-        .and_then(|l| l.to_str().ok()?.trim().parse().ok())
+    match length.and_then(|l| l.to_str().ok()?.trim().parse().ok()) {
+        Some(length) => Ok(length),
+        None => ranged_size(url).await,
+    }
+}
+
+/// The size of the object at `url` from a one-byte ranged `GET`'s `Content-Range`
+/// (`bytes 0-0/N`), for servers whose `HEAD` gives no length (THREDDS).
+#[cfg(not(target_arch = "wasm32"))]
+async fn ranged_size(url: &str) -> Result<u64, String> {
+    let resp = (super::fetch::get_http_client().get(url))
+        .header(reqwest::header::RANGE, "bytes=0-0")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let range = resp.headers().get(reqwest::header::CONTENT_RANGE);
+    range
+        .and_then(|r| r.to_str().ok()?.rsplit_once('/')?.1.trim().parse().ok())
         .ok_or_else(|| format!("No Content-Length for '{url}'"))
 }

@@ -37,17 +37,9 @@ pub struct PureReader {
     by_path: HashMap<String, usize>,
 }
 
-/// Why a file is refused, from its first bytes: classic NetCDF and MATLAB files before
-/// v7.3 are not HDF5.
+/// Why a file is refused, from its first bytes: MATLAB files before v7.3 are not HDF5.
+/// (Classic NetCDF files go to `classic/`, `open.rs`.)
 fn refusal(head: &[u8]) -> Option<&'static str> {
-    if let [b'C', b'D', b'F', 1 | 2 | 5, ..] = head {
-        // The desktop reads them through netCDF-C, from disk only.
-        return Some(if cfg!(target_arch = "wasm32") {
-            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open only in the Octant desktop app"
-        } else {
-            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open from disk only: download the file first"
-        });
-    }
     let old_mat = head.starts_with(b"MATLAB 5.0 MAT-file") && !hdf5_pure::is_hdf5_bytes(head);
     old_mat.then_some(
         "MATLAB files before v7.3 are not supported: save it again with save(..., '-v7.3')",
@@ -91,14 +83,6 @@ impl PureReader {
             entries,
             by_path,
         })
-    }
-
-    /// Opens the file at `path` on disk.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn open_path(path: &str) -> Result<Self, BlockStoreError> {
-        let handle = std::fs::File::open(path).map_err(|e| failed(path, e))?;
-        let source = hdf5_pure::ReadSeekSource::new(handle).map_err(|e| failed(path, e))?;
-        Self::open(source, path)
     }
 
     fn dataset(&self, var: &NcVar) -> Result<hdf5_pure::Dataset, BlockStoreError> {

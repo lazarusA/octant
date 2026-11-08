@@ -9,18 +9,23 @@
 pub mod attrs;
 #[cfg(not(target_arch = "wasm32"))]
 mod c_reader;
+pub mod classic;
 pub mod coord_read;
 pub mod coord_scan;
 pub mod coords;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod inspect;
+pub mod open;
 pub mod pure;
 pub mod reader;
 pub mod slice;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod classic_tests;
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod coord_block_tests;

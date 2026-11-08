@@ -239,21 +239,38 @@ fn deflated_chunks_on_an_unlimited_dimension_read_alike() {
     assert_eq!(block.values[17], 4.25);
 }
 
-/// A remote NetCDF-4 file read by ranged requests (a GOES-16 radiance granule on NOAA's
-/// public bucket): `cargo test --lib remote_netcdf_opens -- --ignored --nocapture`.
+/// Remote files read by ranged requests: a NetCDF-4 GOES-16 radiance granule on NOAA's
+/// public bucket and a classic (CDF-1) Eta model run on Unidata's test server:
+/// `cargo test --lib remote_netcdf_opens -- --ignored --nocapture`.
 #[test]
 #[ignore = "network"]
 fn remote_netcdf_opens() {
-    const URL: &str = "https://noaa-goes16.s3.amazonaws.com/ABI-L1b-RadC/2017/242/00/OR_ABI-L1b-RadC-M3C01_G16_s20172420002168_e20172420004540_c20172420004583.nc";
-    let store = super::NetCdfBlockStore::open_local(URL).expect("open");
-    let meta = store.inspect().expect("inspect");
-    let rad = meta
-        .variables
-        .iter()
-        .find(|v| v.name == "Rad")
-        .expect("Rad");
-    println!("Rad {:?} {:?}", rad.dimension_names, rad.shape);
-    let request = SliceRequest::full_range("Rad", &[100, 100]);
-    let block = store.fetch_block(&request).expect("block");
-    assert_eq!(block.values.len(), 100 * 100);
+    let files = [
+        (
+            "https://noaa-goes16.s3.amazonaws.com/ABI-L1b-RadC/2017/242/00/OR_ABI-L1b-RadC-M3C01_G16_s20172420002168_e20172420004540_c20172420004583.nc",
+            "Rad",
+            &[100, 100][..],
+        ),
+        (
+            "https://remotetest.unidata.ucar.edu/thredds/fileServer/testdata/2004050300_eta_211.nc",
+            "Z_sfc",
+            &[1, 95, 135][..],
+        ),
+    ];
+    for (url, name, shape) in files {
+        let started = std::time::Instant::now();
+        let store = super::NetCdfBlockStore::open_local(url).expect("open");
+        let meta = store.inspect().expect("inspect");
+        let var = meta.variables.iter().find(|v| v.name == name).expect(name);
+        let block = store
+            .fetch_block(&SliceRequest::full_range(name, shape))
+            .expect("block");
+        assert_eq!(block.values.len(), shape.iter().product::<usize>());
+        println!(
+            "{name} {:?} {:?} in {:.1} s",
+            var.dimension_names,
+            var.shape,
+            started.elapsed().as_secs_f64()
+        );
+    }
 }

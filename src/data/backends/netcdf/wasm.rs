@@ -5,11 +5,10 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use hdf5_pure::{FormatError, Source};
 
-use super::pure::PureReader;
+use super::open::{Shared, open_source};
 use super::pure::read_ahead::ReadAhead;
 use super::reader::NcReader;
 use crate::data::DataSource;
@@ -17,9 +16,9 @@ use crate::data::blocks::BlockStoreError;
 
 thread_local! {
     /// The files open in this worker, by URL.
-    /// Held as `dyn NcReader` so that only the worker's `open` names `PureReader`, which
+    /// Held as `dyn NcReader` so that only the worker's `open` names the readers, which
     /// keeps `hdf5-pure` out of the page's `.wasm`.
-    static OPEN: RefCell<HashMap<String, Rc<dyn NcReader>>> = RefCell::default();
+    static OPEN: RefCell<HashMap<String, Shared>> = RefCell::default();
     /// Local files the page handed over, by URL, read through [`LocalSource`].
     static FILES: RefCell<HashMap<String, web_sys::File>> = RefCell::default();
 }
@@ -63,7 +62,7 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
         let file = crate::data::worker::file_from_page(&uri).await?;
         let len = file.size() as u64;
         FILES.with_borrow_mut(|f| f.insert(uri.clone(), file));
-        PureReader::open(
+        open_source(
             LocalSource {
                 uri: uri.clone(),
                 len,
@@ -72,7 +71,7 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
         )
     } else {
         let len = crate::data::backends::http::fetch_url_size(&uri).await?;
-        PureReader::open(
+        open_source(
             HttpSource {
                 url: uri.clone(),
                 len,
@@ -81,7 +80,7 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
             &uri,
         )
     };
-    let reader: Rc<dyn NcReader> = Rc::new(opened.map_err(|e| e.to_string())?);
+    let reader = opened.map_err(|e| e.to_string())?;
     OPEN.with_borrow_mut(|o| o.insert(uri, reader));
     Ok(())
 }
