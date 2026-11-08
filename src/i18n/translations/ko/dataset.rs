@@ -137,6 +137,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "이 MATLAB 파일의 배열 {}개는 표시되지 않습니다: 텍스트, 셀 배열, 빈 배열과 희소 배열, 복소수, 객체는 지원되지 않습니다"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "이 파일의 변수 {}개는 브라우저에서 읽기에 너무 큽니다: 보려면 Octant 데스크톱 앱에서 여세요"
+        }
         DatasetKey::Plate => "플레이트",
         DatasetKey::PlateAcquisition => "획득",
         DatasetKey::PlateAllAcquisitions => "전체",

@@ -123,6 +123,7 @@ crate::i18n::keys::define_keys! {
     LocalNoZarrMetadata,
     NeedsDataWorkers,
     MatArraysLeftOut,
+    VariablesTooLargeForBrowser,
     // OME-Zarr plates
     Plate,
     PlateAcquisition,

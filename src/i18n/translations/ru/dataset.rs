@@ -133,6 +133,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "Массивы этого файла MATLAB не показаны ({}): текст, массивы ячеек, пустые и разреженные массивы, комплексные числа и объекты не поддерживаются"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} переменных этого файла слишком велики для чтения в браузере: откройте его в настольном приложении Octant, чтобы увидеть их"
+        }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Съёмка",
         DatasetKey::PlateAllAcquisitions => "Все",

@@ -139,6 +139,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "この MATLAB ファイルの {} 個の配列は表示されません: テキスト、セル配列、空配列、スパース配列、複素数、オブジェクトには対応していません"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "このファイルの {} 個の変数はブラウザーで読むには大きすぎます: 表示するには Octant デスクトップアプリで開いてください"
+        }
         DatasetKey::Plate => "プレート",
         DatasetKey::PlateAcquisition => "撮像",
         DatasetKey::PlateAllAcquisitions => "すべて",

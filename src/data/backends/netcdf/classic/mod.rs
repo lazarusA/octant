@@ -1,4 +1,4 @@
-//! The reader of classic NetCDF files (CDF-1, CDF-2, CDF-5) over any byte [`Source`], for
+//! The reader of classic NetCDF files (CDF-1, CDF-2, CDF-5) over any byte [`RangeSource`], for
 //! the browser's data workers and remote files on the desktop (netCDF-C reads local ones).
 //! Fixed-size variables are stored whole at their `begin`; record variables (first
 //! dimension unlimited) hold one slab per record, interleaved every `recsize` bytes.
@@ -9,9 +9,8 @@ mod values;
 
 use std::collections::HashMap;
 
-use hdf5_pure::Source;
-
 use super::coord_read::char_labels;
+use super::pure::read_ahead::{BLOCK, RangeSource};
 use super::reader::{NcReader, NcVar, Raw, failed};
 use crate::data::blocks::BlockStoreError;
 use header::{Header, NcType, Short};
@@ -24,7 +23,7 @@ const HEADER_READ: u64 = 64 << 10;
 const MAX_HEADER: u64 = 64 << 20;
 
 pub struct ClassicReader {
-    source: Box<dyn Source + Send + Sync>,
+    source: Box<dyn RangeSource + Send + Sync>,
     header: Header,
     vars: Vec<NcVar>,
     /// Bytes from one record to the next.
@@ -32,7 +31,7 @@ pub struct ClassicReader {
 }
 
 /// The header of the file `source` reads, reading more until it is whole.
-fn read_header(source: &dyn Source, name: &str) -> Result<Header, BlockStoreError> {
+fn read_header(source: &dyn RangeSource, name: &str) -> Result<Header, BlockStoreError> {
     let mut size = HEADER_READ;
     loop {
         let mut bytes = vec![0; size.min(source.len()) as usize];
@@ -50,7 +49,7 @@ fn read_header(source: &dyn Source, name: &str) -> Result<Header, BlockStoreErro
 
 impl ClassicReader {
     pub fn open(
-        source: Box<dyn Source + Send + Sync>,
+        source: Box<dyn RangeSource + Send + Sync>,
         name: &str,
     ) -> Result<Self, BlockStoreError> {
         let header = read_header(source.as_ref(), name)?;
@@ -81,13 +80,15 @@ impl ClassicReader {
         if start.len() != rank || count.len() != rank || !(0..rank).all(inside) {
             return Err(format!("Window outside '{}'", var.name).into());
         }
-        let total = (count.iter())
-            .try_fold(1u64, |a, &c| a.checked_mul(c as u64))
-            .ok_or("Window too large")?;
-        if total == 0 {
+        let size = var.ty.size();
+        // The window must fit in memory (32 bits in the browser), though its variable may not.
+        let bytes = (count.iter())
+            .try_fold(size, |a, &c| a.checked_mul(c as u64))
+            .and_then(|b| usize::try_from(b).ok())
+            .ok_or_else(|| format!("Window of '{}' too large to read here", var.name))?;
+        if bytes == 0 {
             return Ok(Vec::new());
         }
-        let size = var.ty.size();
         let record = layout::is_record(&self.header, var);
         let r = layout::runs(&shape, start, count, record);
         let (k, run, inner) = (r.k, r.run, r.inner);
@@ -95,17 +96,21 @@ impl ClassicReader {
             true => self.recsize,
             false => r.strides[d].saturating_mul(size),
         };
-        // Windows lie within the variable, whose size `layout::describe` checked fits.
+        // A run lies within the window, whose bytes fit `usize`.
         let run_bytes = (run * size) as usize;
-        let mut out = vec![0; total as usize * size as usize];
+        let mut out = vec![0; bytes];
         let mut at = start[..k].to_vec();
         for buf in out.chunks_exact_mut(run_bytes) {
             let outer = (at.iter().enumerate())
                 .map(|(d, &i)| (i as u64).saturating_mul(step(d)))
                 .fold(var.begin, u64::saturating_add);
-            self.source
-                .read_at(outer.saturating_add(inner.saturating_mul(size)), buf)
-                .map_err(|e| failed(&format!("Failed reading '{}'", var.name), e))?;
+            let offset = outer.saturating_add(inner.saturating_mul(size));
+            // Records a block or more apart share no block: each read fetches its own bytes.
+            let read = match record && self.recsize >= BLOCK {
+                true => self.source.read_direct(offset, buf),
+                false => self.source.read_at(offset, buf),
+            };
+            read.map_err(|e| failed(&format!("Failed reading '{}'", var.name), e))?;
             // The next run: the outer dimensions counted up, the last fastest.
             let Some(d) = (0..k).rev().find(|&d| at[d] + 1 < start[d] + count[d]) else {
                 break;

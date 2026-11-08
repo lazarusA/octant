@@ -3,10 +3,9 @@
 
 use std::sync::Arc;
 
-use hdf5_pure::Source;
-
 use super::classic::{ClassicReader, is_classic};
 use super::pure::PureReader;
+use super::pure::read_ahead::RangeSource;
 use super::reader::NcReader;
 use crate::data::blocks::BlockStoreError;
 
@@ -14,7 +13,7 @@ use crate::data::blocks::BlockStoreError;
 pub type Shared = Arc<dyn NcReader + Send + Sync>;
 
 /// Opens the file `source` reads, `name` naming it in errors.
-pub fn open_source<S: Source + Send + Sync + 'static>(
+pub fn open_source<S: RangeSource + Send + Sync + 'static>(
     source: S,
     name: &str,
 ) -> Result<Shared, BlockStoreError> {

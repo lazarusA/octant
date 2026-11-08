@@ -174,3 +174,66 @@ fn a_header_length_past_the_file_is_an_error() {
     let error = super::open::open_path(nc.path()).err().expect("refused");
     assert!(error.to_string().contains("past the end"), "{error}");
 }
+
+/// Records at least a read-ahead block apart are read value by value, not a block each:
+/// the time coordinate of a file with large records costs bytes, not blocks.
+#[test]
+fn records_far_apart_read_only_their_bytes() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::pure::read_ahead::ReadAhead;
+
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("far_records");
+    {
+        let mut f = netcdf::create_with(&nc.0, Options::empty()).expect("create");
+        f.add_unlimited_dimension("time").expect("time");
+        f.add_dimension("x", 70_000).expect("x");
+        f.add_variable::<f64>("time", &["time"]).expect("time");
+        f.add_variable::<f32>("v", &["time", "x"]).expect("v");
+        f.enddef().expect("end of definitions");
+        let mut time = f.variable_mut("time").expect("time");
+        time.put_values(&[0.0f64, 1.0, 2.0, 3.0], 0..4)
+            .expect("times");
+    }
+    let bytes = Arc::new(std::fs::read(&nc.0).expect("read"));
+    let fetched = Arc::new(AtomicU64::new(0));
+    let (file, count) = (bytes.clone(), fetched.clone());
+    let source = ReadAhead::new(bytes.len() as u64, move |offset, length| {
+        count.fetch_add(length, Ordering::SeqCst);
+        let range = offset as usize..(offset + length) as usize;
+        Ok(file.get(range).unwrap_or_default().to_vec())
+    });
+    let reader = super::open::open_source(source, "far_records").expect("open");
+    let time = reader.variable("time").expect("time");
+    let before = fetched.load(Ordering::SeqCst);
+    let Ok(super::reader::Raw::F64(values)) = reader.read(&time, &[0], &[4]) else {
+        panic!("time read as f64");
+    };
+    assert_eq!(values, [0.0, 1.0, 2.0, 3.0]);
+    assert_eq!(
+        fetched.load(Ordering::SeqCst) - before,
+        4 * 8,
+        "8 bytes per record"
+    );
+}
+
+/// A file a writer is still streaming records into says so with all-ones `numrecs`: the
+/// record count then comes from the file's size.
+#[test]
+fn a_streaming_record_count_comes_from_the_file_size() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("streaming");
+    write(&nc, Options::empty(), false);
+    let mut bytes = std::fs::read(&nc.0).expect("read");
+    bytes[4..8].copy_from_slice(&[0xFF; 4]);
+    std::fs::write(&nc.0, &bytes).expect("write");
+    let reader = super::open::open_path(nc.path()).expect("open");
+    let t = reader.variable("t").expect("t");
+    assert_eq!(t.dims[0], ("time".to_owned(), 3), "three records");
+    let Ok(super::reader::Raw::F64(values)) = reader.read(&t, &[2, 2, 3], &[1, 1, 1]) else {
+        panic!("t read as f64");
+    };
+    assert_eq!(values, [35.0], "the last record's last value");
+}

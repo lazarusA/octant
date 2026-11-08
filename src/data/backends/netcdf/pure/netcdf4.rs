@@ -13,6 +13,7 @@ use super::attrs::{calibration, ints, text, texts};
 use super::{Entry, type_name};
 use crate::data::backends::netcdf::coord_read::{group_ancestors, group_of};
 use crate::data::backends::netcdf::reader::{NcVar, join};
+use crate::ui::toast::Severity;
 
 const PHONY: &str = "This is a netCDF dimension but not a netCDF variable";
 /// netCDF-4's dataset name for a variable named like a dimension it does not hold.
@@ -60,8 +61,13 @@ pub(super) fn catalog(
 ) -> Result<(HashMap<String, String>, Vec<Entry>), hdf5_pure::Error> {
     let root = file.root();
     let globals = texts(&root.attrs()?, hidden);
-    let mut found = Vec::new();
-    walk(&root, "", &mut found)?;
+    let (mut found, mut too_large) = (Vec::new(), Vec::new());
+    walk(&root, "", &mut found, &mut too_large)?;
+    if !too_large.is_empty() {
+        let title = crate::i18n::tr(crate::i18n::DatasetKey::VariablesTooLargeForBrowser);
+        let title = crate::i18n::filled(title, &[&too_large.len()]);
+        crate::ui::toast::report(Severity::Warning, &title, too_large.join(", "));
+    }
     let dimids: HashMap<i64, String> = (found.iter())
         .filter(|f| f.is_scale())
         .filter_map(|f| {
@@ -96,11 +102,17 @@ fn leaf(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_owned()
 }
 
-/// The root's datasets, then each group's followed by its subgroups'.
-fn walk(group: &Group, prefix: &str, out: &mut Vec<Found>) -> Result<(), hdf5_pure::Error> {
+/// The root's datasets, then each group's followed by its subgroups'; those whose
+/// lengths do not fit `usize` (the browser's 32 bits) into `too_large`.
+fn walk(
+    group: &Group,
+    prefix: &str,
+    out: &mut Vec<Found>,
+    too_large: &mut Vec<String>,
+) -> Result<(), hdf5_pure::Error> {
     for (name, ds) in group.iter_datasets()? {
         let Some(shape) = shape_of(&ds)? else {
-            log::warn!("[netcdf] '{name}' left out: too large to address here");
+            too_large.push(join(prefix, &name));
             continue;
         };
         let size = ds.datatype()?.type_size();
@@ -113,7 +125,7 @@ fn walk(group: &Group, prefix: &str, out: &mut Vec<Found>) -> Result<(), hdf5_pu
         });
     }
     for (name, sub) in group.iter_groups()? {
-        walk(&sub, &join(prefix, &name), out)?;
+        walk(&sub, &join(prefix, &name), out, too_large)?;
     }
     Ok(())
 }

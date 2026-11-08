@@ -141,6 +141,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "{} matriser i denne MATLAB-filen vises ikke: tekst, cellematriser, tomme og glisne matriser, komplekse tall og objekter støttes ikke"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} variabler i denne filen er for store til å leses i nettleseren: åpne den i Octant-skrivebordsappen for å se dem"
+        }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Opptak",
         DatasetKey::PlateAllAcquisitions => "Alle",

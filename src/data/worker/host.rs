@@ -12,9 +12,13 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
 
+mod page_reads;
+
+pub use page_reads::{file_from_page, read_from_page};
+
 use super::js::{self, Part};
 use super::lifetimes::Lifetimes;
-use super::wire::{BlockHeader, FromWorker, LocalRead, MetadataHeader, ToWorker};
+use super::wire::{BlockHeader, FromWorker, MetadataHeader, ToWorker};
 use crate::data::blocks::memory_budget::MemoryBudget;
 use crate::data::blocks::{BlockLoader, BlockRequest, progress};
 use crate::data::slice_request::SliceRequest;
@@ -24,9 +28,6 @@ use crate::data::{DataSource, SourceFactory, StoreHandle};
 const REPORT_MS: i32 = 100;
 
 type Opened = Result<StoreHandle, String>;
-type ReadAnswer = Result<Vec<u8>, String>;
-/// A page's answer to a `Read`: its first part, bytes or a `File`.
-type PartAnswer = Result<JsValue, String>;
 
 thread_local! {
     static STORES: RefCell<HashMap<DataSource, StoreHandle>> = RefCell::default();
@@ -35,8 +36,6 @@ thread_local! {
         RefCell::default();
     /// When stores are let go.
     static LIFETIMES: RefCell<Lifetimes> = RefCell::default();
-    static READS: RefCell<HashMap<u64, oneshot::Sender<PartAnswer>>> = RefCell::default();
-    static NEXT_READ: Cell<u64> = const { Cell::new(0) };
     /// The progress counts last sent.
     static REPORTED: Cell<[u64; 3]> = const { Cell::new([0; 3]) };
 }
@@ -98,15 +97,7 @@ fn receive(data: &JsValue) {
                 release(uri);
             }
         }
-        ToWorker::ReadDone { id, error } => {
-            let answer = match error {
-                Some(error) => Err(error),
-                None => Ok(parts.get(0)),
-            };
-            if let Some(tx) = READS.with_borrow_mut(|r| r.remove(&id)) {
-                let _ = tx.send(answer);
-            }
-        }
+        ToWorker::ReadDone { id, error } => page_reads::answered(id, error, &parts),
     }
 }
 
@@ -234,34 +225,4 @@ fn report() {
         };
         js::post(&scope(), &message, &[]);
     }
-}
-
-/// Asks the page for `read` of the local file at `url`.
-pub async fn read_from_page(url: &str, read: LocalRead) -> ReadAnswer {
-    let part = ask_page(url, read).await?;
-    let bytes = part.dyn_into::<js_sys::Uint8Array>();
-    bytes
-        .map(|b| b.to_vec())
-        .map_err(|_| "A read without its bytes".to_owned())
-}
-
-/// The local file at `url` itself, for synchronous reads (`netcdf/wasm.rs`).
-pub async fn file_from_page(url: &str) -> Result<web_sys::File, String> {
-    let part = ask_page(url, LocalRead::File).await?;
-    part.dyn_into()
-        .map_err(|_| format!("'{url}' is not one file"))
-}
-
-async fn ask_page(url: &str, read: LocalRead) -> PartAnswer {
-    let id = NEXT_READ.replace(NEXT_READ.get() + 1);
-    let (tx, rx) = oneshot::channel();
-    READS.with_borrow_mut(|r| r.insert(id, tx));
-    let message = FromWorker::Read {
-        id,
-        url: url.to_owned(),
-        read,
-    };
-    js::post(&scope(), &message, &[]);
-    rx.await
-        .unwrap_or_else(|_| Err(format!("No answer reading '{url}'")))
 }

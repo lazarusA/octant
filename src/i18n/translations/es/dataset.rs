@@ -141,6 +141,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "{} arrays de este archivo MATLAB no se muestran: el texto, los arrays de celdas, vacíos y dispersos, los números complejos y los objetos no son compatibles"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} variables de este archivo son demasiado grandes para leerlas en el navegador: ábralo en la aplicación de escritorio de Octant para verlas"
+        }
         DatasetKey::Plate => "Placa",
         DatasetKey::PlateAcquisition => "Adquisición",
         DatasetKey::PlateAllAcquisitions => "Todas",

@@ -38,7 +38,8 @@ pub fn records(header: &Header, len: u64) -> Result<(u64, u64), String> {
 }
 
 /// Every variable as the reader describes it, the record dimension `numrecs` long; an
-/// error for one too large to address here.
+/// error for a dimension longer than `usize` or a variable over `u64` bytes. (A variable
+/// may outgrow the browser's 32-bit memory; only the windows read must fit, `window`.)
 pub fn describe(header: &Header, numrecs: u64) -> Result<Vec<NcVar>, String> {
     let dim = |d: usize| {
         let (name, len) = &header.dims[d];
@@ -47,12 +48,11 @@ pub fn describe(header: &Header, numrecs: u64) -> Result<Vec<NcVar>, String> {
     };
     (header.vars.iter())
         .map(|v| {
-            // Sizes fit `usize`, so the window arithmetic in `runs` cannot overflow.
+            // Byte sizes fit `u64`, so the offsets in `runs` and `window` cannot overflow.
             let dims: Option<Vec<(String, usize)>> = v.dimids.iter().map(|&d| dim(d)).collect();
             let dims = (dims.filter(|dims| {
-                let elem = v.ty.size() as usize; // at most 8
                 (dims.iter())
-                    .try_fold(elem, |a, (_, n)| a.checked_mul(*n))
+                    .try_fold(v.ty.size(), |a, (_, n)| a.checked_mul(*n as u64))
                     .is_some()
             }))
             .ok_or_else(|| format!("'{}' is too large", v.name))?;

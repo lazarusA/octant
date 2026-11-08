@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use hdf5_pure::{FormatError, Source};
 
-const BLOCK: u64 = 256 << 10;
+pub const BLOCK: u64 = 256 << 10;
 /// Blocks kept: 16 MiB.
 const KEPT: usize = 64;
 
@@ -82,6 +82,25 @@ impl<F: Fn(u64, u64) -> Result<Vec<u8>, FormatError>> Source for ReadAhead<F> {
         Ok(())
     }
 }
+
+/// A [`Source`] whose reads may also skip the read-ahead: reads at least a `BLOCK` apart
+/// (a classic file's records) would each fetch a whole block and keep none for long.
+pub trait RangeSource: Source {
+    /// Fills `buf` from `offset`, straight from the file.
+    fn read_direct(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
+        self.read_at(offset, buf)
+    }
+}
+
+impl<F: Fn(u64, u64) -> Result<Vec<u8>, FormatError>> RangeSource for ReadAhead<F> {
+    fn read_direct(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
+        copy_all(&(self.fetch)(offset, buf.len() as u64)?, buf)
+    }
+}
+
+/// A file on disk reads nothing ahead.
+#[cfg(not(target_arch = "wasm32"))]
+impl<R: std::io::Read + std::io::Seek> RangeSource for hdf5_pure::ReadSeekSource<R> {}
 
 fn copy_all(bytes: &[u8], buf: &mut [u8]) -> Result<(), FormatError> {
     if bytes.len() != buf.len() {

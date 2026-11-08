@@ -139,6 +139,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "{} larik dari berkas MATLAB ini tidak ditampilkan: teks, larik sel, larik kosong dan jarang, bilangan kompleks, dan objek tidak didukung"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} variabel dalam berkas ini terlalu besar untuk dibaca di peramban: buka di aplikasi desktop Octant untuk melihatnya"
+        }
         DatasetKey::Plate => "Pelat",
         DatasetKey::PlateAcquisition => "Akuisisi",
         DatasetKey::PlateAllAcquisitions => "Semua",

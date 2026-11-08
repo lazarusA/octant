@@ -184,16 +184,15 @@ pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result
     if status != 200 && status != 206 {
         return Err(format!("HTTP {status} fetching byte range from '{url}'"));
     }
-
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?.to_vec();
-    if status == 200 && (bytes.len() as u64) > length {
-        let start = offset as usize;
-        let slice_end = (offset + length) as usize;
-        if start < bytes.len() {
-            return Ok(bytes[start..slice_end.min(bytes.len())].to_vec());
-        }
+    // A server ignoring `Range` sends the whole object: kept only when that is the range
+    // asked, else refused before its body is read, so a large file is never downloaded
+    // whole for every range asked of it.
+    if status == 200 && (offset != 0 || resp.content_length().is_none_or(|n| n > length)) {
+        return Err(format!(
+            "'{url}': the server does not support range requests"
+        ));
     }
-    Ok(bytes)
+    Ok(resp.bytes().await.map_err(|e| e.to_string())?.to_vec())
 }
 
 #[cfg(test)]
@@ -207,5 +206,32 @@ mod tests {
         assert!(!is_missing("HTTP 500 fetching 'a/0.0'"));
         assert!(!is_missing("Network fetch failed for 'a/0.0'"));
         assert!(!super::is_not_found("HTTP 403 Forbidden fetching 'a/0.0'"));
+    }
+
+    /// A server ignoring `Range` (`python -m http.server`) answers `200` with the whole
+    /// object: a range of it is refused, the whole object asked for is read.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn a_server_ignoring_range_answers_only_the_whole_object() {
+        use std::io::{BufRead, BufReader, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let url = format!("http://{}/f", listener.local_addr().expect("addr"));
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+                let mut line = String::new();
+                while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
+                    line.clear();
+                }
+                let head = "HTTP/1.1 200 OK\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n";
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&[7; 1000]);
+            }
+        });
+        let runtime = crate::utils::executor::get_shared_tokio_rt();
+        let range = runtime.block_on(super::fetch_url_byte_range(&url, 10, 100));
+        assert!(range.is_err_and(|e| e.contains("range requests")));
+        let whole = runtime.block_on(super::fetch_url_byte_range(&url, 0, 1000));
+        assert_eq!(whole.expect("whole object").len(), 1000);
     }
 }

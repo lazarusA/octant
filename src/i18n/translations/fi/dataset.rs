@@ -133,6 +133,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::MatArraysLeftOut => {
             "Tämän MATLAB-tiedoston {} taulukkoa ei näytetä: tekstiä, solutaulukoita, tyhjiä ja harvoja taulukoita, kompleksilukuja ja olioita ei tueta"
         }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} tämän tiedoston muuttujaa on liian suuria luettaviksi selaimessa: avaa tiedosto Octantin työpöytäsovelluksessa nähdäksesi ne"
+        }
         DatasetKey::Plate => "Kuoppalevy",
         DatasetKey::PlateAcquisition => "Kuvauskerta",
         DatasetKey::PlateAllAcquisitions => "Kaikki",

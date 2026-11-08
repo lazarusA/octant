@@ -4,7 +4,7 @@
 
 use super::c_reader::CReader;
 use super::open::{Shared, open_path, open_source};
-use super::pure::read_ahead::ReadAhead;
+use super::pure::read_ahead::{RangeSource, ReadAhead};
 use super::reader::NcReader;
 use crate::data::blocks::BlockStoreError;
 
@@ -104,9 +104,7 @@ impl NetCdfBlockStore {
 /// The remote file at `url`, read by ranged requests on the shared runtime through a
 /// [`ReadAhead`]. Reads come from the background pool's threads, never from the runtime's
 /// own, which `block_on` forbids.
-fn http_source(
-    url: &str,
-) -> Result<impl hdf5_pure::Source + Send + Sync + 'static, BlockStoreError> {
+fn http_source(url: &str) -> Result<impl RangeSource + Send + Sync + 'static, BlockStoreError> {
     let runtime = crate::utils::executor::get_shared_tokio_rt();
     let len = runtime.block_on(crate::data::backends::http::fetch_url_size(url))?;
     let url = url.to_owned();
