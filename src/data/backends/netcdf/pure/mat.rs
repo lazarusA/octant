@@ -72,6 +72,9 @@ fn why_left_out(
     if attrs.contains_key("MATLAB_sparse") {
         return Ok(Some("sparse"));
     }
+    if super::netcdf4::shape_of(ds)?.is_none() {
+        return Ok(Some("too large to address here"));
+    }
     Ok(match class_of(attrs) {
         Some(MatClass::Char) => Some("text"),
         Some(MatClass::Cell) => Some("cell array"),
@@ -86,10 +89,11 @@ fn variable(
     path: String,
     attrs: &HashMap<String, AttrValue>,
 ) -> Result<Entry, hdf5_pure::Error> {
-    let shape = ds.shape()?;
+    // `why_left_out` checked the lengths fit.
+    let shape = super::netcdf4::shape_of(ds)?.unwrap_or_default();
     let rank = shape.len();
-    let dims = (shape.iter().enumerate())
-        .map(|(i, &len)| (format!("dim_{}", rank - i), len as usize))
+    let dims = (shape.into_iter().enumerate())
+        .map(|(i, len)| (format!("dim_{}", rank - i), len))
         .collect();
     let var = NcVar {
         path: path.clone(),

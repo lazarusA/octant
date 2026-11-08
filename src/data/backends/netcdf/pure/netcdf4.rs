@@ -99,11 +99,15 @@ fn leaf(path: &str) -> String {
 /// The root's datasets, then each group's followed by its subgroups'.
 fn walk(group: &Group, prefix: &str, out: &mut Vec<Found>) -> Result<(), hdf5_pure::Error> {
     for (name, ds) in group.iter_datasets()? {
+        let Some(shape) = shape_of(&ds)? else {
+            log::warn!("[netcdf] '{name}' left out: too large to address here");
+            continue;
+        };
         let size = ds.datatype()?.type_size();
         out.push(Found {
             path: join(prefix, name.strip_prefix(NON_COORD).unwrap_or(&name)),
             dataset: join(prefix, &name),
-            shape: ds.shape()?.into_iter().map(|n| n as usize).collect(),
+            shape,
             data_type: type_name(&ds.dtype()?, size),
             attrs: ds.attrs()?,
         });
@@ -112,6 +116,13 @@ fn walk(group: &Group, prefix: &str, out: &mut Vec<Found>) -> Result<(), hdf5_pu
         walk(&sub, &join(prefix, &name), out)?;
     }
     Ok(())
+}
+
+/// `ds`'s shape, `None` when a length does not fit `usize` (32 bits in the browser).
+pub(super) fn shape_of(ds: &hdf5_pure::Dataset) -> Result<Option<Vec<usize>>, hdf5_pure::Error> {
+    Ok((ds.shape()?.into_iter())
+        .map(|n| usize::try_from(n).ok())
+        .collect())
 }
 
 /// Each dimension's name and length: from `_Netcdf4Coordinates`, a scale's own name, or

@@ -47,9 +47,15 @@ pub fn text_dimension(var: &NcVar) -> Option<&str> {
     }
 }
 
-/// The text of a fixed-width C string: up to its first NUL, as padding or junk follows.
-pub fn c_text(row: &[u8]) -> &[u8] {
-    row.split(|&b| b == 0).next().unwrap_or_default()
+/// The labels of an `NC_CHAR (rows, width)` variable's `bytes`: each row's text up to its
+/// first NUL (padding or junk follows), cleaned.
+pub fn char_labels(bytes: &[u8], rows: usize, width: usize) -> Vec<String> {
+    (bytes.chunks(width).take(rows))
+        .map(|row| {
+            let text = row.split(|&b| b == 0).next().unwrap_or_default();
+            clean_label(&String::from_utf8_lossy(text))
+        })
+        .collect()
 }
 
 /// Group paths from `group` up to the root: `a/b`, `a`, then `` (the root).

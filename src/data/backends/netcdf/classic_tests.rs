@@ -133,3 +133,44 @@ fn a_missing_dimension_id_is_an_error() {
     let error = super::open::open_path(nc.path()).err().expect("refused");
     assert!(error.to_string().contains("no dimension 5"), "{error}");
 }
+
+/// One record variable is stored unpadded (records 3 bytes apart here, not 4): read as
+/// netCDF-C reads it.
+#[test]
+fn a_single_record_variable_reads_unpadded() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("one_record_var");
+    {
+        let mut f = netcdf::create_with(&nc.0, Options::empty()).expect("create");
+        f.add_unlimited_dimension("time").expect("time");
+        f.add_dimension("x", 3).expect("x");
+        f.add_variable::<i8>("n", &["time", "x"]).expect("n");
+        f.enddef().expect("end of definitions");
+        let mut n = f.variable_mut("n").expect("n");
+        let values: Vec<i8> = (0..12).collect();
+        n.put_values(&values, (0..4, 0..3)).expect("values");
+    }
+    let store = Parity::open(nc.path()).expect("open");
+    for request in [
+        SliceRequest::full_range("n", &[4, 3]),
+        SliceRequest::new("n", vec![Sel::range(1, 4), Sel::index(2)]),
+    ] {
+        store.fetch_block(&request).expect("n");
+    }
+}
+
+/// A header length past the end of the file is refused at once, not read again and again
+/// at twice the size.
+#[test]
+fn a_header_length_past_the_file_is_an_error() {
+    let mut bytes = b"CDF\x01".to_vec();
+    bytes.extend(
+        [0u32, 0x0A, 1, 0x7FFF_FFFF]
+            .iter()
+            .flat_map(|n| n.to_be_bytes()),
+    );
+    let nc = TempNc::new("bad_name_length");
+    std::fs::write(&nc.0, &bytes).expect("write");
+    let error = super::open::open_path(nc.path()).err().expect("refused");
+    assert!(error.to_string().contains("past the end"), "{error}");
+}

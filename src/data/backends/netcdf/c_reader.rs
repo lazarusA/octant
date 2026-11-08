@@ -9,7 +9,7 @@ use super::attrs::{
     extract_global_attributes, extract_variable_attributes, extract_variable_calibration,
     var_type_to_string,
 };
-use super::coord_read::{c_text, clean_label};
+use super::coord_read::{char_labels, clean_label};
 use super::reader::{NcReader, NcVar, Raw, join};
 use crate::data::blocks::BlockStoreError;
 
@@ -124,10 +124,7 @@ fn read_labels(var: &netcdf::Variable<'_>) -> Option<Vec<String>> {
             .map(|i| var.get_string([i]).ok().map(|s| clean_label(&s)))
             .collect::<Option<_>>()?,
         (NcVariableType::Char, [dim, strlen]) if strlen.len() > 0 => {
-            let bytes = var.get_raw_values(..).ok()?;
-            let rows = bytes.chunks(strlen.len()).take(dim.len());
-            rows.map(|row| clean_label(&String::from_utf8_lossy(c_text(row))))
-                .collect()
+            char_labels(&var.get_raw_values(..).ok()?, dim.len(), strlen.len())
         }
         _ => return None,
     };

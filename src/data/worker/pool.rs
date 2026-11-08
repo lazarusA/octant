@@ -38,9 +38,9 @@ pub enum Outcome {
 #[derive(Default)]
 pub(super) struct Pool {
     pub(super) slots: Vec<Option<Slot>>,
-    pub(super) next_id: u64,
+    next_id: u64,
     next_serial: u64,
-    pub(super) pending: HashMap<u64, oneshot::Sender<Outcome>>,
+    pending: HashMap<u64, oneshot::Sender<Outcome>>,
     /// Notices already shown, once per session.
     shown: HashSet<(String, String)>,
     /// A worker failed to start: the page loads alone from then on.
@@ -59,7 +59,20 @@ thread_local! {
 
 /// Loads `request` in a worker.
 pub async fn load(request: &BlockRequest) -> Outcome {
-    let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(request)) else {
+    let source = request.store.source();
+    run(&source.uri, &request.slice.variable, |id| ToWorker::Load {
+        id,
+        source: source.clone(),
+        slice: request.slice.clone(),
+        language: crate::i18n::language(),
+    })
+    .await
+}
+
+/// Sends the job `make` builds from its id to the worker `uri`'s `variable` loads in, and
+/// waits for its outcome.
+pub(super) async fn run(uri: &str, variable: &str, make: impl FnOnce(u64) -> ToWorker) -> Outcome {
+    let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, make)) else {
         return Outcome::Unavailable;
     };
     answer.await.unwrap_or(Outcome::Unavailable)
@@ -99,17 +112,17 @@ fn pool_size() -> usize {
 }
 
 impl Pool {
-    fn submit(&mut self, request: &BlockRequest) -> Option<oneshot::Receiver<Outcome>> {
-        let index = self.place_of(&request.store.source().uri, &request.slice.variable)?;
+    fn submit(
+        &mut self,
+        uri: &str,
+        variable: &str,
+        make: impl FnOnce(u64) -> ToWorker,
+    ) -> Option<oneshot::Receiver<Outcome>> {
+        let index = self.place_of(uri, variable)?;
         let id = self.next_id;
         let slot = self.slot(index)?;
         slot.jobs.insert(id);
-        slot.send(ToWorker::Load {
-            id,
-            source: request.store.source().clone(),
-            slice: request.slice.clone(),
-            language: crate::i18n::language(),
-        });
+        slot.send(make(id));
         self.next_id += 1;
         let (tx, rx) = oneshot::channel();
         self.pending.insert(id, tx);
@@ -117,7 +130,7 @@ impl Pool {
     }
 
     /// The worker a store's variable loads in, unless the page loads it.
-    pub(super) fn place_of(&mut self, uri: &str, variable: &str) -> Option<usize> {
+    fn place_of(&mut self, uri: &str, variable: &str) -> Option<usize> {
         if self.broken {
             return None;
         }
@@ -137,7 +150,7 @@ impl Pool {
     }
 
     /// The live worker at `index`, started when there is none.
-    pub(super) fn slot(&mut self, index: usize) -> Option<&mut Slot> {
+    fn slot(&mut self, index: usize) -> Option<&mut Slot> {
         let live = matches!(&self.slots[index], Some(slot) if !slot.dead);
         if !live {
             self.next_serial += 1;

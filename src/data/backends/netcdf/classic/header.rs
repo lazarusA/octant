@@ -105,12 +105,16 @@ struct Cursor<'a> {
     bytes: &'a [u8],
     at: usize,
     version: u8,
+    /// The whole file's length: a field running past it is malformed, not cut short.
+    file_len: u64,
 }
 
 impl Cursor<'_> {
     fn take(&mut self, n: u64) -> Result<&[u8], Short> {
         let n = usize::try_from(n).map_err(|_| Short::Bad("Header field too large".into()))?;
-        let end = self.at.checked_add(n).ok_or(Short::More)?;
+        let end = (self.at.checked_add(n))
+            .filter(|&end| end as u64 <= self.file_len)
+            .ok_or_else(|| Short::Bad("Header field runs past the end of the file".into()))?;
         let bytes = self.bytes.get(self.at..end).ok_or(Short::More)?;
         self.at = end;
         Ok(bytes)
@@ -207,8 +211,8 @@ pub fn is_classic(head: &[u8]) -> bool {
     matches!(head, [b'C', b'D', b'F', 1 | 2 | 5, ..])
 }
 
-/// The header at the start of `bytes`.
-pub fn parse(bytes: &[u8]) -> Result<Header, Short> {
+/// The header at the start of `bytes`, read from a file `file_len` bytes long.
+pub fn parse(bytes: &[u8], file_len: u64) -> Result<Header, Short> {
     let version = match bytes {
         [b'C', b'D', b'F', v @ (1 | 2 | 5), ..] => *v,
         [_, _, _, _, ..] => return Err(Short::Bad("Not a classic NetCDF file".into())),
@@ -218,6 +222,7 @@ pub fn parse(bytes: &[u8]) -> Result<Header, Short> {
         bytes,
         at: 4,
         version,
+        file_len,
     };
     let numrecs = c.non_neg()?;
     let streaming = numrecs == u64::from(u32::MAX) || numrecs == u64::MAX;

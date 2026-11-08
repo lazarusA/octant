@@ -38,7 +38,7 @@ impl NetCdfBlockStore {
     /// NetCDF-4/HDF5 one from an `http(s)` URL.
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
         if path.starts_with("https://") || path.starts_with("http://") {
-            let reader = open_source(HttpSource::open(path)?, path)?;
+            let reader = open_source(http_source(path)?, path)?;
             return Ok(Self {
                 file_path: path.to_owned(),
                 pure: Some(reader),
@@ -101,38 +101,17 @@ impl NetCdfBlockStore {
     }
 }
 
-/// A remote file, read by ranged requests on the shared runtime through a [`ReadAhead`].
-/// Reads come from the background pool's threads, never from the runtime's own, which
-/// `block_on` forbids.
-struct HttpSource {
-    url: String,
-    len: u64,
-    ahead: ReadAhead,
-}
-
-impl HttpSource {
-    fn open(url: &str) -> Result<Self, BlockStoreError> {
-        let size = crate::data::backends::http::fetch_url_size(url);
-        let len = crate::utils::executor::get_shared_tokio_rt().block_on(size)?;
-        Ok(Self {
-            url: url.to_owned(),
-            len,
-            ahead: ReadAhead::default(),
-        })
-    }
-}
-
-impl hdf5_pure::Source for HttpSource {
-    fn len(&self) -> u64 {
-        self.len
-    }
-
-    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), hdf5_pure::FormatError> {
-        self.ahead.read(self.len, offset, buf, |offset, length| {
-            let read = crate::data::backends::http::fetch_url_byte_range(&self.url, offset, length);
-            crate::utils::executor::get_shared_tokio_rt()
-                .block_on(read)
-                .map_err(hdf5_pure::FormatError::Source)
-        })
-    }
+/// The remote file at `url`, read by ranged requests on the shared runtime through a
+/// [`ReadAhead`]. Reads come from the background pool's threads, never from the runtime's
+/// own, which `block_on` forbids.
+fn http_source(
+    url: &str,
+) -> Result<impl hdf5_pure::Source + Send + Sync + 'static, BlockStoreError> {
+    let runtime = crate::utils::executor::get_shared_tokio_rt();
+    let len = runtime.block_on(crate::data::backends::http::fetch_url_size(url))?;
+    let url = url.to_owned();
+    Ok(ReadAhead::new(len, move |offset, length| {
+        let read = crate::data::backends::http::fetch_url_byte_range(&url, offset, length);
+        (runtime.block_on(read)).map_err(hdf5_pure::FormatError::Source)
+    }))
 }

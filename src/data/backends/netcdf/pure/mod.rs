@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use hdf5_pure::{ChunkCacheConfig, File, FileAccessProperties, MetadataCacheConfig, Source};
 
-use super::coord_read::{c_text, clean_label};
+use super::coord_read::{char_labels, clean_label};
 use super::reader::{NcReader, NcVar, Raw, failed};
 use crate::data::blocks::BlockStoreError;
 
@@ -134,10 +134,7 @@ impl NcReader for PureReader {
                 .map(|s| clean_label(s))
                 .collect(),
             ("char", [(_, rows), (_, width)]) if *width > 0 => {
-                let bytes = ds.read_raw().ok()?;
-                (bytes.chunks(*width).take(*rows))
-                    .map(|row| clean_label(&String::from_utf8_lossy(c_text(row))))
-                    .collect()
+                char_labels(&ds.read_raw().ok()?, *rows, *width)
             }
             _ => return None,
         };

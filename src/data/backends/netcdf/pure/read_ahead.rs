@@ -1,12 +1,12 @@
-//! Read-ahead for remote files: HDF5 makes many small reads close together (object
-//! headers, heaps, B-tree nodes, small chunks), each a round trip if sent alone. Reads
-//! smaller than a block are served from aligned `BLOCK`-byte blocks, fetched once and kept
-//! (the last `KEPT` of them); larger reads go to the server as they are.
+//! Read-ahead for remote and browser-local files: HDF5 makes many small reads close
+//! together (object headers, heaps, B-tree nodes, small chunks), each a round trip if sent
+//! alone. Reads smaller than a block are served from aligned `BLOCK`-byte blocks, fetched
+//! once and kept (the last `KEPT` of them); larger reads go to the source as they are.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
-use hdf5_pure::FormatError;
+use hdf5_pure::{FormatError, Source};
 
 const BLOCK: u64 = 256 << 10;
 /// Blocks kept: 16 MiB.
@@ -18,29 +18,57 @@ struct Kept {
     order: VecDeque<u64>,
 }
 
-#[derive(Default)]
-pub struct ReadAhead {
+/// A file `len` bytes long, `fetch(offset, length)` reading its bytes.
+pub struct ReadAhead<F> {
+    len: u64,
+    fetch: F,
     kept: Mutex<Kept>,
 }
 
-impl ReadAhead {
-    /// Fills `buf` from `offset` of a file `len` bytes long, `fetch(offset, length)`
-    /// reading the server.
-    pub fn read(
-        &self,
-        len: u64,
-        offset: u64,
-        buf: &mut [u8],
-        fetch: impl Fn(u64, u64) -> Result<Vec<u8>, FormatError>,
-    ) -> Result<(), FormatError> {
+impl<F: Fn(u64, u64) -> Result<Vec<u8>, FormatError>> ReadAhead<F> {
+    pub fn new(len: u64, fetch: F) -> Self {
+        Self {
+            len,
+            fetch,
+            kept: Mutex::default(),
+        }
+    }
+
+    fn block(&self, index: u64) -> Result<Arc<[u8]>, FormatError> {
+        let lock = || self.kept.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(block) = lock().blocks.get(&index) {
+            return Ok(block.clone());
+        }
+        let start = index * BLOCK;
+        let block: Arc<[u8]> =
+            (self.fetch)(start, BLOCK.min(self.len.saturating_sub(start)))?.into();
+        let mut kept = lock();
+        if kept.blocks.insert(index, block.clone()).is_none() {
+            kept.order.push_back(index);
+        }
+        while kept.order.len() > KEPT {
+            if let Some(old) = kept.order.pop_front() {
+                kept.blocks.remove(&old);
+            }
+        }
+        Ok(block)
+    }
+}
+
+impl<F: Fn(u64, u64) -> Result<Vec<u8>, FormatError>> Source for ReadAhead<F> {
+    fn len(&self) -> u64 {
+        self.len
+    }
+
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
         let end = offset.saturating_add(buf.len() as u64);
         if buf.len() as u64 >= BLOCK {
-            return copy_all(&fetch(offset, buf.len() as u64)?, buf);
+            return copy_all(&(self.fetch)(offset, buf.len() as u64)?, buf);
         }
         let mut at = offset;
         while at < end {
             let index = at / BLOCK;
-            let block = self.block(index, len, &fetch)?;
+            let block = self.block(index)?;
             let start = index * BLOCK;
             let from = (at - start) as usize;
             let to = (end.min(start + block.len() as u64) - start) as usize;
@@ -52,30 +80,6 @@ impl ReadAhead {
             at += part.len() as u64;
         }
         Ok(())
-    }
-
-    fn block(
-        &self,
-        index: u64,
-        len: u64,
-        fetch: &impl Fn(u64, u64) -> Result<Vec<u8>, FormatError>,
-    ) -> Result<Arc<[u8]>, FormatError> {
-        let lock = || self.kept.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(block) = lock().blocks.get(&index) {
-            return Ok(block.clone());
-        }
-        let start = index * BLOCK;
-        let block: Arc<[u8]> = fetch(start, BLOCK.min(len.saturating_sub(start)))?.into();
-        let mut kept = lock();
-        if kept.blocks.insert(index, block.clone()).is_none() {
-            kept.order.push_back(index);
-        }
-        while kept.order.len() > KEPT {
-            if let Some(old) = kept.order.pop_front() {
-                kept.blocks.remove(&old);
-            }
-        }
-        Ok(block)
     }
 }
 
@@ -91,6 +95,8 @@ fn copy_all(bytes: &[u8], buf: &mut [u8]) -> Result<(), FormatError> {
 mod tests {
     use std::cell::Cell;
 
+    use hdf5_pure::Source;
+
     use super::{BLOCK, ReadAhead};
 
     #[test]
@@ -102,10 +108,10 @@ mod tests {
             fetches.set(fetches.get() + 1);
             Ok(file[offset as usize..(offset + length) as usize].to_vec())
         };
-        let ahead = ReadAhead::default();
+        let ahead = ReadAhead::new(len, fetch);
         let read = |offset: u64, n: usize| {
             let mut buf = vec![0; n];
-            ahead.read(len, offset, &mut buf, fetch).expect("read");
+            ahead.read_at(offset, &mut buf).expect("read");
             assert_eq!(buf, file[offset as usize..offset as usize + n]);
         };
         read(8, 100);

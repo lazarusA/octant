@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use hdf5_pure::{FormatError, Source};
+use hdf5_pure::FormatError;
 
 use super::open::{Shared, open_source};
 use super::pure::read_ahead::ReadAhead;
@@ -19,7 +19,7 @@ thread_local! {
     /// Held as `dyn NcReader` so that only the worker's `open` names the readers, which
     /// keeps `hdf5-pure` out of the page's `.wasm`.
     static OPEN: RefCell<HashMap<String, Shared>> = RefCell::default();
-    /// Local files the page handed over, by URL, read through [`LocalSource`].
+    /// Local files the page handed over, by URL, read by `read_local`.
     static FILES: RefCell<HashMap<String, web_sys::File>> = RefCell::default();
 }
 
@@ -62,24 +62,16 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
         let file = crate::data::worker::file_from_page(&uri).await?;
         let len = file.size() as u64;
         FILES.with_borrow_mut(|f| f.insert(uri.clone(), file));
+        let local = uri.clone();
         open_source(
-            LocalSource {
-                uri: uri.clone(),
-                len,
-                ahead: ReadAhead::default(),
-            },
+            ReadAhead::new(len, move |o, n| read_local(&local, o, n)),
             &uri,
         )
     } else {
         let len = crate::data::backends::http::fetch_url_size(&uri).await?;
-        open_source(
-            HttpSource {
-                url: uri.clone(),
-                len,
-                ahead: ReadAhead::default(),
-            },
-            &uri,
-        )
+        let url = uri.clone();
+        let source = ReadAhead::new(len, move |o, n| read_http(&url, len, o, n));
+        open_source(source, &uri)
     };
     let reader = opened.map_err(|e| e.to_string())?;
     OPEN.with_borrow_mut(|o| o.insert(uri, reader));
@@ -97,93 +89,51 @@ fn source_error(what: &str, e: impl std::fmt::Debug) -> FormatError {
     FormatError::Source(format!("{what}: {e:?}"))
 }
 
-/// A local file, read by `FileReaderSync` from the `File` in [`FILES`] through a
-/// [`ReadAhead`], as each read crosses into JavaScript.
-struct LocalSource {
-    uri: String,
-    len: u64,
-    ahead: ReadAhead,
+/// `length` bytes at `offset` of the local file at `uri`, read by `FileReaderSync` from the
+/// `File` in [`FILES`].
+fn read_local(uri: &str, offset: u64, length: u64) -> Result<Vec<u8>, FormatError> {
+    let end = offset.saturating_add(length);
+    let slice = FILES.with_borrow(|f| {
+        let file = f.get(uri).ok_or_else(|| source_error(uri, "released"))?;
+        (file.slice_with_f64_and_f64(offset as f64, end as f64)).map_err(|e| source_error(uri, e))
+    })?;
+    let reader = web_sys::FileReaderSync::new().map_err(|e| source_error(uri, e))?;
+    let bytes = (reader.read_as_array_buffer(&slice)).map_err(|e| source_error(uri, e))?;
+    let mut buf = vec![0; length as usize];
+    copy(&js_sys::Uint8Array::new(&bytes), &mut buf, uri)?;
+    Ok(buf)
 }
 
-impl Source for LocalSource {
-    fn len(&self) -> u64 {
-        self.len
+/// `length` bytes at `offset` of the remote file at `url`, `len` bytes long, by a
+/// synchronous ranged request (the server must allow `Range`).
+fn read_http(url: &str, len: u64, offset: u64, length: u64) -> Result<Vec<u8>, FormatError> {
+    let mut buf = vec![0; length as usize];
+    if buf.is_empty() {
+        return Ok(buf);
     }
-
-    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
-        self.ahead.read(self.len, offset, buf, |offset, length| {
-            let mut buf = vec![0; length as usize];
-            self.fetch(offset, &mut buf).map(|()| buf)
-        })
-    }
-}
-
-impl LocalSource {
-    fn fetch(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
-        let end = offset.saturating_add(buf.len() as u64);
-        let slice = FILES.with_borrow(|f| {
-            let file = f
-                .get(&self.uri)
-                .ok_or_else(|| source_error(&self.uri, "released"))?;
-            (file.slice_with_f64_and_f64(offset as f64, end as f64))
-                .map_err(|e| source_error(&self.uri, e))
-        })?;
-        let reader = web_sys::FileReaderSync::new().map_err(|e| source_error(&self.uri, e))?;
-        let bytes =
-            (reader.read_as_array_buffer(&slice)).map_err(|e| source_error(&self.uri, e))?;
-        copy(&js_sys::Uint8Array::new(&bytes), buf, &self.uri)
-    }
-}
-
-/// A remote file, read by synchronous ranged requests (the server must allow `Range`)
-/// through a [`ReadAhead`].
-struct HttpSource {
-    url: String,
-    len: u64,
-    ahead: ReadAhead,
-}
-
-impl Source for HttpSource {
-    fn len(&self) -> u64 {
-        self.len
-    }
-
-    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
-        self.ahead.read(self.len, offset, buf, |offset, length| {
-            self.fetch(offset, length)
-        })
-    }
-}
-
-impl HttpSource {
-    fn fetch(&self, offset: u64, length: u64) -> Result<Vec<u8>, FormatError> {
-        let mut buf = vec![0; length as usize];
-        if buf.is_empty() {
-            return Ok(buf);
+    let last = offset + length - 1;
+    let fail = |e: wasm_bindgen::JsValue| source_error(url, e);
+    let xhr = web_sys::XmlHttpRequest::new().map_err(fail)?;
+    xhr.open_with_async("GET", url, false).map_err(fail)?;
+    xhr.set_request_header("Range", &format!("bytes={offset}-{last}"))
+        .map_err(fail)?;
+    xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
+    // As `http::fetch` gives up: a stalled server would hold this worker for good.
+    xhr.set_timeout(60_000);
+    xhr.send().map_err(fail)?;
+    let bytes = js_sys::Uint8Array::new(&xhr.response().map_err(fail)?);
+    match xhr.status().map_err(fail)? {
+        206 => copy(&bytes, &mut buf, url)?,
+        // The whole file asked for. Otherwise a server ignoring `Range` would send the
+        // whole file for every block read.
+        200 if offset == 0 && length == len => copy(&bytes, &mut buf, url)?,
+        200 => {
+            let why = "the server does not support range requests";
+            return Err(source_error(url, why));
         }
-        let last = offset + length - 1;
-        let fail = |e: wasm_bindgen::JsValue| source_error(&self.url, e);
-        let xhr = web_sys::XmlHttpRequest::new().map_err(fail)?;
-        xhr.open_with_async("GET", &self.url, false).map_err(fail)?;
-        xhr.set_request_header("Range", &format!("bytes={offset}-{last}"))
-            .map_err(fail)?;
-        xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
-        // As `http::fetch` gives up: a stalled server would hold this worker for good.
-        xhr.set_timeout(60_000);
-        xhr.send().map_err(fail)?;
-        let bytes = js_sys::Uint8Array::new(&xhr.response().map_err(fail)?);
-        match xhr.status().map_err(fail)? {
-            206 => copy(&bytes, &mut buf, &self.url)?,
-            // A server ignoring `Range` sends the whole file.
-            200 => copy(
-                &bytes.subarray(offset as u32, (last + 1) as u32),
-                &mut buf,
-                &self.url,
-            )?,
-            status => return Err(source_error(&self.url, format!("HTTP {status}"))),
-        }
-        Ok(buf)
+        status => return Err(source_error(url, format!("HTTP {status}"))),
     }
+    Ok(buf)
 }
 
 fn copy(bytes: &js_sys::Uint8Array, buf: &mut [u8], what: &str) -> Result<(), FormatError> {

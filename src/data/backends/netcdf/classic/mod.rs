@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use hdf5_pure::Source;
 
-use super::coord_read::{c_text, clean_label};
+use super::coord_read::char_labels;
 use super::reader::{NcReader, NcVar, Raw, failed};
 use crate::data::blocks::BlockStoreError;
 use header::{Header, NcType, Short};
@@ -39,7 +39,7 @@ fn read_header(source: &dyn Source, name: &str) -> Result<Header, BlockStoreErro
         source
             .read_at(0, &mut bytes)
             .map_err(|e| failed(&format!("Failed to read '{name}'"), e))?;
-        match header::parse(&bytes) {
+        match header::parse(&bytes, source.len()) {
             Ok(header) => return Ok(header),
             Err(Short::More) if size < source.len().min(MAX_HEADER) => size *= 2,
             Err(Short::More) => return Err(format!("'{name}' has no readable header").into()),
@@ -157,9 +157,7 @@ impl NcReader for ClassicReader {
         let bytes = self
             .window(self.index_of(var).ok()?, &[0, 0], &[*rows, *width])
             .ok()?;
-        let labels: Vec<String> = (bytes.chunks(*width))
-            .map(|row| clean_label(&String::from_utf8_lossy(c_text(row))))
-            .collect();
+        let labels = char_labels(&bytes, *rows, *width);
         (!labels.is_empty()).then_some(labels)
     }
 }
