@@ -136,8 +136,12 @@ impl Pool {
         let places = self.places();
         let mut hasher = std::hash::DefaultHasher::new();
         (uri, variable).hash(&mut hasher);
-        let index = (hasher.finish() % places as u64) as usize;
-        (!self.page_only.contains(&index)).then_some(index)
+        let start = (hasher.finish() % places as u64) as usize;
+        // A place whose worker never started passes its loads to the next: the page reads
+        // no NetCDF, and a variable still always loads in the same worker.
+        (0..places)
+            .map(|i| (start + i) % places)
+            .find(|i| !self.page_only.contains(i))
     }
 
     /// How many workers run here, deciding it on first use.

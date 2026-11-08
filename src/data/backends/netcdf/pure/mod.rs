@@ -164,3 +164,23 @@ pub(super) fn type_name(dtype: &hdf5_pure::DType, size: u32) -> &'static str {
         _ => "opaque",
     }
 }
+
+/// `ds`'s shape, `None` when a length does not fit `usize` (32 bits in the browser).
+pub(super) fn shape_of(ds: &hdf5_pure::Dataset) -> Result<Option<Vec<usize>>, hdf5_pure::Error> {
+    Ok((ds.shape()?.into_iter())
+        .map(|n| usize::try_from(n).ok())
+        .collect())
+}
+
+/// One warning naming the arrays left out for the reason `title` gives (with their count).
+pub(super) fn report_left_out(title: crate::i18n::DatasetKey, paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    let title = crate::i18n::filled(crate::i18n::tr(title), &[&paths.len()]);
+    crate::ui::toast::report(
+        crate::ui::toast::Severity::Warning,
+        &title,
+        paths.join(", "),
+    );
+}

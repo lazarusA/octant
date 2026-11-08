@@ -175,8 +175,9 @@ fn a_header_length_past_the_file_is_an_error() {
     assert!(error.to_string().contains("past the end"), "{error}");
 }
 
-/// Records at least a read-ahead block apart are read value by value, not a block each:
-/// the time coordinate of a file with large records costs bytes, not blocks.
+/// Runs at least a read-ahead block apart are read value by value, not a block each: the
+/// time coordinate of a file with large records, and a point over a fixed dimension, cost
+/// bytes, not blocks.
 #[test]
 fn records_far_apart_read_only_their_bytes() {
     use std::sync::Arc;
@@ -190,9 +191,14 @@ fn records_far_apart_read_only_their_bytes() {
         let mut f = netcdf::create_with(&nc.0, Options::empty()).expect("create");
         f.add_unlimited_dimension("time").expect("time");
         f.add_dimension("x", 70_000).expect("x");
+        f.add_dimension("step", 4).expect("step");
         f.add_variable::<f64>("time", &["time"]).expect("time");
         f.add_variable::<f32>("v", &["time", "x"]).expect("v");
+        f.add_variable::<f32>("w", &["step", "x"]).expect("w");
         f.enddef().expect("end of definitions");
+        let w: Vec<f32> = (0..4 * 70_000).map(|i| i as f32).collect();
+        let mut fixed = f.variable_mut("w").expect("w");
+        fixed.put_values(&w, (0..4, 0..70_000)).expect("w values");
         let mut time = f.variable_mut("time").expect("time");
         time.put_values(&[0.0f64, 1.0, 2.0, 3.0], 0..4)
             .expect("times");
@@ -216,6 +222,17 @@ fn records_far_apart_read_only_their_bytes() {
         fetched.load(Ordering::SeqCst) - before,
         4 * 8,
         "8 bytes per record"
+    );
+    let w = reader.variable("w").expect("w");
+    let before = fetched.load(Ordering::SeqCst);
+    let Ok(super::reader::Raw::F32(values)) = reader.read(&w, &[0, 5], &[4, 1]) else {
+        panic!("w read as f32");
+    };
+    assert_eq!(values, [5.0, 70_005.0, 140_005.0, 210_005.0]);
+    assert_eq!(
+        fetched.load(Ordering::SeqCst) - before,
+        4 * 4,
+        "4 bytes per step"
     );
 }
 

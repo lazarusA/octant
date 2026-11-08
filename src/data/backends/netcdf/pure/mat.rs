@@ -1,7 +1,8 @@
 //! MATLAB v7.3 conventions over HDF5: numeric and `logical` datasets are variables
 //! (`MATLAB_class`), struct groups are groups; `#refs#` and `#subsystem#` hold the internals
 //! of cells and objects and are hidden. Text, cells, empty and sparse arrays, complex numbers
-//! and objects are left out, named in one warning. MATLAB stores arrays column-major, so HDF5 holds the
+//! and objects are left out, named in one warning, as are arrays too large for the
+//! browser's 32 bits in another. MATLAB stores arrays column-major, so HDF5 holds the
 //! shape reversed: values keep HDF5's order and the dimensions are named for MATLAB's
 //! (`dim_1` is the last stored one).
 
@@ -11,44 +12,48 @@ use hdf5_pure::mat::MatClass;
 use hdf5_pure::{AttrValue, DType, Dataset, File, Group};
 
 use super::attrs::{calibration, text, texts};
-use super::{Entry, type_name};
+use super::{Entry, report_left_out, shape_of, type_name};
 use crate::data::backends::netcdf::reader::{NcVar, join};
-use crate::ui::toast::Severity;
+use crate::i18n::DatasetKey;
 
 /// Every numeric variable of `file`; MATLAB files have no global attributes.
 pub(super) fn catalog(
     file: &File,
 ) -> Result<(HashMap<String, String>, Vec<Entry>), hdf5_pure::Error> {
-    let (mut entries, mut left_out) = (Vec::new(), Vec::new());
-    walk(&file.root(), "", &mut entries, &mut left_out)?;
-    if !left_out.is_empty() {
-        let title = crate::i18n::tr(crate::i18n::DatasetKey::MatArraysLeftOut);
-        let title = crate::i18n::filled(title, &[&left_out.len()]);
-        crate::ui::toast::report(Severity::Warning, &title, left_out.join(", "));
-    }
-    Ok((HashMap::new(), entries))
+    let mut found = Found::default();
+    walk(&file.root(), "", &mut found)?;
+    report_left_out(DatasetKey::MatArraysLeftOut, &found.unsupported);
+    report_left_out(DatasetKey::VariablesTooLargeForBrowser, &found.too_large);
+    Ok((HashMap::new(), found.entries))
 }
 
 fn class_of(attrs: &HashMap<String, AttrValue>) -> Option<MatClass> {
     MatClass::parse(&text(attrs.get("MATLAB_class")?)?).ok()
 }
 
-/// Collects `group`'s variables into `entries`, and what it leaves out into `left_out`.
-fn walk(
-    group: &Group,
-    prefix: &str,
-    entries: &mut Vec<Entry>,
-    left_out: &mut Vec<String>,
-) -> Result<(), hdf5_pure::Error> {
+/// The variables found, and the paths of the arrays left out.
+#[derive(Default)]
+struct Found {
+    entries: Vec<Entry>,
+    /// Arrays of a kind Octant does not show.
+    unsupported: Vec<String>,
+    /// Arrays whose lengths do not fit `usize` (the browser's 32 bits).
+    too_large: Vec<String>,
+}
+
+/// Collects `group`'s variables, and what it leaves out, into `found`.
+fn walk(group: &Group, prefix: &str, found: &mut Found) -> Result<(), hdf5_pure::Error> {
     for (name, ds) in group.iter_datasets()? {
         let path = join(prefix, &name);
         let attrs = ds.attrs()?;
-        match why_left_out(&ds, &attrs)? {
-            Some(why) => {
-                log::info!("[mat] '{path}' left out: {why}");
-                left_out.push(path);
-            }
-            None => entries.push(variable(&ds, path, &attrs)?),
+        if let Some(why) = why_left_out(&ds, &attrs)? {
+            log::info!("[mat] '{path}' left out: {why}");
+            found.unsupported.push(path);
+            continue;
+        }
+        match shape_of(&ds)? {
+            Some(shape) => found.entries.push(variable(&ds, path, shape, &attrs)?),
+            None => found.too_large.push(path),
         }
     }
     for (name, sub) in group.iter_groups()? {
@@ -56,7 +61,7 @@ fn walk(
         if name.starts_with('#') || !struct_group {
             continue;
         }
-        walk(&sub, &join(prefix, &name), entries, left_out)?;
+        walk(&sub, &join(prefix, &name), found)?;
     }
     Ok(())
 }
@@ -72,9 +77,6 @@ fn why_left_out(
     if attrs.contains_key("MATLAB_sparse") {
         return Ok(Some("sparse"));
     }
-    if super::netcdf4::shape_of(ds)?.is_none() {
-        return Ok(Some("too large to address here"));
-    }
     Ok(match class_of(attrs) {
         Some(MatClass::Char) => Some("text"),
         Some(MatClass::Cell) => Some("cell array"),
@@ -87,10 +89,9 @@ fn why_left_out(
 fn variable(
     ds: &Dataset,
     path: String,
+    shape: Vec<usize>,
     attrs: &HashMap<String, AttrValue>,
 ) -> Result<Entry, hdf5_pure::Error> {
-    // `why_left_out` checked the lengths fit.
-    let shape = super::netcdf4::shape_of(ds)?.unwrap_or_default();
     let rank = shape.len();
     let dims = (shape.into_iter().enumerate())
         .map(|(i, len)| (format!("dim_{}", rank - i), len))

@@ -10,10 +10,10 @@ use std::collections::HashMap;
 use hdf5_pure::{AttrValue, File, Group};
 
 use super::attrs::{calibration, ints, text, texts};
-use super::{Entry, type_name};
+use super::{Entry, report_left_out, shape_of, type_name};
 use crate::data::backends::netcdf::coord_read::{group_ancestors, group_of};
 use crate::data::backends::netcdf::reader::{NcVar, join};
-use crate::ui::toast::Severity;
+use crate::i18n::DatasetKey;
 
 const PHONY: &str = "This is a netCDF dimension but not a netCDF variable";
 /// netCDF-4's dataset name for a variable named like a dimension it does not hold.
@@ -63,11 +63,7 @@ pub(super) fn catalog(
     let globals = texts(&root.attrs()?, hidden);
     let (mut found, mut too_large) = (Vec::new(), Vec::new());
     walk(&root, "", &mut found, &mut too_large)?;
-    if !too_large.is_empty() {
-        let title = crate::i18n::tr(crate::i18n::DatasetKey::VariablesTooLargeForBrowser);
-        let title = crate::i18n::filled(title, &[&too_large.len()]);
-        crate::ui::toast::report(Severity::Warning, &title, too_large.join(", "));
-    }
+    report_left_out(DatasetKey::VariablesTooLargeForBrowser, &too_large);
     let dimids: HashMap<i64, String> = (found.iter())
         .filter(|f| f.is_scale())
         .filter_map(|f| {
@@ -128,13 +124,6 @@ fn walk(
         walk(&sub, &join(prefix, &name), out, too_large)?;
     }
     Ok(())
-}
-
-/// `ds`'s shape, `None` when a length does not fit `usize` (32 bits in the browser).
-pub(super) fn shape_of(ds: &hdf5_pure::Dataset) -> Result<Option<Vec<usize>>, hdf5_pure::Error> {
-    Ok((ds.shape()?.into_iter())
-        .map(|n| usize::try_from(n).ok())
-        .collect())
 }
 
 /// Each dimension's name and length: from `_Netcdf4Coordinates`, a scale's own name, or

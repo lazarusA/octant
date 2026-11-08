@@ -99,14 +99,16 @@ impl ClassicReader {
         // A run lies within the window, whose bytes fit `usize`.
         let run_bytes = (run * size) as usize;
         let mut out = vec![0; bytes];
+        // Runs a block or more apart (records, or a point read along a fixed dimension)
+        // share no block: each reads only its own bytes.
+        let far = k > 0 && step(k - 1) >= BLOCK;
         let mut at = start[..k].to_vec();
         for buf in out.chunks_exact_mut(run_bytes) {
             let outer = (at.iter().enumerate())
                 .map(|(d, &i)| (i as u64).saturating_mul(step(d)))
                 .fold(var.begin, u64::saturating_add);
             let offset = outer.saturating_add(inner.saturating_mul(size));
-            // Records a block or more apart share no block: each read fetches its own bytes.
-            let read = match record && self.recsize >= BLOCK {
+            let read = match far {
                 true => self.source.read_direct(offset, buf),
                 false => self.source.read_at(offset, buf),
             };
