@@ -125,6 +125,15 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "У цій папці немає метаданих Zarr, які браузер може прочитати. Виберіть папку самого сховища (ту, де лежить zarr.json або .zgroup), а не папку вище. Safari приховує файли, назви яких починаються з крапки, тому папки Zarr v2 (.zgroup, .zarray) відкриваються лише в Chrome, Firefox або настільному застосунку Octant. Папки Zarr v3 відкриваються в будь-якому браузері."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "Файли NetCDF і HDF5 читають робочі потоки даних, які не запустилися в цьому браузері. Перезавантажте сторінку або відкрийте файл у настільному застосунку Octant."
+        }
+        DatasetKey::MatArraysLeftOut => {
+            "Масиви цього файлу MATLAB не показано ({}): текст, масиви комірок, порожні й розріджені масиви, комплексні числа та об'єкти не підтримуються"
+        }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} змінних цього файлу завеликі для читання в браузері: відкрийте його в настільному застосунку Octant, щоб побачити їх"
+        }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Знімання",
         DatasetKey::PlateAllAcquisitions => "Усі",

@@ -5,32 +5,33 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::coord_read::{
-    group_ancestors, group_of, read_labels, read_number_coordinate, text_dimension,
-};
+use super::coord_read::{group_ancestors, group_of, read_number_coordinate, text_dimension};
+use super::reader::{NcReader, NcVar};
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name, is_spatial_z_name};
 use crate::data::metadata::{CoordValues, VariableInfo};
 
 /// Coordinates found in one group, keyed by name and lowercase name.
 type GroupCoords = HashMap<String, CoordValues>;
 
-/// Every dimension coordinate of `file`. Root coordinates are keyed by name; each variable
-/// also gets `{variable}/{dimension}` keys for the coordinates its group chain provides,
-/// and grouped coordinates fill unscoped keys still free, in group path order.
+/// Every dimension coordinate among `nc_vars`, the reader's variables. Root coordinates are
+/// keyed by name; each variable also gets `{variable}/{dimension}` keys for the coordinates
+/// its group chain provides, and grouped coordinates fill unscoped keys still free, in group
+/// path order.
 pub fn extract_dimension_coordinates(
-    file: &netcdf::File,
+    reader: &dyn NcReader,
+    nc_vars: &[NcVar],
     variables: &[VariableInfo],
 ) -> HashMap<String, CoordValues> {
     let aux = auxiliary_names(variables);
     // Sorted by path, so unscoped keys shared by several groups resolve the same way every run.
-    let mut groups: BTreeMap<String, GroupCoords> = BTreeMap::new();
-    groups.insert(String::new(), scan_variables(file.variables(), &aux));
-    if let Ok(subgroups) = file.groups() {
-        for group in subgroups {
-            let name = group.name();
-            scan_group(&group, &name, &aux, &mut groups);
-        }
+    let mut by_group: BTreeMap<&str, Vec<&NcVar>> = BTreeMap::new();
+    by_group.entry("").or_default();
+    for var in nc_vars {
+        by_group.entry(group_of(&var.path)).or_default().push(var);
     }
+    let groups: BTreeMap<String, GroupCoords> = (by_group.into_iter())
+        .map(|(path, vars)| (path.to_owned(), scan_variables(reader, &vars, &aux)))
+        .collect();
 
     let mut coords = groups.get("").cloned().unwrap_or_default();
     for var in variables {
@@ -51,46 +52,29 @@ pub fn extract_dimension_coordinates(
     coords
 }
 
-fn scan_group(
-    group: &netcdf::Group<'_>,
-    path: &str,
-    aux: &HashSet<String>,
-    groups: &mut BTreeMap<String, GroupCoords>,
-) {
-    groups.insert(path.to_string(), scan_variables(group.variables(), aux));
-    for sub in group.groups() {
-        let sub_path = format!("{path}/{}", sub.name());
-        scan_group(&sub, &sub_path, aux, groups);
-    }
-}
-
 /// The coordinates among one group's variables. Labels replace a numeric coordinate only
 /// when it is a plain `0..n-1` index, as xarray writes for dimensions it has no values for.
-fn scan_variables<'f>(
-    vars: impl Iterator<Item = netcdf::Variable<'f>>,
-    aux: &HashSet<String>,
-) -> GroupCoords {
+fn scan_variables(reader: &dyn NcReader, vars: &[&NcVar], aux: &HashSet<String>) -> GroupCoords {
     let mut coords = GroupCoords::new();
     let mut labels = Vec::new();
     for var in vars {
         let name = var.name();
         // Only text variables that label a dimension are read.
-        if let Some(dim) = text_dimension(&var) {
+        if let Some(dim) = text_dimension(var) {
             let own = name == dim;
-            if (own || aux.contains(&name))
-                && let Some(values) = read_labels(&var)
+            if (own || aux.contains(name))
+                && let Some(values) = reader.labels(var)
             {
-                labels.push((own, dim, values));
+                labels.push((own, dim.to_owned(), values));
             }
             continue;
         }
-        let dims = var.dimensions();
-        if let [dim] = dims
-            && dim.len() > 0
-            && is_coordinate_name(&name, &dim.name())
-            && let Some(values) = read_number_coordinate(&var)
+        if let [(dim, len)] = var.dims.as_slice()
+            && *len > 0
+            && is_coordinate_name(name, dim)
+            && let Some(values) = read_number_coordinate(reader, var)
         {
-            insert(&mut coords, &name, values);
+            insert(&mut coords, name, values);
         }
     }
     // A variable named after its dimension labels it before auxiliary ones.

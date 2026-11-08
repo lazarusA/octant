@@ -4,13 +4,17 @@ use std::collections::HashMap;
 
 use super::{coord_values::CoordValues, tree::VariableTreeGroup, variable::VariableInfo};
 
-#[derive(Debug, Clone, Default)]
+/// Serialized for the data workers' inspections (`data::worker::wire_meta`), which send
+/// the coordinates apart.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DatasetMetadata {
     pub name: String,
     pub store_type: String,
     pub variables: Vec<VariableInfo>,
+    #[serde(skip)]
     pub dimension_coordinates: HashMap<String, CoordValues>,
     /// What an OME-Zarr store holds beyond its variables (plates, series names).
+    #[serde(skip)]
     pub ome: Option<std::sync::Arc<crate::data::ome::OmeDataset>>,
 }
 

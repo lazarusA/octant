@@ -39,8 +39,11 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
         }
     }
 
-    // 2. Fallback spatial assignment for unassigned non-channel dimensions
-    for i in 0..rank {
+    // 2. Fallback spatial assignment for unassigned non-channel dimensions. MATLAB arrays
+    // are stored transposed (`netcdf/pure/mat.rs`): their rows, stored last, go on Y.
+    let matlab = var_info.attributes.contains_key("MATLAB_class");
+    for step in 0..rank {
+        let i = if matlab { rank - 1 - step } else { step };
         let dim_name = var_info
             .dimension_names
             .get(i)

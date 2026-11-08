@@ -69,6 +69,9 @@ candle-core = "0.11"
 candle-nn = "0.11"
 candle-transformers = "0.11"
 sha2 = "0.11"
+# NetCDF-4/HDF5 in the browser's data workers and MATLAB v7.3 `.mat` on both
+# (`data/backends/netcdf/pure/`); the desktop reads `.nc`/`.h5` through netCDF-C.
+hdf5-pure = "=0.48.0-rc.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -110,7 +113,7 @@ console_error_panic_hook = "0.1"
 console_log = "1.1"
 uuid = { version = "1", features = ["v4", "js"] }
 zarrs = { version = "0.23", default-features = false, features = ["ndarray", "crc32c", "gzip", "zlib", "sharding", "transpose", "async", "bitround", "pcodec"] }
-web-sys = { version = "0.3", features = ["Window", "Location", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader", "EventTarget", "File", "FileList", "HtmlInputElement", "DragEvent", "DataTransfer", "DataTransferItemList", "DataTransferItem"] }
+web-sys = { version = "0.3", features = ["Window", "Location", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader", "EventTarget", "File", "FileList", "HtmlInputElement", "DragEvent", "DataTransfer", "DataTransferItemList", "DataTransferItem", "XmlHttpRequest", "XmlHttpRequestResponseType", "FileReaderSync"] }
 js-sys = "0.3"
 sys-locale = { version = "0.3", features = ["js"] }
 blusc = "0.0.6"

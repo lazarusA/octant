@@ -133,6 +133,15 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "このフォルダーには、ブラウザーが読み込める Zarr メタデータがありません。その上のフォルダーではなく、データ自体のフォルダー (zarr.json または .zgroup があるフォルダー) を選んでください。Safari は名前がドットで始まるファイルを隠すため、Zarr v2 のフォルダー (.zgroup, .zarray) は Chrome、Firefox、または Octant のデスクトップ版でのみ開けます。Zarr v3 のフォルダーはどのブラウザーでも開けます。"
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF と HDF5 のファイルはデータワーカーが読み込みますが、このブラウザーではワーカーが起動しませんでした。ページを再読み込みするか、Octant のデスクトップアプリでファイルを開いてください。"
+        }
+        DatasetKey::MatArraysLeftOut => {
+            "この MATLAB ファイルの {} 個の配列は表示されません: テキスト、セル配列、空配列、スパース配列、複素数、オブジェクトには対応していません"
+        }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "このファイルの {} 個の変数はブラウザーで読むには大きすぎます: 表示するには Octant デスクトップアプリで開いてください"
+        }
         DatasetKey::Plate => "プレート",
         DatasetKey::PlateAcquisition => "撮像",
         DatasetKey::PlateAllAcquisitions => "すべて",

@@ -10,24 +10,26 @@
 //! while others did leaves its loads to the page. Messages from an earlier
 //! start of a worker are ignored.
 
+mod messages;
+
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
 use futures::channel::oneshot;
-use js_sys::Array;
 
-use super::js;
-use super::slot::{Slot, answer_read};
-use super::wire::{FromWorker, ToWorker};
+use super::slot::Slot;
+use super::wire::ToWorker;
 use crate::data::blocks::BlockRequest;
-use crate::data::blocks::memory_budget::DOWNLOAD_BUDGET;
+use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 
 /// How a load handed to the pool ended.
 pub enum Outcome {
     Block(OctantBlock),
     Failed(String),
+    /// An inspection (`inspect`).
+    Inspected(Box<DatasetMetadata>),
     /// No worker runs it: the page loads it itself.
     Unavailable,
 }
@@ -56,10 +58,35 @@ thread_local! {
 
 /// Loads `request` in a worker.
 pub async fn load(request: &BlockRequest) -> Outcome {
-    let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(request)) else {
-        return Outcome::Unavailable;
-    };
-    answer.await.unwrap_or(Outcome::Unavailable)
+    let source = request.store.source();
+    run(&source.uri, &request.slice.variable, |id| ToWorker::Load {
+        id,
+        source: source.clone(),
+        slice: request.slice.clone(),
+        language: crate::i18n::language(),
+    })
+    .await
+}
+
+/// Sends the job `make` builds from its id to the worker `uri`'s `variable` loads in, and
+/// waits for its outcome. A job whose worker never started (or could not be made) while
+/// others did is sent once
+/// more, to the next place (`place_of`): the page reads no NetCDF.
+pub(super) async fn run(uri: &str, variable: &str, make: impl Fn(u64) -> ToWorker) -> Outcome {
+    for _ in 0..2 {
+        // `None`: this place's worker could not be made; the next try goes to the next one.
+        let answer = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, &make));
+        if let Some(answer) = answer
+            && let Ok(outcome) = answer.await
+            && !matches!(outcome, Outcome::Unavailable)
+        {
+            return outcome;
+        }
+        if POOL.with_borrow(|pool| pool.broken) {
+            break;
+        }
+    }
+    Outcome::Unavailable
 }
 
 /// Has every worker drop the stores of `uri`.
@@ -96,30 +123,37 @@ fn pool_size() -> usize {
 }
 
 impl Pool {
-    fn submit(&mut self, request: &BlockRequest) -> Option<oneshot::Receiver<Outcome>> {
+    fn submit(
+        &mut self,
+        uri: &str,
+        variable: &str,
+        make: impl Fn(u64) -> ToWorker,
+    ) -> Option<oneshot::Receiver<Outcome>> {
+        let index = self.place_of(uri, variable)?;
+        let id = self.next_id;
+        let slot = self.slot(index)?;
+        slot.jobs.insert(id);
+        slot.send(make(id));
+        self.next_id += 1;
+        let (tx, rx) = oneshot::channel();
+        self.pending.insert(id, tx);
+        Some(rx)
+    }
+
+    /// The worker a store's variable loads in, unless the page loads it.
+    fn place_of(&mut self, uri: &str, variable: &str) -> Option<usize> {
         if self.broken {
             return None;
         }
         let places = self.places();
         let mut hasher = std::hash::DefaultHasher::new();
-        (&request.store.source().uri, &request.slice.variable).hash(&mut hasher);
-        let index = (hasher.finish() % places as u64) as usize;
-        if self.page_only.contains(&index) {
-            return None;
-        }
-        let id = self.next_id;
-        let slot = self.slot(index)?;
-        slot.jobs.insert(id);
-        slot.send(ToWorker::Load {
-            id,
-            source: request.store.source().clone(),
-            slice: request.slice.clone(),
-            language: crate::i18n::language(),
-        });
-        self.next_id += 1;
-        let (tx, rx) = oneshot::channel();
-        self.pending.insert(id, tx);
-        Some(rx)
+        (uri, variable).hash(&mut hasher);
+        let start = (hasher.finish() % places as u64) as usize;
+        // A place whose worker never started passes its loads to the next: the page reads
+        // no NetCDF, and a variable still always loads in the same worker.
+        (0..places)
+            .map(|i| (start + i) % places)
+            .find(|i| !self.page_only.contains(i))
     }
 
     /// How many workers run here, deciding it on first use.
@@ -149,74 +183,6 @@ impl Pool {
             }
         }
         self.slots[index].as_mut()
-    }
-
-    /// Takes `message` from the worker at `index`, unless it comes from an
-    /// earlier start (`serial`) of it.
-    pub(super) fn receive(
-        &mut self,
-        index: usize,
-        serial: u64,
-        message: FromWorker,
-        parts: &Array,
-    ) {
-        let current = matches!(&self.slots[index], Some(s) if s.serial == serial && !s.dead);
-        if !current {
-            return;
-        }
-        match message {
-            FromWorker::Hello => self.hello(index),
-            FromWorker::Block { id, header } => {
-                let block = match (js::f32s(parts, 0), js::f64s(parts, 1)) {
-                    (Some(values), Some(numbers)) => header.join(values, &numbers),
-                    _ => Err("A block arrived without its numbers".to_owned()),
-                };
-                let outcome = block.map_or_else(Outcome::Failed, Outcome::Block);
-                self.finish(index, id, outcome);
-            }
-            FromWorker::Failed { id, error } => self.finish(index, id, Outcome::Failed(error)),
-            FromWorker::Progress { counts } => crate::data::blocks::progress::add(counts),
-            FromWorker::Notice {
-                severity,
-                title,
-                detail,
-            } => {
-                if self.shown.insert((title.clone(), detail.clone())) {
-                    crate::ui::toast::report(severity, &title, detail);
-                }
-            }
-            FromWorker::Read { id, url, read } => {
-                if let Some(slot) = self.slots[index].as_ref() {
-                    let worker = slot.worker.clone();
-                    wasm_bindgen_futures::spawn_local(answer_read(worker, id, url, read));
-                }
-            }
-        }
-    }
-
-    fn hello(&mut self, index: usize) {
-        self.any_ready = true;
-        // Half the budget each: one variable's chunks stay on one worker, and
-        // several workers fill theirs only when several variables load.
-        let share = DOWNLOAD_BUDGET / 2;
-        let Some(slot) = self.slots[index].as_mut() else {
-            return;
-        };
-        slot.ready = true;
-        super::slot::clear_timer(slot.timer);
-        js::post(&slot.worker, &ToWorker::Budget { bytes: share }, &[]);
-        for message in std::mem::take(&mut slot.early) {
-            js::post(&slot.worker, &message, &[]);
-        }
-    }
-
-    fn finish(&mut self, index: usize, id: u64, outcome: Outcome) {
-        if let Some(slot) = self.slots[index].as_mut() {
-            slot.jobs.remove(&id);
-        }
-        if let Some(tx) = self.pending.remove(&id) {
-            let _ = tx.send(outcome);
-        }
     }
 
     /// The worker at `index` (start `serial`) stopped: the loads it ran fail,

@@ -71,9 +71,12 @@ pub async fn size(url: &str) -> Result<u64, String> {
 /// main branch reference, else Zarr.
 pub(super) async fn kind_in(source: &Source, name: &str) -> Option<DataSourceKind> {
     if let Source::File(_) = source {
-        let geotiff =
-            crate::utils::infer_store_kind_from_target(name).is_ok_and(|kind| kind.is_geotiff());
-        return geotiff.then_some(DataSourceKind::RemoteGeoTiff);
+        use crate::app::StoreKind;
+        return match crate::utils::infer_store_kind_from_target(name) {
+            Ok(kind) if kind.is_geotiff() => Some(DataSourceKind::RemoteGeoTiff),
+            Ok(StoreKind::LocalNetCdf) => Some(DataSourceKind::NetCdf),
+            _ => None,
+        };
     }
     let marks = ["repo", "refs/branch.main/ref.json"];
     for key in marks {

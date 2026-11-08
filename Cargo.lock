@@ -3579,6 +3579,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "hdf5-pure"
+version = "0.48.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21657a65571cd0fabe526838be93035861ec3586a2f3cda43c031fd0d859c7f7"
+dependencies = [
+ "hdf5-pure-core",
+ "hdf5-pure-filter",
+ "hdf5-pure-format",
+ "hdf5-pure-space",
+]
+
+[[package]]
+name = "hdf5-pure-core"
+version = "0.48.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e04935227e81a22740e120eecfcbc6064d1c9a7ccadec37f7c2b599a6b9ab3ab"
+
+[[package]]
+name = "hdf5-pure-filter"
+version = "0.48.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b62de8c8346e30967dce8a059c33d77f5c0f7f786b1317e0e4dc51cd96f39d1"
+dependencies = [
+ "flate2",
+ "hdf5-pure-core",
+]
+
+[[package]]
+name = "hdf5-pure-format"
+version = "0.48.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51072a16b3ccbbd6fe3cfaca27b479251c66f945b0005188572b8e24844a9945"
+dependencies = [
+ "byteorder",
+ "hdf5-pure-core",
+]
+
+[[package]]
+name = "hdf5-pure-space"
+version = "0.48.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a37c01b25221f6173148dc78aec9f624185779478f7a4a0bb84e5a57bdc49ee"
+dependencies = [
+ "hdf5-pure-core",
+]
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5475,6 +5522,7 @@ dependencies = [
  "getrandom 0.4.3",
  "glam",
  "half",
+ "hdf5-pure",
  "icechunk",
  "icechunk-format",
  "icechunk-types",

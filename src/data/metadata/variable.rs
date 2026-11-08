@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use crate::data::ome::OmeLabelInfo;
 
-#[derive(Debug, Clone, Default)]
+/// Serialized for the data workers' inspections (`data::worker::wire_meta`), without what
+/// only Zarr and OME-Zarr inspections fill in.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct VariableInfo {
     pub name: String,
     pub data_type: String,
@@ -24,13 +26,17 @@ pub struct VariableInfo {
     pub temporal_resolution: Option<String>,
     pub attributes: HashMap<String, String>,
     /// The OME-Zarr image and level this variable is, for OME-Zarr stores.
+    #[serde(skip)]
     pub ome: Option<crate::data::ome::OmeRef>,
     /// The multiscale stack and level this variable is, when its format
     /// groups it with other resolutions of the same data.
+    #[serde(skip)]
     pub multiscale: Option<crate::data::multiscale::LevelRef>,
     /// The CRS of its x/y coordinates (`data::crs::assign`).
+    #[serde(skip)]
     pub crs: Option<crate::data::crs::CrsRef>,
     /// The affine placing its x/y cells, for grids without coordinate arrays.
+    #[serde(skip)]
     pub affine: Option<crate::data::coordinates::affine::GridAffine>,
 }
 

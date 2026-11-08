@@ -1,6 +1,5 @@
 //! Integration tests for NetCDF backend.
 
-use crate::data::backends::netcdf::NetCdfBlockStore;
 use crate::data::blocks::BlockStore;
 use crate::data::slice_request::SliceRequest;
 
@@ -50,7 +49,7 @@ fn test_create_and_read_netcdf() {
     }
 
     // Open with NetCdfBlockStore
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let vars = store.variables().expect("get variables");
     assert!(vars.contains(&"temperature".to_string()));
     assert!(vars.contains(&"lat".to_string()));
@@ -125,7 +124,7 @@ fn test_netcdf_scale_offset_and_fill() {
             .expect("put values");
     }
 
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let req = SliceRequest::full_range("calibrated_data", &[2, 2]);
     let block = store.fetch_block(&req).expect("fetch block");
 
@@ -164,7 +163,7 @@ fn test_netcdf_1d_variable_loading() {
             .expect("put values");
     }
 
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let req = SliceRequest::full_range("lon", &[5]);
     let block = store.fetch_block(&req).expect("fetch 1d block");
 
@@ -210,4 +209,68 @@ fn cf_grid_mappings_name_the_crs() {
     crate::data::crs::assign(&mut meta);
     let t = meta.variables.iter().find(|v| v.name == "t").expect("t");
     assert_eq!(t.crs, Some(crate::data::crs::CrsRef::Wkt(wkt.into())));
+}
+
+/// Chunked, deflated and shuffled data along an unlimited dimension reads the same through
+/// both readers (`test_support::Parity`), as do variables named like dimensions they do not
+/// hold, which netCDF-4 stores as `_nc4_non_coord_*`.
+#[test]
+fn deflated_chunks_on_an_unlimited_dimension_read_alike() {
+    use super::test_support::{Parity, TempNc, netcdf_lock, put};
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("deflated");
+    {
+        let mut file = netcdf::create(&nc.0).expect("create");
+        file.add_unlimited_dimension("time").expect("time");
+        file.add_dimension("x", 6).expect("x");
+        put(&mut file, "x", &["time"], &[5i16, 6, 7]);
+        let mut var = file.add_variable::<f64>("v", &["time", "x"]).expect("v");
+        var.set_compression(4, true).expect("deflate");
+        var.set_chunking(&[2, 4]).expect("chunks");
+        let values: Vec<f64> = (0..18).map(|i| f64::from(i) * 0.25).collect();
+        var.put_values(&values, (0..3, 0..6)).expect("values");
+    }
+    let store = Parity::open(nc.path()).expect("open");
+    let meta = store.inspect().expect("inspect");
+    let v = meta.variables.iter().find(|v| v.name == "v").expect("v");
+    assert_eq!(v.dimension_names, ["time", "x"]);
+    let request = SliceRequest::full_range("v", &[3, 6]);
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(block.values[17], 4.25);
+}
+
+/// Remote files read by ranged requests: a NetCDF-4 GOES-16 radiance granule on NOAA's
+/// public bucket and a classic (CDF-1) Eta model run on Unidata's test server:
+/// `cargo test --lib remote_netcdf_opens -- --ignored --nocapture`.
+#[test]
+#[ignore = "network"]
+fn remote_netcdf_opens() {
+    let files = [
+        (
+            "https://noaa-goes16.s3.amazonaws.com/ABI-L1b-RadC/2017/242/00/OR_ABI-L1b-RadC-M3C01_G16_s20172420002168_e20172420004540_c20172420004583.nc",
+            "Rad",
+            &[100, 100][..],
+        ),
+        (
+            "https://remotetest.unidata.ucar.edu/thredds/fileServer/testdata/2004050300_eta_211.nc",
+            "Z_sfc",
+            &[1, 95, 135][..],
+        ),
+    ];
+    for (url, name, shape) in files {
+        let started = std::time::Instant::now();
+        let store = super::NetCdfBlockStore::open_local(url).expect("open");
+        let meta = store.inspect().expect("inspect");
+        let var = meta.variables.iter().find(|v| v.name == name).expect(name);
+        let block = store
+            .fetch_block(&SliceRequest::full_range(name, shape))
+            .expect("block");
+        assert_eq!(block.values.len(), shape.iter().product::<usize>());
+        println!(
+            "{name} {:?} {:?} in {:.1} s",
+            var.dimension_names,
+            var.shape,
+            started.elapsed().as_secs_f64()
+        );
+    }
 }

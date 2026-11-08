@@ -129,6 +129,15 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "此文件夹中没有浏览器能读取的 Zarr 元数据。请选择数据本身的文件夹（含有 zarr.json 或 .zgroup 的那个），而不是它上一级的文件夹。Safari 会隐藏名称以点开头的文件，因此 Zarr v2 文件夹 (.zgroup, .zarray) 只能在 Chrome、Firefox 或 Octant 桌面版中打开。Zarr v3 文件夹可在任何浏览器中打开。"
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF 和 HDF5 文件由数据工作线程读取，但它们未能在此浏览器中启动。请重新加载页面，或在 Octant 桌面应用中打开该文件。"
+        }
+        DatasetKey::MatArraysLeftOut => {
+            "此 MATLAB 文件中的 {} 个数组未显示：不支持文本、元胞数组、空数组和稀疏数组、复数和对象"
+        }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "此文件中有 {} 个变量太大，无法在浏览器中读取：请在 Octant 桌面应用中打开以查看"
+        }
         DatasetKey::Plate => "孔板",
         DatasetKey::PlateAcquisition => "采集",
         DatasetKey::PlateAllAcquisitions => "全部",

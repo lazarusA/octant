@@ -102,18 +102,24 @@ impl Slot {
     }
 }
 
-/// Reads what a worker asked of a local file, and answers it.
+/// Reads what a worker asked of a local file, and answers it: its bytes, or the `File`.
 pub(super) async fn answer_read(worker: Worker, id: u64, url: String, read: LocalRead) {
     use crate::data::backends::local;
+    let bytes = |r: Result<Vec<u8>, String>| r.map(|b| (b, None));
     let result = match read {
-        LocalRead::All => local::read_all(&url).await,
-        LocalRead::Range { offset, length } => local::read_range(&url, offset, length).await,
-        LocalRead::Size => local::size(&url).await.map(|n| n.to_le_bytes().to_vec()),
+        LocalRead::All => bytes(local::read_all(&url).await),
+        LocalRead::Range { offset, length } => bytes(local::read_range(&url, offset, length).await),
+        LocalRead::Size => bytes(local::size(&url).await.map(|n| n.to_le_bytes().to_vec())),
+        LocalRead::File => local::file(&url).map(|f| (Vec::new(), Some(JsValue::from(f)))),
     };
     let error = match result {
-        Ok(bytes) => {
+        Ok((bytes, file)) => {
             let done = ToWorker::ReadDone { id, error: None };
-            if js::post(&worker, &done, &[Part::Bytes(&bytes)]) {
+            let part = match &file {
+                Some(file) => Part::Js(file),
+                None => Part::Bytes(&bytes),
+            };
+            if js::post(&worker, &done, &[part]) {
                 return;
             }
             format!("Failed to hand '{url}' to the data worker")

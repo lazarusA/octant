@@ -32,7 +32,8 @@ impl BlockLoader {
             Kind::RemoteGeoTiff | Kind::LocalGeoTiff => {
                 geotiff::wasm::load_one_geotiff_wasm_with_progress(request, on_progress).await
             }
-            Kind::Procedural => request.store.fetch(&request.slice),
+            // NetCDF reads synchronously, in a data worker (`netcdf/wasm.rs`).
+            Kind::Procedural | Kind::NetCdf => request.store.fetch(&request.slice),
             _ => zarr::load_one_wasm_with_progress(request, on_progress).await,
         }
     }

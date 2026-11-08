@@ -4,7 +4,7 @@ use super::test_support::{TempNc, inspect, netcdf_lock, put};
 
 /// A 4x2 `t2m(lat, lon)` grid on an uneven latitude stored south to north, at the root
 /// and in group `g1`, with values `0..8` in storage order.
-fn grid_file(nc: &TempNc) -> super::desktop::NetCdfBlockStore {
+fn grid_file(nc: &TempNc) -> super::test_support::Parity {
     let _ = inspect(nc, |f| {
         f.add_dimension("lat", 4).expect("lat");
         f.add_dimension("lon", 2).expect("lon");
@@ -17,7 +17,7 @@ fn grid_file(nc: &TempNc) -> super::desktop::NetCdfBlockStore {
         // The group's own longitudes shadow the root's for its variables.
         put(f, "g1/lon", &["lon"], &[100.0f64, 110.0]);
     });
-    super::desktop::NetCdfBlockStore::open_local(nc.path()).expect("open")
+    super::test_support::Parity::open(nc.path()).expect("open")
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn a_text_coordinate_in_the_group_hides_the_roots_numbers() {
         }
         put(f, "g/t2m", &["lat", "lon"], &[0.0f32, 1.0, 2.0, 3.0]);
     });
-    let store = super::desktop::NetCdfBlockStore::open_local(nc.path()).expect("open");
+    let store = super::test_support::Parity::open(nc.path()).expect("open");
     let request = crate::data::slice_request::SliceRequest::full_range("g/t2m", &[2, 2]);
     let block = store.fetch_block(&request).expect("block");
     assert_eq!(block.coordinates["lat"], [10.0, 0.0]);

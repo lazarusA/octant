@@ -2,10 +2,8 @@
 
 use std::collections::HashMap;
 
-use netcdf::{Extent, Extents};
-
 use super::coord_read::{group_ancestors, group_of, read_numbers_f64, text_dimension};
-use super::slice::with_netcdf_variable;
+use super::reader::{NcReader, NcVar};
 use crate::data::blocks::BlockStoreError;
 use crate::utils::grid_flips::{is_lat_name, is_lon_name};
 
@@ -37,7 +35,7 @@ enum Found {
 /// `var_path`, looking for each dimension's coordinate variable from the variable's group
 /// up to the root. Text coordinates give no block coordinates.
 pub fn extract_sliced_coordinates(
-    file: &netcdf::File,
+    reader: &dyn NcReader,
     var_path: &str,
     dim_names: &[String],
     origin: &[usize],
@@ -49,7 +47,7 @@ pub fn extract_sliced_coordinates(
             origin.get(i).copied().unwrap_or(0),
             block_shape.get(i).copied().unwrap_or(1),
         );
-        let Some(read) = find_coordinate(file, var_path, name, window) else {
+        let Some(read) = find_coordinate(reader, var_path, name, window) else {
             continue;
         };
         if is_lat_name(name) && out.lat_extent.is_none() {
@@ -69,7 +67,7 @@ pub fn extract_sliced_coordinates(
 /// The window of the numeric coordinate named `name` (or its lowercase form) nearest to
 /// `var_path`'s group, or `None` when none is found or the nearest one is text.
 fn find_coordinate(
-    file: &netcdf::File,
+    reader: &dyn NcReader,
     var_path: &str,
     name: &str,
     window: (usize, usize),
@@ -87,57 +85,49 @@ fn find_coordinate(
             } else {
                 format!("{group}/{candidate}")
             };
-            match with_netcdf_variable(file, &path, |var| Ok(classify(var, window))) {
-                Ok(Found::Numbers(read)) => return Some(read),
-                Ok(Found::Text) => return None,
-                Ok(Found::Unreadable) | Err(_) => {}
+            match reader
+                .variable(&path)
+                .map(|var| classify(reader, &var, window))
+            {
+                Some(Found::Numbers(read)) => return Some(read),
+                Some(Found::Text) => return None,
+                Some(Found::Unreadable) | None => {}
             }
         }
     }
     None
 }
 
-fn classify(var: &netcdf::Variable<'_>, window: (usize, usize)) -> Found {
+fn classify(reader: &dyn NcReader, var: &NcVar, window: (usize, usize)) -> Found {
     if text_dimension(var).is_some() {
         return Found::Text;
     }
-    read_window(var, window).map_or(Found::Unreadable, Found::Numbers)
+    read_window(reader, var, window).map_or(Found::Unreadable, Found::Numbers)
 }
 
 /// The values `start..start + count` of a 1D numeric coordinate variable, and its first
 /// and last value.
 fn read_window(
-    var: &netcdf::Variable<'_>,
+    reader: &dyn NcReader,
+    var: &NcVar,
     (start, count): (usize, usize),
 ) -> Result<WindowRead, BlockStoreError> {
-    let [dim] = var.dimensions() else {
+    let [(_, dim_len)] = var.dims.as_slice() else {
         return Err("coordinate variable is not 1D".into());
     };
-    let dim_len = dim.len();
+    let dim_len = *dim_len;
     let start = start.min(dim_len.saturating_sub(1));
     let end = start.saturating_add(count).min(dim_len);
-    let values = read_slice(var, start, end.saturating_sub(start).max(1))?;
+    let read = |start: usize, count: usize| read_numbers_f64(reader, var, &[start], &[count]);
+    let values = read(start, end.saturating_sub(start).max(1))?;
     let (Some(&first), Some(&last)) = (values.first(), values.last()) else {
         return Err("empty coordinate window".into());
     };
     let extent = if start == 0 && end == dim_len {
         Some((first, last))
     } else {
-        let at = |i: usize| read_slice(var, i, 1).ok()?.first().copied();
+        let at = |i: usize| read(i, 1).ok()?.first().copied();
         at(0).zip(at(dim_len - 1))
     };
     Ok(WindowRead { values, extent })
-}
-
-fn read_slice(
-    var: &netcdf::Variable<'_>,
-    start: usize,
-    count: usize,
-) -> Result<Vec<f64>, BlockStoreError> {
-    let extents = Extents::from(vec![Extent::SliceCount {
-        start,
-        count,
-        stride: 1,
-    }]);
-    read_numbers_f64(var, &extents)
 }

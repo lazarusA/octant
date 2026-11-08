@@ -13,10 +13,10 @@ Libraries (Boost Software License 1.0).
 
 ## Overview
 
-- MIT License (655)
+- MIT License (660)
 - Apache License 2.0 (62)
 - ISC License (24)
-- BSD 3-Clause "New" or "Revised" License (20)
+- BSD 3-Clause "New" or "Revised" License (21)
 - Unicode License v3 (19)
 - zlib License (3)
 - Boost Software License 1.0 (2)
@@ -2783,6 +2783,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Used by:
 - hdf5-metno-src 0.10.4 (https://github.com/metno/hdf5-rust)
+- hdf5-pure-filter 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
 
 ```text
 Copyright Notice and License Terms for
@@ -10747,6 +10748,40 @@ Used by:
 MIT License
 
 Copyright (c) 2026 Lazaro Alonso
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
+- hdf5-pure-core 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
+- hdf5-pure-filter 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
+- hdf5-pure-format 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
+- hdf5-pure-space 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
+- hdf5-pure 0.48.0-rc.1 (https://github.com/CramBL/hdf5-pure)
+
+```text
+MIT License
+
+Copyright (c) 2026 The hdf5-pure Authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

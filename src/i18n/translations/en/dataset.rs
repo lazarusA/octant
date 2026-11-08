@@ -131,6 +131,15 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::LocalNoZarrMetadata => {
             "This folder holds no Zarr metadata the browser could read. Pick the store's own folder (the one holding zarr.json or .zgroup), not a folder above it. Safari hides files whose names start with a dot, so Zarr v2 folders (.zgroup, .zarray) open only in Chrome, Firefox or the Octant desktop app. Zarr v3 folders open in every browser."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF and HDF5 files are read by the data workers, which did not start in this browser. Reload the page, or open the file in the Octant desktop app."
+        }
+        DatasetKey::MatArraysLeftOut => {
+            "{} arrays of this MATLAB file are not shown: text, cell, empty and sparse arrays, complex numbers and objects are not supported"
+        }
+        DatasetKey::VariablesTooLargeForBrowser => {
+            "{} variables of this file are too large to read in the browser: open it in the Octant desktop app to see them"
+        }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Acquisition",
         DatasetKey::PlateAllAcquisitions => "All",

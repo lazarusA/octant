@@ -51,13 +51,17 @@ impl OctantApp {
 
                 let res: Result<(crate::data::DatasetMetadata, crate::data::StoreHandle), String> =
                     async {
-                        if matches!(
-                            store_kind,
-                            StoreKind::LocalZarr
-                                | StoreKind::LocalIcechunk
-                                | StoreKind::LocalGeoTiff
-                                | StoreKind::LocalNetCdf
-                        ) {
+                        // NetCDF opens by URL: picked or dropped files (`local://`) and remote ones.
+                        let path = match store_kind {
+                            StoreKind::LocalNetCdf => !target_clone.contains("://"),
+                            kind => matches!(
+                                kind,
+                                StoreKind::LocalZarr
+                                    | StoreKind::LocalIcechunk
+                                    | StoreKind::LocalGeoTiff
+                            ),
+                        };
+                        if path {
                             let refused = crate::i18n::DatasetKey::BrowserLocalPaths;
                             return Err(crate::i18n::tr(refused).to_owned());
                         }

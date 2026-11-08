@@ -18,6 +18,18 @@ fn parse_f64_from_str(s: &str) -> Option<f64> {
 }
 
 impl DataCalibration {
+    /// Creates a `DataCalibration` from each attribute's number, `get` reading it (NetCDF,
+    /// HDF5 and MATLAB readers).
+    pub fn from_numbers(get: impl Fn(&str) -> Option<f64>) -> Self {
+        Self {
+            scale_factor: get("scale_factor"),
+            add_offset: get("add_offset"),
+            fill_value: get("_FillValue").or_else(|| get("missing_value")),
+            valid_min: get("valid_min"),
+            valid_max: get("valid_max"),
+        }
+    }
+
     /// Creates a `DataCalibration` from a JSON key-value map (Zarr v2, Zarr v3, Icechunk).
     pub fn from_json_map(attributes: &serde_json::Map<String, serde_json::Value>) -> Self {
         let scale_factor = attributes.get("scale_factor").and_then(parse_f64_from_json);

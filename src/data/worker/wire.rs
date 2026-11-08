@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+pub use super::wire_meta::MetadataHeader;
 use crate::data::DataSource;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
@@ -27,9 +28,17 @@ pub enum ToWorker {
         slice: SliceRequest,
         language: Language,
     },
+    /// Inspect `source`, answered by `Inspected` or `Failed` with `id`: stores only a
+    /// worker reads (NetCDF, `netcdf/wasm.rs`).
+    Inspect {
+        id: u64,
+        source: DataSource,
+        language: Language,
+    },
     /// Drop the stores of `uri`: its dataset closed.
     Release { uri: String },
-    /// The answer to the worker's `Read` with `id`: its bytes follow, unless `error`.
+    /// The answer to the worker's `Read` with `id`: its bytes (or the `File`) follow, unless
+    /// `error`.
     ReadDone { id: u64, error: Option<String> },
 }
 
@@ -46,6 +55,11 @@ pub enum FromWorker {
     Failed {
         id: u64,
         error: String,
+    },
+    /// An inspected store; its coordinates' numbers follow ([`MetadataHeader::split`]).
+    Inspected {
+        id: u64,
+        header: Box<MetadataHeader>,
     },
     /// What the worker's fetches counted since its last report (`blocks::progress::totals`).
     Progress {
@@ -75,6 +89,8 @@ pub enum LocalRead {
     },
     /// Its size, as 8 little-endian bytes.
     Size,
+    /// The `File` itself, for a reader that reads it synchronously (`FileReaderSync`).
+    File,
 }
 
 /// A block without its numbers: those travel as typed arrays.
