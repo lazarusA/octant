@@ -5,7 +5,7 @@
 //! are read through the page ([`read_from_page`]).
 
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use futures::channel::oneshot;
 use wasm_bindgen::JsCast;
@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
 
 use super::js::{self, Part};
+use super::lifetimes::Lifetimes;
 use super::wire::{BlockHeader, FromWorker, LocalRead, ToWorker};
 use crate::data::blocks::memory_budget::MemoryBudget;
 use crate::data::blocks::{BlockLoader, BlockRequest, progress};
@@ -30,10 +31,8 @@ thread_local! {
     /// Stores being opened, with the loads waiting for them.
     static OPENING: RefCell<HashMap<DataSource, Vec<oneshot::Sender<Opened>>>> =
         RefCell::default();
-    /// The loads running per store URL: a store is let go once none runs.
-    static RUNNING: RefCell<HashMap<String, usize>> = RefCell::default();
-    /// Store URLs released while loads ran on them: let go when the last ends.
-    static RELEASED: RefCell<HashSet<String>> = RefCell::default();
+    /// When stores are let go.
+    static LIFETIMES: RefCell<Lifetimes> = RefCell::default();
     static READS: RefCell<HashMap<u64, oneshot::Sender<ReadAnswer>>> = RefCell::default();
     static NEXT_READ: Cell<u64> = const { Cell::new(0) };
     /// The progress counts last sent.
@@ -70,23 +69,20 @@ fn receive(data: &JsValue) {
         ToWorker::Budget { bytes } => MemoryBudget::set_shared_limit(bytes),
         ToWorker::Load {
             id,
-            source,
+            mut source,
             slice,
             language,
         } => {
             crate::i18n::set_language(language);
-            // Loaded again after a release: its dataset was opened again.
-            let uri = source.uri.trim_end_matches('/');
-            RELEASED.with_borrow_mut(|r| r.remove(uri));
+            // URLs compared without a trailing slash, as the stores' registries keep them.
+            source.uri.truncate(source.uri.trim_end_matches('/').len());
+            LIFETIMES.with_borrow_mut(|l| l.begin(&source.uri));
             wasm_bindgen_futures::spawn_local(load(id, source, slice));
         }
         ToWorker::Release { uri } => {
             let uri = uri.trim_end_matches('/');
-            STORES.with_borrow_mut(|s| s.retain(|source, _| !same_uri(source, uri)));
-            // The loads running read the store's registry by URL: kept until they end.
-            if RUNNING.with_borrow(|r| r.contains_key(uri)) {
-                RELEASED.with_borrow_mut(|r| r.insert(uri.to_owned()));
-            } else {
+            STORES.with_borrow_mut(|s| s.retain(|source, _| source.uri != uri));
+            if LIFETIMES.with_borrow_mut(|l| l.release(uri)) {
                 release(uri);
             }
         }
@@ -103,8 +99,6 @@ fn receive(data: &JsValue) {
 }
 
 async fn load(id: u64, source: DataSource, slice: SliceRequest) {
-    let uri = source.uri.trim_end_matches('/').to_owned();
-    RUNNING.with_borrow_mut(|r| *r.entry(uri.clone()).or_default() += 1);
     let result = match open(&source).await {
         Ok(store) => {
             let request = BlockRequest::new(store, slice);
@@ -115,7 +109,9 @@ async fn load(id: u64, source: DataSource, slice: SliceRequest) {
         }
         Err(e) => Err(e),
     };
-    ended(&uri);
+    if LIFETIMES.with_borrow_mut(|l| l.end(&source.uri)) {
+        release(&source.uri);
+    }
     // Counts and toasts reach the page before the block they came with.
     report();
     match result {
@@ -157,7 +153,7 @@ async fn open(source: &DataSource) -> Opened {
         _ => SourceFactory::open(source.clone()).map_err(|e| e.to_string()),
     };
     // A store released while it opened is not kept: the last load lets it go.
-    let released = RELEASED.with_borrow(|r| r.contains(source.uri.trim_end_matches('/')));
+    let released = LIFETIMES.with_borrow(|l| l.released(&source.uri));
     if let (Ok(store), false) = (&opened, released) {
         STORES.with_borrow_mut(|s| s.insert(source.clone(), store.clone()));
     }
@@ -168,27 +164,6 @@ async fn open(source: &DataSource) -> Opened {
         let _ = tx.send(opened.clone());
     }
     opened
-}
-
-/// A load on `uri` ended: the store goes when it was released and none runs.
-fn ended(uri: &str) {
-    let last = RUNNING.with_borrow_mut(|r| {
-        let count = r.get_mut(uri).map(|n| {
-            *n = n.saturating_sub(1);
-            *n
-        });
-        if count == Some(0) {
-            r.remove(uri);
-        }
-        count == Some(0)
-    });
-    if last && RELEASED.with_borrow_mut(|r| r.remove(uri)) {
-        release(uri);
-    }
-}
-
-fn same_uri(source: &DataSource, uri: &str) -> bool {
-    source.uri.trim_end_matches('/') == uri
 }
 
 /// Lets go of what the worker keeps for `uri`: its stores and coordinates.

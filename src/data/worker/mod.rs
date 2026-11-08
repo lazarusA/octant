@@ -13,6 +13,8 @@ pub mod wire;
 pub mod host;
 #[cfg(target_arch = "wasm32")]
 mod js;
+#[cfg(any(target_arch = "wasm32", test))]
+mod lifetimes;
 #[cfg(target_arch = "wasm32")]
 mod pool;
 #[cfg(target_arch = "wasm32")]
@@ -25,6 +27,8 @@ pub use wire::LocalRead;
 
 #[cfg(target_arch = "wasm32")]
 pub use host::read_from_page;
+#[cfg(target_arch = "wasm32")]
+pub use pool::{release, warm};
 
 /// Loads `request` in a worker, or on the page when it has none (stores the
 /// worker cannot open, or workers that did not start).
@@ -46,12 +50,6 @@ pub async fn load(
         }
     }
     crate::data::blocks::BlockLoader::load_one_wasm(request, on_progress).await
-}
-
-/// Has the workers drop the stores of `uri`: its dataset closed.
-#[cfg(target_arch = "wasm32")]
-pub fn release(uri: &str) {
-    pool::release(uri);
 }
 
 /// Whether this code runs in a data worker, not on the page.

@@ -41,6 +41,8 @@ impl OctantApp {
 
         #[cfg(target_arch = "wasm32")]
         {
+            // Workers download while the dataset is inspected, ready for its first plot.
+            crate::data::worker::warm();
             let target_clone = target_input.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let kind = store_kind.to_data_source_kind();

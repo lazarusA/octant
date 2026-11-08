@@ -72,6 +72,22 @@ pub fn release(uri: &str) {
     });
 }
 
+/// Starts the workers ahead of the first load (a dataset starts opening),
+/// so their download and compile overlap its inspection instead of holding
+/// its first plot.
+pub fn warm() {
+    POOL.with_borrow_mut(|pool| {
+        for index in 0..pool.places() {
+            if pool.broken {
+                return;
+            }
+            if !pool.page_only.contains(&index) {
+                pool.slot(index);
+            }
+        }
+    });
+}
+
 /// How many workers to run: half the cores, two to four.
 fn pool_size() -> usize {
     let cores = web_sys::window().map_or(4.0, |w| w.navigator().hardware_concurrency());
@@ -83,12 +99,10 @@ impl Pool {
         if self.broken {
             return None;
         }
-        if self.slots.is_empty() {
-            self.slots.resize_with(pool_size(), || None);
-        }
+        let places = self.places();
         let mut hasher = std::hash::DefaultHasher::new();
         (&request.store.source().uri, &request.slice.variable).hash(&mut hasher);
-        let index = (hasher.finish() % self.slots.len() as u64) as usize;
+        let index = (hasher.finish() % places as u64) as usize;
         if self.page_only.contains(&index) {
             return None;
         }
@@ -105,6 +119,14 @@ impl Pool {
         let (tx, rx) = oneshot::channel();
         self.pending.insert(id, tx);
         Some(rx)
+    }
+
+    /// How many workers run here, deciding it on first use.
+    fn places(&mut self) -> usize {
+        if self.slots.is_empty() {
+            self.slots.resize_with(pool_size(), || None);
+        }
+        self.slots.len()
     }
 
     /// The live worker at `index`, started when there is none.
