@@ -65,6 +65,7 @@ pub fn kind_of(url: &str) -> Option<DataSourceKind> {
 pub fn release(url: &str) {
     if let Some((id, _)) = path::parse(url) {
         SOURCES.with(|s| s.borrow_mut().remove(&id));
+        super::read::forget_built(id);
     }
 }
 

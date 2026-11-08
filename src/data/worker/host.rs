@@ -1,11 +1,11 @@
 //! The worker's side: loads blocks as the page would (`BlockLoader::load_one_wasm`),
 //! from stores it opens itself, once each, by inspecting them as the page
-//! does, and keeps until their dataset closes. Every `REPORT_MS` it sends the
+//! does (`backends::inspect_web`), and keeps until their dataset closes. Every `REPORT_MS` it sends the
 //! page what its fetches counted and the toasts reported here. Local files
 //! are read through the page ([`read_from_page`]).
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use futures::channel::oneshot;
 use wasm_bindgen::JsCast;
@@ -17,7 +17,7 @@ use super::wire::{BlockHeader, FromWorker, LocalRead, ToWorker};
 use crate::data::blocks::memory_budget::MemoryBudget;
 use crate::data::blocks::{BlockLoader, BlockRequest, progress};
 use crate::data::slice_request::SliceRequest;
-use crate::data::{DataSource, DataSourceKind, SourceFactory, StoreHandle};
+use crate::data::{DataSource, SourceFactory, StoreHandle};
 
 /// How often the worker reports its counts and toasts.
 const REPORT_MS: i32 = 100;
@@ -30,6 +30,8 @@ thread_local! {
     /// Stores being opened, with the loads waiting for them.
     static OPENING: RefCell<HashMap<DataSource, Vec<oneshot::Sender<Opened>>>> =
         RefCell::default();
+    /// Stores released while they opened: let go again once open.
+    static RELEASED: RefCell<HashSet<String>> = RefCell::default();
     static READS: RefCell<HashMap<u64, oneshot::Sender<ReadAnswer>>> = RefCell::default();
     static NEXT_READ: Cell<u64> = const { Cell::new(0) };
     /// The progress counts last sent.
@@ -75,9 +77,12 @@ fn receive(data: &JsValue) {
         }
         ToWorker::Release { uri } => {
             let uri = uri.trim_end_matches('/');
-            STORES
-                .with_borrow_mut(|s| s.retain(|source, _| source.uri.trim_end_matches('/') != uri));
-            crate::data::backends::release_stores(uri);
+            let opening = OPENING.with_borrow(|o| o.keys().any(|s| same_uri(s, uri)));
+            if opening {
+                RELEASED.with_borrow_mut(|r| r.insert(uri.to_owned()));
+            }
+            STORES.with_borrow_mut(|s| s.retain(|source, _| !same_uri(source, uri)));
+            release(uri);
         }
         ToWorker::ReadDone { id, error } => {
             let answer = match error {
@@ -108,9 +113,14 @@ async fn load(id: u64, source: DataSource, slice: SliceRequest) {
         Ok(block) => {
             let (header, values, numbers) = BlockHeader::split(block);
             let parts = [Part::F32(&values), Part::F64(&numbers)];
-            js::post(&scope(), &FromWorker::Block { id, header }, &parts);
+            if !js::post(&scope(), &FromWorker::Block { id, header }, &parts) {
+                let error = "The loaded block could not be sent".to_owned();
+                js::post(&scope(), &FromWorker::Failed { id, error }, &[]);
+            }
         }
-        Err(error) => js::post(&scope(), &FromWorker::Failed { id, error }, &[]),
+        Err(error) => {
+            js::post(&scope(), &FromWorker::Failed { id, error }, &[]);
+        }
     }
 }
 
@@ -132,11 +142,16 @@ async fn open(source: &DataSource) -> Opened {
             .unwrap_or_else(|_| Err("The store did not open".to_owned()));
     }
     OPENING.with_borrow_mut(|o| o.insert(source.clone(), Vec::new()));
-    let opened = match inspect(source).await {
-        Ok(()) => SourceFactory::open(source.clone()).map_err(|e| e.to_string()),
-        Err(e) => Err(e),
+    let inspected = crate::data::backends::inspect_web(source).await;
+    let opened = match inspected {
+        Some(Err(e)) => Err(e),
+        _ => SourceFactory::open(source.clone()).map_err(|e| e.to_string()),
     };
-    if let Ok(store) = &opened {
+    let uri = source.uri.trim_end_matches('/');
+    if RELEASED.with_borrow_mut(|r| r.remove(uri)) {
+        // Its dataset closed meanwhile: this load still runs, nothing is kept.
+        release(uri);
+    } else if let Ok(store) = &opened {
         STORES.with_borrow_mut(|s| s.insert(source.clone(), store.clone()));
     }
     let waiting = OPENING
@@ -148,21 +163,14 @@ async fn open(source: &DataSource) -> Opened {
     opened
 }
 
-/// Reads the metadata of `source` into the worker's own store registry, as
-/// the page did when it opened the dataset (`app/data_loading.rs`).
-async fn inspect(source: &DataSource) -> Result<(), String> {
-    use crate::data::backends::{geotiff, icechunk, zarr};
-    let uri = &source.uri;
-    match source.kind {
-        DataSourceKind::RemoteZarr => zarr::inspect_wasm_remote_zarr(uri).await.map(drop),
-        DataSourceKind::RemoteIcechunk => icechunk::wasm::inspect_wasm_remote_icechunk(uri)
-            .await
-            .map(drop),
-        DataSourceKind::RemoteGeoTiff => geotiff::wasm::inspect_wasm_remote_geotiff(uri)
-            .await
-            .map(drop),
-        _ => Ok(()),
-    }
+fn same_uri(source: &DataSource, uri: &str) -> bool {
+    source.uri.trim_end_matches('/') == uri
+}
+
+/// Lets go of what the worker keeps for `uri`: its stores and coordinates.
+fn release(uri: &str) {
+    crate::data::backends::release_stores(uri);
+    crate::data::backends::coord_bounds::evict_coord_values(Some(uri));
 }
 
 /// Sends the page what was counted since the last report, and the toasts.

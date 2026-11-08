@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
-use web_sys::{ErrorEvent, MessageEvent, Worker};
+use web_sys::{Event, MessageEvent, Worker};
 
 use super::js::{self, Part};
 use super::pool::POOL;
@@ -26,7 +26,7 @@ pub(super) struct Slot {
     pub(super) early: Vec<ToWorker>,
     pub(super) jobs: HashSet<u64>,
     _on_message: Closure<dyn FnMut(MessageEvent)>,
-    _on_error: Closure<dyn FnMut(ErrorEvent)>,
+    _on_error: Closure<dyn FnMut(Event)>,
     /// The start timer, cleared on hello or drop so it never calls its
     /// dropped closure.
     pub(super) timer: i32,
@@ -54,8 +54,11 @@ impl Slot {
                 POOL.with_borrow_mut(|pool| pool.receive(index, message, &parts));
             }
         });
-        let on_error = Closure::<dyn FnMut(ErrorEvent)>::new(move |e: ErrorEvent| {
-            POOL.with_borrow_mut(|pool| pool.stopped(index, serial, &e.message()));
+        // A script that fails to load may raise a plain `Event`, without a message.
+        let on_error = Closure::<dyn FnMut(Event)>::new(move |e: Event| {
+            let message = js_sys::Reflect::get(&e, &"message".into()).ok();
+            let why = message.and_then(|m| m.as_string()).unwrap_or_default();
+            POOL.with_borrow_mut(|pool| pool.stopped(index, serial, &why));
         });
         let timeout = Closure::<dyn FnMut()>::new(move || {
             POOL.with_borrow_mut(|pool| {
@@ -107,19 +110,16 @@ pub(super) async fn answer_read(worker: Worker, id: u64, url: String, read: Loca
         LocalRead::Range { offset, length } => local::read_range(&url, offset, length).await,
         LocalRead::Size => local::size(&url).await.map(|n| n.to_le_bytes().to_vec()),
     };
-    match result {
-        Ok(bytes) => js::post(
-            &worker,
-            &ToWorker::ReadDone { id, error: None },
-            &[Part::Bytes(&bytes)],
-        ),
-        Err(error) => js::post(
-            &worker,
-            &ToWorker::ReadDone {
-                id,
-                error: Some(error),
-            },
-            &[],
-        ),
-    }
+    let error = match result {
+        Ok(bytes) => {
+            let done = ToWorker::ReadDone { id, error: None };
+            if js::post(&worker, &done, &[Part::Bytes(&bytes)]) {
+                return;
+            }
+            format!("Failed to hand '{url}' to the data worker")
+        }
+        Err(error) => error,
+    };
+    let error = Some(error);
+    js::post(&worker, &ToWorker::ReadDone { id, error }, &[]);
 }

@@ -1,10 +1,12 @@
 //! The page's side: a few data workers, started on the first load. A load
-//! goes to the worker its block key hashes to, so retries find that worker's
-//! store and chunks, and the blocks of one dataset decode in parallel.
-//! Messages wait until a worker says hello. A worker that never starts
-//! (missing, blocked, too slow to load) leaves loads to the page for the
-//! session ([`Outcome::Unavailable`]); one that stops later fails the loads
-//! it ran and is started again on the next load.
+//! goes to the worker its store and variable hash to, so one variable's
+//! chunks are downloaded and kept by one worker (a band or a step whose
+//! chunk arrived already downloads nothing), while other variables and
+//! overlays load in parallel. Messages wait until a worker says hello. When
+//! the first workers never start (missing, blocked, too slow to load), loads
+//! stay on the page for the session ([`Outcome::Unavailable`]); a worker that
+//! stops later fails the loads it ran (those it never started go to the
+//! page) and is started again on the next load.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -38,6 +40,9 @@ pub(super) struct Pool {
     shown: HashSet<(String, String)>,
     /// A worker failed to start: the page loads alone from then on.
     broken: bool,
+    /// Some worker said hello: workers can run here, so one that does not
+    /// start later never turns them all off.
+    any_ready: bool,
 }
 
 thread_local! {
@@ -78,7 +83,7 @@ impl Pool {
             self.slots.resize_with(pool_size(), || None);
         }
         let mut hasher = std::hash::DefaultHasher::new();
-        request.cache_key().hash(&mut hasher);
+        (&request.store.source().uri, &request.slice.variable).hash(&mut hasher);
         let index = (hasher.finish() % self.slots.len() as u64) as usize;
         let id = self.next_id;
         let slot = self.slot(index)?;
@@ -144,6 +149,7 @@ impl Pool {
     }
 
     fn hello(&mut self, index: usize) {
+        self.any_ready = true;
         let share = DOWNLOAD_BUDGET / self.slots.len() as u64;
         let Some(slot) = self.slots[index].as_mut() else {
             return;
@@ -165,8 +171,9 @@ impl Pool {
         }
     }
 
-    /// The worker at `index` (start `serial`) stopped: its loads fail, or,
-    /// when it never started, no worker is used again and they run on the page.
+    /// The worker at `index` (start `serial`) stopped: the loads it ran fail,
+    /// those it never started run on the page, and when no worker ever
+    /// started, no worker is used again.
     pub(super) fn stopped(&mut self, index: usize, serial: u64, why: &str) {
         let Some(slot) = self.slots[index].as_mut().filter(|s| s.serial == serial) else {
             return;
@@ -178,11 +185,14 @@ impl Pool {
         slot.dead = true;
         slot.worker.terminate();
         let jobs: Vec<u64> = slot.jobs.drain().collect();
-        if started {
+        if started || self.any_ready {
             log::error!("[data worker] Stopped: {why}");
             for id in jobs {
-                let failure = format!("The data worker stopped: {why}");
-                self.finish(index, id, Outcome::Failed(failure));
+                let outcome = match started {
+                    true => Outcome::Failed(format!("The data worker stopped: {why}")),
+                    false => Outcome::Unavailable,
+                };
+                self.finish(index, id, outcome);
             }
             return;
         }

@@ -56,12 +56,15 @@ impl Part<'_> {
     }
 }
 
-/// Posts `message` with `parts` to `target`; a failure is logged, as the
-/// receiver then never answers and its waiter is released another way.
-pub fn post<M: Serialize>(target: &impl Post, message: &M, parts: &[Part<'_>]) {
+/// Posts `message` with `parts` to `target`; whether it was posted (a
+/// failure is logged).
+pub fn post<M: Serialize>(target: &impl Post, message: &M, parts: &[Part<'_>]) -> bool {
     let text = match serde_json::to_string(message) {
         Ok(text) => text,
-        Err(e) => return log::error!("[data worker] Unencodable message: {e}"),
+        Err(e) => {
+            log::error!("[data worker] Unencodable message: {e}");
+            return false;
+        }
     };
     let framed = Array::of1(&JsValue::from_str(&text));
     let transfer = Array::new();
@@ -70,9 +73,11 @@ pub fn post<M: Serialize>(target: &impl Post, message: &M, parts: &[Part<'_>]) {
         framed.push(&array);
         transfer.push(&buffer);
     }
-    if let Err(e) = target.post(&framed, &transfer) {
+    let posted = target.post(&framed, &transfer);
+    if let Err(e) = &posted {
         log::error!("[data worker] Failed to post a message: {e:?}");
     }
+    posted.is_ok()
 }
 
 /// The message in `data` and its parts, or `None` for anything else.
