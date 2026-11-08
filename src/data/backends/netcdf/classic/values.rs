@@ -3,6 +3,7 @@
 
 use super::header::{Attr, NcType};
 use crate::data::DataCalibration;
+use crate::data::backends::netcdf::reader::list;
 
 /// `bytes` of type `ty` as `f64`s (`char` as its byte values).
 pub fn numbers(ty: NcType, bytes: &[u8]) -> Vec<f64> {
@@ -33,14 +34,6 @@ pub fn floats(bytes: &[u8]) -> Vec<f32> {
     (bytes.as_chunks::<4>().0.iter())
         .map(|c| f32::from_be_bytes(*c))
         .collect()
-}
-
-/// One value alone, several as `[a, b]`, as netCDF-C's attributes print.
-fn list<T: std::fmt::Display + std::fmt::Debug>(values: &[T]) -> String {
-    match values {
-        [one] => one.to_string(),
-        _ => format!("{values:?}"),
-    }
 }
 
 /// The text netCDF-C shows for `attr`.
@@ -81,12 +74,5 @@ fn number(attr: &Attr) -> Option<f64> {
 
 /// CF scale, offset, fill and valid range from `attrs`, read as netCDF-C's reader does.
 pub fn calibration(attrs: &[Attr]) -> DataCalibration {
-    let get = |name: &str| attrs.iter().find(|a| a.name == name).and_then(number);
-    DataCalibration {
-        scale_factor: get("scale_factor"),
-        add_offset: get("add_offset"),
-        fill_value: get("_FillValue").or_else(|| get("missing_value")),
-        valid_min: get("valid_min"),
-        valid_max: get("valid_max"),
-    }
+    DataCalibration::from_numbers(|name| attrs.iter().find(|a| a.name == name).and_then(number))
 }

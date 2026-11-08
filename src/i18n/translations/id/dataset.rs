@@ -136,6 +136,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "Berkas NetCDF dan HDF5 dibaca oleh worker data, yang tidak berjalan di peramban ini. Muat ulang halaman, atau buka berkas di aplikasi desktop Octant."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "{} larik dari berkas MATLAB ini tidak ditampilkan: teks, larik sel, larik kosong dan jarang, bilangan kompleks, dan objek tidak didukung"
+        }
         DatasetKey::Plate => "Pelat",
         DatasetKey::PlateAcquisition => "Akuisisi",
         DatasetKey::PlateAllAcquisitions => "Semua",

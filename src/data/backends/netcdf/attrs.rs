@@ -107,35 +107,7 @@ pub fn var_type_to_string(vartype: &NcVariableType) -> &'static str {
     }
 }
 
-/// Extracts calibration rules (`scale_factor`, `add_offset`, `_FillValue`, `missing_value`, `valid_range`) from a NetCDF variable.
+/// CF scale, offset, fill and valid range from `var`'s attributes.
 pub fn extract_variable_calibration(var: &netcdf::Variable<'_>) -> DataCalibration {
-    let scale_factor = var
-        .attribute_value("scale_factor")
-        .and_then(|r| r.ok())
-        .and_then(|a| attribute_value_to_f64(&a));
-    let add_offset = var
-        .attribute_value("add_offset")
-        .and_then(|r| r.ok())
-        .and_then(|a| attribute_value_to_f64(&a));
-    let fill_value = var
-        .attribute_value("_FillValue")
-        .or_else(|| var.attribute_value("missing_value"))
-        .and_then(|r| r.ok())
-        .and_then(|a| attribute_value_to_f64(&a));
-    let valid_min = var
-        .attribute_value("valid_min")
-        .and_then(|r| r.ok())
-        .and_then(|a| attribute_value_to_f64(&a));
-    let valid_max = var
-        .attribute_value("valid_max")
-        .and_then(|r| r.ok())
-        .and_then(|a| attribute_value_to_f64(&a));
-
-    DataCalibration {
-        scale_factor,
-        add_offset,
-        fill_value,
-        valid_min,
-        valid_max,
-    }
+    DataCalibration::from_numbers(|name| attribute_value_to_f64(&var.attribute_value(name)?.ok()?))
 }

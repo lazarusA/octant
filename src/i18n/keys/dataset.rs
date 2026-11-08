@@ -122,6 +122,7 @@ crate::i18n::keys::define_keys! {
     BrowserLocalPaths,
     LocalNoZarrMetadata,
     NeedsDataWorkers,
+    MatArraysLeftOut,
     // OME-Zarr plates
     Plate,
     PlateAcquisition,

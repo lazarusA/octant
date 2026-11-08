@@ -140,6 +140,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "Les fichiers NetCDF et HDF5 sont lus par les workers de données, qui n'ont pas démarré dans ce navigateur. Rechargez la page ou ouvrez le fichier dans l'application de bureau Octant."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "{} tableaux de ce fichier MATLAB ne sont pas affichés : le texte, les tableaux de cellules, vides et creux, les nombres complexes et les objets ne sont pas pris en charge"
+        }
         DatasetKey::Plate => "Plaque",
         DatasetKey::PlateAcquisition => "Acquisition",
         DatasetKey::PlateAllAcquisitions => "Toutes",

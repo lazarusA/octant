@@ -134,6 +134,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF와 HDF5 파일은 데이터 워커가 읽는데, 이 브라우저에서 워커가 시작되지 않았습니다. 페이지를 새로 고치거나 Octant 데스크톱 앱에서 파일을 여세요."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "이 MATLAB 파일의 배열 {}개는 표시되지 않습니다: 텍스트, 셀 배열, 빈 배열과 희소 배열, 복소수, 객체는 지원되지 않습니다"
+        }
         DatasetKey::Plate => "플레이트",
         DatasetKey::PlateAcquisition => "획득",
         DatasetKey::PlateAllAcquisitions => "전체",

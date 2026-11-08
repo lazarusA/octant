@@ -1,7 +1,7 @@
 //! MATLAB v7.3 conventions over HDF5: numeric and `logical` datasets are variables
 //! (`MATLAB_class`), struct groups are groups; `#refs#` and `#subsystem#` hold the internals
 //! of cells and objects and are hidden. Text, cells, empty and sparse arrays, complex numbers
-//! and objects are left out (logged). MATLAB stores arrays column-major, so HDF5 holds the
+//! and objects are left out, named in one warning. MATLAB stores arrays column-major, so HDF5 holds the
 //! shape reversed: values keep HDF5's order and the dimensions are named for MATLAB's
 //! (`dim_1` is the last stored one).
 
@@ -12,14 +12,20 @@ use hdf5_pure::{AttrValue, DType, Dataset, File, Group};
 
 use super::attrs::{calibration, text, texts};
 use super::{Entry, type_name};
-use crate::data::backends::netcdf::reader::NcVar;
+use crate::data::backends::netcdf::reader::{NcVar, join};
+use crate::ui::toast::Severity;
 
 /// Every numeric variable of `file`; MATLAB files have no global attributes.
 pub(super) fn catalog(
     file: &File,
 ) -> Result<(HashMap<String, String>, Vec<Entry>), hdf5_pure::Error> {
-    let mut entries = Vec::new();
-    walk(&file.root(), "", &mut entries)?;
+    let (mut entries, mut left_out) = (Vec::new(), Vec::new());
+    walk(&file.root(), "", &mut entries, &mut left_out)?;
+    if !left_out.is_empty() {
+        let title = crate::i18n::tr(crate::i18n::DatasetKey::MatArraysLeftOut);
+        let title = crate::i18n::filled(title, &[&left_out.len()]);
+        crate::ui::toast::report(Severity::Warning, &title, left_out.join(", "));
+    }
     Ok((HashMap::new(), entries))
 }
 
@@ -27,16 +33,21 @@ fn class_of(attrs: &HashMap<String, AttrValue>) -> Option<MatClass> {
     MatClass::parse(&text(attrs.get("MATLAB_class")?)?).ok()
 }
 
-fn walk(group: &Group, prefix: &str, entries: &mut Vec<Entry>) -> Result<(), hdf5_pure::Error> {
-    let join = |name: &str| match prefix {
-        "" => name.to_owned(),
-        _ => format!("{prefix}/{name}"),
-    };
+/// Collects `group`'s variables into `entries`, and what it leaves out into `left_out`.
+fn walk(
+    group: &Group,
+    prefix: &str,
+    entries: &mut Vec<Entry>,
+    left_out: &mut Vec<String>,
+) -> Result<(), hdf5_pure::Error> {
     for (name, ds) in group.iter_datasets()? {
-        let path = join(&name);
+        let path = join(prefix, &name);
         let attrs = ds.attrs()?;
         match why_left_out(&ds, &attrs)? {
-            Some(why) => log::info!("[mat] '{path}' left out: {why}"),
+            Some(why) => {
+                log::info!("[mat] '{path}' left out: {why}");
+                left_out.push(path);
+            }
             None => entries.push(variable(&ds, path, &attrs)?),
         }
     }
@@ -45,7 +56,7 @@ fn walk(group: &Group, prefix: &str, entries: &mut Vec<Entry>) -> Result<(), hdf
         if name.starts_with('#') || !struct_group {
             continue;
         }
-        walk(&sub, &join(&name), entries)?;
+        walk(&sub, &join(prefix, &name), entries, left_out)?;
     }
     Ok(())
 }

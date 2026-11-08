@@ -16,13 +16,17 @@ use std::collections::HashMap;
 use hdf5_pure::{ChunkCacheConfig, File, FileAccessProperties, MetadataCacheConfig, Source};
 
 use super::coord_read::{c_text, clean_label};
-use super::reader::{NcReader, NcVar, Raw};
+use super::reader::{NcReader, NcVar, Raw, failed};
 use crate::data::blocks::BlockStoreError;
 
 /// Parsed metadata kept per open file: a remote one would otherwise pay a round trip per read.
 const METADATA_CACHE: usize = 16 << 20;
-/// Decoded chunks kept per open file.
+/// Decoded chunks kept per open file. In the browser every data worker reading the file
+/// keeps its own, outside `MemoryBudget`, and a worker's memory never shrinks.
+#[cfg(not(target_arch = "wasm32"))]
 const CHUNK_CACHE: usize = 64 << 20;
+#[cfg(target_arch = "wasm32")]
+const CHUNK_CACHE: usize = 16 << 20;
 
 /// A variable and the HDF5 dataset holding it.
 pub(super) struct Entry {
@@ -46,17 +50,13 @@ fn refusal(head: &[u8]) -> Option<&'static str> {
     )
 }
 
-fn failed(what: &str, e: impl std::fmt::Display) -> BlockStoreError {
-    format!("{what}: {e}").into()
-}
-
 impl PureReader {
     /// Opens the file `source` reads, `name` naming it in errors.
     pub fn open<S: Source + Send + Sync + 'static>(
         source: S,
         name: &str,
     ) -> Result<Self, BlockStoreError> {
-        let mut head = vec![0; 128.min(source.len() as usize)];
+        let mut head = vec![0; source.len().min(128) as usize];
         source
             .read_at(0, &mut head)
             .map_err(|e| failed(&format!("Failed to read '{name}'"), e))?;

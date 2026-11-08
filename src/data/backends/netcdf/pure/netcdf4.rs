@@ -12,7 +12,7 @@ use hdf5_pure::{AttrValue, File, Group};
 use super::attrs::{calibration, ints, text, texts};
 use super::{Entry, type_name};
 use crate::data::backends::netcdf::coord_read::{group_ancestors, group_of};
-use crate::data::backends::netcdf::reader::NcVar;
+use crate::data::backends::netcdf::reader::{NcVar, join};
 
 const PHONY: &str = "This is a netCDF dimension but not a netCDF variable";
 /// netCDF-4's dataset name for a variable named like a dimension it does not hold.
@@ -98,22 +98,18 @@ fn leaf(path: &str) -> String {
 
 /// The root's datasets, then each group's followed by its subgroups'.
 fn walk(group: &Group, prefix: &str, out: &mut Vec<Found>) -> Result<(), hdf5_pure::Error> {
-    let join = |name: &str| match prefix {
-        "" => name.to_owned(),
-        _ => format!("{prefix}/{name}"),
-    };
     for (name, ds) in group.iter_datasets()? {
         let size = ds.datatype()?.type_size();
         out.push(Found {
-            path: join(name.strip_prefix(NON_COORD).unwrap_or(&name)),
-            dataset: join(&name),
+            path: join(prefix, name.strip_prefix(NON_COORD).unwrap_or(&name)),
+            dataset: join(prefix, &name),
             shape: ds.shape()?.into_iter().map(|n| n as usize).collect(),
             data_type: type_name(&ds.dtype()?, size),
             attrs: ds.attrs()?,
         });
     }
     for (name, sub) in group.iter_groups()? {
-        walk(&sub, &join(&name), out)?;
+        walk(&sub, &join(prefix, &name), out)?;
     }
     Ok(())
 }

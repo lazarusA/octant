@@ -134,6 +134,9 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF and HDF5 files are read by the data workers, which did not start in this browser. Reload the page, or open the file in the Octant desktop app."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "{} arrays of this MATLAB file are not shown: text, cell, empty and sparse arrays, complex numbers and objects are not supported"
+        }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Acquisition",
         DatasetKey::PlateAllAcquisitions => "All",

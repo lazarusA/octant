@@ -128,6 +128,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "Файли NetCDF і HDF5 читають робочі потоки даних, які не запустилися в цьому браузері. Перезавантажте сторінку або відкрийте файл у настільному застосунку Octant."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "Масиви цього файлу MATLAB не показано ({}): текст, масиви комірок, порожні й розріджені масиви, комплексні числа та об'єкти не підтримуються"
+        }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Знімання",
         DatasetKey::PlateAllAcquisitions => "Усі",

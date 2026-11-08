@@ -132,6 +132,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF 和 HDF5 文件由数据工作线程读取，但它们未能在此浏览器中启动。请重新加载页面，或在 Octant 桌面应用中打开该文件。"
         }
+        DatasetKey::MatArraysLeftOut => {
+            "此 MATLAB 文件中的 {} 个数组未显示：不支持文本、元胞数组、空数组和稀疏数组、复数和对象"
+        }
         DatasetKey::Plate => "孔板",
         DatasetKey::PlateAcquisition => "采集",
         DatasetKey::PlateAllAcquisitions => "全部",

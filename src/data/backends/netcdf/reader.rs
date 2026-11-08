@@ -54,3 +54,24 @@ pub trait NcReader {
     /// The labels of a text variable `coord_read::text_dimension` accepts.
     fn labels(&self, var: &NcVar) -> Option<Vec<String>>;
 }
+
+/// `what` failed with `e`.
+pub fn failed(what: &str, e: impl std::fmt::Display) -> BlockStoreError {
+    format!("{what}: {e}").into()
+}
+
+/// One value alone, several as `[a, b]`, as netCDF-C prints attributes.
+pub fn list<T: std::fmt::Display + std::fmt::Debug>(values: &[T]) -> String {
+    match values {
+        [one] => one.to_string(),
+        _ => format!("{values:?}"),
+    }
+}
+
+/// `name` within the group at `prefix` (`""` the root).
+pub fn join(prefix: &str, name: &str) -> String {
+    match prefix {
+        "" => name.to_owned(),
+        _ => format!("{prefix}/{name}"),
+    }
+}

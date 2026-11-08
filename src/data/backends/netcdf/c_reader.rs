@@ -10,7 +10,7 @@ use super::attrs::{
     var_type_to_string,
 };
 use super::coord_read::{c_text, clean_label};
-use super::reader::{NcReader, NcVar, Raw};
+use super::reader::{NcReader, NcVar, Raw, join};
 use crate::data::blocks::BlockStoreError;
 
 pub struct CReader {
@@ -34,13 +34,6 @@ fn describe(var: &netcdf::Variable<'_>, path: String) -> NcVar {
             .collect(),
         attributes: extract_variable_attributes(var),
         calibration: extract_variable_calibration(var),
-    }
-}
-
-fn join(prefix: &str, name: &str) -> String {
-    match prefix {
-        "" => name.to_owned(),
-        _ => format!("{prefix}/{name}"),
     }
 }
 

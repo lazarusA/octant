@@ -130,6 +130,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF- ja HDF5-tiedostot lukevat datatyöntekijät, jotka eivät käynnistyneet tässä selaimessa. Lataa sivu uudelleen tai avaa tiedosto Octantin työpöytäsovelluksessa."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "Tämän MATLAB-tiedoston {} taulukkoa ei näytetä: tekstiä, solutaulukoita, tyhjiä ja harvoja taulukoita, kompleksilukuja ja olioita ei tueta"
+        }
         DatasetKey::Plate => "Kuoppalevy",
         DatasetKey::PlateAcquisition => "Kuvauskerta",
         DatasetKey::PlateAllAcquisitions => "Kaikki",

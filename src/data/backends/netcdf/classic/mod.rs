@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use hdf5_pure::Source;
 
 use super::coord_read::{c_text, clean_label};
-use super::reader::{NcReader, NcVar, Raw};
+use super::reader::{NcReader, NcVar, Raw, failed};
 use crate::data::blocks::BlockStoreError;
 use header::{Header, NcType, Short};
 
@@ -29,10 +29,6 @@ pub struct ClassicReader {
     vars: Vec<NcVar>,
     /// Bytes from one record to the next.
     recsize: u64,
-}
-
-fn failed(what: &str, e: impl std::fmt::Display) -> BlockStoreError {
-    format!("{what}: {e}").into()
 }
 
 /// The header of the file `source` reads, reading more until it is whole.

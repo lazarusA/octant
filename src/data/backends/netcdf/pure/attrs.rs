@@ -6,14 +6,7 @@ use std::collections::HashMap;
 use hdf5_pure::AttrValue;
 
 use crate::data::DataCalibration;
-
-/// `values` as netCDF-C's attributes print: a single value alone, several as `[a, b]`.
-fn list<T: std::fmt::Display + std::fmt::Debug>(values: &[T]) -> String {
-    match values {
-        [one] => one.to_string(),
-        _ => format!("{values:?}"),
-    }
-}
+use crate::data::backends::netcdf::reader::list;
 
 /// The text of `value`, or `None` for kinds netCDF has no text for.
 pub fn text(value: &AttrValue) -> Option<String> {
@@ -109,12 +102,5 @@ pub fn texts(
 
 /// CF scale, offset, fill and valid range from `raw`, read as netCDF-C's reader does.
 pub fn calibration(raw: &HashMap<String, AttrValue>) -> DataCalibration {
-    let get = |name: &str| raw.get(name).and_then(number);
-    DataCalibration {
-        scale_factor: get("scale_factor"),
-        add_offset: get("add_offset"),
-        fill_value: get("_FillValue").or_else(|| get("missing_value")),
-        valid_min: get("valid_min"),
-        valid_max: get("valid_max"),
-    }
+    DataCalibration::from_numbers(|name| raw.get(name).and_then(number))
 }

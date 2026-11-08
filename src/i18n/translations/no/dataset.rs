@@ -138,6 +138,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF- og HDF5-filer leses av dataarbeiderne, som ikke startet i denne nettleseren. Last inn siden på nytt, eller åpne filen i Octants skrivebordsapp."
         }
+        DatasetKey::MatArraysLeftOut => {
+            "{} matriser i denne MATLAB-filen vises ikke: tekst, cellematriser, tomme og glisne matriser, komplekse tall og objekter støttes ikke"
+        }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Opptak",
         DatasetKey::PlateAllAcquisitions => "Alle",

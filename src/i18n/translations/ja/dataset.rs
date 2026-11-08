@@ -136,6 +136,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NeedsDataWorkers => {
             "NetCDF と HDF5 のファイルはデータワーカーが読み込みますが、このブラウザーではワーカーが起動しませんでした。ページを再読み込みするか、Octant のデスクトップアプリでファイルを開いてください。"
         }
+        DatasetKey::MatArraysLeftOut => {
+            "この MATLAB ファイルの {} 個の配列は表示されません: テキスト、セル配列、空配列、スパース配列、複素数、オブジェクトには対応していません"
+        }
         DatasetKey::Plate => "プレート",
         DatasetKey::PlateAcquisition => "撮像",
         DatasetKey::PlateAllAcquisitions => "すべて",
