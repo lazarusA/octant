@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Жоден набір даних не завантажено",
         DatasetKey::MemoryCache => "Пам'ять і кеш",
         DatasetKey::SampleDatasets => "Зразки",
+        DatasetKey::OpenFolder => "Відкрити папку",
+        DatasetKey::OpenFile => "Відкрити файл",
         DatasetKey::DropFilesHere => "Перетягніть файл або каталог",
         DatasetKey::SourceUrlOrPath => "Цільовий URL / шлях до файлу",
         DatasetKey::LoadingMetadata => "Перевірка метаданих сховища у фоновому режимі...",
@@ -118,7 +120,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoading => "завантаження...",
         DatasetKey::HeroLoaded => "завантажено: {}",
         DatasetKey::BrowserLocalPaths => {
-            "Браузер не може читати локальні шляхи до файлів напряму через обмеження безпеки веб-пісочниці.\n\nЩоб переглянути локальні набори даних у браузері:\n1. Роздайте каталог або файл через локальний HTTP-сервер: `npx serve` або `python3 -m http.server`\n2. Введіть URL: `http://localhost:8000/my_dataset`\n\nАбо запустіть нативну настільну версію Octant (`cargo run --release`)."
+            "Браузер не може читати локальні шляхи до файлів напряму через обмеження безпеки веб-пісочниці.\n\nВідкрийте його кнопкою \"Відкрити папку\" або \"Відкрити файл\" чи перетягніть у вікно.\n\nЩоб переглянути локальні набори даних у браузері:\n1. Роздайте каталог або файл через локальний HTTP-сервер: `npx serve` або `python3 -m http.server`\n2. Введіть URL: `http://localhost:8000/my_dataset`\n\nАбо запустіть нативну настільну версію Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "У цій папці немає метаданих Zarr, які браузер може прочитати. Виберіть папку самого сховища (ту, де лежить zarr.json або .zgroup), а не папку вище. Safari приховує файли, назви яких починаються з крапки, тому папки Zarr v2 (.zgroup, .zarray) відкриваються лише в Chrome, Firefox або настільному застосунку Octant. Папки Zarr v3 відкриваються в будь-якому браузері."
         }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Знімання",

@@ -2,6 +2,7 @@ pub mod coord_bounds;
 pub mod geotiff;
 pub mod http;
 pub mod icechunk;
+pub mod local;
 pub mod netcdf;
 pub mod procedural;
 pub mod zarr;

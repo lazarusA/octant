@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Aineistoa ei ole ladattu",
         DatasetKey::MemoryCache => "Muisti ja välimuisti",
         DatasetKey::SampleDatasets => "Esimerkit",
+        DatasetKey::OpenFolder => "Avaa kansio",
+        DatasetKey::OpenFile => "Avaa tiedosto",
         DatasetKey::DropFilesHere => "Vedä ja pudota tiedosto tai kansio",
         DatasetKey::SourceUrlOrPath => "Kohde-URL / tiedostopolku",
         DatasetKey::LoadingMetadata => "Tarkastetaan säilön metatietoja taustalla...",
@@ -120,7 +122,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoading => "ladataan...",
         DatasetKey::HeroLoaded => "ladattu: {}",
         DatasetKey::BrowserLocalPaths => {
-            "Paikallisia tiedostopolkuja ei voi lukea suoraan selaimessa verkon hiekkalaatikon tietoturvan vuoksi.\n\nPaikallisten aineistojen katselu selaimessa:\n1. Jaa kansio tai tiedosto paikallisella HTTP-palvelimella: `npx serve` tai `python3 -m http.server`\n2. Syötä URL: `http://localhost:8000/my_dataset`\n\nTai käytä Octantin natiivia työpöytäversiota (`cargo run --release`)."
+            "Paikallisia tiedostopolkuja ei voi lukea suoraan selaimessa verkon hiekkalaatikon tietoturvan vuoksi.\n\nAvaa se painikkeella \"Avaa kansio\" tai \"Avaa tiedosto\", tai pudota se ikkunaan.\n\nPaikallisten aineistojen katselu selaimessa:\n1. Jaa kansio tai tiedosto paikallisella HTTP-palvelimella: `npx serve` tai `python3 -m http.server`\n2. Syötä URL: `http://localhost:8000/my_dataset`\n\nTai käytä Octantin natiivia työpöytäversiota (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Tässä kansiossa ei ole Zarr-metatietoja, joita selain voisi lukea. Valitse tallennuksen oma kansio (se, jossa on zarr.json tai .zgroup), älä sen yläkansiota. Safari piilottaa tiedostot, joiden nimi alkaa pisteellä, joten Zarr v2 -kansiot (.zgroup, .zarray) avautuvat vain Chromessa, Firefoxissa tai Octantin työpöytäsovelluksessa. Zarr v3 -kansiot avautuvat kaikissa selaimissa."
         }
         DatasetKey::Plate => "Kuoppalevy",
         DatasetKey::PlateAcquisition => "Kuvauskerta",

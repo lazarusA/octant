@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "データセットが読み込まれていません",
         DatasetKey::MemoryCache => "メモリとキャッシュ",
         DatasetKey::SampleDatasets => "サンプル",
+        DatasetKey::OpenFolder => "フォルダーを開く",
+        DatasetKey::OpenFile => "ファイルを開く",
         DatasetKey::DropFilesHere => "ファイルまたはフォルダーをドラッグ&ドロップ",
         DatasetKey::SourceUrlOrPath => "URL / ファイルパス",
         DatasetKey::LoadingMetadata => "バックグラウンドでストアのメタデータを確認中...",
@@ -126,7 +128,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "読み込み完了: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "ブラウザーではWebのサンドボックスによる制限のため、ローカルファイルのパスを直接読み込めません。\n\nブラウザーでローカルのデータセットを表示するには:\n1. ローカルHTTPサーバーでフォルダーまたはファイルを配信します: `npx serve` または `python3 -m http.server`\n2. URLを入力します: `http://localhost:8000/my_dataset`\n\nまたは、Octantのネイティブデスクトップ版を実行してください (`cargo run --release`)。"
+            "ブラウザーではWebのサンドボックスによる制限のため、ローカルファイルのパスを直接読み込めません。\n\n\"フォルダーを開く\"または\"ファイルを開く\"で開くか、ウィンドウにドロップしてください。\n\nブラウザーでローカルのデータセットを表示するには:\n1. ローカルHTTPサーバーでフォルダーまたはファイルを配信します: `npx serve` または `python3 -m http.server`\n2. URLを入力します: `http://localhost:8000/my_dataset`\n\nまたは、Octantのネイティブデスクトップ版を実行してください (`cargo run --release`)。"
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "このフォルダーには、ブラウザーが読み込める Zarr メタデータがありません。その上のフォルダーではなく、データ自体のフォルダー (zarr.json または .zgroup があるフォルダー) を選んでください。Safari は名前がドットで始まるファイルを隠すため、Zarr v2 のフォルダー (.zgroup, .zarray) は Chrome、Firefox、または Octant のデスクトップ版でのみ開けます。Zarr v3 のフォルダーはどのブラウザーでも開けます。"
         }
         DatasetKey::Plate => "プレート",
         DatasetKey::PlateAcquisition => "撮像",

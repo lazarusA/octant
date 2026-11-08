@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "불러온 데이터셋이 없습니다",
         DatasetKey::MemoryCache => "메모리 및 캐시",
         DatasetKey::SampleDatasets => "샘플",
+        DatasetKey::OpenFolder => "폴더 열기",
+        DatasetKey::OpenFile => "파일 열기",
         DatasetKey::DropFilesHere => "파일 또는 폴더를 끌어다 놓으세요",
         DatasetKey::SourceUrlOrPath => "대상 URL / 파일 경로",
         DatasetKey::LoadingMetadata => "백그라운드에서 저장소 메타데이터를 확인하는 중...",
@@ -124,7 +126,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "불러옴: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "웹 샌드박스 보안 때문에 브라우저에서는 로컬 파일 경로를 직접 읽을 수 없습니다.\n\n브라우저에서 로컬 데이터셋을 보려면:\n1. 로컬 HTTP 서버로 폴더나 파일을 제공하세요: `npx serve` 또는 `python3 -m http.server`\n2. URL을 입력하세요: `http://localhost:8000/my_dataset`\n\n또는 Octant 데스크톱 버전을 실행하세요 (`cargo run --release`)."
+            "웹 샌드박스 보안 때문에 브라우저에서는 로컬 파일 경로를 직접 읽을 수 없습니다.\n\n'폴더 열기' 또는 '파일 열기'로 열거나 창에 끌어다 놓으세요.\n\n브라우저에서 로컬 데이터셋을 보려면:\n1. 로컬 HTTP 서버로 폴더나 파일을 제공하세요: `npx serve` 또는 `python3 -m http.server`\n2. URL을 입력하세요: `http://localhost:8000/my_dataset`\n\n또는 Octant 데스크톱 버전을 실행하세요 (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "이 폴더에는 브라우저가 읽을 수 있는 Zarr 메타데이터가 없습니다. 상위 폴더가 아니라 데이터 자체의 폴더(zarr.json 또는 .zgroup이 있는 폴더)를 선택하세요. Safari는 이름이 점으로 시작하는 파일을 숨기므로 Zarr v2 폴더(.zgroup, .zarray)는 Chrome, Firefox 또는 Octant 데스크톱 앱에서만 열립니다. Zarr v3 폴더는 모든 브라우저에서 열립니다."
         }
         DatasetKey::Plate => "플레이트",
         DatasetKey::PlateAcquisition => "획득",

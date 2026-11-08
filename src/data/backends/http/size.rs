@@ -7,6 +7,9 @@
 /// it is absent ([`super::is_not_found`]).
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_size(url: &str) -> Result<u64, String> {
+    if url.starts_with(crate::data::backends::local::SCHEME) {
+        return crate::data::backends::local::size(url).await;
+    }
     let init = web_sys::RequestInit::new();
     init.set_method("HEAD");
     let resp = super::fetch::send(url, &init).await?;

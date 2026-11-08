@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "No hay ningún conjunto de datos cargado",
         DatasetKey::MemoryCache => "Memoria y caché",
         DatasetKey::SampleDatasets => "Ejemplos",
+        DatasetKey::OpenFolder => "Abrir carpeta",
+        DatasetKey::OpenFile => "Abrir archivo",
         DatasetKey::DropFilesHere => "Arrastre un archivo o directorio",
         DatasetKey::SourceUrlOrPath => "URL de destino / ruta de archivo",
         DatasetKey::LoadingMetadata => "Inspeccionando metadatos del almacén en segundo plano...",
@@ -128,7 +130,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "cargado: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Las rutas de archivos locales no se pueden leer en un navegador debido al aislamiento de seguridad web.\n\nPara ver conjuntos de datos locales en el navegador:\n1. Sirva su directorio o archivo con un servidor HTTP local: `npx serve` o `python3 -m http.server`\n2. Introduzca la URL: `http://localhost:8000/my_dataset`\n\nO ejecute la versión nativa de escritorio de Octant (`cargo run --release`)."
+            "Las rutas de archivos locales no se pueden leer en un navegador debido al aislamiento de seguridad web.\n\nÁbralo con \"Abrir carpeta\" o \"Abrir archivo\", o arrástrelo a la ventana.\n\nPara ver conjuntos de datos locales en el navegador:\n1. Sirva su directorio o archivo con un servidor HTTP local: `npx serve` o `python3 -m http.server`\n2. Introduzca la URL: `http://localhost:8000/my_dataset`\n\nO ejecute la versión nativa de escritorio de Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Esta carpeta no contiene metadatos Zarr que el navegador pueda leer. Elija la carpeta del propio almacén (la que contiene zarr.json o .zgroup), no una carpeta superior. Safari oculta los archivos cuyo nombre empieza por un punto, así que las carpetas Zarr v2 (.zgroup, .zarray) solo se abren en Chrome, Firefox o la aplicación de escritorio de Octant. Las carpetas Zarr v3 se abren en cualquier navegador."
         }
         DatasetKey::Plate => "Placa",
         DatasetKey::PlateAcquisition => "Adquisición",

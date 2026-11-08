@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Inget dataset inläst",
         DatasetKey::MemoryCache => "Minne och cache",
         DatasetKey::SampleDatasets => "Exempel",
+        DatasetKey::OpenFolder => "Öppna mapp",
+        DatasetKey::OpenFile => "Öppna fil",
         DatasetKey::DropFilesHere => "Dra och släpp fil eller mapp",
         DatasetKey::SourceUrlOrPath => "Mål-URL / filsökväg",
         DatasetKey::LoadingMetadata => "Inspekterar lagringsmetadata i bakgrunden...",
@@ -118,7 +120,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoading => "laddar...",
         DatasetKey::HeroLoaded => "inläst: {}",
         DatasetKey::BrowserLocalPaths => {
-            "Lokala filsökvägar kan inte läsas direkt i en webbläsare på grund av webbens sandlådesäkerhet.\n\nSå här visar du lokala dataset i webbläsaren:\n1. Servera mappen eller filen med en lokal HTTP-server: `npx serve` eller `python3 -m http.server`\n2. Ange URL:en: `http://localhost:8000/my_dataset`\n\nEller kör den inbyggda skrivbordsversionen av Octant (`cargo run --release`)."
+            "Lokala filsökvägar kan inte läsas direkt i en webbläsare på grund av webbens sandlådesäkerhet.\n\nÖppna det med \"Öppna mapp\" eller \"Öppna fil\", eller släpp det i fönstret.\n\nSå här visar du lokala dataset i webbläsaren:\n1. Servera mappen eller filen med en lokal HTTP-server: `npx serve` eller `python3 -m http.server`\n2. Ange URL:en: `http://localhost:8000/my_dataset`\n\nEller kör den inbyggda skrivbordsversionen av Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Den här mappen innehåller inga Zarr-metadata som webbläsaren kan läsa. Välj lagrets egen mapp (den med zarr.json eller .zgroup), inte en mapp ovanför. Safari döljer filer vars namn börjar med en punkt, så Zarr v2-mappar (.zgroup, .zarray) öppnas bara i Chrome, Firefox eller Octants skrivbordsapp. Zarr v3-mappar öppnas i alla webbläsare."
         }
         DatasetKey::Plate => "Platta",
         DatasetKey::PlateAcquisition => "Bildtagning",

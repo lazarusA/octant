@@ -6,6 +6,8 @@ crate::i18n::keys::define_keys! {
     NoDatasetLoaded,
     MemoryCache,
     SampleDatasets,
+    OpenFolder,
+    OpenFile,
     DropFilesHere,
     SourceUrlOrPath,
     LoadingMetadata,
@@ -118,6 +120,7 @@ crate::i18n::keys::define_keys! {
     HeroLoaded,
     // Errors
     BrowserLocalPaths,
+    LocalNoZarrMetadata,
     // OME-Zarr plates
     Plate,
     PlateAcquisition,

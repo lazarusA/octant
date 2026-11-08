@@ -25,6 +25,7 @@ impl OctantApp {
         {
             let ctx = cc.egui_ctx.clone();
             crate::data::crs::set_wake(move || ctx.request_repaint());
+            crate::data::backends::local::install_drop_listener(&cc.egui_ctx);
         }
         app.load_colormap_prefs(cc.storage);
 

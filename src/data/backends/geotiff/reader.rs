@@ -117,7 +117,8 @@ pub async fn create_async_reader(
     }
     #[cfg(target_arch = "wasm32")]
     {
-        if clean.starts_with("http://") || clean.starts_with("https://") {
+        let local = clean.starts_with(crate::data::backends::local::SCHEME);
+        if clean.starts_with("http://") || clean.starts_with("https://") || local {
             Ok(Arc::new(WasmHttpTiffReader::new(clean)))
         } else {
             Err(format!("Local filesystem paths unsupported on WASM: {clean}").into())

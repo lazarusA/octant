@@ -84,6 +84,9 @@ async fn body(resp: web_sys::Response) -> Result<Vec<u8>, String> {
 /// Fetches raw bytes from a remote URL using browser `window.fetch()`.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
+    if url.starts_with(crate::data::backends::local::SCHEME) {
+        return crate::data::backends::local::read_all(url).await;
+    }
     let resp = send(url, &web_sys::RequestInit::new()).await?;
 
     if !resp.ok() {
@@ -96,6 +99,9 @@ pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
 /// Fetches a specific byte range from a remote URL using HTTP Range headers.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result<Vec<u8>, String> {
+    if url.starts_with(crate::data::backends::local::SCHEME) {
+        return crate::data::backends::local::read_range(url, offset, length).await;
+    }
     let headers =
         web_sys::Headers::new().map_err(|e| format!("Failed to create headers: {e:?}"))?;
     let end = offset.saturating_add(length).saturating_sub(1);

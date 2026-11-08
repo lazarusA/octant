@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Aucun jeu de données chargé",
         DatasetKey::MemoryCache => "Mémoire et cache",
         DatasetKey::SampleDatasets => "Exemples",
+        DatasetKey::OpenFolder => "Ouvrir un dossier",
+        DatasetKey::OpenFile => "Ouvrir un fichier",
         DatasetKey::DropFilesHere => "Glisser-déposer un fichier ou un dossier",
         DatasetKey::SourceUrlOrPath => "URL cible / chemin de fichier",
         DatasetKey::LoadingMetadata => "Inspection des métadonnées en arrière-plan...",
@@ -130,7 +132,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "chargé : {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Les chemins de fichiers locaux ne peuvent pas être lus directement dans un navigateur en raison du bac à sable de sécurité du web.\n\nPour afficher des jeux de données locaux dans le navigateur :\n1. Servez votre dossier ou fichier avec un serveur HTTP local : `npx serve` ou `python3 -m http.server`\n2. Saisissez l'URL : `http://localhost:8000/my_dataset`\n\nOu lancez la version de bureau native d'Octant (`cargo run --release`)."
+            "Les chemins de fichiers locaux ne peuvent pas être lus directement dans un navigateur en raison du bac à sable de sécurité du web.\n\nOuvrez-le avec \"Ouvrir un dossier\" ou \"Ouvrir un fichier\", ou déposez-le sur la fenêtre.\n\nPour afficher des jeux de données locaux dans le navigateur :\n1. Servez votre dossier ou fichier avec un serveur HTTP local : `npx serve` ou `python3 -m http.server`\n2. Saisissez l'URL : `http://localhost:8000/my_dataset`\n\nOu lancez la version de bureau native d'Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Ce dossier ne contient aucune métadonnée Zarr lisible par le navigateur. Choisissez le dossier du magasin lui-même (celui qui contient zarr.json ou .zgroup), pas un dossier au-dessus. Safari masque les fichiers dont le nom commence par un point : les dossiers Zarr v2 (.zgroup, .zarray) ne s'ouvrent donc que dans Chrome, Firefox ou l'application de bureau Octant. Les dossiers Zarr v3 s'ouvrent dans tous les navigateurs."
         }
         DatasetKey::Plate => "Plaque",
         DatasetKey::PlateAcquisition => "Acquisition",

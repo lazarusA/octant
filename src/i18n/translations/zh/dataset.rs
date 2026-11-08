@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "当前未加载数据集",
         DatasetKey::MemoryCache => "内存与缓存",
         DatasetKey::SampleDatasets => "示例",
+        DatasetKey::OpenFolder => "打开文件夹",
+        DatasetKey::OpenFile => "打开文件",
         DatasetKey::DropFilesHere => "拖放文件或目录",
         DatasetKey::SourceUrlOrPath => "目标 URL / 文件路径",
         DatasetKey::LoadingMetadata => "正在后台读取存储元数据...",
@@ -122,7 +124,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "已加载：{}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "出于网页沙盒安全限制，浏览器无法直接读取本地文件路径。\n\n要在浏览器中查看本地数据集：\n1. 用本地 HTTP 服务器提供目录或文件：`npx serve` 或 `python3 -m http.server`\n2. 输入 URL：`http://localhost:8000/my_dataset`\n\n或者运行 Octant 的原生桌面版本 (`cargo run --release`)。"
+            "出于网页沙盒安全限制，浏览器无法直接读取本地文件路径。\n\n请用\"打开文件夹\"或\"打开文件\"打开，或将其拖到窗口中。\n\n要在浏览器中查看本地数据集：\n1. 用本地 HTTP 服务器提供目录或文件：`npx serve` 或 `python3 -m http.server`\n2. 输入 URL：`http://localhost:8000/my_dataset`\n\n或者运行 Octant 的原生桌面版本 (`cargo run --release`)。"
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "此文件夹中没有浏览器能读取的 Zarr 元数据。请选择数据本身的文件夹（含有 zarr.json 或 .zgroup 的那个），而不是它上一级的文件夹。Safari 会隐藏名称以点开头的文件，因此 Zarr v2 文件夹 (.zgroup, .zarray) 只能在 Chrome、Firefox 或 Octant 桌面版中打开。Zarr v3 文件夹可在任何浏览器中打开。"
         }
         DatasetKey::Plate => "孔板",
         DatasetKey::PlateAcquisition => "采集",
