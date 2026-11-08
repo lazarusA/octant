@@ -53,7 +53,14 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         return Ok(StoreKind::ProceduralRandom);
     }
 
-    // 2. Remote URIs (HTTP / HTTPS / S3 / GS / AZ / VCC / ICECHUNK+)
+    // 2. Remote URIs (HTTP / HTTPS / S3 / GS / AZ / VCC / ICECHUNK+), and the
+    // browser's local files and folders, read like them.
+    if trimmed.starts_with(crate::data::backends::local::SCHEME) {
+        let kind = crate::data::backends::local::kind_of(trimmed);
+        return kind
+            .map(|k| StoreKind::from_data_source_kind(&k))
+            .ok_or("Type not supported");
+    }
     let lower = trimmed.to_lowercase();
     if lower.starts_with("icechunk+")
         || lower.starts_with("vcc://")

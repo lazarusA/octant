@@ -2,6 +2,7 @@ pub mod coord_bounds;
 pub mod geotiff;
 pub mod http;
 pub mod icechunk;
+pub mod local;
 pub mod netcdf;
 pub mod procedural;
 pub mod zarr;
@@ -19,4 +20,5 @@ pub fn release_stores(uri: &str) {
     WasmZarrBlockStore::release(uri);
     icechunk::wasm::WasmIcechunkBlockStore::release(uri);
     geotiff::WasmGeoTiffBlockStore::release(uri);
+    local::release(uri);
 }

@@ -51,6 +51,11 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
         return Ok(store.finalize_metadata(variables, None, clean_url).await);
     }
 
+    // A local folder's metadata went missing in the browser, not on a server:
+    // Safari hides dotfiles, all of Zarr v2's metadata.
+    if clean_url.starts_with(crate::data::backends::local::SCHEME) {
+        return Err(crate::i18n::tr(crate::i18n::DatasetKey::LocalNoZarrMetadata).to_owned());
+    }
     Err(format!(
         "Failed to inspect Zarr metadata at '{clean_url}'. Ensure the server allows CORS (Access-Control-Allow-Origin) and contains '.zmetadata', '.zattrs', or 'zarr.json'."
     ))
