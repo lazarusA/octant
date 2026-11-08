@@ -69,19 +69,21 @@ pub async fn load(request: &BlockRequest) -> Outcome {
 }
 
 /// Sends the job `make` builds from its id to the worker `uri`'s `variable` loads in, and
-/// waits for its outcome. A job whose worker never started while others did is sent once
+/// waits for its outcome. A job whose worker never started (or could not be made) while
+/// others did is sent once
 /// more, to the next place (`place_of`): the page reads no NetCDF.
 pub(super) async fn run(uri: &str, variable: &str, make: impl Fn(u64) -> ToWorker) -> Outcome {
     for _ in 0..2 {
-        let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, &make)) else {
-            return Outcome::Unavailable;
-        };
-        match answer.await {
-            Ok(outcome @ (Outcome::Block(_) | Outcome::Failed(_) | Outcome::Inspected(_))) => {
-                return outcome;
-            }
-            _ if POOL.with_borrow(|pool| pool.broken) => break,
-            _ => {}
+        // `None`: this place's worker could not be made; the next try goes to the next one.
+        let answer = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, &make));
+        if let Some(answer) = answer
+            && let Ok(outcome) = answer.await
+            && !matches!(outcome, Outcome::Unavailable)
+        {
+            return outcome;
+        }
+        if POOL.with_borrow(|pool| pool.broken) {
+            break;
         }
     }
     Outcome::Unavailable

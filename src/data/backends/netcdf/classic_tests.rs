@@ -195,6 +195,11 @@ fn records_far_apart_read_only_their_bytes() {
         f.add_variable::<f64>("time", &["time"]).expect("time");
         f.add_variable::<f32>("v", &["time", "x"]).expect("v");
         f.add_variable::<f32>("w", &["step", "x"]).expect("w");
+        // Rows of 4 KB, steps of 400 KB: a point's rows are close, its steps far apart.
+        f.add_dimension("row", 100).expect("row");
+        f.add_dimension("col", 1000).expect("col");
+        f.add_variable::<f32>("u", &["step", "row", "col"])
+            .expect("u");
         f.enddef().expect("end of definitions");
         let w: Vec<f32> = (0..4 * 70_000).map(|i| i as f32).collect();
         let mut fixed = f.variable_mut("w").expect("w");
@@ -233,6 +238,15 @@ fn records_far_apart_read_only_their_bytes() {
         fetched.load(Ordering::SeqCst) - before,
         4 * 4,
         "4 bytes per step"
+    );
+    // A point of a 3D variable: its rows are close, its steps far apart.
+    let u = reader.variable("u").expect("u");
+    let before = fetched.load(Ordering::SeqCst);
+    reader.read(&u, &[0, 1, 5], &[4, 1, 1]).expect("u");
+    assert_eq!(
+        fetched.load(Ordering::SeqCst) - before,
+        4 * 4,
+        "4 bytes per step of a 3D point"
     );
 }
 

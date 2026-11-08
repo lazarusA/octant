@@ -100,8 +100,12 @@ impl ClassicReader {
         let run_bytes = (run * size) as usize;
         let mut out = vec![0; bytes];
         // Runs a block or more apart (records, or a point read along a fixed dimension)
-        // share no block: each reads only its own bytes.
-        let far = k > 0 && step(k - 1) >= BLOCK;
+        // share no block: each reads only its own bytes. The gap is the innermost outer
+        // dimension's that changes (a point of a 3D variable: the time step's, not a row's).
+        let far = (0..k)
+            .rev()
+            .find(|&d| count[d] > 1)
+            .is_some_and(|d| step(d) >= BLOCK);
         let mut at = start[..k].to_vec();
         for buf in out.chunks_exact_mut(run_bytes) {
             let outer = (at.iter().enumerate())
