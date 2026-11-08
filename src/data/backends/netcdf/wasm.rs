@@ -168,6 +168,8 @@ impl HttpSource {
         xhr.set_request_header("Range", &format!("bytes={offset}-{last}"))
             .map_err(fail)?;
         xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
+        // As `http::fetch` gives up: a stalled server would hold this worker for good.
+        xhr.set_timeout(60_000);
         xhr.send().map_err(fail)?;
         let bytes = js_sys::Uint8Array::new(&xhr.response().map_err(fail)?);
         match xhr.status().map_err(fail)? {
