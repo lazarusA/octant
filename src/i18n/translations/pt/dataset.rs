@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Nenhum conjunto de dados carregado",
         DatasetKey::MemoryCache => "Memória e cache",
         DatasetKey::SampleDatasets => "Exemplos",
+        DatasetKey::OpenFolder => "Abrir pasta",
+        DatasetKey::OpenFile => "Abrir arquivo",
         DatasetKey::DropFilesHere => "Arraste e solte um arquivo ou pasta",
         DatasetKey::SourceUrlOrPath => "URL de destino / caminho do arquivo",
         DatasetKey::LoadingMetadata => "Inspecionando metadados em segundo plano...",
@@ -130,7 +132,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "carregado: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Caminhos de arquivos locais não podem ser lidos diretamente no navegador por causa da segurança do sandbox da web.\n\nPara ver conjuntos de dados locais no navegador:\n1. Sirva sua pasta ou arquivo com um servidor HTTP local: `npx serve` ou `python3 -m http.server`\n2. Digite a URL: `http://localhost:8000/my_dataset`\n\nOu execute a versão nativa para desktop do Octant (`cargo run --release`)."
+            "Caminhos de arquivos locais não podem ser lidos diretamente no navegador por causa da segurança do sandbox da web.\n\nAbra com \"Abrir pasta\" ou \"Abrir arquivo\", ou arraste para a janela.\n\nPara ver conjuntos de dados locais no navegador:\n1. Sirva sua pasta ou arquivo com um servidor HTTP local: `npx serve` ou `python3 -m http.server`\n2. Digite a URL: `http://localhost:8000/my_dataset`\n\nOu execute a versão nativa para desktop do Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Esta pasta não contém metadados Zarr que o navegador consiga ler. Escolha a pasta do próprio armazenamento (a que contém zarr.json ou .zgroup), não uma pasta acima dela. O Safari oculta arquivos cujo nome começa com um ponto, então pastas Zarr v2 (.zgroup, .zarray) só abrem no Chrome, no Firefox ou no aplicativo para desktop do Octant. Pastas Zarr v3 abrem em qualquer navegador."
         }
         DatasetKey::Plate => "Placa",
         DatasetKey::PlateAcquisition => "Aquisição",

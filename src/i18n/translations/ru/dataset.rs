@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Набор данных не загружен",
         DatasetKey::MemoryCache => "Память и кэш",
         DatasetKey::SampleDatasets => "Примеры",
+        DatasetKey::OpenFolder => "Открыть папку",
+        DatasetKey::OpenFile => "Открыть файл",
         DatasetKey::DropFilesHere => "Перетащите файл или папку",
         DatasetKey::SourceUrlOrPath => "URL / путь к файлу",
         DatasetKey::LoadingMetadata => "Чтение метаданных хранилища в фоновом режиме...",
@@ -120,7 +122,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoading => "загрузка...",
         DatasetKey::HeroLoaded => "загружено: {}",
         DatasetKey::BrowserLocalPaths => {
-            "Браузер не может читать локальные файлы напрямую из-за ограничений безопасности веб-песочницы.\n\nЧтобы открыть локальные наборы данных в браузере:\n1. Раздайте папку или файл через локальный HTTP-сервер: `npx serve` или `python3 -m http.server`\n2. Введите URL: `http://localhost:8000/my_dataset`\n\nИли запустите настольную версию Octant (`cargo run --release`)."
+            "Браузер не может читать локальные файлы напрямую из-за ограничений безопасности веб-песочницы.\n\nОткройте его кнопкой \"Открыть папку\" или \"Открыть файл\" либо перетащите в окно.\n\nЧтобы открыть локальные наборы данных в браузере:\n1. Раздайте папку или файл через локальный HTTP-сервер: `npx serve` или `python3 -m http.server`\n2. Введите URL: `http://localhost:8000/my_dataset`\n\nИли запустите настольную версию Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "В этой папке нет метаданных Zarr, которые браузер может прочитать. Выберите папку самого хранилища (ту, где лежит zarr.json или .zgroup), а не папку выше. Safari скрывает файлы, имена которых начинаются с точки, поэтому папки Zarr v2 (.zgroup, .zarray) открываются только в Chrome, Firefox или настольном приложении Octant. Папки Zarr v3 открываются в любом браузере."
         }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Съёмка",

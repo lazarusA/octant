@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Ingen datasett lastet inn",
         DatasetKey::MemoryCache => "Minne og hurtigbuffer",
         DatasetKey::SampleDatasets => "Eksempler",
+        DatasetKey::OpenFolder => "Åpne mappe",
+        DatasetKey::OpenFile => "Åpne fil",
         DatasetKey::DropFilesHere => "Dra og slipp fil eller mappe",
         DatasetKey::SourceUrlOrPath => "Mål-URL / filbane",
         DatasetKey::LoadingMetadata => "Inspiserer metadata i bakgrunnen...",
@@ -128,7 +130,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "lastet inn: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Lokale filbaner kan ikke leses direkte i en nettleser på grunn av nettleserens sikkerhetssandkasse.\n\nSlik viser du lokale datasett i nettleseren:\n1. Server mappen eller filen med en lokal HTTP-server: `npx serve` eller `python3 -m http.server`\n2. Skriv inn URL-en: `http://localhost:8000/my_dataset`\n\nEller kjør den native skrivebordsversjonen av Octant (`cargo run --release`)."
+            "Lokale filbaner kan ikke leses direkte i en nettleser på grunn av nettleserens sikkerhetssandkasse.\n\nÅpne det med \"Åpne mappe\" eller \"Åpne fil\", eller slipp det i vinduet.\n\nSlik viser du lokale datasett i nettleseren:\n1. Server mappen eller filen med en lokal HTTP-server: `npx serve` eller `python3 -m http.server`\n2. Skriv inn URL-en: `http://localhost:8000/my_dataset`\n\nEller kjør den native skrivebordsversjonen av Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Denne mappen inneholder ingen Zarr-metadata nettleseren kan lese. Velg lagerets egen mappe (den med zarr.json eller .zgroup), ikke en mappe over den. Safari skjuler filer med navn som begynner med punktum, så Zarr v2-mapper (.zgroup, .zarray) åpnes bare i Chrome, Firefox eller Octants skrivebordsapp. Zarr v3-mapper åpnes i alle nettlesere."
         }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Opptak",

@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Tidak ada dataset yang dimuat",
         DatasetKey::MemoryCache => "Memori & Cache",
         DatasetKey::SampleDatasets => "Contoh",
+        DatasetKey::OpenFolder => "Buka folder",
+        DatasetKey::OpenFile => "Buka berkas",
         DatasetKey::DropFilesHere => "Seret & Lepas Berkas atau Direktori",
         DatasetKey::SourceUrlOrPath => "URL Target / Jalur Berkas",
         DatasetKey::LoadingMetadata => "Memeriksa metadata penyimpanan di latar belakang...",
@@ -126,7 +128,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "dimuat: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Jalur berkas lokal tidak dapat dibaca langsung di browser karena keamanan sandbox web.\n\nUntuk melihat dataset lokal di browser:\n1. Sajikan direktori atau berkas Anda dengan server HTTP lokal: `npx serve` atau `python3 -m http.server`\n2. Masukkan URL: `http://localhost:8000/my_dataset`\n\nAtau jalankan versi desktop native Octant (`cargo run --release`)."
+            "Jalur berkas lokal tidak dapat dibaca langsung di browser karena keamanan sandbox web.\n\nBuka dengan \"Buka folder\" atau \"Buka berkas\", atau seret ke jendela.\n\nUntuk melihat dataset lokal di browser:\n1. Sajikan direktori atau berkas Anda dengan server HTTP lokal: `npx serve` atau `python3 -m http.server`\n2. Masukkan URL: `http://localhost:8000/my_dataset`\n\nAtau jalankan versi desktop native Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Folder ini tidak berisi metadata Zarr yang dapat dibaca browser. Pilih folder penyimpanan itu sendiri (yang berisi zarr.json atau .zgroup), bukan folder di atasnya. Safari menyembunyikan berkas yang namanya diawali titik, jadi folder Zarr v2 (.zgroup, .zarray) hanya terbuka di Chrome, Firefox, atau aplikasi desktop Octant. Folder Zarr v3 terbuka di semua browser."
         }
         DatasetKey::Plate => "Pelat",
         DatasetKey::PlateAcquisition => "Akuisisi",

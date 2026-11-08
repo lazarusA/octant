@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::NoDatasetLoaded => "No dataset currently loaded",
         DatasetKey::MemoryCache => "Memory & Cache",
         DatasetKey::SampleDatasets => "Samples",
+        DatasetKey::OpenFolder => "Open Folder",
+        DatasetKey::OpenFile => "Open File",
         DatasetKey::DropFilesHere => "Drag & Drop File or Directory",
         DatasetKey::SourceUrlOrPath => "Target URL / File Path",
         DatasetKey::LoadingMetadata => "Inspecting store metadata in background...",
@@ -124,7 +126,10 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::HeroLoaded => "loaded: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`)."
+            "Direct local file paths cannot be read in a browser due to web sandbox security.\n\nOpen it with Open Folder or Open File, or drop it on the window.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "This folder holds no Zarr metadata the browser could read. Pick the store's own folder (the one holding zarr.json or .zgroup), not a folder above it. Safari hides files whose names start with a dot, so Zarr v2 folders (.zgroup, .zarray) open only in Chrome, Firefox or the Octant desktop app. Zarr v3 folders open in every browser."
         }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Acquisition",

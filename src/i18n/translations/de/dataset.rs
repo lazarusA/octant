@@ -6,6 +6,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::NoDatasetLoaded => "Kein Datensatz geladen",
         DatasetKey::MemoryCache => "Speicher & Cache",
         DatasetKey::SampleDatasets => "Beispiele",
+        DatasetKey::OpenFolder => "Ordner öffnen",
+        DatasetKey::OpenFile => "Datei öffnen",
         DatasetKey::DropFilesHere => "Datei oder Ordner per Drag & Drop",
         DatasetKey::SourceUrlOrPath => "Ziel-URL / Dateipfad",
         DatasetKey::LoadingMetadata => "Metadaten werden im Hintergrund geprüft...",
@@ -130,7 +132,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroLoaded => "geladen: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {
-            "Lokale Dateipfade können im Browser aufgrund der Sandbox-Sicherheit nicht direkt gelesen werden.\n\nSo zeigen Sie lokale Datensätze im Browser an:\n1. Stellen Sie Ihr Verzeichnis oder Ihre Datei über einen lokalen HTTP-Server bereit: `npx serve` oder `python3 -m http.server`\n2. Geben Sie die URL ein: `http://localhost:8000/my_dataset`\n\nOder starten Sie die native Desktop-Version von Octant (`cargo run --release`)."
+            "Lokale Dateipfade können im Browser aufgrund der Sandbox-Sicherheit nicht direkt gelesen werden.\n\nÖffnen Sie es mit \"Ordner öffnen\" oder \"Datei öffnen\", oder ziehen Sie es ins Fenster.\n\nSo zeigen Sie lokale Datensätze im Browser an:\n1. Stellen Sie Ihr Verzeichnis oder Ihre Datei über einen lokalen HTTP-Server bereit: `npx serve` oder `python3 -m http.server`\n2. Geben Sie die URL ein: `http://localhost:8000/my_dataset`\n\nOder starten Sie die native Desktop-Version von Octant (`cargo run --release`)."
+        }
+        DatasetKey::LocalNoZarrMetadata => {
+            "Dieser Ordner enthält keine Zarr-Metadaten, die der Browser lesen kann. Wählen Sie den Ordner des Speichers selbst (den mit zarr.json oder .zgroup), nicht einen Ordner darüber. Safari blendet Dateien aus, deren Name mit einem Punkt beginnt, daher öffnen sich Zarr-v2-Ordner (.zgroup, .zarray) nur in Chrome, Firefox oder der Octant-Desktop-App. Zarr-v3-Ordner öffnen sich in jedem Browser."
         }
         DatasetKey::Plate => "Platte",
         DatasetKey::PlateAcquisition => "Aufnahme",
