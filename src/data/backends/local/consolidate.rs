@@ -8,12 +8,17 @@
 use super::read::{Missing, blob_bytes, call, file_in, handle_dir, with_callbacks};
 use super::registry::Source;
 use super::{documents, path};
+use futures::{StreamExt, stream};
 use js_sys::{Array, Function, Reflect};
 use serde_json::{Map, Value};
 use wasm_bindgen::{JsCast, JsValue};
 
-/// The metadata documents a node's folder may hold.
-const NODE_DOCS: [&str; 4] = ["zarr.json", ".zarray", ".zgroup", ".zattrs"];
+/// The metadata documents a v3 node's folder holds.
+const V3_DOCS: &[&str] = &["zarr.json"];
+/// The metadata documents a v2 node's folder may hold.
+const V2_DOCS: &[&str] = &[".zarray", ".zgroup", ".zattrs"];
+/// Files read, and folders listed, at the same time while walking.
+const CONCURRENT_READS: usize = 32;
 
 /// A v2 `.zmetadata` of the store in `source`; none when it is no v2 store,
 /// or an OME-Zarr one (its discovery reads it by known paths, so a large
@@ -25,7 +30,7 @@ pub(super) async fn zmetadata(source: &Source) -> Option<Vec<u8>> {
     if documents::is_ome_root(json_at(source, ".zattrs").await.as_ref()) {
         return None;
     }
-    let document = documents::v2_document(metadata_docs(source).await);
+    let document = documents::v2_document(metadata_docs(source, V2_DOCS).await);
     serde_json::to_vec(&document).ok()
 }
 
@@ -39,42 +44,53 @@ pub(super) async fn v3_root(source: &Source, bytes: Vec<u8>) -> Vec<u8> {
     if !documents::v3_needs_consolidation(&root) {
         return bytes;
     }
-    documents::consolidate_v3(&mut root, metadata_docs(source).await);
+    documents::consolidate_v3(&mut root, metadata_docs(source, V3_DOCS).await);
     serde_json::to_vec(&root).unwrap_or(bytes)
 }
 
-/// Every node's metadata documents by key, from the root down through its
-/// groups.
-async fn metadata_docs(source: &Source) -> Map<String, Value> {
+/// Every node's metadata documents (`names`, the store's format's) by key,
+/// from the root down through its groups, a level of folders at a time.
+async fn metadata_docs(source: &Source, names: &[&str]) -> Map<String, Value> {
     let mut docs = Map::new();
-    let mut groups = vec![String::new()];
-    while let Some(dir) = groups.pop() {
-        let prefix = if dir.is_empty() {
-            String::new()
-        } else {
-            format!("{dir}/")
-        };
-        let mut group = false;
-        for name in NODE_DOCS {
-            let key = format!("{prefix}{name}");
-            let Some(doc) = json_at(source, &key).await else {
-                continue;
-            };
-            let v3_group = doc.get("node_type").and_then(Value::as_str) == Some("group");
-            group |= name == ".zgroup" || (name == "zarr.json" && v3_group);
-            docs.insert(key, doc);
-            // A v3 node has no v2 documents beside its `zarr.json`.
-            if name == "zarr.json" {
-                break;
-            }
-        }
-        if group {
-            for folder in subfolders(source, &dir).await {
-                groups.push(format!("{prefix}{folder}"));
-            }
-        }
+    let mut level = vec![String::new()];
+    while !level.is_empty() {
+        let keys = level
+            .iter()
+            .flat_map(|dir| names.iter().map(move |n| key_in(dir, n)));
+        let found: Vec<(String, Option<Value>)> = stream::iter(keys)
+            .map(|key| async move {
+                let doc = json_at(source, &key).await;
+                (key, doc)
+            })
+            .buffered(CONCURRENT_READS)
+            .collect()
+            .await;
+        let groups: Vec<String> = found
+            .iter()
+            .filter_map(|(key, doc)| documents::group_of(key, doc.as_ref()?))
+            .collect();
+        docs.extend(found.into_iter().filter_map(|(key, doc)| Some((key, doc?))));
+        level = stream::iter(groups)
+            .map(|dir| async move {
+                let names = subfolders(source, &dir).await;
+                names
+                    .into_iter()
+                    .map(|n| key_in(&dir, &n))
+                    .collect::<Vec<_>>()
+            })
+            .buffered(CONCURRENT_READS)
+            .concat()
+            .await;
     }
     docs
+}
+
+/// `name` in folder `dir` (`""` the root).
+fn key_in(dir: &str, name: &str) -> String {
+    match dir {
+        "" => name.to_owned(),
+        _ => format!("{dir}/{name}"),
+    }
 }
 
 /// The JSON document at `key`, none when absent or unreadable.

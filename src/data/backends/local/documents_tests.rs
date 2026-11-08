@@ -1,4 +1,6 @@
-use super::documents::{consolidate_v3, is_ome_root, v2_document, v3_needs_consolidation};
+use super::documents::{
+    consolidate_v3, group_of, is_ome_root, v2_document, v3_needs_consolidation,
+};
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
 use zarrs::group::Group;
@@ -93,4 +95,16 @@ fn a_v2_document_keeps_only_v2_keys() {
         .collect();
     keys.sort_unstable();
     assert_eq!(keys, [".zgroup", "u/.zarray", "u/.zattrs"]);
+}
+
+#[test]
+fn groups_are_the_folders_of_group_documents() {
+    let v2_group = json!({ "zarr_format": 2 });
+    assert_eq!(group_of(".zgroup", &v2_group).as_deref(), Some(""));
+    assert_eq!(group_of("a/b/.zgroup", &v2_group).as_deref(), Some("a/b"));
+    assert_eq!(group_of("a/.zattrs", &v2_group), None);
+    assert_eq!(group_of("a/x.zgroup", &v2_group), None);
+    assert_eq!(group_of("zarr.json", &group()).as_deref(), Some(""));
+    assert_eq!(group_of("g/zarr.json", &group()).as_deref(), Some("g"));
+    assert_eq!(group_of("g/v/zarr.json", &array()), None);
 }

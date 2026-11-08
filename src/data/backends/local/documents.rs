@@ -36,6 +36,21 @@ pub fn consolidate_v3(root: &mut Value, docs: Map<String, Value>) {
         json!({ "kind": "inline", "must_understand": false, "metadata": nodes });
 }
 
+/// The group folder `doc`, found at `key`, declares: a v2 `.zgroup`'s, or a
+/// v3 group's `zarr.json`'s.
+pub fn group_of(key: &str, doc: &Value) -> Option<String> {
+    let file = if doc.get("node_type").and_then(Value::as_str) == Some("group") {
+        "zarr.json"
+    } else {
+        ".zgroup"
+    };
+    let dir = match key.strip_suffix(file)? {
+        "" => "",
+        dir => dir.strip_suffix('/')?,
+    };
+    Some(dir.to_owned())
+}
+
 /// Whether a store's root attributes (v3 `attributes`, v2 `.zattrs`) are
 /// OME-Zarr's.
 pub fn is_ome_root(attributes: Option<&Value>) -> bool {
