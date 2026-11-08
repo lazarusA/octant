@@ -69,12 +69,22 @@ pub async fn load(request: &BlockRequest) -> Outcome {
 }
 
 /// Sends the job `make` builds from its id to the worker `uri`'s `variable` loads in, and
-/// waits for its outcome.
-pub(super) async fn run(uri: &str, variable: &str, make: impl FnOnce(u64) -> ToWorker) -> Outcome {
-    let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, make)) else {
-        return Outcome::Unavailable;
-    };
-    answer.await.unwrap_or(Outcome::Unavailable)
+/// waits for its outcome. A job whose worker never started while others did is sent once
+/// more, to the next place (`place_of`): the page reads no NetCDF.
+pub(super) async fn run(uri: &str, variable: &str, make: impl Fn(u64) -> ToWorker) -> Outcome {
+    for _ in 0..2 {
+        let Some(answer) = POOL.with_borrow_mut(|pool| pool.submit(uri, variable, &make)) else {
+            return Outcome::Unavailable;
+        };
+        match answer.await {
+            Ok(outcome @ (Outcome::Block(_) | Outcome::Failed(_) | Outcome::Inspected(_))) => {
+                return outcome;
+            }
+            _ if POOL.with_borrow(|pool| pool.broken) => break,
+            _ => {}
+        }
+    }
+    Outcome::Unavailable
 }
 
 /// Has every worker drop the stores of `uri`.
@@ -115,7 +125,7 @@ impl Pool {
         &mut self,
         uri: &str,
         variable: &str,
-        make: impl FnOnce(u64) -> ToWorker,
+        make: impl Fn(u64) -> ToWorker,
     ) -> Option<oneshot::Receiver<Outcome>> {
         let index = self.place_of(uri, variable)?;
         let id = self.next_id;
