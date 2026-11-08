@@ -144,6 +144,22 @@ fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) 
                 }
             });
 
+        #[cfg(target_arch = "wasm32")]
+        {
+            if ui
+                .icon_button(Icon::Folder, tr(DatasetKey::OpenFolder))
+                .clicked()
+            {
+                crate::data::backends::local::pick_folder(ui.ctx());
+            }
+            if ui
+                .icon_button(Icon::Dataset, tr(DatasetKey::OpenFile))
+                .clicked()
+            {
+                crate::data::backends::local::pick_file(ui.ctx());
+            }
+        }
+
         if has_input && ui.button(tr(DatasetKey::Clear)).clicked() {
             app.selected.store_target.clear();
         }

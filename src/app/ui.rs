@@ -1,6 +1,3 @@
-use crate::i18n::{NoticesKey as N, tr};
-use crate::ui::toast::Severity;
-
 use super::OctantApp;
 
 impl eframe::App for OctantApp {
@@ -69,31 +66,8 @@ impl eframe::App for OctantApp {
         // Process in-flight export / screenshot requests
         self.process_pending_export();
 
-        // Global Drag-and-Drop handler for files and directories
-        let dropped_file = ctx.input(|i| i.raw.dropped_files.first().cloned());
-        if let Some(file) = dropped_file {
-            let path = file.path();
-            let path_str = path.to_string_lossy().trim().to_string();
-            if !path_str.is_empty() {
-                match crate::utils::infer_store_kind_from_target(&path_str) {
-                    Ok(_) => {
-                        crate::ui::drop_zone::clear_drop_zone_warning(&ctx);
-                        self.layout.hero_state.input = path_str.clone();
-                        self.selected.store_target = path_str.clone();
-                        self.submit_or_activate_source(&path_str, None);
-                    }
-                    Err(err) => {
-                        self.status_message = format!("{err}: '{path_str}'");
-                        crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
-                        self.notify(
-                            Severity::Warning,
-                            tr(N::UnsupportedFile),
-                            format!("{err}: {path_str}"),
-                        );
-                    }
-                }
-            }
-        }
+        // Dropped files and folders (and, on the web, picked ones)
+        self.open_dropped(&ctx);
 
         // 3. Bars, modal windows and floating panels around the canvas
         let canvas_rect = self.show_chrome(ui, !is_hero_active);

@@ -27,6 +27,7 @@ mod composite_defaults_tests;
 pub mod controllers;
 mod data_loading;
 pub(crate) mod detail;
+mod dropped;
 mod export_lifecycle;
 mod floating;
 #[cfg(test)]
