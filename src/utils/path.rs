@@ -27,7 +27,7 @@ pub fn expand_tilde_str(path: &str) -> String {
 
 const GEOTIFF_EXTS: &[&str] = &[".tif", ".tiff", ".geotif", ".geotiff", ".cog"];
 const NETCDF_EXTS: &[&str] = &[
-    ".nc", ".nc4", ".cdf", ".netcdf", ".h5", ".hdf5", ".hdf", ".he5",
+    ".nc", ".nc4", ".cdf", ".netcdf", ".h5", ".hdf5", ".hdf", ".he5", ".mat",
 ];
 
 fn has_ext(s: &str, exts: &[&str]) -> bool {

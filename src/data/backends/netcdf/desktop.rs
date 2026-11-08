@@ -1,4 +1,5 @@
-//! Desktop NetCDF storage backend: local files through netCDF-C.
+//! Desktop NetCDF storage backend: local files through netCDF-C, MATLAB v7.3 `.mat` files
+//! through `hdf5-pure`.
 
 use std::sync::Arc;
 
@@ -10,7 +11,7 @@ use crate::data::blocks::BlockStoreError;
 #[derive(Clone)]
 pub struct NetCdfBlockStore {
     pub(crate) file_path: String,
-    /// The file open in `hdf5-pure` (the parity tests); netCDF files are opened by netCDF-C
+    /// The file open in `hdf5-pure` (`.mat` files); netCDF files are opened by netCDF-C
     /// per read.
     pure: Option<Arc<PureReader>>,
 }
@@ -23,8 +24,17 @@ impl std::fmt::Debug for NetCdfBlockStore {
     }
 }
 
+/// Whether the file at `path` starts as a MATLAB file does (`MATLAB 7.3 MAT-file`, or an
+/// older one, which `PureReader` refuses with its reason).
+fn is_matlab(path: &std::path::Path) -> bool {
+    use std::io::Read;
+    let mut head = [0; 6];
+    std::fs::File::open(path).is_ok_and(|mut f| f.read_exact(&mut head).is_ok())
+        && &head == b"MATLAB"
+}
+
 impl NetCdfBlockStore {
-    /// Opens a NetCDF or HDF5 dataset from a local filesystem path.
+    /// Opens a NetCDF, HDF5 or MATLAB v7.3 dataset from a local filesystem path.
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
         let clean_path = path
             .strip_prefix("file://")
@@ -40,18 +50,21 @@ impl NetCdfBlockStore {
         }
         if p.is_dir() {
             return Err(format!(
-                "'{}' is a directory. Please specify a .nc / .h5 / .hdf5 / .cdf file path.",
+                "'{}' is a directory. Please specify a .nc / .h5 / .hdf5 / .cdf / .mat file path.",
                 p.display()
             )
             .into());
         }
         let file_path = p.to_string_lossy().to_string();
-        // Verify that the file can be opened and parsed by netcdf
-        CReader::open(&file_path)?;
-        Ok(Self {
-            file_path,
-            pure: None,
-        })
+        let pure = match is_matlab(&p) {
+            true => Some(Arc::new(PureReader::open_path(&file_path)?)),
+            false => {
+                // Verify that the file can be opened and parsed by netcdf
+                CReader::open(&file_path)?;
+                None
+            }
+        };
+        Ok(Self { file_path, pure })
     }
 
     /// The file at `path` read by `hdf5-pure`, whatever it holds, for the parity tests.

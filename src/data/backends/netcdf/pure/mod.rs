@@ -1,8 +1,14 @@
-//! The reader over `hdf5-pure`: netCDF-4/HDF5 files (`netcdf4.rs`). The file is read
+//! The reader over `hdf5-pure`: netCDF-4/HDF5 files (`netcdf4.rs`) in the browser's data
+//! workers, and MATLAB v7.3 `.mat` files (`mat.rs`) on both targets. The file is read
 //! lazily through a [`Source`]; its variables are described once, when it opens.
 
 mod attrs;
+mod mat;
 mod netcdf4;
+
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod mat_tests;
 
 use std::collections::HashMap;
 
@@ -30,11 +36,18 @@ pub struct PureReader {
     by_path: HashMap<String, usize>,
 }
 
-/// Why a file is refused, from its first bytes: classic NetCDF files are not HDF5.
+/// Why a file is refused, from its first bytes: classic NetCDF and MATLAB files before
+/// v7.3 are not HDF5.
 fn refusal(head: &[u8]) -> Option<&'static str> {
-    let classic = matches!(head, [b'C', b'D', b'F', 1 | 2 | 5, ..]);
-    classic
-        .then_some("Classic NetCDF files (CDF-1, CDF-2, CDF-5) open only in the Octant desktop app")
+    if let [b'C', b'D', b'F', 1 | 2 | 5, ..] = head {
+        return Some(
+            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open only in the Octant desktop app",
+        );
+    }
+    let old_mat = head.starts_with(b"MATLAB 5.0 MAT-file") && !hdf5_pure::is_hdf5_bytes(head);
+    old_mat.then_some(
+        "MATLAB files before v7.3 are not supported: save it again with save(..., '-v7.3')",
+    )
 }
 
 fn failed(what: &str, e: impl std::fmt::Display) -> BlockStoreError {
@@ -54,13 +67,17 @@ impl PureReader {
         if let Some(why) = refusal(&head) {
             return Err(why.into());
         }
+        let matlab = head.starts_with(b"MATLAB 7.3 MAT-file");
         let properties = FileAccessProperties::new()
             .with_metadata_cache(MetadataCacheConfig::new(METADATA_CACHE))
             .with_chunk_cache(ChunkCacheConfig::from_h5p_cache(521, CHUNK_CACHE));
         let file = File::from_source_with_options(source, properties)
             .map_err(|e| failed(&format!("Failed to open '{name}' as NetCDF-4/HDF5"), e))?;
-        let (globals, entries) =
-            netcdf4::catalog(&file).map_err(|e| failed(&format!("Failed to read '{name}'"), e))?;
+        let (globals, entries) = match matlab {
+            true => mat::catalog(&file),
+            false => netcdf4::catalog(&file),
+        }
+        .map_err(|e| failed(&format!("Failed to read '{name}'"), e))?;
         let by_path = (entries.iter().enumerate())
             .map(|(i, e)| (e.var.path.clone(), i))
             .collect();
