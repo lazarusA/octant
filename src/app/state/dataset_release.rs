@@ -51,17 +51,28 @@ impl OctantApp {
     /// Drops the blocks of `source_id` and the stores of `uri` once nothing
     /// reads them.
     pub(super) fn release_dataset_memory(&mut self, source_id: &str, uri: &str) {
-        let reads = |target: &str| same_target(target, uri);
-        let in_use = self.dataset_manager.iter().any(|d| reads(&d.source.uri))
+        use crate::data::backends::local;
+        if !self.reads_source(|target| same_target(target, uri)) {
+            self.block_cache.remove_source(source_id);
+            crate::data::backends::release_stores(uri);
+        }
+        // A local plate and its fields (`{plate}/{well}/{field}`) share one
+        // local source, kept until none of them is read.
+        if let Some(id) = local::id_of(uri)
+            && !self.reads_source(|target| local::id_of(target) == Some(id))
+        {
+            local::release(uri);
+        }
+    }
+
+    /// Whether a dataset, plotted layer or staged selection reads a source
+    /// `reads` accepts.
+    fn reads_source(&self, reads: impl Fn(&str) -> bool) -> bool {
+        self.dataset_manager.iter().any(|d| reads(&d.source.uri))
             || self
                 .layers
                 .iter()
                 .any(|l| reads(&l.selection().store_target))
-            || (self.selected.metadata.is_some() && reads(&self.selected.store_target));
-        if in_use {
-            return;
-        }
-        self.block_cache.remove_source(source_id);
-        crate::data::backends::release_stores(uri);
+            || (self.selected.metadata.is_some() && reads(&self.selected.store_target))
     }
 }

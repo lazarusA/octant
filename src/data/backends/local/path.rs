@@ -19,6 +19,11 @@ pub fn parse(url: &str) -> Option<(u32, &str)> {
     Some((id.parse().ok()?, key.trim_end_matches('/')))
 }
 
+/// The source id of local `url`; none for other URLs.
+pub fn id_of(url: &str) -> Option<u32> {
+    parse(url).map(|(id, _)| id)
+}
+
 /// The path segments of `key`, none when it names nothing under the root
 /// (empty, `.` or `..` segments).
 pub fn segments(key: &str) -> Option<Vec<&str>> {
@@ -46,7 +51,15 @@ pub fn subfolders<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, segments, subfolders, url_of};
+    use super::{id_of, parse, segments, subfolders, url_of};
+
+    #[test]
+    fn a_plate_and_its_fields_share_one_source() {
+        let plate = url_of(3, "plate.zarr");
+        assert_eq!(id_of(&plate), Some(3));
+        assert_eq!(id_of(&format!("{plate}/B/3/0")), Some(3));
+        assert_eq!(id_of("https://host/3/plate.zarr"), None);
+    }
 
     #[test]
     fn subfolders_are_the_next_segment_under_a_folder() {

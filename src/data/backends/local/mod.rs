@@ -21,7 +21,7 @@ mod read;
 #[cfg(target_arch = "wasm32")]
 mod registry;
 
-pub use path::SCHEME;
+pub use path::{SCHEME, id_of};
 
 #[cfg(target_arch = "wasm32")]
 pub use drop::install_drop_listener;

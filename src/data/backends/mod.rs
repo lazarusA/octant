@@ -20,5 +20,4 @@ pub fn release_stores(uri: &str) {
     WasmZarrBlockStore::release(uri);
     icechunk::wasm::WasmIcechunkBlockStore::release(uri);
     geotiff::WasmGeoTiffBlockStore::release(uri);
-    local::release(uri);
 }
