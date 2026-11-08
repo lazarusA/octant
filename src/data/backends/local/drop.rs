@@ -47,7 +47,10 @@ async fn open_entry(entry: JsValue, ctx: egui::Context) {
         match entry_as_file(&entry).await {
             Ok(file) => Source::File(file),
             Err(e) => {
-                log::warn!("Could not read the dropped file '{name}': {e:?}");
+                let title = crate::i18n::tr(crate::i18n::NoticesKey::CouldntOpenDataset);
+                let severity = crate::ui::toast::Severity::Warning;
+                crate::ui::toast::report(severity, title, format!("{name}: {e:?}"));
+                ctx.request_repaint();
                 return;
             }
         }

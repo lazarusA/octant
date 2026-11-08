@@ -19,7 +19,7 @@ impl OctantApp {
         }
         match crate::utils::infer_store_kind_from_target(&path_str) {
             Ok(_) => self.open_dropped_source(ctx, &path_str, None),
-            Err(err) => self.refuse_dropped(ctx, &format!("{err}: {path_str}")),
+            Err(_) => self.refuse_dropped(ctx, &path_str),
         }
     }
 
@@ -34,7 +34,7 @@ impl OctantApp {
                     let kind = StoreKind::from_data_source_kind(&kind);
                     self.open_dropped_source(ctx, &url, Some(kind));
                 }
-                Err(name) => self.refuse_dropped(ctx, &format!("Type not supported: {name}")),
+                Err(name) => self.refuse_dropped(ctx, &name),
             }
         }
     }
@@ -46,13 +46,9 @@ impl OctantApp {
         self.submit_or_activate_source(target, kind);
     }
 
-    fn refuse_dropped(&mut self, ctx: &egui::Context, detail: &str) {
-        self.status_message = detail.to_string();
+    /// Warns that the file or folder `name` cannot be opened.
+    fn refuse_dropped(&mut self, ctx: &egui::Context, name: &str) {
         crate::ui::drop_zone::trigger_drop_zone_warning(ctx);
-        self.notify(
-            Severity::Warning,
-            tr(N::UnsupportedFile),
-            detail.to_string(),
-        );
+        self.notify(Severity::Warning, tr(N::UnsupportedFile), name.to_string());
     }
 }
