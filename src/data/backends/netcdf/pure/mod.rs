@@ -41,9 +41,12 @@ pub struct PureReader {
 /// v7.3 are not HDF5.
 fn refusal(head: &[u8]) -> Option<&'static str> {
     if let [b'C', b'D', b'F', 1 | 2 | 5, ..] = head {
-        return Some(
-            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open only in the Octant desktop app",
-        );
+        // The desktop reads them through netCDF-C, from disk only.
+        return Some(if cfg!(target_arch = "wasm32") {
+            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open only in the Octant desktop app"
+        } else {
+            "Classic NetCDF files (CDF-1, CDF-2, CDF-5) open from disk only: download the file first"
+        });
     }
     let old_mat = head.starts_with(b"MATLAB 5.0 MAT-file") && !hdf5_pure::is_hdf5_bytes(head);
     old_mat.then_some(

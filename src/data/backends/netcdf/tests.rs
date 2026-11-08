@@ -238,3 +238,22 @@ fn deflated_chunks_on_an_unlimited_dimension_read_alike() {
     let block = store.fetch_block(&request).expect("block");
     assert_eq!(block.values[17], 4.25);
 }
+
+/// A remote NetCDF-4 file read by ranged requests (a GOES-16 radiance granule on NOAA's
+/// public bucket): `cargo test --lib remote_netcdf_opens -- --ignored --nocapture`.
+#[test]
+#[ignore = "network"]
+fn remote_netcdf_opens() {
+    const URL: &str = "https://noaa-goes16.s3.amazonaws.com/ABI-L1b-RadC/2017/242/00/OR_ABI-L1b-RadC-M3C01_G16_s20172420002168_e20172420004540_c20172420004583.nc";
+    let store = super::NetCdfBlockStore::open_local(URL).expect("open");
+    let meta = store.inspect().expect("inspect");
+    let rad = meta
+        .variables
+        .iter()
+        .find(|v| v.name == "Rad")
+        .expect("Rad");
+    println!("Rad {:?} {:?}", rad.dimension_names, rad.shape);
+    let request = SliceRequest::full_range("Rad", &[100, 100]);
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(block.values.len(), 100 * 100);
+}

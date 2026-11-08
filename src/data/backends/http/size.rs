@@ -1,7 +1,9 @@
 //! The size of a remote object, from a `HEAD` request's `Content-Length`:
 //! readable by the page on any CORS-enabled server and, with no `Range`
 //! header, sent without a preflight (suffix ranges need one, which some
-//! stores refuse).
+//! stores refuse). In the browser, a server whose CORS rules allow only `GET`
+//! (S3 buckets such as NOAA's) refuses the `HEAD`: the size then comes from a
+//! plain `GET`, its body cancelled once the headers arrive.
 
 /// The size in bytes of the object at `url`; an `HTTP 404 ...` error when
 /// it is absent ([`super::is_not_found`]).
@@ -12,7 +14,18 @@ pub async fn fetch_url_size(url: &str) -> Result<u64, String> {
     }
     let init = web_sys::RequestInit::new();
     init.set_method("HEAD");
-    let resp = super::fetch::send(url, &init).await?;
+    let resp = match super::fetch::send(url, &init).await {
+        Ok(resp) => resp,
+        Err(head_error) => {
+            let resp = super::fetch::send(url, &web_sys::RequestInit::new())
+                .await
+                .map_err(|_| head_error)?;
+            if let Some(body) = resp.body() {
+                let _ = body.cancel();
+            }
+            resp
+        }
+    };
     if !resp.ok() {
         return Err(format!(
             "HTTP {} fetching the size of '{url}'",

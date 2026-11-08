@@ -1,10 +1,12 @@
-//! Desktop NetCDF storage backend: local files through netCDF-C, MATLAB v7.3 `.mat` files
-//! through `hdf5-pure`.
+//! Desktop NetCDF storage backend: local files through netCDF-C; MATLAB v7.3 `.mat` files
+//! and remote (`http(s)://`) NetCDF-4/HDF5 files through `hdf5-pure`, the remote ones read
+//! by ranged requests.
 
 use std::sync::Arc;
 
 use super::c_reader::CReader;
 use super::pure::PureReader;
+use super::pure::read_ahead::ReadAhead;
 use super::reader::NcReader;
 use crate::data::blocks::BlockStoreError;
 
@@ -34,8 +36,16 @@ fn is_matlab(path: &std::path::Path) -> bool {
 }
 
 impl NetCdfBlockStore {
-    /// Opens a NetCDF, HDF5 or MATLAB v7.3 dataset from a local filesystem path.
+    /// Opens a NetCDF, HDF5 or MATLAB v7.3 dataset from a local filesystem path, or a
+    /// NetCDF-4/HDF5 one from an `http(s)` URL.
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
+        if path.starts_with("https://") || path.starts_with("http://") {
+            let reader = PureReader::open(HttpSource::open(path)?, path)?;
+            return Ok(Self {
+                file_path: path.to_owned(),
+                pure: Some(Arc::new(reader)),
+            });
+        }
         let clean_path = path
             .strip_prefix("file://")
             .or_else(|| path.strip_prefix("netcdf://"))
@@ -90,5 +100,41 @@ impl NetCdfBlockStore {
             Some(reader) => f(reader.as_ref()),
             None => f(&CReader::open(&self.file_path)?),
         }
+    }
+}
+
+/// A remote file, read by ranged requests on the shared runtime through a [`ReadAhead`].
+/// Reads come from the background pool's threads, never from the runtime's own, which
+/// `block_on` forbids.
+struct HttpSource {
+    url: String,
+    len: u64,
+    ahead: ReadAhead,
+}
+
+impl HttpSource {
+    fn open(url: &str) -> Result<Self, BlockStoreError> {
+        let size = crate::data::backends::http::fetch_url_size(url);
+        let len = crate::utils::executor::get_shared_tokio_rt().block_on(size)?;
+        Ok(Self {
+            url: url.to_owned(),
+            len,
+            ahead: ReadAhead::default(),
+        })
+    }
+}
+
+impl hdf5_pure::Source for HttpSource {
+    fn len(&self) -> u64 {
+        self.len
+    }
+
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), hdf5_pure::FormatError> {
+        self.ahead.read(self.len, offset, buf, |offset, length| {
+            let read = crate::data::backends::http::fetch_url_byte_range(&self.url, offset, length);
+            crate::utils::executor::get_shared_tokio_rt()
+                .block_on(read)
+                .map_err(hdf5_pure::FormatError::Source)
+        })
     }
 }
