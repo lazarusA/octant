@@ -82,6 +82,10 @@ pub fn report_warnings(found: &Discovery, dataset: &str) {
     for w in &found.warnings {
         log::warn!("OME-Zarr metadata of {dataset}: {w}");
     }
+    // A data worker inspects a dataset the page opened and reported already.
+    if crate::data::worker::in_worker() {
+        return;
+    }
     let version = if found.dataset.version.is_empty() {
         "?"
     } else {

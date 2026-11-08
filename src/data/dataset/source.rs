@@ -3,7 +3,7 @@
 //! This is intentionally independent of the backend implementation.
 //! The UI chooses a DataSource before choosing variables.
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DataSourceKind {
     LocalZarr,
     RemoteZarr,
@@ -22,7 +22,7 @@ pub enum DataSourceKind {
     Other(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DataSource {
     pub id: String,
     pub kind: DataSourceKind,

@@ -125,3 +125,4 @@ jobs:
         run: |
           scripts/check_wasm_size.sh dist .github/wasm-size-budget
           scripts/check_wasm_size.sh dist .github/wasm-size-budget-voice-worker voice_worker_bg.wasm
+          scripts/check_wasm_size.sh dist .github/wasm-size-budget-data-worker data_worker_bg.wasm

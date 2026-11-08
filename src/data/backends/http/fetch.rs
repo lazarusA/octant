@@ -16,6 +16,50 @@ pub fn is_missing(err: &str) -> bool {
 #[cfg(target_arch = "wasm32")]
 const ANSWER_TIMEOUT_MS: i32 = 60_000;
 
+/// The global scope requests are sent from: the page's window, or a data
+/// worker's scope (`data::worker`), which has `fetch` and timers too.
+#[cfg(target_arch = "wasm32")]
+enum Scope {
+    Window(web_sys::Window),
+    Worker(web_sys::WorkerGlobalScope),
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Scope {
+    fn current() -> Result<Self, String> {
+        use wasm_bindgen::JsCast;
+        let global = js_sys::global();
+        match global.dyn_into::<web_sys::Window>() {
+            Ok(window) => Ok(Self::Window(window)),
+            Err(global) => global
+                .dyn_into::<web_sys::WorkerGlobalScope>()
+                .map(Self::Worker)
+                .map_err(|_| "No global window or worker scope found".to_string()),
+        }
+    }
+
+    fn fetch(&self, request: &web_sys::Request) -> js_sys::Promise {
+        match self {
+            Self::Window(w) => w.fetch_with_request(request),
+            Self::Worker(w) => w.fetch_with_request(request),
+        }
+    }
+
+    fn set_timeout(&self, f: &js_sys::Function, ms: i32) -> Result<i32, wasm_bindgen::JsValue> {
+        match self {
+            Self::Window(w) => w.set_timeout_with_callback_and_timeout_and_arguments_0(f, ms),
+            Self::Worker(w) => w.set_timeout_with_callback_and_timeout_and_arguments_0(f, ms),
+        }
+    }
+
+    fn clear_timeout(&self, handle: i32) {
+        match self {
+            Self::Window(w) => w.clear_timeout_with_handle(handle),
+            Self::Worker(w) => w.clear_timeout_with_handle(handle),
+        }
+    }
+}
+
 /// Sends `init` to `url` and waits for the answer, giving up after
 /// [`ANSWER_TIMEOUT_MS`]: `fetch` has no limit of its own, and a server that
 /// never answers would hold its prefetch worker for good. Only the wait for
@@ -34,35 +78,33 @@ pub(crate) async fn send(
     /// The pending timer, cleared when the answer comes or the fetch is
     /// dropped, so it never calls its dropped closure.
     struct Timer {
-        window: web_sys::Window,
+        scope: Scope,
         handle: i32,
         _abort: Closure<dyn FnMut()>,
     }
     impl Drop for Timer {
         fn drop(&mut self) {
-            self.window.clear_timeout_with_handle(self.handle);
+            self.scope.clear_timeout(self.handle);
         }
     }
 
-    let window = web_sys::window().ok_or_else(|| "No global window object found".to_string())?;
+    let scope = Scope::current()?;
     let controller =
         web_sys::AbortController::new().map_err(|e| format!("No AbortController: {e:?}"))?;
     init.set_signal(Some(&controller.signal()));
     let request = web_sys::Request::new_with_str_and_init(url, init)
         .map_err(|e| format!("Failed to build request: {e:?}"))?;
     let abort = Closure::<dyn FnMut()>::new(move || controller.abort());
-    let handle = window
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            abort.as_ref().unchecked_ref(),
-            ANSWER_TIMEOUT_MS,
-        )
+    let handle = scope
+        .set_timeout(abort.as_ref().unchecked_ref(), ANSWER_TIMEOUT_MS)
         .map_err(|e| format!("Failed to set a timeout: {e:?}"))?;
+    let fetched = scope.fetch(&request);
     let _timer = Timer {
-        window: window.clone(),
+        scope,
         handle,
         _abort: abort,
     };
-    JsFuture::from(window.fetch_with_request(&request))
+    JsFuture::from(fetched)
         .await
         .map_err(|e| format!("Network fetch failed for '{url}': {e:?}"))?
         .dyn_into()
@@ -81,7 +123,7 @@ async fn body(resp: web_sys::Response) -> Result<Vec<u8>, String> {
     Ok(js_sys::Uint8Array::new(&buffer).to_vec())
 }
 
-/// Fetches raw bytes from a remote URL using browser `window.fetch()`.
+/// Fetches raw bytes from a remote URL using the browser's `fetch()`.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
     if url.starts_with(crate::data::backends::local::SCHEME) {

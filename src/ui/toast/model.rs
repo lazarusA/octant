@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::ui::icons::{Icon, IconTone};
 
 /// How serious a toast is; sets its icon, tone and lifetime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Severity {
     Info,
     Success,

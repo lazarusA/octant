@@ -80,7 +80,7 @@ impl OctantBlock {
         }
     }
 
-    fn row_major_strides(shape: &[usize]) -> Vec<usize> {
+    pub(crate) fn row_major_strides(shape: &[usize]) -> Vec<usize> {
         let mut strides = vec![1; shape.len()];
 
         for i in (0..shape.len().saturating_sub(1)).rev() {

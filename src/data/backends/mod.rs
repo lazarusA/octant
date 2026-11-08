@@ -15,9 +15,12 @@ pub use procedural::ProceduralBlockStore;
 pub use zarr::{GenericZarrBlockStore, WasmZarrBlockStore, ZarrBlockStore};
 
 /// Lets go of what the browser's stores keep for the dataset at `uri`, once
-/// it is closed: metadata, headers, downloaded chunks and manifests.
+/// it is closed: metadata, headers, downloaded chunks and manifests, the
+/// data workers' too (`data::worker`).
 pub fn release_stores(uri: &str) {
     WasmZarrBlockStore::release(uri);
     icechunk::wasm::WasmIcechunkBlockStore::release(uri);
     geotiff::WasmGeoTiffBlockStore::release(uri);
+    #[cfg(target_arch = "wasm32")]
+    crate::data::worker::release(uri);
 }

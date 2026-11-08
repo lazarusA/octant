@@ -2,17 +2,17 @@
 //! backend that keeps any (the browser's Zarr and Icechunk chunks and shard
 //! parts, Icechunk manifests). Past [`DOWNLOAD_BUDGET`], the least recently
 //! used objects their holders let go are dropped (fetched again when asked
-//! for), down to [`TRIM_TO`]. WebAssembly memory never shrinks, so the
-//! budget is what caps its peak.
+//! for), down to 7/8 of it. WebAssembly memory never shrinks, so the budget
+//! is what caps its peak.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 /// Bytes of downloaded data held by every holder together.
 pub const DOWNLOAD_BUDGET: u64 = 256 * 1024 * 1024;
-/// Held bytes once a trim is done, below the budget so that the next
-/// downloads do not trim again at once.
-const TRIM_TO: u64 = DOWNLOAD_BUDGET / 8 * 7;
+/// The limit of [`MemoryBudget::shared`], [`DOWNLOAD_BUDGET`] unless a data
+/// worker takes its share of it ([`MemoryBudget::set_shared_limit`]).
+static SHARED_LIMIT: AtomicU64 = AtomicU64::new(DOWNLOAD_BUDGET);
 
 /// Something holding downloaded objects the budget may drop.
 pub trait Evictable: Send + Sync {
@@ -52,9 +52,18 @@ impl MemoryBudget {
 
     /// The budget every holder shares.
     pub fn shared() -> Arc<Self> {
-        static SHARED: LazyLock<Arc<MemoryBudget>> =
-            LazyLock::new(|| MemoryBudget::new(DOWNLOAD_BUDGET, TRIM_TO));
+        static SHARED: LazyLock<Arc<MemoryBudget>> = LazyLock::new(|| {
+            let limit = SHARED_LIMIT.load(Ordering::Relaxed);
+            // Trimmed below the limit, so the next downloads do not trim again at once.
+            MemoryBudget::new(limit, limit / 8 * 7)
+        });
         SHARED.clone()
+    }
+
+    /// Sets the limit of [`Self::shared`], before its first use: a data
+    /// worker's share of [`DOWNLOAD_BUDGET`] (`data::worker`).
+    pub fn set_shared_limit(limit: u64) {
+        SHARED_LIMIT.store(limit, Ordering::Relaxed);
     }
 
     /// Bytes held now.

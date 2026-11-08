@@ -3,7 +3,8 @@
 #
 # Usage: scripts/check_wasm_size.sh [dist dir] [budget file] [wasm name]
 # Defaults: dist/, .github/wasm-size-budget (one line: a byte count) and the
-# app's `octant-*_bg.wasm`; the voice worker's is `voice_worker_bg.wasm`.
+# app's `octant-*_bg.wasm`; the workers' are `voice_worker_bg.wasm` and
+# `data_worker_bg.wasm`.
 # Raise the budget only in a dedicated commit that says why the size grew.
 set -euo pipefail
 

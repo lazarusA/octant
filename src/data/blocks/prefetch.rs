@@ -12,6 +12,7 @@ use std::time::Duration;
 use web_time::Instant;
 
 use super::cache::{BlockCache, BlockCacheKey};
+#[cfg(not(target_arch = "wasm32"))]
 use super::loader::BlockLoader;
 use super::prefetch_task::Task;
 use super::request::BlockRequest;
@@ -142,7 +143,7 @@ impl BlockPrefetcher {
                 return;
             }
             let mut on_progress = |bytes| task.progress(bytes);
-            let result = BlockLoader::load_one_wasm(&request, Some(&mut on_progress))
+            let result = crate::data::worker::load(&request, Some(&mut on_progress))
                 .await
                 .map_err(|error| error.to_string());
             task.finish(result);
