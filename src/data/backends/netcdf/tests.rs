@@ -1,6 +1,5 @@
 //! Integration tests for NetCDF backend.
 
-use crate::data::backends::netcdf::NetCdfBlockStore;
 use crate::data::blocks::BlockStore;
 use crate::data::slice_request::SliceRequest;
 
@@ -50,7 +49,7 @@ fn test_create_and_read_netcdf() {
     }
 
     // Open with NetCdfBlockStore
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let vars = store.variables().expect("get variables");
     assert!(vars.contains(&"temperature".to_string()));
     assert!(vars.contains(&"lat".to_string()));
@@ -125,7 +124,7 @@ fn test_netcdf_scale_offset_and_fill() {
             .expect("put values");
     }
 
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let req = SliceRequest::full_range("calibrated_data", &[2, 2]);
     let block = store.fetch_block(&req).expect("fetch block");
 
@@ -164,7 +163,7 @@ fn test_netcdf_1d_variable_loading() {
             .expect("put values");
     }
 
-    let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+    let store = super::test_support::Parity::open(&path_str).expect("open store");
     let req = SliceRequest::full_range("lon", &[5]);
     let block = store.fetch_block(&req).expect("fetch 1d block");
 
@@ -210,4 +209,32 @@ fn cf_grid_mappings_name_the_crs() {
     crate::data::crs::assign(&mut meta);
     let t = meta.variables.iter().find(|v| v.name == "t").expect("t");
     assert_eq!(t.crs, Some(crate::data::crs::CrsRef::Wkt(wkt.into())));
+}
+
+/// Chunked, deflated and shuffled data along an unlimited dimension reads the same through
+/// both readers (`test_support::Parity`), as do variables named like dimensions they do not
+/// hold, which netCDF-4 stores as `_nc4_non_coord_*`.
+#[test]
+fn deflated_chunks_on_an_unlimited_dimension_read_alike() {
+    use super::test_support::{Parity, TempNc, netcdf_lock, put};
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("deflated");
+    {
+        let mut file = netcdf::create(&nc.0).expect("create");
+        file.add_unlimited_dimension("time").expect("time");
+        file.add_dimension("x", 6).expect("x");
+        put(&mut file, "x", &["time"], &[5i16, 6, 7]);
+        let mut var = file.add_variable::<f64>("v", &["time", "x"]).expect("v");
+        var.set_compression(4, true).expect("deflate");
+        var.set_chunking(&[2, 4]).expect("chunks");
+        let values: Vec<f64> = (0..18).map(|i| f64::from(i) * 0.25).collect();
+        var.put_values(&values, (0..3, 0..6)).expect("values");
+    }
+    let store = Parity::open(nc.path()).expect("open");
+    let meta = store.inspect().expect("inspect");
+    let v = meta.variables.iter().find(|v| v.name == "v").expect("v");
+    assert_eq!(v.dimension_names, ["time", "x"]);
+    let request = SliceRequest::full_range("v", &[3, 6]);
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(block.values[17], 4.25);
 }

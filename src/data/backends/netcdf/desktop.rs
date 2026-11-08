@@ -1,11 +1,26 @@
-//! Desktop NetCDF storage backend reading local files via `libnetcdf`.
+//! Desktop NetCDF storage backend: local files through netCDF-C.
 
+use std::sync::Arc;
+
+use super::c_reader::CReader;
+use super::pure::PureReader;
+use super::reader::NcReader;
 use crate::data::blocks::BlockStoreError;
 
-/// NetCDF storage backend reading local files via `libnetcdf`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NetCdfBlockStore {
     pub(crate) file_path: String,
+    /// The file open in `hdf5-pure` (the parity tests); netCDF files are opened by netCDF-C
+    /// per read.
+    pure: Option<Arc<PureReader>>,
+}
+
+impl std::fmt::Debug for NetCdfBlockStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetCdfBlockStore")
+            .field("file_path", &self.file_path)
+            .finish()
+    }
 }
 
 impl NetCdfBlockStore {
@@ -30,17 +45,37 @@ impl NetCdfBlockStore {
             )
             .into());
         }
-
+        let file_path = p.to_string_lossy().to_string();
         // Verify that the file can be opened and parsed by netcdf
-        let _file = netcdf::open(&p)
-            .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", p.display()))?;
-
+        CReader::open(&file_path)?;
         Ok(Self {
-            file_path: p.to_string_lossy().to_string(),
+            file_path,
+            pure: None,
+        })
+    }
+
+    /// The file at `path` read by `hdf5-pure`, whatever it holds, for the parity tests.
+    #[cfg(test)]
+    pub(super) fn open_pure(path: &str) -> Result<Self, BlockStoreError> {
+        let pure = Some(Arc::new(PureReader::open_path(path)?));
+        Ok(Self {
+            file_path: path.to_owned(),
+            pure,
         })
     }
 
     pub fn file_path(&self) -> &str {
         &self.file_path
+    }
+
+    /// Runs `f` on the file's reader.
+    pub(super) fn with_reader<R>(
+        &self,
+        f: impl FnOnce(&dyn NcReader) -> Result<R, BlockStoreError>,
+    ) -> Result<R, BlockStoreError> {
+        match &self.pure {
+            Some(reader) => f(reader.as_ref()),
+            None => f(&CReader::open(&self.file_path)?),
+        }
     }
 }

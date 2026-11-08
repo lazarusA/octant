@@ -1,37 +1,26 @@
-//! WebAssembly fallback stub for NetCDF backend.
+//! WebAssembly stub for the NetCDF backend: nothing reads NetCDF in the browser yet.
 
-use crate::data::blocks::{BlockStore, BlockStoreError};
-use crate::data::metadata::DatasetMetadata;
-use crate::data::octant_block::OctantBlock;
-use crate::data::slice_request::SliceRequest;
+use super::reader::NcReader;
+use crate::data::blocks::BlockStoreError;
 
 #[derive(Debug, Clone)]
-pub struct NetCdfBlockStore;
+pub struct NetCdfBlockStore {
+    uri: String,
+}
 
 impl NetCdfBlockStore {
-    pub fn open_local(_path: &str) -> Result<Self, BlockStoreError> {
+    pub fn open_local(_uri: &str) -> Result<Self, BlockStoreError> {
         Err("NetCDF storage backend is not supported on WebAssembly targets".into())
     }
 
     pub fn file_path(&self) -> &str {
-        ""
-    }
-}
-
-impl BlockStore for NetCdfBlockStore {
-    fn backend_name(&self) -> &str {
-        "NetCDF (unsupported on WASM)"
+        &self.uri
     }
 
-    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        Err("NetCDF is not supported on WASM".into())
-    }
-
-    fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
-        Err("NetCDF is not supported on WASM".into())
-    }
-
-    fn fetch_block(&self, _request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
+    pub(super) fn with_reader<R>(
+        &self,
+        _f: impl FnOnce(&dyn NcReader) -> Result<R, BlockStoreError>,
+    ) -> Result<R, BlockStoreError> {
         Err("NetCDF is not supported on WASM".into())
     }
 }

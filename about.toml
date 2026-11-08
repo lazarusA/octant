@@ -83,3 +83,23 @@ checksum = "47c0cccbeec7e8614548cc485588b28149e7874188df5f41b36efebcee285c87"
 path = "fonts/emoji-icon-font-mit-license.txt"
 license = "MIT"
 checksum = "b9d2c1d909aa149996fd4c91dcb92b2362a04431640c1d200959da94caf8cde1"
+
+# hdf5-pure-filter ports HDF5's scale-offset filter (H5Zscaleoffset.c), under HDF5's
+# BSD-3-Clause license, beside its own MIT OR Apache-2.0.
+[hdf5-pure-filter.clarify]
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+
+[[hdf5-pure-filter.clarify.files]]
+path = "LICENSE-MIT"
+license = "MIT"
+checksum = "d3eeda15aa20be2aed677f81c970cecef6af149852ee57f72a44f0e990cfb3e1"
+
+[[hdf5-pure-filter.clarify.files]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
+[[hdf5-pure-filter.clarify.files]]
+path = "LICENSE-HDF5"
+license = "BSD-3-Clause"
+checksum = "b384492d25c6e4a49f371b646d9a81bc0a4b97cf0c66c2f3ed1b35f78a148732"
