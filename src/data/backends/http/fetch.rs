@@ -16,6 +16,22 @@ pub fn is_missing(err: &str) -> bool {
 #[cfg(target_arch = "wasm32")]
 const ANSWER_TIMEOUT_MS: i32 = 60_000;
 
+/// `fetch` and timers, globals both of the page and of a data worker
+/// (`data::worker`).
+#[cfg(target_arch = "wasm32")]
+mod global {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    extern "C" {
+        pub fn fetch(request: &web_sys::Request) -> js_sys::Promise;
+        #[wasm_bindgen(js_name = setTimeout)]
+        pub fn set_timeout(callback: &js_sys::Function, ms: i32) -> i32;
+        #[wasm_bindgen(js_name = clearTimeout)]
+        pub fn clear_timeout(handle: i32);
+    }
+}
+
 /// Sends `init` to `url` and waits for the answer, giving up after
 /// [`ANSWER_TIMEOUT_MS`]: `fetch` has no limit of its own, and a server that
 /// never answers would hold its prefetch worker for good. Only the wait for
@@ -34,35 +50,28 @@ pub(crate) async fn send(
     /// The pending timer, cleared when the answer comes or the fetch is
     /// dropped, so it never calls its dropped closure.
     struct Timer {
-        window: web_sys::Window,
         handle: i32,
         _abort: Closure<dyn FnMut()>,
     }
     impl Drop for Timer {
         fn drop(&mut self) {
-            self.window.clear_timeout_with_handle(self.handle);
+            global::clear_timeout(self.handle);
         }
     }
 
-    let window = web_sys::window().ok_or_else(|| "No global window object found".to_string())?;
     let controller =
         web_sys::AbortController::new().map_err(|e| format!("No AbortController: {e:?}"))?;
     init.set_signal(Some(&controller.signal()));
     let request = web_sys::Request::new_with_str_and_init(url, init)
         .map_err(|e| format!("Failed to build request: {e:?}"))?;
     let abort = Closure::<dyn FnMut()>::new(move || controller.abort());
-    let handle = window
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            abort.as_ref().unchecked_ref(),
-            ANSWER_TIMEOUT_MS,
-        )
-        .map_err(|e| format!("Failed to set a timeout: {e:?}"))?;
+    let handle = global::set_timeout(abort.as_ref().unchecked_ref(), ANSWER_TIMEOUT_MS);
+    let fetched = global::fetch(&request);
     let _timer = Timer {
-        window: window.clone(),
         handle,
         _abort: abort,
     };
-    JsFuture::from(window.fetch_with_request(&request))
+    JsFuture::from(fetched)
         .await
         .map_err(|e| format!("Network fetch failed for '{url}': {e:?}"))?
         .dyn_into()
@@ -81,7 +90,7 @@ async fn body(resp: web_sys::Response) -> Result<Vec<u8>, String> {
     Ok(js_sys::Uint8Array::new(&buffer).to_vec())
 }
 
-/// Fetches raw bytes from a remote URL using browser `window.fetch()`.
+/// Fetches raw bytes from a remote URL using the browser's `fetch()`.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
     if url.starts_with(crate::data::backends::local::SCHEME) {

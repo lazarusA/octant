@@ -1,6 +1,6 @@
 //! Generic N-dimensional selections used to describe a block load.
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DimensionSelection {
     /// Load exactly one element from this dimension.
     Index(usize),
@@ -26,7 +26,7 @@ impl DimensionSelection {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SliceRequest {
     pub variable: String,
     pub selections: Vec<DimensionSelection>,

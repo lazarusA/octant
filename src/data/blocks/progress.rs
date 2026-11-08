@@ -60,6 +60,20 @@ pub fn bytes(n: u64) {
     BYTES.fetch_add(n, Ordering::Relaxed);
 }
 
+/// Chunks planned, chunks arrived and bytes counted since the last
+/// [`reset`]: a data worker's counts, which the page adds to its own
+/// ([`add`], `data::worker`).
+pub fn totals() -> [u64; 3] {
+    [&PLANNED, &ARRIVED, &BYTES].map(|counter| counter.load(Ordering::Relaxed))
+}
+
+/// Adds counts a data worker took ([`totals`]).
+pub fn add([planned, arrived, bytes]: [u64; 3]) {
+    plan(planned);
+    self::arrived(arrived);
+    self::bytes(bytes);
+}
+
 pub fn snapshot() -> Snapshot {
     let planned = PLANNED.load(Ordering::Relaxed);
     let arrived = ARRIVED.load(Ordering::Relaxed);

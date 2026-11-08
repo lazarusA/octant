@@ -3,6 +3,8 @@
 //! range (`read.rs`) through the same `http` functions remote stores use, so
 //! they open as remote Zarr, Icechunk or GeoTIFF. Session only: a reload
 //! forgets them. The desktop reads local paths directly and has none.
+//! Only the page holds the files: a data worker asks the page for what it
+//! reads (`data::worker`), as dropped folders cannot be sent to a worker.
 
 pub mod documents;
 pub mod path;
@@ -27,8 +29,41 @@ pub use path::{SCHEME, id_of};
 pub use drop::install_drop_listener;
 #[cfg(target_arch = "wasm32")]
 pub use pick::{pick_file, pick_folder};
+
+/// The bytes of the file at local `url` (`read.rs`).
 #[cfg(target_arch = "wasm32")]
-pub use read::{read_all, read_range, size};
+pub async fn read_all(url: &str) -> Result<Vec<u8>, String> {
+    use crate::data::worker::{self, LocalRead};
+    if worker::in_worker() {
+        return worker::read_from_page(url, LocalRead::All).await;
+    }
+    read::read_all(url).await
+}
+
+/// `length` bytes of the file at local `url` from `offset` (`read.rs`).
+#[cfg(target_arch = "wasm32")]
+pub async fn read_range(url: &str, offset: u64, length: u64) -> Result<Vec<u8>, String> {
+    use crate::data::worker::{self, LocalRead};
+    if worker::in_worker() {
+        let read = LocalRead::Range { offset, length };
+        return worker::read_from_page(url, read).await;
+    }
+    read::read_range(url, offset, length).await
+}
+
+/// The size in bytes of the file at local `url` (`read.rs`).
+#[cfg(target_arch = "wasm32")]
+pub async fn size(url: &str) -> Result<u64, String> {
+    use crate::data::worker::{self, LocalRead};
+    if worker::in_worker() {
+        let bytes = worker::read_from_page(url, LocalRead::Size).await?;
+        let size: [u8; 8] = bytes
+            .try_into()
+            .map_err(|_| "Bad size answer".to_string())?;
+        return Ok(u64::from_le_bytes(size));
+    }
+    read::size(url).await
+}
 #[cfg(target_arch = "wasm32")]
 pub use registry::{kind_of, release, take_opened};
 

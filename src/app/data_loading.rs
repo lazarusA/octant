@@ -41,6 +41,8 @@ impl OctantApp {
 
         #[cfg(target_arch = "wasm32")]
         {
+            // Workers download while the dataset is inspected, ready for its first plot.
+            crate::data::worker::warm();
             let target_clone = target_input.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let kind = store_kind.to_data_source_kind();
@@ -49,47 +51,24 @@ impl OctantApp {
 
                 let res: Result<(crate::data::DatasetMetadata, crate::data::StoreHandle), String> =
                     async {
-                        match store_kind {
-                            StoreKind::RemoteZarr => {
-                                let meta = crate::data::backends::zarr::inspect_wasm_remote_zarr(
-                                    &target_clone,
-                                )
-                                .await?;
-                                let handle = crate::data::SourceFactory::open(source)
-                                    .map_err(|e| e.to_string())?;
-                                Ok((meta, handle))
-                            }
-                            StoreKind::RemoteIcechunk => {
-                                let meta = crate::data::backends::icechunk::wasm::inspect_wasm_remote_icechunk(
-                                    &target_clone,
-                                )
-                                .await?;
-                                let handle = crate::data::SourceFactory::open(source)
-                                    .map_err(|e| e.to_string())?;
-                                Ok((meta, handle))
-                            }
-                            StoreKind::RemoteGeoTiff => {
-                                let meta = crate::data::backends::geotiff::wasm::inspect_wasm_remote_geotiff(
-                                    &target_clone,
-                                )
-                                .await?;
-                                let handle = crate::data::SourceFactory::open(source)
-                                    .map_err(|e| e.to_string())?;
-                                Ok((meta, handle))
-                            }
+                        if matches!(
+                            store_kind,
                             StoreKind::LocalZarr
-                            | StoreKind::LocalIcechunk
-                            | StoreKind::LocalGeoTiff
-                            | StoreKind::LocalNetCdf => {
-                                Err(crate::i18n::tr(crate::i18n::DatasetKey::BrowserLocalPaths).to_owned())
-                            }
-                            _ => {
-                                let handle = crate::data::SourceFactory::open(source)
-                                    .map_err(|e| e.to_string())?;
-                                let meta = handle.inspect().map_err(|e| e.to_string())?;
-                                Ok((meta, handle))
-                            }
+                                | StoreKind::LocalIcechunk
+                                | StoreKind::LocalGeoTiff
+                                | StoreKind::LocalNetCdf
+                        ) {
+                            let refused = crate::i18n::DatasetKey::BrowserLocalPaths;
+                            return Err(crate::i18n::tr(refused).to_owned());
                         }
+                        let inspected = crate::data::backends::inspect_web(&source).await;
+                        let handle =
+                            crate::data::SourceFactory::open(source).map_err(|e| e.to_string())?;
+                        let meta = match inspected {
+                            Some(meta) => meta?,
+                            None => handle.inspect().map_err(|e| e.to_string())?,
+                        };
+                        Ok((meta, handle))
                     }
                     .await;
                 // The web inspects stores directly, not through `StoreHandle::inspect`.

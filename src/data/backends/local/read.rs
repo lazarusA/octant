@@ -6,26 +6,49 @@ use super::path;
 use super::registry::{Source, source_of};
 use crate::data::DataSourceKind;
 use js_sys::{Array, Function, Promise, Reflect, Uint8Array};
+use std::cell::RefCell;
+use std::collections::HashMap;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
+
+thread_local! {
+    /// The consolidated metadata built for local Zarr folders, by URL: built
+    /// once, however many readers ask (the page and each data worker).
+    static BUILT: RefCell<HashMap<String, Vec<u8>>> = RefCell::default();
+}
 
 /// The bytes of the file at local `url`. A Zarr folder's consolidated
 /// metadata, which the web's Zarr reader needs, is built from its folders
 /// when the store has none (`consolidate.rs`).
 pub async fn read_all(url: &str) -> Result<Vec<u8>, String> {
+    if let Some(built) = BUILT.with_borrow(|b| b.get(url).cloned()) {
+        return Ok(built);
+    }
     let (source, key) = source_of(url).ok_or_else(|| not_found(url))?;
-    let file = match file_in(&source, key).await {
+    let built = match file_in(&source, key).await {
         Err(Missing::NotFound) if key == ".zmetadata" => {
             let built = super::consolidate::zmetadata(&source).await;
-            return built.ok_or_else(|| not_found(url));
+            built.ok_or_else(|| not_found(url))?
         }
-        found => found.map_err(|missing| failure(url, missing))?,
+        found => {
+            let file = found.map_err(|missing| failure(url, missing))?;
+            let bytes = blob_bytes(&file).await?;
+            if key != "zarr.json" {
+                return Ok(bytes);
+            }
+            super::consolidate::v3_root(&source, bytes).await
+        }
     };
-    let bytes = blob_bytes(&file).await?;
-    if key == "zarr.json" {
-        return Ok(super::consolidate::v3_root(&source, bytes).await);
+    // Kept only while its source is: one released during the build is not.
+    if source_of(url).is_some() {
+        BUILT.with_borrow_mut(|b| b.insert(url.to_owned(), built.clone()));
     }
-    Ok(bytes)
+    Ok(built)
+}
+
+/// Forgets the documents built for the local source `id` (released).
+pub(super) fn forget_built(id: u32) {
+    BUILT.with_borrow_mut(|b| b.retain(|url, _| path::parse(url).map(|(i, _)| i) != Some(id)));
 }
 
 /// `length` bytes of the file at local `url` from `offset` (fewer at its end).

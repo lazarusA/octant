@@ -18,6 +18,7 @@ pub mod slice_request;
 pub mod slicing;
 #[cfg(test)]
 pub(crate) mod test_stores;
+pub mod worker;
 
 pub use blocks::{
     BlockCache, BlockCacheKey, BlockLoader, BlockPrefetcher, BlockRequest, BlockStore,
