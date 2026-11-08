@@ -1,13 +1,14 @@
-//! The page's side: a few data workers, started on the first load. A load
-//! goes to the worker its store and variable hash to, so one variable's
-//! chunks are downloaded and kept by one worker (a band or a step whose
-//! chunk arrived already downloads nothing), while other variables and
-//! overlays load in parallel. Messages wait until a worker says hello. When
-//! the first workers never start (missing, blocked, too slow to load), loads
-//! stay on the page for the session ([`Outcome::Unavailable`]); a worker that
-//! stops later fails the loads it ran and is started again on the next load,
-//! and one that does not start while others did leaves its loads to the
-//! page. Messages from an earlier start of a worker are ignored.
+//! The page's side: a few data workers, started when a dataset starts
+//! opening (`warm`). A load goes to the worker its store and variable hash
+//! to, so one variable's chunks are downloaded and kept by one worker (a
+//! band or a step whose chunk arrived already downloads nothing), while other
+//! variables and overlays load in parallel. Messages wait until a worker
+//! says hello. When the first workers never start (missing, blocked, too
+//! slow to load), loads stay on the page for the session
+//! ([`Outcome::Unavailable`]); a worker that stops later fails the loads it
+//! ran and is started again on the next load, and one that does not start
+//! while others did leaves its loads to the page. Messages from an earlier
+//! start of a worker are ignored.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
