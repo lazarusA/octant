@@ -121,6 +121,7 @@ crate::i18n::keys::define_keys! {
     // Errors
     BrowserLocalPaths,
     LocalNoZarrMetadata,
+    NeedsDataWorkers,
     // OME-Zarr plates
     Plate,
     PlateAcquisition,

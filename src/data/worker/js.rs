@@ -30,12 +30,15 @@ pub enum Part<'a> {
     F32(&'a [f32]),
     F64(&'a [f64]),
     Bytes(&'a [u8]),
+    /// A JavaScript object sent as is, cloned rather than transferred (a `File`).
+    Js(&'a JsValue),
 }
 
 impl Part<'_> {
-    /// A copy outside wasm memory, whose buffer the message then transfers.
-    fn array(&self) -> (JsValue, JsValue) {
+    /// A copy outside wasm memory and the buffer the message then transfers, if any.
+    fn array(&self) -> (JsValue, Option<JsValue>) {
         let (array, buffer): (JsValue, _) = match self {
+            Self::Js(value) => return ((*value).clone(), None),
             Self::F32(v) => {
                 let a = Float32Array::from(*v);
                 let b = a.buffer();
@@ -52,7 +55,7 @@ impl Part<'_> {
                 (a.into(), b)
             }
         };
-        (array, buffer.into())
+        (array, Some(buffer.into()))
     }
 }
 
@@ -71,7 +74,9 @@ pub fn post<M: Serialize>(target: &impl Post, message: &M, parts: &[Part<'_>]) -
     for part in parts {
         let (array, buffer) = part.array();
         framed.push(&array);
-        transfer.push(&buffer);
+        if let Some(buffer) = buffer {
+            transfer.push(&buffer);
+        }
     }
     let posted = target.post(&framed, &transfer);
     if let Err(e) = &posted {
@@ -103,9 +108,4 @@ pub fn f32s(parts: &Array, i: u32) -> Option<Arc<[f32]>> {
 /// Part `i` of `parts` as `f64`s.
 pub fn f64s(parts: &Array, i: u32) -> Option<Vec<f64>> {
     Some(parts.get(i).dyn_into::<Float64Array>().ok()?.to_vec())
-}
-
-/// Part `i` of `parts` as bytes.
-pub fn bytes(parts: &Array, i: u32) -> Option<Vec<u8>> {
-    Some(parts.get(i).dyn_into::<Uint8Array>().ok()?.to_vec())
 }

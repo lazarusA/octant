@@ -8,9 +8,12 @@
 //! The desktop has none.
 
 pub mod wire;
+mod wire_meta;
 
 #[cfg(target_arch = "wasm32")]
 pub mod host;
+#[cfg(target_arch = "wasm32")]
+mod inspect;
 #[cfg(target_arch = "wasm32")]
 mod js;
 #[cfg(any(target_arch = "wasm32", test))]
@@ -26,7 +29,9 @@ mod wire_tests;
 pub use wire::LocalRead;
 
 #[cfg(target_arch = "wasm32")]
-pub use host::read_from_page;
+pub use host::{file_from_page, read_from_page};
+#[cfg(target_arch = "wasm32")]
+pub use inspect::inspect;
 #[cfg(target_arch = "wasm32")]
 pub use pool::{release, warm};
 
@@ -40,12 +45,17 @@ pub async fn load(
     use crate::data::DataSourceKind as Kind;
     let in_worker = matches!(
         request.store.source().kind,
-        Kind::RemoteZarr | Kind::RemoteIcechunk | Kind::RemoteGeoTiff | Kind::Procedural
+        Kind::RemoteZarr
+            | Kind::RemoteIcechunk
+            | Kind::RemoteGeoTiff
+            | Kind::Procedural
+            | Kind::NetCdf
     );
     if in_worker {
         match pool::load(request).await {
             pool::Outcome::Block(block) => return Ok(block),
             pool::Outcome::Failed(error) => return Err(error.into()),
+            pool::Outcome::Inspected(_) => return Err("An inspection answered a load".into()),
             pool::Outcome::Unavailable => {}
         }
     }

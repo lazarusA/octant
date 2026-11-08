@@ -127,6 +127,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "В этой папке нет метаданных Zarr, которые браузер может прочитать. Выберите папку самого хранилища (ту, где лежит zarr.json или .zgroup), а не папку выше. Safari скрывает файлы, имена которых начинаются с точки, поэтому папки Zarr v2 (.zgroup, .zarray) открываются только в Chrome, Firefox или настольном приложении Octant. Папки Zarr v3 открываются в любом браузере."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "Файлы NetCDF и HDF5 читают рабочие потоки данных, которые не запустились в этом браузере. Перезагрузите страницу или откройте файл в настольном приложении Octant."
+        }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Съёмка",
         DatasetKey::PlateAllAcquisitions => "Все",

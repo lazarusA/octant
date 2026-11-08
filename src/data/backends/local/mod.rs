@@ -51,6 +51,12 @@ pub async fn read_range(url: &str, offset: u64, length: u64) -> Result<Vec<u8>, 
     read::read_range(url, offset, length).await
 }
 
+/// The `File` of the local file source at `url`, which a data worker reads itself.
+#[cfg(target_arch = "wasm32")]
+pub fn file(url: &str) -> Result<web_sys::File, String> {
+    registry::file_of(url).ok_or_else(|| format!("'{url}' is not one picked or dropped file"))
+}
+
 /// The size in bytes of the file at local `url` (`read.rs`).
 #[cfg(target_arch = "wasm32")]
 pub async fn size(url: &str) -> Result<u64, String> {

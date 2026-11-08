@@ -5,6 +5,7 @@
 mod attrs;
 mod mat;
 mod netcdf4;
+pub mod read_ahead;
 
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]

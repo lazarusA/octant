@@ -112,6 +112,11 @@ fn messages_to_the_worker_read_back() {
             ),
             language: Language::default(),
         },
+        ToWorker::Inspect {
+            id: 4,
+            source: DataSource::new("id", DataSourceKind::NetCdf, "local://2/f.nc", "f"),
+            language: Language::default(),
+        },
         ToWorker::Release {
             uri: "local://1/a.zarr".into(),
         },
@@ -132,6 +137,62 @@ fn messages_to_the_worker_read_back() {
             length: 16,
         },
     };
-    let text = serde_json::to_string(&read).unwrap();
-    assert_eq!(serde_json::from_str::<FromWorker>(&text).unwrap(), read);
+    let file = FromWorker::Read {
+        id: 3,
+        url: "local://2/f.nc".into(),
+        read: LocalRead::File,
+    };
+    for read in [read, file] {
+        let text = serde_json::to_string(&read).unwrap();
+        assert_eq!(serde_json::from_str::<FromWorker>(&text).unwrap(), read);
+    }
+}
+
+#[test]
+fn an_inspection_comes_back_whole_and_ill_framed_numbers_are_refused() {
+    use super::wire::MetadataHeader;
+    use crate::data::metadata::{CoordValues, DatasetMetadata, VariableInfo};
+    let labels = CoordValues::Labels(["a".to_owned(), "b".to_owned()].into());
+    let uneven = CoordValues::Values([1.0, f64::NAN, 4.0].into());
+    let even = CoordValues::Regular {
+        start: 0.0,
+        step: 0.5,
+        len: 4,
+    };
+    let metadata = DatasetMetadata {
+        name: "f.nc".into(),
+        store_type: "NetCDF".into(),
+        variables: vec![VariableInfo {
+            name: "g/t".into(),
+            shape: vec![2, 3],
+            dimension_names: vec!["y".into(), "x".into()],
+            ..VariableInfo::default()
+        }],
+        dimension_coordinates: HashMap::from([
+            ("x".to_owned(), uneven.clone()),
+            ("y".to_owned(), labels.clone()),
+            ("g/t/z".to_owned(), even.clone()),
+        ]),
+        ome: None,
+    };
+    let (header, numbers) = MetadataHeader::split(metadata);
+    let text = serde_json::to_string(&FromWorker::Inspected {
+        id: 3,
+        header: Box::new(header),
+    })
+    .expect("encode");
+    let decode = || match serde_json::from_str(&text) {
+        Ok(FromWorker::Inspected { header, .. }) => header,
+        _ => panic!("decode"),
+    };
+    assert!(decode().join(&numbers[1..]).is_err(), "numbers short");
+    let back = decode().join(&numbers).expect("join");
+    assert_eq!(back.variables[0].dimension_names, ["y", "x"]);
+    assert_eq!(back.dimension_coordinates["y"], labels);
+    assert_eq!(back.dimension_coordinates["g/t/z"], even);
+    let CoordValues::Values(x) = &back.dimension_coordinates["x"] else {
+        panic!("x");
+    };
+    assert_eq!(x.len(), 3);
+    assert!(x[1].is_nan());
 }

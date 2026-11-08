@@ -22,6 +22,8 @@ pub fn release_stores(uri: &str) {
     icechunk::wasm::WasmIcechunkBlockStore::release(uri);
     geotiff::WasmGeoTiffBlockStore::release(uri);
     #[cfg(target_arch = "wasm32")]
+    netcdf::wasm::release(uri);
+    #[cfg(target_arch = "wasm32")]
     if !crate::data::worker::in_worker() {
         crate::data::worker::release(uri);
     }
@@ -40,6 +42,8 @@ pub async fn inspect_web(
         Kind::RemoteZarr => zarr::inspect_wasm_remote_zarr(uri).await,
         Kind::RemoteIcechunk => icechunk::wasm::inspect_wasm_remote_icechunk(uri).await,
         Kind::RemoteGeoTiff => geotiff::wasm::inspect_wasm_remote_geotiff(uri).await,
+        // Only workers read NetCDF (`netcdf/wasm.rs`): the page asks one.
+        Kind::NetCdf => crate::data::worker::inspect(source).await,
         _ => return None,
     })
 }

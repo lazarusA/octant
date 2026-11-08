@@ -41,7 +41,7 @@ pub fn pick_folder(ctx: &egui::Context) {
     });
 }
 
-/// Asks for a GeoTIFF file; once picked it opens as a dataset.
+/// Asks for a GeoTIFF, NetCDF, HDF5 or MATLAB file; once picked it opens as a dataset.
 pub fn pick_file(ctx: &egui::Context) {
     pick_with_input(ctx, false);
 }
@@ -62,7 +62,9 @@ fn pick_with_input(ctx: &egui::Context, folder: bool) {
     if folder {
         let _ = input.set_attribute("webkitdirectory", "");
     } else {
-        input.set_accept(".tif,.tiff,.geotif,.geotiff,.cog");
+        input.set_accept(
+            ".tif,.tiff,.geotif,.geotiff,.cog,.nc,.nc4,.cdf,.netcdf,.h5,.hdf5,.hdf,.he5,.mat",
+        );
     }
     let _ = input.set_attribute("style", "display: none");
     if let Some(body) = document.body() {

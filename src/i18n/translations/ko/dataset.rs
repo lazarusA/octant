@@ -131,6 +131,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "이 폴더에는 브라우저가 읽을 수 있는 Zarr 메타데이터가 없습니다. 상위 폴더가 아니라 데이터 자체의 폴더(zarr.json 또는 .zgroup이 있는 폴더)를 선택하세요. Safari는 이름이 점으로 시작하는 파일을 숨기므로 Zarr v2 폴더(.zgroup, .zarray)는 Chrome, Firefox 또는 Octant 데스크톱 앱에서만 열립니다. Zarr v3 폴더는 모든 브라우저에서 열립니다."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF와 HDF5 파일은 데이터 워커가 읽는데, 이 브라우저에서 워커가 시작되지 않았습니다. 페이지를 새로 고치거나 Octant 데스크톱 앱에서 파일을 여세요."
+        }
         DatasetKey::Plate => "플레이트",
         DatasetKey::PlateAcquisition => "획득",
         DatasetKey::PlateAllAcquisitions => "전체",

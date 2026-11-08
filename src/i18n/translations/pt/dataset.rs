@@ -137,6 +137,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "Esta pasta não contém metadados Zarr que o navegador consiga ler. Escolha a pasta do próprio armazenamento (a que contém zarr.json ou .zgroup), não uma pasta acima dela. O Safari oculta arquivos cujo nome começa com um ponto, então pastas Zarr v2 (.zgroup, .zarray) só abrem no Chrome, no Firefox ou no aplicativo para desktop do Octant. Pastas Zarr v3 abrem em qualquer navegador."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "Os arquivos NetCDF e HDF5 são lidos pelos workers de dados, que não iniciaram neste navegador. Recarregue a página ou abra o arquivo no aplicativo de desktop do Octant."
+        }
         DatasetKey::Plate => "Placa",
         DatasetKey::PlateAcquisition => "Aquisição",
         DatasetKey::PlateAllAcquisitions => "Todas",

@@ -133,6 +133,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "Folder ini tidak berisi metadata Zarr yang dapat dibaca browser. Pilih folder penyimpanan itu sendiri (yang berisi zarr.json atau .zgroup), bukan folder di atasnya. Safari menyembunyikan berkas yang namanya diawali titik, jadi folder Zarr v2 (.zgroup, .zarray) hanya terbuka di Chrome, Firefox, atau aplikasi desktop Octant. Folder Zarr v3 terbuka di semua browser."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "Berkas NetCDF dan HDF5 dibaca oleh worker data, yang tidak berjalan di peramban ini. Muat ulang halaman, atau buka berkas di aplikasi desktop Octant."
+        }
         DatasetKey::Plate => "Pelat",
         DatasetKey::PlateAcquisition => "Akuisisi",
         DatasetKey::PlateAllAcquisitions => "Semua",

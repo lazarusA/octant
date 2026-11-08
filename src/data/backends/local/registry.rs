@@ -55,6 +55,14 @@ pub(super) fn source_of(url: &str) -> Option<(Source, &str)> {
     Some((source, key))
 }
 
+/// The `File` of a one-file source at `url`.
+pub(super) fn file_of(url: &str) -> Option<web_sys::File> {
+    match source_of(url)? {
+        (Source::File(file), "") => Some(file),
+        _ => None,
+    }
+}
+
 /// The store kind of the local source at `url`.
 pub fn kind_of(url: &str) -> Option<DataSourceKind> {
     let (id, _) = path::parse(url)?;

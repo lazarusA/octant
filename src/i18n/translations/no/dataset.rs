@@ -135,6 +135,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "Denne mappen inneholder ingen Zarr-metadata nettleseren kan lese. Velg lagerets egen mappe (den med zarr.json eller .zgroup), ikke en mappe over den. Safari skjuler filer med navn som begynner med punktum, så Zarr v2-mapper (.zgroup, .zarray) åpnes bare i Chrome, Firefox eller Octants skrivebordsapp. Zarr v3-mapper åpnes i alle nettlesere."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF- og HDF5-filer leses av dataarbeiderne, som ikke startet i denne nettleseren. Last inn siden på nytt, eller åpne filen i Octants skrivebordsapp."
+        }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Opptak",
         DatasetKey::PlateAllAcquisitions => "Alle",

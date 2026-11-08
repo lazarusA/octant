@@ -127,6 +127,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::LocalNoZarrMetadata => {
             "Tässä kansiossa ei ole Zarr-metatietoja, joita selain voisi lukea. Valitse tallennuksen oma kansio (se, jossa on zarr.json tai .zgroup), älä sen yläkansiota. Safari piilottaa tiedostot, joiden nimi alkaa pisteellä, joten Zarr v2 -kansiot (.zgroup, .zarray) avautuvat vain Chromessa, Firefoxissa tai Octantin työpöytäsovelluksessa. Zarr v3 -kansiot avautuvat kaikissa selaimissa."
         }
+        DatasetKey::NeedsDataWorkers => {
+            "NetCDF- ja HDF5-tiedostot lukevat datatyöntekijät, jotka eivät käynnistyneet tässä selaimessa. Lataa sivu uudelleen tai avaa tiedosto Octantin työpöytäsovelluksessa."
+        }
         DatasetKey::Plate => "Kuoppalevy",
         DatasetKey::PlateAcquisition => "Kuvauskerta",
         DatasetKey::PlateAllAcquisitions => "Kaikki",

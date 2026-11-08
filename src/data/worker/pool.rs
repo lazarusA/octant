@@ -22,12 +22,15 @@ use super::slot::{Slot, answer_read};
 use super::wire::{FromWorker, ToWorker};
 use crate::data::blocks::BlockRequest;
 use crate::data::blocks::memory_budget::DOWNLOAD_BUDGET;
+use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 
 /// How a load handed to the pool ended.
 pub enum Outcome {
     Block(OctantBlock),
     Failed(String),
+    /// An inspection (`inspect`).
+    Inspected(Box<DatasetMetadata>),
     /// No worker runs it: the page loads it itself.
     Unavailable,
 }
@@ -35,9 +38,9 @@ pub enum Outcome {
 #[derive(Default)]
 pub(super) struct Pool {
     pub(super) slots: Vec<Option<Slot>>,
-    next_id: u64,
+    pub(super) next_id: u64,
     next_serial: u64,
-    pending: HashMap<u64, oneshot::Sender<Outcome>>,
+    pub(super) pending: HashMap<u64, oneshot::Sender<Outcome>>,
     /// Notices already shown, once per session.
     shown: HashSet<(String, String)>,
     /// A worker failed to start: the page loads alone from then on.
@@ -97,16 +100,7 @@ fn pool_size() -> usize {
 
 impl Pool {
     fn submit(&mut self, request: &BlockRequest) -> Option<oneshot::Receiver<Outcome>> {
-        if self.broken {
-            return None;
-        }
-        let places = self.places();
-        let mut hasher = std::hash::DefaultHasher::new();
-        (&request.store.source().uri, &request.slice.variable).hash(&mut hasher);
-        let index = (hasher.finish() % places as u64) as usize;
-        if self.page_only.contains(&index) {
-            return None;
-        }
+        let index = self.place_of(&request.store.source().uri, &request.slice.variable)?;
         let id = self.next_id;
         let slot = self.slot(index)?;
         slot.jobs.insert(id);
@@ -122,6 +116,18 @@ impl Pool {
         Some(rx)
     }
 
+    /// The worker a store's variable loads in, unless the page loads it.
+    pub(super) fn place_of(&mut self, uri: &str, variable: &str) -> Option<usize> {
+        if self.broken {
+            return None;
+        }
+        let places = self.places();
+        let mut hasher = std::hash::DefaultHasher::new();
+        (uri, variable).hash(&mut hasher);
+        let index = (hasher.finish() % places as u64) as usize;
+        (!self.page_only.contains(&index)).then_some(index)
+    }
+
     /// How many workers run here, deciding it on first use.
     fn places(&mut self) -> usize {
         if self.slots.is_empty() {
@@ -131,7 +137,7 @@ impl Pool {
     }
 
     /// The live worker at `index`, started when there is none.
-    fn slot(&mut self, index: usize) -> Option<&mut Slot> {
+    pub(super) fn slot(&mut self, index: usize) -> Option<&mut Slot> {
         let live = matches!(&self.slots[index], Some(slot) if !slot.dead);
         if !live {
             self.next_serial += 1;
@@ -175,6 +181,14 @@ impl Pool {
                 self.finish(index, id, outcome);
             }
             FromWorker::Failed { id, error } => self.finish(index, id, Outcome::Failed(error)),
+            FromWorker::Inspected { id, header } => {
+                let numbers = js::f64s(parts, 0).unwrap_or_default();
+                let outcome = match header.join(&numbers) {
+                    Ok(metadata) => Outcome::Inspected(Box::new(metadata)),
+                    Err(error) => Outcome::Failed(error),
+                };
+                self.finish(index, id, outcome);
+            }
             FromWorker::Progress { counts } => crate::data::blocks::progress::add(counts),
             FromWorker::Notice {
                 severity,

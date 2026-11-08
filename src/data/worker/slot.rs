@@ -105,10 +105,32 @@ impl Slot {
 /// Reads what a worker asked of a local file, and answers it.
 pub(super) async fn answer_read(worker: Worker, id: u64, url: String, read: LocalRead) {
     use crate::data::backends::local;
+    if let LocalRead::File = read {
+        let error = match local::file(&url) {
+            Ok(file) => {
+                let done = ToWorker::ReadDone { id, error: None };
+                if js::post(&worker, &done, &[Part::Js(&file.into())]) {
+                    return;
+                }
+                format!("Failed to hand '{url}' to the data worker")
+            }
+            Err(error) => error,
+        };
+        js::post(
+            &worker,
+            &ToWorker::ReadDone {
+                id,
+                error: Some(error),
+            },
+            &[],
+        );
+        return;
+    }
     let result = match read {
         LocalRead::All => local::read_all(&url).await,
         LocalRead::Range { offset, length } => local::read_range(&url, offset, length).await,
         LocalRead::Size => local::size(&url).await.map(|n| n.to_le_bytes().to_vec()),
+        LocalRead::File => return,
     };
     let error = match result {
         Ok(bytes) => {
