@@ -73,12 +73,3 @@ pub fn inspect_reader(reader: &dyn NcReader, file_path: &str) -> DatasetMetadata
         ome: None,
     }
 }
-
-/// The metadata of the netCDF file at `file_path`, read by netCDF-C.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn inspect_netcdf_file(
-    file_path: &str,
-) -> Result<DatasetMetadata, crate::data::blocks::BlockStoreError> {
-    let reader = super::c_reader::CReader::open(file_path)?;
-    Ok(inspect_reader(&reader, file_path))
-}

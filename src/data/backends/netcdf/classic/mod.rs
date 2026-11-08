@@ -15,12 +15,13 @@ use super::coord_read::{c_text, clean_label};
 use super::reader::{NcReader, NcVar, Raw};
 use crate::data::blocks::BlockStoreError;
 use header::{Header, NcType, Short};
-use layout::Runs;
 
 pub use header::is_classic;
 
-/// The first read of the header; larger headers are read again at twice the size.
+/// The first read of the header; larger headers are read again at twice the size, up to
+/// `MAX_HEADER`, so a corrupt length never reads a whole file.
 const HEADER_READ: u64 = 64 << 10;
+const MAX_HEADER: u64 = 64 << 20;
 
 pub struct ClassicReader {
     source: Box<dyn Source + Send + Sync>,
@@ -44,8 +45,8 @@ fn read_header(source: &dyn Source, name: &str) -> Result<Header, BlockStoreErro
             .map_err(|e| failed(&format!("Failed to read '{name}'"), e))?;
         match header::parse(&bytes) {
             Ok(header) => return Ok(header),
-            Err(Short::More) if size < source.len() => size = size.saturating_mul(2),
-            Err(Short::More) => return Err(format!("'{name}' ends inside its header").into()),
+            Err(Short::More) if size < source.len().min(MAX_HEADER) => size *= 2,
+            Err(Short::More) => return Err(format!("'{name}' has no readable header").into()),
             Err(Short::Bad(why)) => return Err(failed(&format!("Bad header in '{name}'"), why)),
         }
     }
@@ -57,8 +58,9 @@ impl ClassicReader {
         name: &str,
     ) -> Result<Self, BlockStoreError> {
         let header = read_header(source.as_ref(), name)?;
-        let (recsize, numrecs) = layout::records(&header, source.len());
-        let vars = layout::describe(&header, numrecs);
+        let bad = |e: String| failed(&format!("Bad header in '{name}'"), e);
+        let (recsize, numrecs) = layout::records(&header, source.len()).map_err(bad)?;
+        let vars = layout::describe(&header, numrecs).map_err(bad)?;
         Ok(Self {
             source,
             header,
@@ -78,8 +80,10 @@ impl ClassicReader {
         let var = &self.header.vars[index];
         let shape: Vec<u64> = self.vars[index].shape().map(|n| n as u64).collect();
         let rank = shape.len();
-        if start.len() != rank || count.len() != rank {
-            return Err(format!("Window of rank {} for '{}'", start.len(), var.name).into());
+        let inside =
+            |d: usize| (start[d].checked_add(count[d])).is_some_and(|e| e as u64 <= shape[d]);
+        if start.len() != rank || count.len() != rank || !(0..rank).all(inside) {
+            return Err(format!("Window outside '{}'", var.name).into());
         }
         let total = (count.iter())
             .try_fold(1u64, |a, &c| a.checked_mul(c as u64))
@@ -89,27 +93,23 @@ impl ClassicReader {
         }
         let size = var.ty.size();
         let record = layout::is_record(&self.header, var);
-        let Runs {
-            k,
-            run,
-            inner,
-            strides,
-        } = layout::runs(&shape, start, count, record);
+        let r = layout::runs(&shape, start, count, record);
+        let (k, run, inner) = (r.k, r.run, r.inner);
         let step = |d: usize| match record && d == 0 {
             true => self.recsize,
-            false => strides[d].saturating_mul(size),
+            false => r.strides[d].saturating_mul(size),
         };
-        let mut out = Vec::with_capacity(total.saturating_mul(size) as usize);
+        // Windows lie within the variable, whose size `layout::describe` checked fits.
+        let run_bytes = (run * size) as usize;
+        let mut out = vec![0; total as usize * size as usize];
         let mut at = start[..k].to_vec();
-        loop {
+        for buf in out.chunks_exact_mut(run_bytes) {
             let outer = (at.iter().enumerate())
                 .map(|(d, &i)| (i as u64).saturating_mul(step(d)))
                 .fold(var.begin, u64::saturating_add);
-            let mut buf = vec![0; run.saturating_mul(size) as usize];
             self.source
-                .read_at(outer.saturating_add(inner.saturating_mul(size)), &mut buf)
+                .read_at(outer.saturating_add(inner.saturating_mul(size)), buf)
                 .map_err(|e| failed(&format!("Failed reading '{}'", var.name), e))?;
-            out.extend_from_slice(&buf);
             // The next run: the outer dimensions counted up, the last fastest.
             let Some(d) = (0..k).rev().find(|&d| at[d] + 1 < start[d] + count[d]) else {
                 break;

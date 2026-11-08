@@ -66,6 +66,7 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
             LocalSource {
                 uri: uri.clone(),
                 len,
+                ahead: ReadAhead::default(),
             },
             &uri,
         )
@@ -96,10 +97,12 @@ fn source_error(what: &str, e: impl std::fmt::Debug) -> FormatError {
     FormatError::Source(format!("{what}: {e:?}"))
 }
 
-/// A local file, read by `FileReaderSync` from the `File` in [`FILES`].
+/// A local file, read by `FileReaderSync` from the `File` in [`FILES`] through a
+/// [`ReadAhead`], as each read crosses into JavaScript.
 struct LocalSource {
     uri: String,
     len: u64,
+    ahead: ReadAhead,
 }
 
 impl Source for LocalSource {
@@ -108,6 +111,15 @@ impl Source for LocalSource {
     }
 
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
+        self.ahead.read(self.len, offset, buf, |offset, length| {
+            let mut buf = vec![0; length as usize];
+            self.fetch(offset, &mut buf).map(|()| buf)
+        })
+    }
+}
+
+impl LocalSource {
+    fn fetch(&self, offset: u64, buf: &mut [u8]) -> Result<(), FormatError> {
         let end = offset.saturating_add(buf.len() as u64);
         let slice = FILES.with_borrow(|f| {
             let file = f

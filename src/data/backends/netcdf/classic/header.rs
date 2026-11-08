@@ -172,11 +172,16 @@ impl Cursor<'_> {
             .collect()
     }
 
-    fn var(&mut self) -> Result<Var, Short> {
+    /// A variable over the file's `dims` dimensions.
+    fn var(&mut self, dims: usize) -> Result<Var, Short> {
         let name = self.name()?;
         let ndims = self.non_neg()?;
         let dimids = (0..ndims)
-            .map(|_| Ok(self.non_neg()? as usize))
+            .map(|_| {
+                let id = self.non_neg()?;
+                (usize::try_from(id).ok().filter(|&d| d < dims))
+                    .ok_or_else(|| Short::Bad(format!("'{name}' has no dimension {id}")))
+            })
             .collect::<Result<_, Short>>()?;
         let attrs = self.attrs()?;
         let code = self.u32()?;
@@ -216,12 +221,12 @@ pub fn parse(bytes: &[u8]) -> Result<Header, Short> {
     };
     let numrecs = c.non_neg()?;
     let streaming = numrecs == u64::from(u32::MAX) || numrecs == u64::MAX;
-    let dims = (0..c.list(DIMENSION)?)
+    let dims: Vec<(String, u64)> = (0..c.list(DIMENSION)?)
         .map(|_| Ok((c.name()?, c.non_neg()?)))
         .collect::<Result<_, Short>>()?;
     let attrs = c.attrs()?;
     let vars = (0..c.list(VARIABLE)?)
-        .map(|_| c.var())
+        .map(|_| c.var(dims.len()))
         .collect::<Result<_, Short>>()?;
     Ok(Header {
         numrecs: (!streaming).then_some(numrecs),

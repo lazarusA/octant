@@ -83,14 +83,21 @@ fn classic_files_read_as_netcdf_c_reads_them() {
     }
 }
 
-/// Real classic files read alike, every variable's first window included; the files live
-/// in the git-ignored `dev/land_sea_mask_grids`:
-/// `cargo test --lib real_classic_files -- --ignored --nocapture`.
+/// Real classic and netCDF-4 files read alike, every variable whole; the files live in the
+/// git-ignored `dev/land_sea_mask_grids`:
+/// `cargo test --lib dev_files_read -- --ignored --nocapture`.
 #[test]
 #[ignore = "local files"]
-fn real_classic_files_read_as_netcdf_c_reads_them() {
+fn dev_files_read_as_netcdf_c_reads_them() {
     let _lock = netcdf_lock();
-    for name in ["2004050300_eta_211.nc", "tos_O1_2001-2002.nc"] {
+    for name in [
+        "2004050300_eta_211.nc",
+        "tos_O1_2001-2002.nc",
+        "full_healpix.nc",
+        "full_gaussian.nc",
+        "full_clenshaw.nc",
+        "full_octahealpix.nc",
+    ] {
         let path = format!(
             "{}/dev/land_sea_mask_grids/{name}",
             env!("CARGO_MANIFEST_DIR")
@@ -98,11 +105,31 @@ fn real_classic_files_read_as_netcdf_c_reads_them() {
         let store = Parity::open(&path).expect("open");
         let meta = store.inspect().expect("inspect");
         for var in meta.variables.iter().filter(|v| v.data_type != "char") {
-            let shape: Vec<usize> = var.shape.iter().map(|&n| (n as usize).min(8)).collect();
+            let shape: Vec<usize> = var.shape.iter().map(|&n| n as usize).collect();
             store
                 .fetch_block(&SliceRequest::full_range(&var.name, &shape))
                 .expect(&var.name);
         }
         println!("{name}: {} variables read alike", meta.variables.len());
     }
+}
+
+/// A variable naming a dimension the file lacks is refused, never indexed (a panic would
+/// end the browser's data worker).
+#[test]
+fn a_missing_dimension_id_is_an_error() {
+    let be = |n: u32| n.to_be_bytes();
+    let mut bytes = b"CDF\x01".to_vec();
+    bytes.extend([be(0), be(0x0A), be(1), be(1)].concat()); // numrecs, one dimension
+    bytes.extend(b"x\0\0\0");
+    bytes.extend(be(4)); // its length
+    bytes.extend([be(0), be(0)].concat()); // no global attributes
+    bytes.extend([be(0x0B), be(1), be(1)].concat()); // one variable, its name
+    bytes.extend(b"v\0\0\0");
+    bytes.extend([be(1), be(5)].concat()); // one dimension: id 5
+    bytes.extend([be(0), be(0), be(5), be(16), be(0)].concat()); // attrs, float, vsize, begin
+    let nc = TempNc::new("bad_dimid");
+    std::fs::write(&nc.0, &bytes).expect("write");
+    let error = super::open::open_path(nc.path()).err().expect("refused");
+    assert!(error.to_string().contains("no dimension 5"), "{error}");
 }
