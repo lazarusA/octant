@@ -4,12 +4,6 @@ use super::ordering::detect_healpix_ordering_with_dggs;
 use super::types::CoordinateGrid;
 use std::sync::Arc;
 
-/// Normalizes longitude degree values to [-180, 180].
-#[inline]
-pub fn normalize_lon_deg(lon: f32) -> f32 {
-    if lon > 180.0 { lon - 360.0 } else { lon }
-}
-
 /// Checks if a 1D sequence of coordinates has non-uniform spacing (> 0.05% relative delta variation).
 pub fn is_irregular_series(coords: &[f64]) -> bool {
     if coords.len() < 3 {
@@ -139,6 +133,7 @@ fn build_coordinate_slice(
 }
 
 /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.
+/// HEALPix grids are recognized before this, by `detect_grid_from_block`.
 pub fn detect_grid(
     x_name: &str,
     y_name: &str,
@@ -147,23 +142,6 @@ pub fn detect_grid(
     width: usize,
     height: usize,
 ) -> CoordinateGrid {
-    let is_healpix_x = super::naming::is_healpix_dim_name(x_name);
-    let is_healpix_y = super::naming::is_healpix_dim_name(y_name);
-
-    if is_healpix_x || is_healpix_y {
-        let npix = if height == 1 { width } else { width * height };
-        if let Some(nside) = super::healpix::npix_to_nside(npix) {
-            log::info!("CoordinateGrid: Detected HEALPix grid (nside={nside}, npix={npix})");
-            return CoordinateGrid::Healpix {
-                nside,
-                ordering: super::healpix::HealpixOrder::Ring,
-                npix,
-                coords_lon: None,
-                coords_lat: None,
-            };
-        }
-    }
-
     let is_spatial_x = super::naming::is_spatial_x_name(x_name);
     let is_spatial_y = super::naming::is_spatial_y_name(y_name);
 

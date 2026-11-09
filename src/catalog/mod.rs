@@ -13,7 +13,7 @@ pub use entries::{ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG};
 pub use geotiff::{GEOTIFF_CATALOG, GEOTIFF_DESKTOP_CATALOG};
 pub use microscopy::MICROSCOPY_CATALOG;
 pub use soil::SOIL_CATALOG;
-pub use types::{CatalogCategoryFilter, CatalogEntry, CatalogProvider, StaticCatalogProvider};
+pub use types::{CatalogCategoryFilter, CatalogEntry};
 
 /// The GeoTIFF category: browser-readable entries first, then desktop-only ones.
 fn geotiff_entries() -> impl Iterator<Item = &'static CatalogEntry> {

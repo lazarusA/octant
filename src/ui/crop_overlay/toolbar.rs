@@ -57,14 +57,7 @@ pub fn render_crop_toolbar(
                             let is_active = crop_box.aspect == preset;
                             if ui.selectable_label(is_active, preset.label()).clicked() {
                                 crop_box.aspect = preset;
-                                if let Some(target_ratio) = preset.ratio() {
-                                    let cur_w =
-                                        (crop_box.u_max - crop_box.u_min) * canvas_rect.width();
-                                    let target_h = (cur_w / target_ratio) / canvas_rect.height();
-                                    let center_v = (crop_box.v_min + crop_box.v_max) * 0.5;
-                                    crop_box.v_min = (center_v - target_h * 0.5).max(0.0);
-                                    crop_box.v_max = (center_v + target_h * 0.5).min(1.0);
-                                }
+                                super::handles::fit_aspect(crop_box, canvas_rect);
                             }
                         }
 

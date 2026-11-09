@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
-use super::expansion::expand_coastline_line_list;
+use super::expansion::{expand_coastline_line_list, line_list_or_placeholder, write_or_grow};
 use super::types::CoastlineUniforms;
 
 struct CoastlineGpuResources {
@@ -55,16 +55,11 @@ impl CoastlineRenderer {
             &initial_uniforms,
         );
 
-        let line_vertices = expand_coastline_line_list(verts);
-        let safe_verts: &[f32] = if line_vertices.is_empty() {
-            &[0.0_f32, 0.0]
-        } else {
-            line_vertices.as_slice()
-        };
+        let safe_verts = line_list_or_placeholder(verts);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Coastline 2D Vertex Buffer"),
-            contents: bytemuck::cast_slice(safe_verts),
+            contents: bytemuck::cast_slice(&safe_verts),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -171,23 +166,18 @@ impl CoastlineRenderer {
         if line_vertices.is_empty() {
             return;
         }
-        let needed = std::mem::size_of_val(line_vertices.as_slice()) as u64;
-        let current_capacity = self.gpu.read().map(|g| g.vertex_buffer.size()).unwrap_or(0);
-
-        if needed <= current_capacity {
-            if let Ok(guard) = self.gpu.read() {
-                queue.write_buffer(
-                    &guard.vertex_buffer,
-                    0,
-                    bytemuck::cast_slice(line_vertices.as_slice()),
-                );
-            }
-        } else {
-            let new_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Coastline 2D Vertex Buffer (Resized)"),
-                contents: bytemuck::cast_slice(line_vertices.as_slice()),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            });
+        let grown = write_or_grow(
+            device,
+            queue,
+            &self
+                .gpu
+                .read()
+                .unwrap_or_else(|p| p.into_inner())
+                .vertex_buffer,
+            &line_vertices,
+            "Coastline 2D Vertex Buffer (Resized)",
+        );
+        if let Some(new_buf) = grown {
             let new_bg = crate::plots::common::create_uniform_storage_bind_group(
                 device,
                 "Coastline 2D Bind Group (Resized)",
@@ -195,10 +185,9 @@ impl CoastlineRenderer {
                 &self.uniform_buffer,
                 &new_buf,
             );
-            if let Ok(mut guard) = self.gpu.write() {
-                guard.vertex_buffer = new_buf;
-                guard.bind_group = new_bg;
-            }
+            let mut guard = self.gpu.write().unwrap_or_else(|p| p.into_inner());
+            guard.vertex_buffer = new_buf;
+            guard.bind_group = new_bg;
         }
 
         self.vertex_count

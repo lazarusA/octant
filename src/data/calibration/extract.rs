@@ -1,5 +1,6 @@
 //! CF conventions metadata attribute parsers for calibration rules.
 
+#[cfg(test)]
 use std::collections::HashMap;
 
 use super::types::DataCalibration;
@@ -13,6 +14,7 @@ fn parse_f64_from_json(val: &serde_json::Value) -> Option<f64> {
     }
 }
 
+#[cfg(test)]
 fn parse_f64_from_str(s: &str) -> Option<f64> {
     s.trim().parse::<f64>().ok()
 }
@@ -63,6 +65,7 @@ impl DataCalibration {
         }
     }
 
+    #[cfg(test)]
     /// Creates a `DataCalibration` from a string HashMap (GeoTIFF, NetCDF, GRIB, generic stores).
     pub fn from_string_map(attributes: &HashMap<String, String>) -> Self {
         let scale_factor = attributes

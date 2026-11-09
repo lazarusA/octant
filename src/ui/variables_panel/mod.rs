@@ -43,24 +43,10 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let room = canvas_rect.right() - origin.x - 24.0;
     let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
 
-    let mut header = PanelHeader::default();
-    let area_resp = egui::Area::new(Panel::Dimensions.area_id())
-        .fixed_pos(origin)
-        .constrain_to(canvas_rect)
-        .order(egui::Order::Foreground)
-        .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.set_width(panel_w);
-                header = show_panel(app, ui);
-            });
-        });
-    panel_layout::finish(
-        app,
-        Panel::Dimensions,
-        header,
-        &area_resp.response,
-        canvas_rect,
-    );
+    panel_layout::show(app, ctx, Panel::Dimensions, canvas_rect, |app, ui| {
+        ui.set_width(panel_w);
+        Some(show_panel(app, ui))
+    });
 }
 
 /// The staged variable's header, Plot Data row and dimension sliders; what

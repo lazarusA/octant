@@ -27,9 +27,6 @@ const MAX_WIDTH: f32 = 720.0;
 
 /// Render the About Octant modal dialog window.
 pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
-    if app.layout.show_icon_gallery_window {
-        app.layout.show_about_window = true;
-    }
     let key = egui::Id::unique("about_window");
     let opened = windows::follow_window(ctx, key, app.layout.show_about_window);
     if !app.layout.show_about_window {
@@ -37,7 +34,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     }
 
     let storage_id = egui::Id::unique(("about_window", "active_tab"));
-    let mut active_tab = shown_tab(app, ctx, storage_id);
+    let mut active_tab = shown_tab(ctx, storage_id);
     let (default_size, min_size, max_size) = window_sizes(active_tab, ctx.viewport_rect().size());
     let title = match active_tab {
         AboutTab::About => tr(AboutKey::WindowTitle),
@@ -71,12 +68,8 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     app.layout.show_shortcuts |= shortcuts;
 }
 
-/// The tab to show: the icons when the icon gallery asked for the window,
-/// else the tab shown last (kept under `storage_id`).
-fn shown_tab(app: &mut OctantApp, ctx: &egui::Context, storage_id: egui::Id) -> AboutTab {
-    if std::mem::take(&mut app.layout.show_icon_gallery_window) {
-        return AboutTab::Icons;
-    }
+/// The tab shown last (kept under `storage_id`).
+fn shown_tab(ctx: &egui::Context, storage_id: egui::Id) -> AboutTab {
     ctx.data(|d| d.get_temp(storage_id))
         .unwrap_or(AboutTab::About)
 }
@@ -135,11 +128,4 @@ fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab, shortcuts: &mut boo
         *shortcuts = ui.link(tr(KeymapKey::Title)).clicked();
     });
     open
-}
-
-pub fn show_icon_gallery_window(app: &mut OctantApp, ctx: &egui::Context) {
-    if app.layout.show_icon_gallery_window {
-        app.layout.show_about_window = true;
-        show_about_window(app, ctx);
-    }
 }

@@ -63,6 +63,40 @@ fn push_segment_with_antimeridian_split(out: &mut Vec<f32>, p0: (f32, f32), p1: 
     }
 }
 
+/// The line list of `vertices`, or one placeholder point when there is none:
+/// a GPU buffer cannot be empty.
+pub fn line_list_or_placeholder(vertices: &[f32]) -> Vec<f32> {
+    let line = expand_coastline_line_list(vertices);
+    if line.is_empty() {
+        vec![0.0, 0.0]
+    } else {
+        line
+    }
+}
+
+/// Writes `line` into `buffer` when it fits; otherwise a new buffer holding
+/// it, for the caller to bind in `buffer`'s place.
+pub fn write_or_grow(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    line: &[f32],
+    label: &str,
+) -> Option<wgpu::Buffer> {
+    use wgpu::util::DeviceExt;
+    if std::mem::size_of_val(line) as u64 <= buffer.size() {
+        queue.write_buffer(buffer, 0, bytemuck::cast_slice(line));
+        return None;
+    }
+    Some(
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(label),
+            contents: bytemuck::cast_slice(line),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

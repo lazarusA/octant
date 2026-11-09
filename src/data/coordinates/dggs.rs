@@ -116,12 +116,6 @@ impl DggsMetadata {
         None
     }
 
-    /// Attempts to parse DGGS metadata from a serde_json::Value map.
-    pub fn from_json_value(val: &serde_json::Value) -> Option<Self> {
-        let dggs_obj = val.get("dggs")?;
-        serde::Deserialize::deserialize(dggs_obj).ok()
-    }
-
     /// Checks if this DGGS metadata describes a HEALPix discrete global grid.
     #[inline]
     pub fn is_healpix(&self) -> bool {

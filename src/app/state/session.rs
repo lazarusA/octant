@@ -62,19 +62,13 @@ impl OctantApp {
         eframe::set_value(storage, LANGUAGE_STORAGE_KEY, &crate::i18n::language());
     }
 
-    pub fn reset_heatmap_view(&mut self) {
-        self.nav.reset_heatmap();
-    }
-
-    pub fn reset_line_view(&mut self) {
-        self.nav.reset_line();
-    }
-
+    #[cfg(test)]
     /// Returns the default automatic label for the active plotted variable (including unit if available).
     pub fn default_colorbar_label(&self) -> String {
         self.layers.base.default_colorbar_label()
     }
 
+    #[cfg(test)]
     /// Returns the effective colorbar label (custom overridden label if set, otherwise default).
     pub fn colorbar_label(&self) -> String {
         self.layers.base.colorbar_label()

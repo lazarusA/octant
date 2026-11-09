@@ -215,6 +215,7 @@ impl CoordinateGrid {
         self.lon_lat_to_cell(lon_rad, lat_rad, width, height)
     }
 
+    #[cfg(test)]
     pub fn detect_grid(
         x_name: &str,
         y_name: &str,

@@ -37,10 +37,3 @@ pub fn detect_healpix_ordering_with_dggs(
         HealpixOrder::Ring
     }
 }
-
-/// Detects HEALPix ordering scheme from an attributes map with zero heap allocations.
-#[inline]
-pub fn detect_healpix_ordering(attributes: &HashMap<String, String>) -> HealpixOrder {
-    let dggs = DggsMetadata::from_attributes(attributes);
-    detect_healpix_ordering_with_dggs(attributes, dggs.as_ref())
-}

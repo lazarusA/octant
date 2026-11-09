@@ -53,20 +53,18 @@ pub fn encode_raster_image(
         ));
     }
 
+    let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
+        .ok_or_else(|| "Failed to construct RGBA image".to_string())?;
     let mut buffer = Vec::new();
     let cursor = Cursor::new(&mut buffer);
 
     match format {
         ExportFormat::Png => {
-            let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
-                .ok_or_else(|| "Failed to construct RGBA image for PNG encoding".to_string())?;
             img.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
                 .map_err(|e| format!("PNG encoding error: {}", e))?;
             buffer = inject_display_p3_chunks(&buffer)?;
         }
         ExportFormat::Jpeg => {
-            let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
-                .ok_or_else(|| "Failed to construct RGBA image for JPEG encoding".to_string())?;
             let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
             let mut encoder =
                 image::codecs::jpeg::JpegEncoder::new_with_quality(cursor, quality.clamp(1, 100));
@@ -75,8 +73,6 @@ pub fn encode_raster_image(
                 .map_err(|e| format!("JPEG encoding error: {}", e))?;
         }
         ExportFormat::Webp => {
-            let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
-                .ok_or_else(|| "Failed to construct RGBA image for WebP encoding".to_string())?;
             img.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::WebP)
                 .map_err(|e| format!("WebP encoding error: {}", e))?;
         }

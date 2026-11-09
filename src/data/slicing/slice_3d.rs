@@ -3,6 +3,7 @@
 use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::common::{clamp_slice_range, compute_fixed_dims_offset, resolve_min_max};
+use crate::data::slicing::copy::{copy_row_contiguous_into, copy_strided_into};
 
 /// Computes the clamped effective depth ensuring the total voxel count stays within GPU storage limits.
 pub fn clamp_gpu_volume_depth(nx: usize, ny: usize, nz: usize) -> usize {
@@ -56,22 +57,17 @@ fn copy_row_contiguous_3d(
     nx: usize,
 ) -> Vec<f32> {
     let mut result = Vec::with_capacity(nx * (y_end - y_start) * eff_nz);
-
     for z in z_start..(z_start + eff_nz) {
-        let z_offset = base_offset + z * stride_z;
-        for y in y_start..y_end {
-            let row_start = z_offset + y * stride_y + x_start;
-            let row_end = row_start + nx;
-            if row_end <= values.len() {
-                result.extend_from_slice(&values[row_start..row_end]);
-            } else {
-                for x in 0..nx {
-                    result.push(values.get(row_start + x).copied().unwrap_or(f32::NAN));
-                }
-            }
-        }
+        let rows = (y_start, y_end, stride_y);
+        copy_row_contiguous_into(
+            &mut result,
+            values,
+            base_offset + z * stride_z,
+            rows,
+            x_start,
+            nx,
+        );
     }
-
     result
 }
 
@@ -93,18 +89,10 @@ fn copy_strided_3d(
     let nx = x_end.saturating_sub(x_start);
     let ny = y_end.saturating_sub(y_start);
     let mut result = Vec::with_capacity(nx * ny * eff_nz);
-
     for z in z_start..(z_start + eff_nz) {
-        let z_offset = base_offset + z * stride_z;
-        for y in y_start..y_end {
-            let row_start = z_offset + y * stride_y;
-            for x in x_start..x_end {
-                let idx = row_start + x * stride_x;
-                result.push(values.get(idx).copied().unwrap_or(f32::NAN));
-            }
-        }
+        let (rows, cols) = ((y_start, y_end, stride_y), (x_start, x_end, stride_x));
+        copy_strided_into(&mut result, values, base_offset + z * stride_z, rows, cols);
     }
-
     result
 }
 

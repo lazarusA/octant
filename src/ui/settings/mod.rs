@@ -45,27 +45,11 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         return;
     }
 
-    let origin = panel_layout::origin(app, Panel::Settings, canvas_rect);
-    let mut header = None;
-    let area_resp = egui::Area::new(Panel::Settings.area_id())
-        .fixed_pos(origin)
-        .constrain_to(canvas_rect)
-        .order(egui::Order::Foreground)
-        .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| header = show_panel(app, ui, canvas_rect));
+    // Stored for the next frame so Variable Controls can position to the right.
+    app.layout.settings_overlay_width =
+        panel_layout::show(app, ctx, Panel::Settings, canvas_rect, |app, ui| {
+            show_panel(app, ui, canvas_rect)
         });
-
-    // Store width for next frame so Variable Controls can position to the right.
-    app.layout.settings_overlay_width = area_resp.response.rect.width();
-    if let Some(header) = header {
-        panel_layout::finish(
-            app,
-            Panel::Settings,
-            header,
-            &area_resp.response,
-            canvas_rect,
-        );
-    }
 }
 
 /// The collapsible "Settings" header over the scrolled body, which stops

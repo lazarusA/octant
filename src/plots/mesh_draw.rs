@@ -121,39 +121,13 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
     }
 }
 
-impl super::traits::PlotRenderer for Mesh3DRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
-        if let crate::data::RenderData::Matrix(m) = data {
-            self.update_data(queue, &m.values);
-        }
-    }
-
-    fn paint(
-        &self,
-        _ui: &mut egui::Ui,
-        _rect: egui::Rect,
-        _params: &super::traits::PlotRenderParams,
-    ) {
-        // Concrete painter dispatched via egui callback
-    }
-
-    fn inspect_hover(
-        &self,
-        _pointer_pos: egui::Pos2,
-        _rect: egui::Rect,
-        _data: &crate::data::RenderData,
-        _params: &super::traits::PlotRenderParams,
-    ) -> Option<super::traits::HoverSample> {
-        None
-    }
-}
-
 pub type SphereRenderer = Mesh3DRenderer;
 pub type SphereCallback = Mesh3DCallback;
 pub type SurfaceRenderer = Mesh3DRenderer;
 pub type SurfaceCallback = Mesh3DCallback;
 
 impl Mesh3DRenderer {
+    #[cfg(test)]
     pub fn new_sphere(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,
@@ -197,6 +171,7 @@ impl Mesh3DRenderer {
         )
     }
 
+    #[cfg(test)]
     pub fn new_surface(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,

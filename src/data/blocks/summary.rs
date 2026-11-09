@@ -47,6 +47,7 @@ impl BlockCache {
         summaries
     }
 
+    #[cfg(test)]
     /// Aggregated bytes by variable name.
     pub fn bytes_by_variable(&self) -> HashMap<String, usize> {
         let mut map = HashMap::new();
@@ -56,6 +57,7 @@ impl BlockCache {
         map
     }
 
+    #[cfg(test)]
     /// Aggregated bytes by source ID.
     pub fn bytes_by_source(&self) -> HashMap<String, usize> {
         let mut map = HashMap::new();
@@ -71,25 +73,6 @@ impl BlockCache {
             .entries
             .keys()
             .filter(|k| k.source_id == source_id && k.variable_name == variable_name)
-            .cloned()
-            .collect();
-
-        for key in keys_to_remove {
-            if let Some(block) = self.entries.remove(&key) {
-                self.current_bytes = self.current_bytes.saturating_sub(block.bytes_size());
-            }
-            if let Some(pos) = self.access_order.iter().position(|k| k == &key) {
-                self.access_order.remove(pos);
-            }
-        }
-    }
-
-    /// Removes and evicts all cached blocks for a specific source ID.
-    pub fn clear_source(&mut self, source_id: &str) {
-        let keys_to_remove: Vec<BlockCacheKey> = self
-            .entries
-            .keys()
-            .filter(|k| k.source_id == source_id)
             .cloned()
             .collect();
 

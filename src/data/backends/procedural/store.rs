@@ -2,16 +2,15 @@
 
 use super::ProceduralBlockStore;
 use super::healpix::slice_healpix_block;
-use super::inspect::inspect_procedural;
+use super::inspect::{GRIDS_2D, grid_coords, inspect_procedural};
 use super::slice_2d::slice_2d_grid_block;
 use super::slice_3d::{slice_gaussian_wave_packet_4d, slice_procedural_matrix_block};
 use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::procedural::{
-    generate_clenshaw_curtis_2d, generate_clenshaw_curtis_coords, generate_gaussian_coords,
-    generate_gaussian_grid_2d, generate_stepped_resolution_2d, generate_stepped_resolution_coords,
-    generate_stretched_regional_2d, generate_stretched_regional_coords,
+    generate_clenshaw_curtis_2d, generate_gaussian_grid_2d, generate_stepped_resolution_2d,
+    generate_stretched_regional_2d,
 };
 use crate::data::slice_request::SliceRequest;
 
@@ -21,31 +20,8 @@ impl BlockStore for ProceduralBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        if self.uri.contains("healpix") {
-            return Ok(vec![
-                "temp".to_string(),
-                "mslp".to_string(),
-                "lat".to_string(),
-                "lon".to_string(),
-                "ring".to_string(),
-            ]);
-        }
-        let is_4d = self.uri.contains("volume") || self.uri.contains("4d");
-        if is_4d {
-            Ok(vec![
-                "gaussian_wave_packet_4d".to_string(),
-                "procedural_matrix_2d".to_string(),
-            ])
-        } else {
-            Ok(vec![
-                "clenshaw_curtis_2d".to_string(),
-                "gaussian_grid_2d".to_string(),
-                "stretched_regional_2d".to_string(),
-                "stepped_resolution_2d".to_string(),
-                "gaussian_wave_packet_4d".to_string(),
-                "procedural_matrix_2d".to_string(),
-            ])
-        }
+        let meta = inspect_procedural(&self.uri)?;
+        Ok(meta.variables.into_iter().map(|v| v.name).collect())
     }
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
@@ -57,54 +33,13 @@ impl BlockStore for ProceduralBlockStore {
             return slice_healpix_block(request);
         }
 
-        if request.variable == "clenshaw_curtis_2d" {
-            let (h_full, w_full) = (64, 128);
-            let (full_data, _, _) = generate_clenshaw_curtis_2d(w_full, h_full, 0);
-            let (xs, ys) = generate_clenshaw_curtis_coords(w_full, h_full);
+        if let Some((size, values, (xs, ys))) = grid_2d(&request.variable) {
+            let coords = (xs.as_slice(), ys.as_slice());
             return Ok(slice_2d_grid_block(
                 &request.variable,
-                (w_full, h_full),
-                &full_data,
-                (&xs, &ys),
-                request,
-            ));
-        }
-
-        if request.variable == "gaussian_grid_2d" {
-            let (h_full, w_full) = (64, 128);
-            let (full_data, _, _) = generate_gaussian_grid_2d(w_full, h_full, 0);
-            let (xs, ys) = generate_gaussian_coords(w_full, h_full);
-            return Ok(slice_2d_grid_block(
-                &request.variable,
-                (w_full, h_full),
-                &full_data,
-                (&xs, &ys),
-                request,
-            ));
-        }
-
-        if request.variable == "stretched_regional_2d" {
-            let (h_full, w_full) = (32, 48);
-            let (full_data, _, _) = generate_stretched_regional_2d(w_full, h_full);
-            let (xs, ys) = generate_stretched_regional_coords(w_full, h_full);
-            return Ok(slice_2d_grid_block(
-                &request.variable,
-                (w_full, h_full),
-                &full_data,
-                (&xs, &ys),
-                request,
-            ));
-        }
-
-        if request.variable == "stepped_resolution_2d" {
-            let (h_full, w_full) = (32, 64);
-            let (full_data, _, _) = generate_stepped_resolution_2d(w_full, h_full);
-            let (xs, ys) = generate_stepped_resolution_coords(w_full, h_full);
-            return Ok(slice_2d_grid_block(
-                &request.variable,
-                (w_full, h_full),
-                &full_data,
-                (&xs, &ys),
+                size,
+                &values,
+                coords,
                 request,
             ));
         }
@@ -116,4 +51,21 @@ impl BlockStore for ProceduralBlockStore {
         // Default 4D Known-Truth Block slicing
         Ok(slice_gaussian_wave_packet_4d(request))
     }
+}
+
+/// A 2D test grid: (width, height), values and x/y coordinates.
+type Grid2d = ((usize, usize), Vec<f32>, (Vec<f64>, Vec<f64>));
+
+/// A 2D test grid's (width, height), values and x/y coordinates, sized by
+/// `GRIDS_2D` as its inspection lists it.
+fn grid_2d(name: &str) -> Option<Grid2d> {
+    let &(_, w, h) = GRIDS_2D.iter().find(|g| g.0 == name)?;
+    let values = match name {
+        "clenshaw_curtis_2d" => generate_clenshaw_curtis_2d(w, h, 0).0,
+        "gaussian_grid_2d" => generate_gaussian_grid_2d(w, h, 0).0,
+        "stretched_regional_2d" => generate_stretched_regional_2d(w, h).0,
+        _ => generate_stepped_resolution_2d(w, h).0,
+    };
+    let coords = grid_coords(name, w, h);
+    Some(((w, h), values, coords))
 }

@@ -104,7 +104,6 @@ pub fn draw_clip_triangles(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle, i
             &mut color.lowclip_color,
             low_shape,
         )
-        .title(tr(K::LowClipTitle))
         .tooltip(tr(K::LowClipHover))
         .show_at(ui, low_rect);
     }
@@ -115,7 +114,6 @@ pub fn draw_clip_triangles(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle, i
             &mut color.highclip_color,
             high_shape,
         )
-        .title(tr(K::HighClipTitle))
         .tooltip(tr(K::HighClipHover))
         .anchor_offset(egui::Vec2::new(-170.0, -250.0))
         .show_at(ui, high_rect);

@@ -52,17 +52,14 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Borne supérieure (Max). Faites glisser pour ajuster ou cliquez pour saisir."
         }
-        ColormapKey::LowClipTitle => "Couleur sous la plage (< Min)",
         ColormapKey::LowClipHover => {
             "Couleur sous la plage (< Min). Cliquez pour choisir la couleur."
         }
-        ColormapKey::HighClipTitle => "Couleur au-dessus de la plage (> Max)",
         ColormapKey::HighClipHover => {
             "Couleur au-dessus de la plage (> Max). Cliquez pour choisir la couleur."
         }
         ColormapKey::HoveredValue => "Val. : {}",
         ColormapKey::TitleHover => "Titre de la barre de couleurs. Cliquez pour modifier.",
-        ColormapKey::ColorPicker => "Sélecteur de couleur",
         ColormapKey::Copy => "Copier",
         ColormapKey::CopyHover => "Copier les valeurs de la couleur dans le presse-papiers",
         ColormapKey::AlphaNotANumber => "'{}' n'est pas un nombre",

@@ -45,7 +45,7 @@ pub use procedural::{
     generate_stretched_regional_coords, get_known_truth_4d_center,
 };
 pub use render::{
-    AggregationOp, MatrixData, MatrixPyramid, PyramidLevel, RenderData, ResampledTile,
-    SpatialLayout, ViewportRequest, ViewportResampler, VolumeData,
+    AggregationOp, MatrixData, MatrixPyramid, PyramidLevel, ResampledTile, SpatialLayout,
+    ViewportRequest, ViewportResampler, VolumeData,
 };
 pub use slice_request::{DimensionSelection, SliceRequest};

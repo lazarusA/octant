@@ -20,17 +20,6 @@ pub enum CoastlineLod {
 }
 
 impl CoastlineLod {
-    /// Chooses the appropriate LOD based on the current zoom level.
-    pub fn from_zoom(zoom: f32) -> Self {
-        if zoom < 4.0 {
-            Self::Lod110m
-        } else if zoom < 20.0 {
-            Self::Lod50m
-        } else {
-            Self::Lod10m
-        }
-    }
-
     /// Returns the asset filename for this LOD.
     pub const fn filename(self) -> &'static str {
         match self {

@@ -94,6 +94,7 @@ impl OctantApp {
         eframe::set_value(storage, STORAGE_KEY, &prefs);
     }
 
+    #[cfg(test)]
     /// Atlas row the base layer draws: the previewed or active colormap, or
     /// its smooth twin when "Smooth" is on and the palette has one.
     pub fn effective_colormap(&self) -> u32 {

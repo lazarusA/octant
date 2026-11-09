@@ -49,14 +49,11 @@ crate::i18n::keys::define_keys! {
     FlipOrientation,
     RangeMinHover,
     RangeMaxHover,
-    LowClipTitle,
     LowClipHover,
-    HighClipTitle,
     HighClipHover,
     HoveredValue,
     TitleHover,
     // Color picker popup
-    ColorPicker,
     Copy,
     CopyHover,
     // Alpha curve errors

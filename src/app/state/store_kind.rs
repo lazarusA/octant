@@ -44,7 +44,6 @@ impl StoreKind {
             crate::data::DataSourceKind::LocalGeoTiff => StoreKind::LocalGeoTiff,
             crate::data::DataSourceKind::NetCdf => StoreKind::LocalNetCdf,
             crate::data::DataSourceKind::Procedural => StoreKind::ProceduralVolume4D,
-            _ => StoreKind::ProceduralRandom,
         }
     }
 

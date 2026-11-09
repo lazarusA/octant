@@ -9,6 +9,31 @@ use zarrs::storage::ReadableStorageTraits;
 pub use super::reader::ChunkReader;
 use super::reader::{Sharded, SubsetRetriever};
 
+/// `$on!(T)` for the integer type `$dt` holds (`i8` to `u64`), else `$other`.
+macro_rules! by_int_type {
+    ($dt:expr, $on:ident, $other:expr) => {
+        if $dt.is::<Int8DataType>() {
+            $on!(i8)
+        } else if $dt.is::<Int16DataType>() {
+            $on!(i16)
+        } else if $dt.is::<Int32DataType>() {
+            $on!(i32)
+        } else if $dt.is::<Int64DataType>() {
+            $on!(i64)
+        } else if $dt.is::<UInt8DataType>() {
+            $on!(u8)
+        } else if $dt.is::<UInt16DataType>() {
+            $on!(u16)
+        } else if $dt.is::<UInt32DataType>() {
+            $on!(u32)
+        } else if $dt.is::<UInt64DataType>() {
+            $on!(u64)
+        } else {
+            $other
+        }
+    };
+}
+
 fn decode_with<R: SubsetRetriever>(
     retriever: &R,
     dt: &DataType,
@@ -39,24 +64,12 @@ fn decode_with<R: SubsetRetriever>(
         Ok(raw_vals)
     } else if dt.is::<Float64DataType>() {
         decode_typed!(f64)
-    } else if dt.is::<Int32DataType>() {
-        decode_typed!(i32)
-    } else if dt.is::<Int16DataType>() {
-        decode_typed!(i16)
-    } else if dt.is::<Int8DataType>() {
-        decode_typed!(i8)
-    } else if dt.is::<UInt32DataType>() {
-        decode_typed!(u32)
-    } else if dt.is::<UInt16DataType>() {
-        decode_typed!(u16)
-    } else if dt.is::<UInt8DataType>() {
-        decode_typed!(u8)
-    } else if dt.is::<Int64DataType>() {
-        decode_typed!(i64)
-    } else if dt.is::<UInt64DataType>() {
-        decode_typed!(u64)
     } else {
-        decode_other(retriever, dt, calibration, subset)
+        by_int_type!(
+            dt,
+            decode_typed,
+            decode_other(retriever, dt, calibration, subset)
+        )
     }
 }
 
@@ -122,13 +135,10 @@ fn label_bits<R: SubsetRetriever>(
     subset: &ArraySubset,
 ) -> Result<Option<Vec<f32>>, BlockStoreError> {
     macro_rules! ids {
-        ($t:ty) => {
-            ids!($t, |_| false)
-        };
-        // `$wide`: whether an id does not fit 32 bits (64-bit types).
-        ($t:ty, $wide:expr) => {{
+        ($t:ty) => {{
             let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
-            if vals.iter().copied().any($wide) {
+            // Only 64-bit ids can exceed the 32 bits kept.
+            if size_of::<$t>() == 8 && vals.iter().any(|&v| u32::try_from(v).is_err()) {
                 report_wide_label_ids();
             }
             Ok(Some(
@@ -136,25 +146,7 @@ fn label_bits<R: SubsetRetriever>(
             ))
         }};
     }
-    if dt.is::<UInt8DataType>() {
-        ids!(u8)
-    } else if dt.is::<UInt16DataType>() {
-        ids!(u16)
-    } else if dt.is::<UInt32DataType>() {
-        ids!(u32)
-    } else if dt.is::<UInt64DataType>() {
-        ids!(u64, |v: u64| u32::try_from(v).is_err())
-    } else if dt.is::<Int8DataType>() {
-        ids!(i8)
-    } else if dt.is::<Int16DataType>() {
-        ids!(i16)
-    } else if dt.is::<Int32DataType>() {
-        ids!(i32)
-    } else if dt.is::<Int64DataType>() {
-        ids!(i64, |v: i64| u32::try_from(v).is_err())
-    } else {
-        Ok(None)
-    }
+    by_int_type!(dt, ids, Ok(None))
 }
 
 /// Reads an integer array subset as label ids, kept exact: each value's low
@@ -191,22 +183,6 @@ pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + '
         array.retrieve_subset::<Vec<f64>>(subset)?
     } else if dt.is::<Float32DataType>() {
         widen!(f32)
-    } else if dt.is::<Int64DataType>() {
-        widen!(i64)
-    } else if dt.is::<Int32DataType>() {
-        widen!(i32)
-    } else if dt.is::<Int16DataType>() {
-        widen!(i16)
-    } else if dt.is::<Int8DataType>() {
-        widen!(i8)
-    } else if dt.is::<UInt64DataType>() {
-        widen!(u64)
-    } else if dt.is::<UInt32DataType>() {
-        widen!(u32)
-    } else if dt.is::<UInt16DataType>() {
-        widen!(u16)
-    } else if dt.is::<UInt8DataType>() {
-        widen!(u8)
     } else if dt.is::<Float16DataType>() {
         let vals: Vec<half::f16> = array.retrieve_subset(subset)?;
         vals.into_iter().map(f64::from).collect()
@@ -214,7 +190,9 @@ pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + '
         let vals: Vec<half::bf16> = array.retrieve_subset(subset)?;
         vals.into_iter().map(f64::from).collect()
     } else {
-        return Err("coordinate data type is not numeric".into());
+        by_int_type!(dt, widen, {
+            return Err("coordinate data type is not numeric".into());
+        })
     };
     let calibration = DataCalibration::from_json_map(array.attributes());
     if calibration.has_transformation() {

@@ -35,7 +35,6 @@ pub struct UiLayoutState {
     // Modal windows
     pub show_catalog_window: bool,
     pub show_about_window: bool,
-    pub show_icon_gallery_window: bool,
     /// The keyboard shortcut list.
     pub show_shortcuts: bool,
     /// The centered plot type picker.
@@ -70,7 +69,6 @@ impl Default for UiLayoutState {
             colorbar_transparency: 0.0,
             show_catalog_window: false,
             show_about_window: false,
-            show_icon_gallery_window: false,
             show_shortcuts: false,
             show_plot_picker: false,
             catalog_search_query: String::new(),
@@ -107,7 +105,6 @@ impl UiLayoutState {
         self.show_variable_controls = false;
         self.show_catalog_window = false;
         self.show_about_window = false;
-        self.show_icon_gallery_window = false;
         self.show_shortcuts = false;
         self.show_plot_picker = false;
     }

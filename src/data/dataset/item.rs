@@ -4,11 +4,7 @@
 //! completely different sources to be displayed together.
 
 use super::{handle::StoreHandle, source::DataSource};
-use crate::data::{
-    blocks::BlockRequest,
-    metadata::DatasetMetadata,
-    slice_request::{DimensionSelection, SliceRequest},
-};
+use crate::data::metadata::DatasetMetadata;
 
 #[derive(Clone)]
 pub struct Dataset {
@@ -16,7 +12,6 @@ pub struct Dataset {
     pub source: DataSource,
     pub store: StoreHandle,
     pub metadata: Option<DatasetMetadata>,
-    pub selected_variables: Vec<String>,
 }
 
 impl Dataset {
@@ -26,37 +21,6 @@ impl Dataset {
             source,
             store,
             metadata: None,
-            selected_variables: Vec::new(),
         }
-    }
-
-    pub fn add_variable(&mut self, variable: impl Into<String>) {
-        let variable = variable.into();
-
-        if !self.selected_variables.contains(&variable) {
-            self.selected_variables.push(variable);
-        }
-    }
-
-    pub fn remove_variable(&mut self, variable: &str) {
-        self.selected_variables.retain(|v| v != variable);
-    }
-
-    pub fn has_variable(&self, variable: &str) -> bool {
-        self.selected_variables.iter().any(|v| v == variable)
-    }
-
-    /// Builds a `BlockRequest` for a selection against this dataset's own
-    /// store.
-    pub fn request(&self, slice: SliceRequest) -> BlockRequest {
-        BlockRequest::new(self.store.clone(), slice)
-    }
-
-    pub fn request_variable(
-        &self,
-        variable: impl Into<String>,
-        selections: Vec<DimensionSelection>,
-    ) -> BlockRequest {
-        self.request(SliceRequest::new(variable, selections))
     }
 }

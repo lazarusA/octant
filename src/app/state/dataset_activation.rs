@@ -186,11 +186,6 @@ impl OctantApp {
         selection.store_kind.is_geotiff()
     }
 
-    /// The plotted `(start, end)` selection of dimension `dim_idx`.
-    pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
-        self.layer_dim_range(LayerId::BASE, dim_idx)
-    }
-
     /// Layer `id`'s `(start, end)` selection of dimension `dim_idx`: its
     /// range while expanded, else its single index.
     pub fn layer_dim_range(&self, id: LayerId, dim_idx: usize) -> (usize, usize) {

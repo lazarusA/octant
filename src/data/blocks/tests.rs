@@ -125,7 +125,7 @@ fn test_block_cache_summary_and_clearing() {
     assert_eq!(cache.summary_per_variable().len(), 2);
 
     // Clear dataset-a remaining
-    cache.clear_source("dataset-a");
+    cache.remove_source("dataset-a");
     assert_eq!(cache.cached_count(), 1);
     assert_eq!(cache.summary_per_variable()[0].source_id, "dataset-b");
 }

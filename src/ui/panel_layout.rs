@@ -130,16 +130,34 @@ fn apply_grip(app: &mut OctantApp, panel: Panel, action: GripAction, rect: Rect,
     *pos = drag_grip::apply(*pos, action, rect.min, canvas);
 }
 
+/// Draws `panel` at its place in a popup-framed foreground area held inside
+/// `canvas`, its content by `body` (which returns its header, if drawn), then
+/// applies the header (`finish`); the panel's drawn width.
+pub fn show(
+    app: &mut OctantApp,
+    ctx: &egui::Context,
+    panel: Panel,
+    canvas: Rect,
+    body: impl FnOnce(&mut OctantApp, &mut egui::Ui) -> Option<PanelHeader>,
+) -> f32 {
+    let mut header = None;
+    let area = egui::Area::new(panel.area_id())
+        .fixed_pos(origin(app, panel, canvas))
+        .constrain_to(canvas)
+        .order(egui::Order::Foreground)
+        .show(ctx, |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| header = body(app, ui));
+        });
+    if let Some(header) = header {
+        finish(app, panel, header, &area.response, canvas);
+    }
+    area.response.rect.width()
+}
+
 /// After `panel` drew as `area` on `canvas`: applies what its `header`'s
 /// grip asked, registers it as a keyboard region entered at the header's
 /// `entry`, and closes it when its close button was clicked.
-pub fn finish(
-    app: &mut OctantApp,
-    panel: Panel,
-    header: PanelHeader,
-    area: &Response,
-    canvas: Rect,
-) {
+fn finish(app: &mut OctantApp, panel: Panel, header: PanelHeader, area: &Response, canvas: Rect) {
     apply_grip(app, panel, header.grip, area.rect, canvas);
     if let Some(entry) = header.entry {
         regions::register(

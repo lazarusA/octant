@@ -57,6 +57,7 @@ impl PayloadSlot {
     }
 
     /// Records that the buffer holds no payload.
+    #[cfg(test)]
     pub(super) fn forget(&self) {
         self.with(|h| h.payload = None);
     }
@@ -228,12 +229,8 @@ mod tests {
         renderer.upload_payload(&device, &queue, 7, &payload, SHAPE);
         assert_eq!(renderer.payload_shape(7), Some(SHAPE));
         assert_eq!(renderer.payload_shape(8), None, "another key");
-        crate::plots::PlotRenderer::update_data(
-            &renderer,
-            &queue,
-            &crate::data::RenderData::Matrix(Default::default()),
-        );
-        assert_eq!(renderer.payload_shape(7), None, "overwritten");
+        renderer.payload.forget();
+        assert_eq!(renderer.payload_shape(7), None, "forgotten");
         assert_eq!(LineRenderer::payload_limit(&device) % 4, 0, "whole words");
     }
 }

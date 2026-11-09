@@ -50,17 +50,14 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Oberes Bereichsende (Max). Ziehen zum Anpassen oder klicken zum Eingeben."
         }
-        ColormapKey::LowClipTitle => "Farbe unter dem Bereich (< Min)",
         ColormapKey::LowClipHover => {
             "Farbe unter dem Bereich (< Min). Klicken, um eine Farbe zu wählen."
         }
-        ColormapKey::HighClipTitle => "Farbe über dem Bereich (> Max)",
         ColormapKey::HighClipHover => {
             "Farbe über dem Bereich (> Max). Klicken, um eine Farbe zu wählen."
         }
         ColormapKey::HoveredValue => "Wert: {}",
         ColormapKey::TitleHover => "Titel der Farbleiste. Klicken zum Bearbeiten.",
-        ColormapKey::ColorPicker => "Farbwähler",
         ColormapKey::Copy => "Kopieren",
         ColormapKey::CopyHover => "Farbwerte in die Zwischenablage kopieren",
         ColormapKey::AlphaNotANumber => "'{}' ist keine Zahl",
