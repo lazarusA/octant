@@ -30,15 +30,3 @@ pub fn apply_colormap_into(
         out[i] = (lut_val as f32) * (255.0 / 65535.0);
     }
 }
-
-/// Apply ColorMap palette lookup returning a newly allocated `Vec<f32>`.
-pub fn apply_colormap(
-    indices: &[f32],
-    colormap: &[u16],
-    bits_per_sample: u16,
-    channel: usize,
-) -> Vec<f32> {
-    let mut out = vec![f32::NAN; indices.len()];
-    apply_colormap_into(indices, colormap, bits_per_sample, channel, &mut out);
-    out
-}

@@ -20,11 +20,6 @@ impl BlockCacheKey {
             selections: slice.selections.clone(),
         }
     }
-
-    /// Reconstructs the SliceRequest represented by this key.
-    pub fn to_slice_request(&self) -> SliceRequest {
-        SliceRequest::new(self.variable_name.clone(), self.selections.clone())
-    }
 }
 
 pub(crate) fn selections_match_except_anim(

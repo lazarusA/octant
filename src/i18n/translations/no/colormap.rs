@@ -52,13 +52,10 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Øvre grense (Maks). Dra for å justere eller klikk for å skrive."
         }
-        ColormapKey::LowClipTitle => "Farge for nedre klipp (< Min)",
         ColormapKey::LowClipHover => "Farge for nedre klipp (< Min). Klikk for å velge farge.",
-        ColormapKey::HighClipTitle => "Farge for øvre klipp (> Maks)",
         ColormapKey::HighClipHover => "Farge for øvre klipp (> Maks). Klikk for å velge farge.",
         ColormapKey::HoveredValue => "Verdi: {}",
         ColormapKey::TitleHover => "Tittel på fargeskalaen. Klikk for å redigere.",
-        ColormapKey::ColorPicker => "Fargevelger",
         ColormapKey::Copy => "Kopier",
         ColormapKey::CopyHover => "Kopier fargeverdiene til utklippstavlen",
         ColormapKey::AlphaNotANumber => "'{}' er ikke et tall",

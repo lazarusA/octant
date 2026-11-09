@@ -10,6 +10,34 @@ use crate::data::procedural::{
     generate_stretched_regional_coords,
 };
 
+/// The 2D test grids: name, width and height.
+pub(super) const GRIDS_2D: [(&str, usize, usize); 4] = [
+    ("clenshaw_curtis_2d", 128, 64),
+    ("gaussian_grid_2d", 128, 64),
+    ("stretched_regional_2d", 48, 32),
+    ("stepped_resolution_2d", 64, 32),
+];
+
+/// `GRIDS_2D`'s shape of `name`, as `[height, width]`.
+fn grid_shape(name: &str) -> Vec<u64> {
+    let (_, w, h) = GRIDS_2D
+        .iter()
+        .find(|g| g.0 == name)
+        .copied()
+        .unwrap_or(("", 0, 0));
+    vec![h as u64, w as u64]
+}
+
+/// A 2D test grid's x and y coordinates at `w` x `h`.
+pub(super) fn grid_coords(name: &str, w: usize, h: usize) -> (Vec<f64>, Vec<f64>) {
+    match name {
+        "clenshaw_curtis_2d" => generate_clenshaw_curtis_coords(w, h),
+        "gaussian_grid_2d" => generate_gaussian_coords(w, h),
+        "stretched_regional_2d" => generate_stretched_regional_coords(w, h),
+        _ => generate_stepped_resolution_coords(w, h),
+    }
+}
+
 fn make_var(
     name: &str,
     shape: Vec<u64>,
@@ -73,8 +101,8 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
         vec![
             make_var(
                 "clenshaw_curtis_2d",
-                vec![64, 128],
-                vec![64, 128],
+                grid_shape("clenshaw_curtis_2d"),
+                grid_shape("clenshaw_curtis_2d"),
                 &["lat", "lon"],
                 "dimensionless",
                 "2D Clenshaw-Curtis Grid (Boundary Compressed)",
@@ -82,8 +110,8 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
             ),
             make_var(
                 "gaussian_grid_2d",
-                vec![64, 128],
-                vec![64, 128],
+                grid_shape("gaussian_grid_2d"),
+                grid_shape("gaussian_grid_2d"),
                 &["lat", "lon"],
                 "K",
                 "2D Gaussian Latitude Grid (Poles Compressed)",
@@ -91,8 +119,8 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
             ),
             make_var(
                 "stretched_regional_2d",
-                vec![32, 48],
-                vec![32, 48],
+                grid_shape("stretched_regional_2d"),
+                grid_shape("stretched_regional_2d"),
                 &["lat", "lon"],
                 "dimensionless",
                 "2D Geometrically Stretched Regional Grid [10E..50E, 30N..60N]",
@@ -100,8 +128,8 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
             ),
             make_var(
                 "stepped_resolution_2d",
-                vec![32, 64],
-                vec![32, 64],
+                grid_shape("stepped_resolution_2d"),
+                grid_shape("stepped_resolution_2d"),
                 &["lat", "lon"],
                 "dimensionless",
                 "2D Stepped Multi-Resolution Grid (5x Resolution Jump)",
@@ -153,22 +181,8 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
         insert("lat", &lat);
         insert("lon", &lon);
     } else {
-        let grids = [
-            (
-                "clenshaw_curtis_2d",
-                generate_clenshaw_curtis_coords(128, 64),
-            ),
-            ("gaussian_grid_2d", generate_gaussian_coords(128, 64)),
-            (
-                "stretched_regional_2d",
-                generate_stretched_regional_coords(48, 32),
-            ),
-            (
-                "stepped_resolution_2d",
-                generate_stepped_resolution_coords(64, 32),
-            ),
-        ];
-        for (var, (x, y)) in grids {
+        for &(var, w, h) in &GRIDS_2D {
+            let (x, y) = grid_coords(var, w, h);
             for (dim, values) in [("lon", x), ("lat", y)] {
                 let Some(values) = CoordValues::from_values(values, false) else {
                     continue;

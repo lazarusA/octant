@@ -45,7 +45,6 @@ mod slice_gpu_tests;
 pub(crate) mod test_frame;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
-pub mod traits;
 pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
@@ -72,7 +71,6 @@ pub use mesh_draw::{
     Mesh3DCallback, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
 };
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
-pub use traits::{HoverSample, PlotRenderParams, PlotRenderer};
 pub use volume::{VolumeCallback, VolumeEncoding, VolumeRenderer, VolumeUniformParams};
 
 /// Supported visualization plot types in Octant Engine

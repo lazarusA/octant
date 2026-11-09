@@ -5,7 +5,7 @@ use crate::data::octant_block::OctantBlock;
 
 use super::cmyk::{blend_cmyk, is_cmyk_block};
 use super::probe::local_channel;
-use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
+use super::utils::compute_channel_normalization;
 
 /// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `VolumeData`.
 #[allow(clippy::too_many_arguments)]
@@ -64,7 +64,7 @@ pub fn slice_rgb_volume_composite_nd(
         let (r_v, r_scale, r_off, r_i8) = norm_volume_info(channel_vol(channels[0]));
         let (g_v, g_scale, g_off, g_i8) = norm_volume_info(channel_vol(channels[1]));
         let (b_v, b_scale, b_off, b_i8) = norm_volume_info(channel_vol(channels[2]));
-        blend_rgb_voxels(
+        super::rgb::blend_rgb_pixels(
             total_voxels,
             (r_v.as_deref(), r_scale, r_off, r_i8),
             (g_v.as_deref(), g_scale, g_off, g_i8),
@@ -126,42 +126,4 @@ fn norm_volume_info(vol_opt: Option<Vec<f32>>) -> (Option<Vec<f32>>, f32, f32, b
     } else {
         (None, 1.0, 0.0, false)
     }
-}
-
-type ChannelNormTuple<'a> = (Option<&'a [f32]>, f32, f32, bool);
-
-fn blend_rgb_voxels(
-    total_voxels: usize,
-    r: ChannelNormTuple,
-    g: ChannelNormTuple,
-    b: ChannelNormTuple,
-) -> Vec<f32> {
-    let mut values = Vec::with_capacity(total_voxels);
-    for i in 0..total_voxels {
-        let r_val = r.0.and_then(|v| v.get(i).copied()).unwrap_or(f32::NAN);
-        let g_val = g.0.and_then(|v| v.get(i).copied()).unwrap_or(f32::NAN);
-        let b_val = b.0.and_then(|v| v.get(i).copied()).unwrap_or(f32::NAN);
-
-        if r_val.is_nan() && g_val.is_nan() && b_val.is_nan() {
-            values.push(f32::NAN);
-        } else {
-            let r_n = if r.0.is_some() && !r_val.is_nan() {
-                normalize_channel_value(r_val, r.1, r.2, r.3, 255.0)
-            } else {
-                0.0
-            };
-            let g_n = if g.0.is_some() && !g_val.is_nan() {
-                normalize_channel_value(g_val, g.1, g.2, g.3, 255.0)
-            } else {
-                0.0
-            };
-            let b_n = if b.0.is_some() && !b_val.is_nan() {
-                normalize_channel_value(b_val, b.1, b.2, b.3, 255.0)
-            } else {
-                0.0
-            };
-            values.push(pack_rgb(r_n, g_n, b_n));
-        }
-    }
-    values
 }

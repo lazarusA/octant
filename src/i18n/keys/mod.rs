@@ -47,9 +47,32 @@ pub use plot_options::PlotOptionsKey;
 pub use settings::SettingsKey;
 pub use variables::VariablesKey;
 
-/// Any translatable text, by area.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Key {
+/// Declares `Key`, one variant per area wrapping that area's key enum, each
+/// enum's `From` into `Key`, and `Key::all`.
+macro_rules! key_areas {
+    ($($area:ident($keys:ident)),* $(,)?) => {
+        /// Any translatable text, by area.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+        pub enum Key {
+            $($area($keys)),*
+        }
+
+        $(impl From<$keys> for Key {
+            fn from(key: $keys) -> Self {
+                Key::$area(key)
+            }
+        })*
+
+        impl Key {
+            /// Every key of every area.
+            pub fn all() -> impl Iterator<Item = Key> {
+                std::iter::empty()$(.chain($keys::ALL.iter().copied().map(Key::from)))*
+            }
+        }
+    };
+}
+
+key_areas! {
     Common(CommonKey),
     Dataset(DatasetKey),
     Variables(VariablesKey),
@@ -63,104 +86,4 @@ pub enum Key {
     Keymap(KeymapKey),
     About(AboutKey),
     Notices(NoticesKey),
-}
-
-impl From<CommonKey> for Key {
-    fn from(key: CommonKey) -> Self {
-        Key::Common(key)
-    }
-}
-
-impl From<DatasetKey> for Key {
-    fn from(key: DatasetKey) -> Self {
-        Key::Dataset(key)
-    }
-}
-
-impl From<VariablesKey> for Key {
-    fn from(key: VariablesKey) -> Self {
-        Key::Variables(key)
-    }
-}
-
-impl From<PlaybackKey> for Key {
-    fn from(key: PlaybackKey) -> Self {
-        Key::Playback(key)
-    }
-}
-
-impl From<PlotKey> for Key {
-    fn from(key: PlotKey) -> Self {
-        Key::Plot(key)
-    }
-}
-
-impl From<PlotOptionsKey> for Key {
-    fn from(key: PlotOptionsKey) -> Self {
-        Key::PlotOptions(key)
-    }
-}
-
-impl From<SettingsKey> for Key {
-    fn from(key: SettingsKey) -> Self {
-        Key::Settings(key)
-    }
-}
-
-impl From<ColormapKey> for Key {
-    fn from(key: ColormapKey) -> Self {
-        Key::Colormap(key)
-    }
-}
-
-impl From<ExportKey> for Key {
-    fn from(key: ExportKey) -> Self {
-        Key::Export(key)
-    }
-}
-
-impl From<HoverKey> for Key {
-    fn from(key: HoverKey) -> Self {
-        Key::Hover(key)
-    }
-}
-
-impl From<AboutKey> for Key {
-    fn from(key: AboutKey) -> Self {
-        Key::About(key)
-    }
-}
-
-impl From<KeymapKey> for Key {
-    fn from(key: KeymapKey) -> Self {
-        Key::Keymap(key)
-    }
-}
-
-impl From<NoticesKey> for Key {
-    fn from(key: NoticesKey) -> Self {
-        Key::Notices(key)
-    }
-}
-
-impl Key {
-    /// Every key of every area.
-    pub fn all() -> impl Iterator<Item = Key> {
-        CommonKey::ALL
-            .iter()
-            .copied()
-            .map(Key::from)
-            .chain(DatasetKey::ALL.iter().copied().map(Key::from))
-            .chain(VariablesKey::ALL.iter().copied().map(Key::from))
-            .chain(PlaybackKey::ALL.iter().copied().map(Key::from))
-            .chain(PlotKey::ALL.iter().copied().map(Key::from))
-            .chain(PlotOptionsKey::ALL.iter().copied().map(Key::from))
-            .chain(SettingsKey::ALL.iter().copied().map(Key::from))
-            .chain(ColormapKey::ALL.iter().copied().map(Key::from))
-            .chain(ExportKey::ALL.iter().copied().map(Key::from))
-            .chain(HoverKey::ALL.iter().copied().map(Key::from))
-            .chain(AboutKey::ALL.iter().copied().map(Key::from))
-            .chain(KeymapKey::ALL.iter().copied().map(Key::from))
-            .chain(NoticesKey::ALL.iter().copied().map(Key::from))
-    }
 }

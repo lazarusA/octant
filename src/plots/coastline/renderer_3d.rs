@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
-use super::expansion::expand_coastline_line_list;
+use super::expansion::{expand_coastline_line_list, line_list_or_placeholder, write_or_grow};
 use super::types::{Coastline3DParams, Coastline3DUniforms};
 use crate::plots::common::bgl_entry;
 
@@ -95,17 +95,8 @@ impl Coastline3DRenderer {
             if values.is_empty() { &[0.0] } else { values },
         );
 
-        let dummy_coords = [0.0_f32; 1];
-        let mut x_coords = coords_x
-            .filter(|c| !c.is_empty())
-            .unwrap_or(&dummy_coords)
-            .to_vec();
-        x_coords.resize(x_coords.len().max(width.max(128)), 0.0);
-        let mut y_coords = coords_y
-            .filter(|c| !c.is_empty())
-            .unwrap_or(&dummy_coords)
-            .to_vec();
-        y_coords.resize(y_coords.len().max(height.max(128)), 0.0);
+        let x_coords = crate::plots::mesh::pad_coord_buffer(coords_x, width.max(128));
+        let y_coords = crate::plots::mesh::pad_coord_buffer(coords_y, height.max(128));
         let coord_x_buffer = crate::plots::common::create_storage_buffer(
             device,
             "3D Coastline Coord X Buffer",
@@ -117,15 +108,10 @@ impl Coastline3DRenderer {
             &y_coords,
         );
 
-        let line_vertices = expand_coastline_line_list(coastline_vertices);
-        let safe_vertices = if line_vertices.is_empty() {
-            &[0.0_f32, 0.0][..]
-        } else {
-            line_vertices.as_slice()
-        };
+        let safe_vertices = line_list_or_placeholder(coastline_vertices);
         let coastline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("3D Coastline Vertex Buffer"),
-            contents: bytemuck::cast_slice(safe_vertices),
+            contents: bytemuck::cast_slice(&safe_vertices),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -258,26 +244,18 @@ impl Coastline3DRenderer {
         if line_vertices.is_empty() {
             return;
         }
-        let needed = std::mem::size_of_val(line_vertices.as_slice()) as u64;
-        let capacity = self
-            .gpu
-            .read()
-            .map(|r| r.coastline_buffer.size())
-            .unwrap_or(0);
-        if needed <= capacity {
-            if let Ok(res) = self.gpu.read() {
-                queue.write_buffer(
-                    &res.coastline_buffer,
-                    0,
-                    bytemuck::cast_slice(line_vertices.as_slice()),
-                );
-            }
-        } else {
-            let coastline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("3D Coastline Vertex Buffer (Resized)"),
-                contents: bytemuck::cast_slice(line_vertices.as_slice()),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            });
+        let grown = write_or_grow(
+            device,
+            queue,
+            &self
+                .gpu
+                .read()
+                .unwrap_or_else(|p| p.into_inner())
+                .coastline_buffer,
+            &line_vertices,
+            "3D Coastline Vertex Buffer (Resized)",
+        );
+        if let Some(coastline_buffer) = grown {
             let bind_group = make_3d_bind_group(
                 device,
                 &self.bind_group_layout,
@@ -287,10 +265,9 @@ impl Coastline3DRenderer {
                 &self.coord_y_buffer,
                 &coastline_buffer,
             );
-            if let Ok(mut res) = self.gpu.write() {
-                res.coastline_buffer = coastline_buffer;
-                res.bind_group = bind_group;
-            }
+            let mut res = self.gpu.write().unwrap_or_else(|p| p.into_inner());
+            res.coastline_buffer = coastline_buffer;
+            res.bind_group = bind_group;
         }
         self.vertex_count
             .store((line_vertices.len() / 2) as u32, Ordering::Relaxed);

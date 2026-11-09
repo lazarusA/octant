@@ -231,15 +231,3 @@ fn default_bytes_codec() -> Value {
         "configuration": { "endian": "little" }
     })
 }
-
-/// Orders codecs into canonical Zarr v3 execution order:
-/// 1. Array-to-Array (e.g. `bitround`)
-/// 2. Array-to-Bytes (e.g. `bytes`, `sharding_indexed`, `vlen`)
-/// 3. Bytes-to-Bytes filters (e.g. `numcodecs.shuffle`)
-/// 4. Bytes-to-Bytes compression/checksums (`numcodecs.zlib`, `gzip`, `zstd`, `blosc`, `crc32c`)
-pub fn order_codec_pipeline(codecs: &mut [Value]) {
-    codecs.sort_by_key(|c| {
-        let name = c.get("name").and_then(|n| n.as_str()).unwrap_or("");
-        codec_stage(name).unwrap_or(3)
-    });
-}

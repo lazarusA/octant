@@ -48,30 +48,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let screen_size = ctx.input(|i| i.viewport_rect().size());
     let width = (screen_size.x * 0.28).clamp(280.0, 520.0);
     let list_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
-    let origin = panel_layout::origin(app, Panel::Variables, canvas_rect);
-    app.layout.variables_overlay_width = width;
-
-    let mut header = None;
-    let area_resp = egui::Area::new(Panel::Variables.area_id())
-        .fixed_pos(origin)
-        .constrain_to(canvas_rect)
-        .order(egui::Order::Foreground)
-        .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.set_width(width);
-                header = show_panel(ui, app, list_height, canvas_rect);
-            });
+    app.layout.variables_overlay_width =
+        panel_layout::show(app, ctx, Panel::Variables, canvas_rect, |app, ui| {
+            ui.set_width(width);
+            show_panel(ui, app, list_height, canvas_rect)
         });
-    app.layout.variables_overlay_width = area_resp.response.rect.width();
-    if let Some(header) = header {
-        panel_layout::finish(
-            app,
-            Panel::Variables,
-            header,
-            &area_resp.response,
-            canvas_rect,
-        );
-    }
 }
 
 /// Collapsible "Variables" header with the search field and list (at most

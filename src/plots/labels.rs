@@ -57,7 +57,11 @@ impl LabelRenderer {
         target_format: wgpu::TextureFormat,
         info: &Arc<OmeLabelInfo>,
     ) -> Self {
-        let layout = label_bind_group_layout(device);
+        let layout = super::common::create_uniform_storage_bind_group_layout(
+            device,
+            "Label Bind Group Layout",
+            wgpu::ShaderStages::FRAGMENT,
+        );
         let data_layout = super::common::create_plot_with_coords_bind_group_layout(
             device,
             "Label Data Bind Group Layout",
@@ -158,26 +162,6 @@ impl LabelRenderer {
         rpass.set_bind_group(1, &self.bind_group, &[]);
         heatmap.draw_quad(rpass);
     }
-}
-
-fn label_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Buffer {
-            ty,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    };
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Label Bind Group Layout"),
-        entries: &[
-            buffer(0, wgpu::BufferBindingType::Uniform),
-            buffer(1, wgpu::BufferBindingType::Storage { read_only: true }),
-        ],
-    })
 }
 
 // Label colors on the CPU, exactly as `labels.wgsl` draws them: the palette

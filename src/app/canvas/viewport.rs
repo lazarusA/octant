@@ -41,20 +41,8 @@ fn compute_line_uniforms(
     canvas_rect: egui::Rect,
     gpu_aspect_scale: [f32; 2],
 ) -> ViewportUniforms {
-    let zoom = nav.line_zoom;
-    let pan = nav.line_pan;
-    let scaled_size = canvas_rect.size() * zoom;
-    let scaled_center = canvas_rect.center() + pan;
-    let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
-    let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
-    let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-
-    ViewportUniforms {
-        plot_rect: rect,
-        gpu_pan: [gpu_pan_x, gpu_pan_y],
-        gpu_zoom: zoom,
-        gpu_aspect_scale,
-    }
+    let (zoom, pan) = (nav.line_zoom, nav.line_pan);
+    planar_uniforms(zoom, pan, canvas_rect, [1.0, 1.0], gpu_aspect_scale)
 }
 
 fn compute_heatmap_uniforms(
@@ -62,14 +50,24 @@ fn compute_heatmap_uniforms(
     canvas_rect: egui::Rect,
     gpu_aspect_scale: [f32; 2],
 ) -> ViewportUniforms {
-    let [aspect_scale_x, aspect_scale_y] = gpu_aspect_scale;
-    let zoom = nav.heatmap_zoom;
-    let pan = nav.heatmap_pan;
-    let plot_w = canvas_rect.width() * aspect_scale_x * zoom;
-    let plot_h = canvas_rect.height() * aspect_scale_y * zoom;
-    let scaled_center = canvas_rect.center() + pan;
-    let rect = egui::Rect::from_center_size(scaled_center, egui::vec2(plot_w, plot_h));
+    let (zoom, pan) = (nav.heatmap_zoom, nav.heatmap_pan);
+    planar_uniforms(zoom, pan, canvas_rect, gpu_aspect_scale, gpu_aspect_scale)
+}
 
+/// A 2D plot's rectangle on the canvas, `rect_scale` of the canvas at `zoom`
+/// and moved by `pan` (points), and the matching GPU pan and zoom.
+fn planar_uniforms(
+    zoom: f32,
+    pan: egui::Vec2,
+    canvas_rect: egui::Rect,
+    [scale_x, scale_y]: [f32; 2],
+    gpu_aspect_scale: [f32; 2],
+) -> ViewportUniforms {
+    let size = egui::vec2(
+        canvas_rect.width() * scale_x * zoom,
+        canvas_rect.height() * scale_y * zoom,
+    );
+    let rect = egui::Rect::from_center_size(canvas_rect.center() + pan, size);
     let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
     let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
 

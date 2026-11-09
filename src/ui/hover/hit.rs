@@ -79,15 +79,17 @@ pub(crate) fn drawn_cell(app: &OctantApp, nx: f32, ny: f32) -> Option<(usize, us
     ))
 }
 
-fn hit_sphere(
+/// The cell a mesh `raycast` (sphere or surface) hits, marched over the grid
+/// the mesh draws (`Layer::mesh_view`).
+fn hit_mesh(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
     camera: &Camera3D,
     hover_pos: Pos2,
+    raycast: MeshRaycast,
 ) -> HitResult {
-    // Marched over the grid the sphere draws (`Layer::mesh_view`).
     if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
-        && let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos)
+        && let Some((nx, ny, geo)) = raycast(app, matrix, camera, hover_pos)
     {
         HitResult {
             cell: drawn_cell(app, nx, ny),
@@ -98,23 +100,8 @@ fn hit_sphere(
     }
 }
 
-fn hit_surface(
-    app: &OctantApp,
-    matrix: Option<&MatrixData>,
-    camera: &Camera3D,
-    hover_pos: Pos2,
-) -> HitResult {
-    if let Some(matrix) = matrix.map(|m| app.layers.base.mesh_view(m).0)
-        && let Some((nx, ny, geo)) = raycast_surface(app, matrix, camera, hover_pos)
-    {
-        HitResult {
-            cell: drawn_cell(app, nx, ny),
-            ..HitResult::norm_2d(nx, ny, true, geo)
-        }
-    } else {
-        HitResult::invalid()
-    }
-}
+type MeshRaycast =
+    fn(&OctantApp, &MatrixData, &Camera3D, Pos2) -> Option<(f32, f32, Option<(f32, f32)>)>;
 
 fn hit_3d_volume(
     app: &OctantApp,
@@ -175,8 +162,8 @@ pub fn resolve_hit_coordinates(
     hover_pos: Pos2,
 ) -> HitResult {
     match app.effective_canvas_plot_type() {
-        PlotType::Sphere => hit_sphere(app, matrix, camera, hover_pos),
-        PlotType::Surface => hit_surface(app, matrix, camera, hover_pos),
+        PlotType::Sphere => hit_mesh(app, matrix, camera, hover_pos, raycast_sphere),
+        PlotType::Surface => hit_mesh(app, matrix, camera, hover_pos, raycast_surface),
         PlotType::PointCloud | PlotType::Volume => hit_3d_volume(app, camera, sampler, hover_pos),
         PlotType::Line => {
             let is_inside = rect.contains(hover_pos);

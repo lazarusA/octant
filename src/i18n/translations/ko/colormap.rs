@@ -46,13 +46,10 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "범위 상한 (최대). 드래그하여 조정하거나 클릭하여 입력하세요."
         }
-        ColormapKey::LowClipTitle => "하한 클립 색상 (< 최소)",
         ColormapKey::LowClipHover => "하한 클립 색상 (< 최소). 클릭하여 색상을 선택하세요.",
-        ColormapKey::HighClipTitle => "상한 클립 색상 (> 최대)",
         ColormapKey::HighClipHover => "상한 클립 색상 (> 최대). 클릭하여 색상을 선택하세요.",
         ColormapKey::HoveredValue => "값: {}",
         ColormapKey::TitleHover => "컬러바 제목. 클릭하여 편집하세요.",
-        ColormapKey::ColorPicker => "색상 선택기",
         ColormapKey::Copy => "복사",
         ColormapKey::CopyHover => "색상 값을 클립보드에 복사",
         ColormapKey::AlphaNotANumber => "숫자가 아님: '{}'",

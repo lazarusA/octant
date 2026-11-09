@@ -191,9 +191,12 @@ fn norm_plane_info(
     }
 }
 
-type ChannelPlaneTuple<'a> = (Option<&'a [f32]>, f32, f32, bool);
+/// One channel to blend: its values (`None` when the band is unset), scale,
+/// offset and whether it holds `i8` data.
+pub(super) type ChannelPlaneTuple<'a> = (Option<&'a [f32]>, f32, f32, bool);
 
-fn blend_rgb_pixels(
+/// Packs `len` pixels or voxels of three normalized channels into RGB values.
+pub(super) fn blend_rgb_pixels(
     plane_size: usize,
     r: ChannelPlaneTuple,
     g: ChannelPlaneTuple,

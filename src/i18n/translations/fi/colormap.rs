@@ -48,13 +48,10 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Välin yläpää (Max). Säädä vetämällä tai kirjoita napsauttamalla."
         }
-        ColormapKey::LowClipTitle => "Alaleikkauksen väri (< Min)",
         ColormapKey::LowClipHover => "Alaleikkauksen väri (< Min). Valitse väri napsauttamalla.",
-        ColormapKey::HighClipTitle => "Yläleikkauksen väri (> Max)",
         ColormapKey::HighClipHover => "Yläleikkauksen väri (> Max). Valitse väri napsauttamalla.",
         ColormapKey::HoveredValue => "Arvo: {}",
         ColormapKey::TitleHover => "Väripalkin otsikko. Muokkaa napsauttamalla.",
-        ColormapKey::ColorPicker => "Värivalitsin",
         ColormapKey::Copy => "Kopioi",
         ColormapKey::CopyHover => "Kopioi väriarvot leikepöydälle",
         ColormapKey::AlphaNotANumber => "'{}' ei ole luku",

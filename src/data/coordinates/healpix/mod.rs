@@ -20,14 +20,6 @@ pub enum HealpixOrder {
 }
 
 impl HealpixOrder {
-    pub fn from_str_case_insensitive(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("nested") {
-            Self::Nested
-        } else {
-            Self::Ring
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Ring => "ring",

@@ -20,10 +20,8 @@ impl OctantApp {
         let was_3d = prev_plot_type == PlotType::Volume || prev_plot_type == PlotType::PointCloud;
         let is_3d = new_plot_type == PlotType::Volume || new_plot_type == PlotType::PointCloud;
 
-        if was_3d && !is_3d {
-            self.switch_from_3d_to_2d();
-        } else if !was_3d && is_3d {
-            self.switch_from_2d_to_3d();
+        if was_3d != is_3d {
+            self.switch_dimensionality(is_3d);
         }
         // Those switches change the base layer's plot type in place: overlays
         // follow it now, not when its block arrives.
@@ -34,49 +32,36 @@ impl OctantApp {
         }
     }
 
-    fn switch_from_3d_to_2d(&mut self) {
+    /// Moves the staged and plotted selections between 2D and 3D plots
+    /// (`to_3d`), dropping the base layer's data of the other kind when it
+    /// shows another variable.
+    fn switch_dimensionality(&mut self, to_3d: bool) {
         // Each selection by its own variable: the staged one may be another.
         let composite = self.layers.base.composite.enabled;
-        adapt_sel_to_2d(&mut self.selected, composite);
-        adapt_sel_to_2d(self.layers.base.selection_mut(), composite);
+        let adapt = if to_3d {
+            adapt_sel_to_3d
+        } else {
+            adapt_sel_to_2d
+        };
+        adapt(&mut self.selected, composite);
+        adapt(self.layers.base.selection_mut(), composite);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
         let cur_var = self.plotted_variable_info();
         let cur_name = cur_var.map(|v| v.name.as_str());
-        if !self.is_exploring_unplotted_variable()
-            && self
-                .layers
-                .base
-                .data
-                .matrix
-                .as_ref()
-                .is_some_and(|m| cur_name.is_none_or(|n| !m.dataset_name.contains(n)))
-        {
-            self.layers.base.clear_2d();
-        }
-
-        self.layers.base.color.lock_bounds = false;
-    }
-
-    fn switch_from_2d_to_3d(&mut self) {
-        // Each selection by its own variable: the staged one may be another.
-        let composite = self.layers.base.composite.enabled;
-        adapt_sel_to_3d(&mut self.selected, composite);
-        adapt_sel_to_3d(self.layers.base.selection_mut(), composite);
-        self.layers.base.selection_mut().plot_type = self.selected.plot_type;
-
-        let cur_var = self.plotted_variable_info();
-        let cur_name = cur_var.map(|v| v.name.as_str());
-        if !self.is_exploring_unplotted_variable()
-            && self
-                .layers
-                .base
-                .data
-                .volume
-                .as_ref()
-                .is_some_and(|v| cur_name.is_none_or(|n| !v.dataset_name.contains(n)))
-        {
-            self.layers.base.clear_3d();
+        let data = &self.layers.base.data;
+        let shown = if to_3d {
+            data.volume.as_ref().map(|v| v.dataset_name.as_str())
+        } else {
+            data.matrix.as_ref().map(|m| m.dataset_name.as_str())
+        };
+        let stale = shown.is_some_and(|d| cur_name.is_none_or(|n| !d.contains(n)));
+        if !self.is_exploring_unplotted_variable() && stale {
+            if to_3d {
+                self.layers.base.clear_3d();
+            } else {
+                self.layers.base.clear_2d();
+            }
         }
 
         self.layers.base.color.lock_bounds = false;

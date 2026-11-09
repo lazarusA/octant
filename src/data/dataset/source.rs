@@ -17,9 +17,6 @@ pub enum DataSourceKind {
     RemoteGeoTiff,
 
     NetCdf,
-
-    /// Reserved for future readers.
-    Other(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

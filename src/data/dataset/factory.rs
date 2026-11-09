@@ -49,14 +49,6 @@ impl SourceFactory {
             DataSourceKind::LocalGeoTiff | DataSourceKind::RemoteGeoTiff => {
                 crate::data::backends::geotiff::WasmGeoTiffBlockStore::get_or_create(&source.uri)
             }
-
-            DataSourceKind::Other(kind) => {
-                if kind.to_lowercase().contains("procedural") {
-                    Arc::new(ProceduralBlockStore::open(&source.uri)?)
-                } else {
-                    return Err(format!("Unsupported data source kind: {kind}").into());
-                }
-            }
         };
 
         Ok(StoreHandle::new(source, backend))

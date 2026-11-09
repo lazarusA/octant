@@ -50,17 +50,14 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Верхня межа діапазону (Макс.). Потягніть, щоб змінити, або клацніть, щоб ввести."
         }
-        ColormapKey::LowClipTitle => "Колір нижнього відсікання (< Мін.)",
         ColormapKey::LowClipHover => {
             "Колір нижнього відсікання (< Мін.). Клацніть, щоб вибрати колір."
         }
-        ColormapKey::HighClipTitle => "Колір верхнього відсікання (> Макс.)",
         ColormapKey::HighClipHover => {
             "Колір верхнього відсікання (> Макс.). Клацніть, щоб вибрати колір."
         }
         ColormapKey::HoveredValue => "Знач.: {}",
         ColormapKey::TitleHover => "Заголовок кольорової смуги. Клацніть, щоб редагувати.",
-        ColormapKey::ColorPicker => "Вибір кольору",
         ColormapKey::Copy => "Копіювати",
         ColormapKey::CopyHover => "Копіювати значення кольору в буфер обміну",
         ColormapKey::AlphaNotANumber => "'{}' не є числом",

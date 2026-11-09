@@ -241,7 +241,7 @@ impl Mesh3DRenderer {
     }
 }
 
-fn pad_coord_buffer(coord: Option<&[f32]>, min_capacity: usize) -> Vec<f32> {
+pub(crate) fn pad_coord_buffer(coord: Option<&[f32]>, min_capacity: usize) -> Vec<f32> {
     let dummy = [0.0f32; 4];
     let mut padded = coord.filter(|s| !s.is_empty()).unwrap_or(&dummy).to_vec();
     if padded.len() < min_capacity {

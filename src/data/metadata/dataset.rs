@@ -94,6 +94,7 @@ impl DatasetMetadata {
         Some((coords, coords.len().max(dim_size).max(1)))
     }
 
+    #[cfg(test)]
     /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.
     pub fn get_coord_bounds_for_range(
         &self,

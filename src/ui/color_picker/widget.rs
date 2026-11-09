@@ -2,7 +2,6 @@
 
 use super::popup::show_clean_color_picker_popup;
 use super::shape::ColorShape;
-use crate::i18n::{ColormapKey as K, tr};
 use egui::{Color32, Rect, Vec2};
 
 /// A flexible color picker button widget that supports arbitrary custom vector shapes
@@ -12,7 +11,6 @@ pub struct ShapeColorPicker<'a> {
     color: &'a mut [f32; 4],
     shape: ColorShape,
     size: Option<Vec2>,
-    title: &'a str,
     tooltip: Option<&'a str>,
     anchor_offset: Vec2,
 }
@@ -29,16 +27,9 @@ impl<'a> ShapeColorPicker<'a> {
             color,
             shape,
             size: None,
-            title: tr(K::ColorPicker),
             tooltip: None,
             anchor_offset: Vec2::new(-70.0, -250.0),
         }
-    }
-
-    /// Sets the header title displayed inside the popup.
-    pub fn title(mut self, title: &'a str) -> Self {
-        self.title = title;
-        self
     }
 
     /// Sets an optional hover tooltip on the shape button.

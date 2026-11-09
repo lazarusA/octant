@@ -49,22 +49,4 @@ impl DatasetManager {
     pub fn is_empty(&self) -> bool {
         self.datasets.is_empty()
     }
-
-    pub fn add_variable(&mut self, dataset_id: &str, variable: impl Into<String>) -> bool {
-        if let Some(dataset) = self.datasets.get_mut(dataset_id) {
-            dataset.add_variable(variable);
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn remove_variable(&mut self, dataset_id: &str, variable: &str) -> bool {
-        if let Some(dataset) = self.datasets.get_mut(dataset_id) {
-            dataset.remove_variable(variable);
-            true
-        } else {
-            false
-        }
-    }
 }

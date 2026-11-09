@@ -13,37 +13,7 @@ pub fn surface_uv_to_cell(
     width: usize,
     height: usize,
 ) -> (usize, usize) {
-    match grid {
-        CoordinateGrid::GlobalRegular
-        | CoordinateGrid::RegionalRegular { .. }
-        | CoordinateGrid::Curvilinear2D { .. } => {
-            let px = ((u.clamp(0.0, 1.0) * width.max(1) as f32).floor() as usize)
-                .min(width.max(1).saturating_sub(1));
-            let py = ((v.clamp(0.0, 1.0) * height.max(1) as f32).floor() as usize)
-                .min(height.max(1).saturating_sub(1));
-            (px, py)
-        }
-        CoordinateGrid::Irregular1D {
-            coords_x, coords_y, ..
-        } => Irregular1DTopology::cell_from_norm_slices(
-            coords_x,
-            coords_y,
-            u.clamp(0.0, 1.0),
-            v.clamp(0.0, 1.0),
-            width,
-            height,
-        ),
-        CoordinateGrid::Healpix {
-            nside,
-            ordering,
-            npix,
-            ..
-        } => {
-            let lon_rad = u.clamp(0.0, 1.0) * 2.0 * std::f32::consts::PI;
-            let lat_rad = (0.5 - v.clamp(0.0, 1.0)) * std::f32::consts::PI;
-            HealpixTopology::lon_lat_to_cell_calc(*nside, *ordering, *npix, lon_rad, lat_rad)
-        }
-    }
+    cell_at(grid, (u, v), (width, height), 0.0)
 }
 
 pub fn norm_to_cell(
@@ -53,34 +23,39 @@ pub fn norm_to_cell(
     width: usize,
     height: usize,
 ) -> (usize, usize) {
+    cell_at(grid, (norm_x, norm_y), (width, height), 0.5)
+}
+
+/// The cell at position `(u, v)` (0..1 across the grid); HEALPix longitude
+/// zero sits at `u = lon_zero` (0 on the surface and sphere, 0.5 on flat plots).
+fn cell_at(
+    grid: &CoordinateGrid,
+    (u, v): (f32, f32),
+    (width, height): (usize, usize),
+    lon_zero: f32,
+) -> (usize, usize) {
+    let (u, v) = (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0));
     match grid {
         CoordinateGrid::GlobalRegular
         | CoordinateGrid::RegionalRegular { .. }
         | CoordinateGrid::Curvilinear2D { .. } => {
-            let px = ((norm_x.clamp(0.0, 1.0) * width.max(1) as f32).floor() as usize)
-                .min(width.max(1).saturating_sub(1));
-            let py = ((norm_y.clamp(0.0, 1.0) * height.max(1) as f32).floor() as usize)
-                .min(height.max(1).saturating_sub(1));
+            let px =
+                ((u * width.max(1) as f32).floor() as usize).min(width.max(1).saturating_sub(1));
+            let py =
+                ((v * height.max(1) as f32).floor() as usize).min(height.max(1).saturating_sub(1));
             (px, py)
         }
         CoordinateGrid::Irregular1D {
             coords_x, coords_y, ..
-        } => Irregular1DTopology::cell_from_norm_slices(
-            coords_x,
-            coords_y,
-            norm_x.clamp(0.0, 1.0),
-            norm_y.clamp(0.0, 1.0),
-            width,
-            height,
-        ),
+        } => Irregular1DTopology::cell_from_norm_slices(coords_x, coords_y, u, v, width, height),
         CoordinateGrid::Healpix {
             nside,
             ordering,
             npix,
             ..
         } => {
-            let lon_rad = (norm_x.clamp(0.0, 1.0) - 0.5) * 2.0 * std::f32::consts::PI;
-            let lat_rad = (0.5 - norm_y.clamp(0.0, 1.0)) * std::f32::consts::PI;
+            let lon_rad = (u - lon_zero) * 2.0 * std::f32::consts::PI;
+            let lat_rad = (0.5 - v) * std::f32::consts::PI;
             HealpixTopology::lon_lat_to_cell_calc(*nside, *ordering, *npix, lon_rad, lat_rad)
         }
     }

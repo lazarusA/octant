@@ -73,7 +73,6 @@ fn source_kind_icon(kind: &DataSourceKind) -> Icon {
         DataSourceKind::RemoteGeoTiff => Icon::Globe,
         DataSourceKind::LocalGeoTiff => Icon::Folder,
         DataSourceKind::Procedural => Icon::PlotPlane,
-        _ => Icon::PlotVolume,
     }
 }
 

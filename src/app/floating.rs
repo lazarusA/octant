@@ -21,7 +21,6 @@ impl OctantApp {
         self.run_commands(&ctx);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);
-        crate::ui::about::show_icon_gallery_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);
         crate::ui::keyboard::help::show(self, &ctx);
         crate::ui::plot_type::picker::show_plot_type_picker(self, &ctx);

@@ -285,6 +285,9 @@ pub fn buffer_range_bytes<T>(offset: usize, len: usize, capacity: u64) -> Option
     (end <= capacity).then_some((start, end))
 }
 
+/// A read-only storage buffer binding.
+const STORAGE: wgpu::BufferBindingType = wgpu::BufferBindingType::Storage { read_only: true };
+
 /// Creates a standard plot bind group layout with binding 0 (Uniform) and binding 1 (Storage).
 pub fn create_uniform_storage_bind_group_layout(
     device: &wgpu::Device,
@@ -294,26 +297,8 @@ pub fn create_uniform_storage_bind_group_layout(
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some(label),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            bgl_entry(0, visibility, wgpu::BufferBindingType::Uniform),
+            bgl_entry(1, visibility, STORAGE),
         ],
     })
 }
@@ -352,46 +337,10 @@ pub fn create_plot_with_coords_bind_group_layout(
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some(label),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: uniform_data_visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: uniform_data_visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: coords_visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: coords_visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            bgl_entry(0, uniform_data_visibility, wgpu::BufferBindingType::Uniform),
+            bgl_entry(1, uniform_data_visibility, STORAGE),
+            bgl_entry(2, coords_visibility, STORAGE),
+            bgl_entry(3, coords_visibility, STORAGE),
         ],
     })
 }

@@ -53,6 +53,7 @@ impl SliceIndex {
         }
     }
 
+    #[cfg(test)]
     /// Number of slices.
     pub fn slice_count(&self) -> u16 {
         self.slices

@@ -1,3 +1,7 @@
+//! Future work, not used yet: a typed error for Octant, to replace
+//! `BlockStoreError` (`Box<dyn Error>`) and `Result<_, String>` so callers
+//! can match on what failed instead of reading strings.
+
 use std::fmt;
 
 #[derive(Debug)]
