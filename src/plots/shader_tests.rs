@@ -33,15 +33,9 @@ fn mesh_and_point_cloud_pipelines_validate() {
 }
 
 /// Every plot shader, by name.
-const SHADERS: [(&str, &str); 16] = [
-    (
-        "sphere",
-        crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl")),
-    ),
-    (
-        "surface",
-        crate::assemble_plot_with_coords_shader!(include_str!("shaders/surface.wgsl")),
-    ),
+pub(super) const SHADERS: [(&str, &str); 16] = [
+    ("sphere", super::mesh_draw::SPHERE_WGSL),
+    ("surface", super::mesh_draw::SURFACE_WGSL),
     ("heatmap", super::heatmap::HEATMAP_WGSL),
     ("labels", super::labels::LABELS_WGSL),
     ("channels", super::channels::CHANNELS_WGSL),
@@ -122,68 +116,6 @@ fn test_all_plot_shaders_parse_cleanly() {
         validator
             .validate(&module)
             .unwrap_or_else(|e| panic!("Failed to validate WGSL shader '{name}': {e}"));
-    }
-}
-
-/// Size of WGSL struct `name` in shader `shader` of `SHADERS`.
-fn wgsl_size(shader: &str, name: &str) -> usize {
-    use wgpu::naga;
-    let Some((_, source)) = SHADERS.iter().find(|(n, _)| *n == shader) else {
-        panic!("no shader {shader}");
-    };
-    let module = naga::front::wgsl::parse_str(source).expect("shader parses");
-    let mut layouter = naga::proc::Layouter::default();
-    layouter.update(module.to_ctx()).expect("layout");
-    let Some((handle, _)) = module
-        .types
-        .iter()
-        .find(|(_, ty)| ty.name.as_deref() == Some(name))
-    else {
-        panic!("no struct {name} in {shader}");
-    };
-    layouter[handle].size as usize
-}
-
-/// The 3D uniform blocks match their WGSL structs.
-#[test]
-fn uniform_layouts_match_wgsl() {
-    use std::mem::size_of;
-    let blocks = [
-        (
-            "surface",
-            "Camera",
-            size_of::<super::camera::CameraUniform>(),
-        ),
-        ("surface", "Uniforms", size_of::<super::Mesh3DUniforms>()),
-        ("sphere", "Uniforms", size_of::<super::Mesh3DUniforms>()),
-        (
-            "point_cloud",
-            "Uniforms",
-            size_of::<super::point_cloud_types::PointCloudUniforms>(),
-        ),
-        (
-            "coastline",
-            "CoastlineUniforms",
-            size_of::<super::coastline::types::CoastlineUniforms>(),
-        ),
-        (
-            "coastline_3d",
-            "Coastline3DUniforms",
-            size_of::<super::coastline::types::Coastline3DUniforms>(),
-        ),
-        (
-            "channels",
-            "Channel",
-            size_of::<super::channel_params::ChannelGpu>(),
-        ),
-        (
-            "channels",
-            "ChannelParams",
-            size_of::<super::ChannelParams>(),
-        ),
-    ];
-    for (shader, name, size) in blocks {
-        assert_eq!(wgsl_size(shader, name), size, "{shader} {name}");
     }
 }
 

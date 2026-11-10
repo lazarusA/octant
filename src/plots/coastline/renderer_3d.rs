@@ -19,7 +19,7 @@ pub struct Coastline3DRenderer {
     uniform_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
     /// Names `data_buffer` to the channel bake.
-    bake_id: crate::plots::BakeId,
+    bake_id: crate::plots::BakeSlot,
     coord_x_buffer: wgpu::Buffer,
     coord_y_buffer: wgpu::Buffer,
     gpu: RwLock<Coastline3DGpuResources>,
@@ -198,7 +198,7 @@ impl Coastline3DRenderer {
             bind_group_layout,
             uniform_buffer,
             data_buffer,
-            bake_id: crate::plots::BakeId::next(),
+            bake_id: crate::plots::BakeSlot::default(),
             coord_x_buffer,
             coord_y_buffer,
             gpu: RwLock::new(Coastline3DGpuResources {
@@ -212,6 +212,7 @@ impl Coastline3DRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        self.bake_id.renew();
         crate::plots::common::safe_write_buffer(
             queue,
             &self.data_buffer,
@@ -322,7 +323,7 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         );
         if let Some(channels) = &self.channels {
             let r = &self.renderer;
-            let target = (r.bake_id, &r.data_buffer, self.thinning);
+            let target = (r.bake_id.id(), &r.data_buffer, self.thinning);
             channels.bake_into(device, queue, encoder, target);
         }
         Vec::new()

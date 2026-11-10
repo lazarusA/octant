@@ -26,7 +26,7 @@ When developing and reviewing code in this repository:
      - Never hand-write colormap formulas in Rust or WGSL: add maps to the catalog or registry instead. Tests that add or remove custom maps or depend on row ids take `registry::test_lock()`.
      - Never project in a shader or the hover by hand; read the camera (`src/plots/camera.rs`).
      - Uniform parameter structs (such as `Mesh3DUniformParams`) must be zero-allocation `Copy` structs; never clone large coordinate vectors or data structures inside paint loops.
-     - GPU uniform structs are `#[repr(C)]`, `bytemuck::Pod`/`Zeroable`, laid out by WGSL's std140/std430 rules (`vec4` 16-byte aligned) with explicit padding fields; `shader_tests.rs` `uniform_layouts_match_wgsl` checks them.
+     - GPU uniform structs are `#[repr(C)]`, `bytemuck::Pod`/`Zeroable`, laid out by WGSL's std140/std430 rules (`vec4` 16-byte aligned) with explicit padding fields; `uniform_layout_tests.rs` checks them (sizes; `Mesh3DUniforms` field by field).
      - For all structured, discrete global (HEALPix, ICON, Cubed-Sphere), and unstructured grid formats (UGRID, MPAS), use zero-allocation GPU instancing or GPU vertex pulling. Reserve CPU mesh generation strictly for non-grid geometry (GIS vector polygons, streamlines, Marching Cubes CAD export, UI labels and annotations).
      - Read colors from `ui.visuals()`, never hard-code theme grays; floating panels keep the theme border (`Frame::popup`/`window`, no `Stroke::NONE`) so overlapping panels stay distinguishable.
      - After changing a CJK translation run `cargo run --features font-tools --bin subset_fonts` (`.agents/skills/octant-ui-egui/i18n.md`).

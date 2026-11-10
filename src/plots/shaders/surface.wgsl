@@ -1,44 +1,7 @@
-struct Uniforms {
-    camera: Camera,
-    slice: Slice,
-    displacement_strength: f32,
-    surface_mode: u32,
-    width: u32,
-    height: u32,
-    coord_mode: u32,
-    has_reference_globe: u32,
-    lon_bounds: vec2<f32>,
-    lat_bounds: vec2<f32>,
-    flip_height: u32,
-    _pad: u32,
-    color: ColorUniforms,
-};
-
-@group(0) @binding(0)
-var<uniform> uniforms: Uniforms;
-
-@group(0) @binding(1)
-var<storage, read> data_buffer: array<f32>;
-
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) uv: vec2<f32>,
-    @location(2) raw_normal: vec3<f32>,
-};
-
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-    @location(1) val: f32,
-    @location(2) normal: vec3<f32>,
-    @location(3) world_pos: vec3<f32>,
-    // RGB composite color, interpolated per channel: the packed value in
-    // `val` must never be blended between vertices.
-    @location(4) rgb: vec3<f32>,
-    // Where the slicer reads the fragment: fractions of the grid's cells
-    // along x and y, and its normalized height (`common/slice.wgsl`).
-    @location(5) slice_at: vec3<f32>,
-};
+// The flat heightfield; `common/mesh3d.wgsl` holds what it shares with
+// sphere.wgsl. Modes: 0 bumpy terrain, 1 flat steps, 2 blocks.
+const SCREEN_NORMAL_MODE: u32 = 0u;
+const LIGHT_DIR = vec3<f32>(0.4, 0.8, 0.6);
 
 fn get_normalized_height(val: f32) -> f32 {
     return normalized_height(
@@ -117,7 +80,7 @@ fn vs_main(
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
 
-    if (uniforms.surface_mode == 0u) {
+    if (uniforms.mode == 0u) {
         // Mode 0: Smooth Bumpy Terrain
         if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
             let nside = healpix_nside(grid_w * grid_h);
@@ -139,7 +102,7 @@ fn vs_main(
         let height = norm_h * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(world_x, height, world_z);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
-    } else if (uniforms.surface_mode == 1u) {
+    } else if (uniforms.mode == 1u) {
         // Mode 1: Flat Steps
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.6 * uniforms.displacement_strength;
@@ -162,13 +125,12 @@ fn vs_main(
     let norm_rot = camera_view_normal(uniforms.camera, normal_3d);
 
     out.position = camera_project(uniforms.camera, pos_rot);
-    out.uv = model.uv;
     out.val = raw_val;
     out.rgb = unpack_composite_rgb(raw_val);
     // Heights back to normalized heights (the 0.6 or 0.8 of each mode).
-    let height_scale = select(0.8, 0.6, uniforms.surface_mode == 1u) * uniforms.displacement_strength;
+    let height_scale = select(0.8, 0.6, uniforms.mode == 1u) * uniforms.displacement_strength;
     out.slice_at = vec3<f32>(slice_xy, select(0.0, pos_3d.y / height_scale, height_scale > 0.0));
-    if (uniforms.surface_mode == 2u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
+    if (uniforms.mode == 2u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.
         let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
@@ -180,41 +142,3 @@ fn vs_main(
     return out;
 }
 
-// Lit, colormapped fragment color (straight alpha).
-fn shade(in: VertexOutput) -> vec4<f32> {
-    if (!slice_box_keeps(uniforms.slice, in.slice_at)) {
-        discard;
-    }
-    var eval_color = evaluate_plot_color(in.val, uniforms.color);
-    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE && eval_color.a > 0.0) {
-        eval_color = vec4<f32>(in.rgb, eval_color.a);
-    }
-
-    if (eval_color.a < 0.01) {
-        discard;
-    }
-
-    var geom_normal = in.normal;
-    if (uniforms.surface_mode == 0u) {
-        geom_normal = compute_screen_space_normal(in.world_pos);
-    }
-
-    let lighting = evaluate_directional_lighting(geom_normal, vec3<f32>(0.4, 0.8, 0.6), 0.35, 0.65);
-    return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return shade(in);
-}
-
-// Opaque and translucent passes of order-independent transparency.
-@fragment
-fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
-    return oit_opaque(shade(in));
-}
-
-@fragment
-fn fs_oit(in: VertexOutput) -> OitOutput {
-    return oit_accumulate(shade(in), in.position.z, uniforms.camera);
-}

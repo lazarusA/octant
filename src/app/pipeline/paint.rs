@@ -142,7 +142,7 @@ impl OctantApp {
         } else {
             PlotType::Surface
         };
-        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = layer
+        let (coord_mode, lon_bounds, lat_bounds) = layer
             .data
             .matrix
             .as_ref()
@@ -151,17 +151,10 @@ impl OctantApp {
                     true => m.grid.sphere_coord_mode(),
                     false => m.grid.render_coord_mode(),
                 };
-                (
-                    mode,
-                    // Projected grids drawn around the whole globe need none.
-                    !m.grid.is_global() && mode == m.grid.render_coord_mode(),
-                    m.grid.lon_bounds_rad(),
-                    m.grid.lat_bounds_rad(),
-                )
+                (mode, m.grid.lon_bounds_rad(), m.grid.lat_bounds_rad())
             })
             .unwrap_or((
                 0,
-                false,
                 [-std::f32::consts::PI, std::f32::consts::PI],
                 [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             ));
@@ -173,7 +166,6 @@ impl OctantApp {
             displacement_strength,
             mode,
             coord_mode,
-            has_reference_globe,
             lon_bounds,
             lat_bounds,
             flip_height,

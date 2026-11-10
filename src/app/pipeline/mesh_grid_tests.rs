@@ -95,7 +95,7 @@ fn the_detail_setting_thins_again() {
             .renderers
             .surface
             .as_ref()
-            .map(|s| s.bake_id)
+            .map(|s| s.bake_id.id())
     };
     let thinned = bake_id(&app);
     app.plot_configs.mesh.detail = crate::app::MeshDetail::Full;

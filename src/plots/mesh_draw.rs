@@ -7,6 +7,18 @@ use super::mesh::Mesh3DRenderer;
 use super::oit::{Transparency, Variant, build_pipeline};
 use std::sync::Arc;
 
+/// The globe and flat heightfield shaders, around `common/mesh3d.wgsl`.
+pub(super) const SPHERE_WGSL: &str = crate::assemble_plot_with_coords_shader!(concat!(
+    include_str!("shaders/common/mesh3d.wgsl"),
+    "\n",
+    include_str!("shaders/sphere.wgsl")
+));
+pub(super) const SURFACE_WGSL: &str = crate::assemble_plot_with_coords_shader!(concat!(
+    include_str!("shaders/common/mesh3d.wgsl"),
+    "\n",
+    include_str!("shaders/surface.wgsl")
+));
+
 impl Mesh3DRenderer {
     /// Binds group 0 and the cube or quad template and draws every instance.
     fn draw_geometry(&self, pass: &mut wgpu::RenderPass<'_>, cubes: bool) {
@@ -81,7 +93,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         self.renderer.update_uniforms(queue, &self.params);
         if let Some(channels) = &self.channels {
             let r = &self.renderer;
-            let target = (r.bake_id, &r.data_buffer, self.thinning);
+            let target = (r.bake_id.id(), &r.data_buffer, self.thinning);
             if channels.bake_into(device, queue, encoder, target) {
                 r.inputs.data_changed();
             }
@@ -156,12 +168,10 @@ impl Mesh3DRenderer {
         coord_x: Option<&[f32]>,
         coord_y: Option<&[f32]>,
     ) -> Self {
-        let shader_source =
-            crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl"));
         Self::new_with_coords(
             device,
             target_format,
-            shader_source,
+            SPHERE_WGSL,
             Some(wgpu::Face::Back),
             matrix_data,
             width,
@@ -200,12 +210,10 @@ impl Mesh3DRenderer {
         coord_x: Option<&[f32]>,
         coord_y: Option<&[f32]>,
     ) -> Self {
-        let shader_source =
-            crate::assemble_plot_with_coords_shader!(include_str!("shaders/surface.wgsl"));
         Self::new_with_coords(
             device,
             target_format,
-            shader_source,
+            SURFACE_WGSL,
             None,
             matrix_data,
             width,

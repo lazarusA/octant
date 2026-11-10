@@ -148,3 +148,52 @@ fn assert_close(baked: &[f32], packed: &[f32]) {
         assert!(close, "cell {cell}: baked {got:?}, CPU {want:?}");
     }
 }
+
+/// A raw upload into a baked mesh or point cloud (`update_data`,
+/// `update_data_range`) overwrites its composite, so the next frame bakes it
+/// again. Skipped without a GPU.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_raw_upload_bakes_the_mesh_again() {
+    let Some((device, queue)) = super::test_gpu::device() else {
+        eprintln!("SKIPPED a_raw_upload_bakes_the_mesh_again: no GPU device");
+        return;
+    };
+    let (block, configs) = (block(), configs());
+    let mut stretch = CompositeStretch::default();
+    let (_, planes) = cpu(&block, &configs, &mut stretch);
+    let renderer = super::ChannelRenderer::new(&device, wgpu::TextureFormat::Rgba8Unorm, 3, 64);
+    for (i, plane) in planes.iter().enumerate() {
+        renderer.write_plane(&queue, i, plane);
+    }
+    let params = super::ChannelParams::of(&configs, &stretch, (0, 3), 64, None);
+    renderer.update_params(&queue, &params);
+    let format = wgpu::TextureFormat::Rgba8Unorm;
+    let mesh = super::SurfaceRenderer::new_surface(&device, format, &[0.0; 64], 8, 8);
+    let mut encoder = device.create_command_encoder(&Default::default());
+    let points = super::PointCloudRenderer::new(&device, format, &[0.0; 64], 8, 8);
+    let mut bake =
+        |id, buffer| renderer.bake(&device, &mut encoder, &params, (id, buffer, Thinning::NONE));
+    assert!(
+        bake(mesh.bake_id.id(), &mesh.data_buffer),
+        "a new mesh bakes"
+    );
+    assert!(
+        !bake(mesh.bake_id.id(), &mesh.data_buffer),
+        "a baked one is skipped"
+    );
+    mesh.update_data(&queue, &[0.0; 64]);
+    assert!(
+        bake(mesh.bake_id.id(), &mesh.data_buffer),
+        "raw values replaced it"
+    );
+    assert!(
+        bake(points.bake_id.id(), &points.data_buffer),
+        "new points bake"
+    );
+    points.update_data_range(&queue, 0, &[0.0; 8]);
+    assert!(
+        bake(points.bake_id.id(), &points.data_buffer),
+        "a raw slab replaced it"
+    );
+}
