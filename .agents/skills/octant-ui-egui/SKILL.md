@@ -11,6 +11,8 @@ description: >-
 
 This skill guides development of the user interface in Octant using `egui` and `eframe`.
 
+**Reference**: `ui.md` (every `src/ui/` module), `app.md` (`src/app/`: state, actions, share links, controllers, canvas, pipeline, layers, block loading), `i18n.md` (translations and fonts). Update them with the code they describe.
+
 ## Key Patterns
 
 ### 1. Modular Subsystem Architecture (`src/ui/`, `src/export/`, `src/app/`)
@@ -22,8 +24,8 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   - `overlays.rs`: Interactive canvas crop bounding box, reticles, hover indicator pins (`draw_canvas_overlays`).
   - `mod.rs`: Central viewport entry point `render_canvas(app, ui, canvas_rect)`.
 - **Plot Controllers Subsystem (`src/app/controllers/`)**:
-  - `traits.rs`: `PlotController` trait defining UI input handling (`handle_input`), selection changes (`on_staged_selection_change`), data load arrival hooks (`on_data_loaded`), and GPU uniform uploads (`update_uniforms`).
-  - Concrete controllers: `HeatmapController`, `LineController`, `VolumeController`, `MeshController`, `PointCloudController`.
+  - `traits.rs`: `PlotController`, a plot's canvas interaction (`reset_view`, `handle_drag`, `handle_pan`, `handle_zoom`, `handle_scroll`), what it draws (`draws_coastlines`, `draws_categories`) and the resolution it reads (`resolution_demand`).
+  - Controllers: `planar.rs` `HeatmapController` and `LineController`, `orbit.rs` `Orbit3DController` (surface, sphere, volume, point cloud).
   - `mod.rs`: `controller_for(plot_type) -> &'static dyn PlotController` singleton dispatcher.
 - **Modular App State (`src/app/state/`)**:
   - `navigation.rs` (`app.nav`): 2D pan/zoom, 3D camera orbit/zoom, `view_interacting`.
@@ -63,10 +65,10 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   - `mod.rs`: Floating overlay coordinator `show_variables_overlay`.
 - **Variables Panel Subsystem (`src/ui/variables_panel/`)**:
   - `info.rs`: Dataset metadata, summary cards, and chunk shape breakdown (`show_variable_info`).
-  - `dimension_slider/`: `defaults.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `slice_req.rs`, `slider_row.rs`, `mod.rs`.
+  - `dimension_slider/`: `defaults.rs` (`defaults_clamp.rs`, `defaults_dggs.rs`, `defaults_spatial.rs`), `composite.rs`, `coord_label.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `role_row.rs`, `slider_row.rs`, `mod.rs`.
   - `mod.rs`: Coordinator widget `show_variable_controls`.
 - **Hover Tooltip Subsystem (`src/ui/hover/`)**:
-  - `callout.rs`: Leader lines and anchor callout cards.
+  - `card/`: the hover card and its leader line (`leader.rs`), laid out and painted (`layout.rs`, `place.rs`, `paint.rs`).
   - `camera.rs`: 3D view frustum, ray projection, and AABB intersection.
   - `format.rs`: Multi-dimensional coordinate label formatting and dimension enrichment.
   - `raycast_sphere.rs`, `raycast_surface.rs`, `raycast_volume.rs`: Analytical and voxel raymarching hit-tests.
@@ -80,7 +82,7 @@ UI and application files are decomposed into focused submodules (< 250 lines per
 - **Action layer (`src/app/actions/`)**:
   - Voice and typed commands become `AppAction`s (`SelectVariable { path }`, `Plot { plot_type }`, `Play`, `SetColormap { name }`, ...), names resolved against the loaded dataset, run by `OctantApp::dispatch`, which calls the same methods the UI calls. Panels keep calling those methods directly.
 - **Plot-Specific Interactions (`src/app/controllers/`)**:
-  - Delegate plot-specific pointer interaction, coordinate probing, and uniform updates to `controller_for(plot_type)`.
+  - Delegate plot-specific pointer interaction to `controller_for(plot_type)`.
 
 ### 3. Zero-Allocation UI Invariants & Performance
 - **Tuple Salts**: Pass tuple literals directly into ID salts to avoid heap strings:
@@ -92,11 +94,11 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   // Avoid: Allocates a String every single frame
   egui::ComboBox::from_id_salt(format!("spatial_role_{}", dim_idx))
   ```
-- **Canvas Ticks (`src/ui/axes.rs`, `src/app/canvas/axes.rs`)**:
+- **Canvas Ticks (`src/ui/axes/`, `src/app/canvas/axes.rs`)**:
   - Never allocate `Vec<TickMark>` or `String`s per frame.
   - Use stack arrays with an internal fixed stack buffer (`[u8; 32]`) and in-place `write!` cursor formatting.
-- **Dimension & Coordinate Checks (`src/utils/coordinates.rs`)**:
-  - Use zero-allocation ASCII search (`is_spatial_x_name`, `is_spatial_y_name`, `is_spatial_z_name`, `is_animated_time_name`) without lowercasing or cloning `String`s.
+- **Dimension & Coordinate Checks (`src/data/coordinates/naming.rs`)**:
+  - Use zero-allocation name checks (`is_lat_name`, `is_lon_name`, `is_spatial_x_name`, `is_spatial_y_name`, `is_spatial_z_name`, `is_animated_time_name`) without lowercasing or cloning `String`s.
 - **Borrow FontId**: Pass `&FontId` to helper rendering functions instead of cloning `FontId`.
 
 ### 4. Float Sorting & Safe Comparisons
@@ -135,7 +137,7 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   - Use geometric bracket shapes (L-shaped corner brackets with $16$ px arms, $3$ px thickness) and thin bars ($28\times 4$ px) along edges.
   - Provide responsive cursor feedback (`ResizeNorthWest`, `ResizeNorthEast`, `ResizeVertical`, `ResizeHorizontal`, `Grab`).
 - **Responsive Layout Accounting**:
-  - When calculating dynamic widget space (e.g. `slider_w`), subtract all trailing badges, buttons, and menus in `right_elements_w`.
+  - Rows that would widen their panel stack instead (`src/ui/flow_row/`): measure with its cached widths, never per frame.
 
 ### 10. Native Procedural Vector Icons (`src/ui/icons/`)
 - **Forbid Raw Emojis and Unicode Glyphs**: Never use font-dependent emojis or unicode symbols in UI labels, buttons, toasts, status text, or logs.

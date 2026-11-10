@@ -11,6 +11,8 @@ description: >-
 
 This skill guides development and debugging of Octant's N-dimensional tensor extraction, caching, storage backends, codecs, and hyperslab slicing in `src/data/`.
 
+**Reference**: `data.md` (every `src/data/` module: blocks and prefetch, data workers, each backend, OME-Zarr, CRS, multiscale and detail tiles, codecs, coordinates, slicing, orientation) and `catalog.md`. Update them with the code they describe.
+
 ## Architecture Overview
 
 ```
@@ -43,8 +45,8 @@ Blocks Engine (src/data/blocks/)
 ├── coord_loader.rs (CoordinateLoader: async background coordinate loader)
 ├── prefetch.rs     (BlockPrefetcher lookahead pool over bounded channels)
 ├── cache.rs        (LRU memory cache of resident OctantBlocks)
-├── key.rs          (BlockKey hashing URI, variable, and hyperslab ranges)
-└── summary.rs      (BlockSummary)
+├── key.rs          (BlockCacheKey hashing URI, variable, and hyperslab ranges)
+└── summary.rs      (VariableCacheSummary)
             │
             ▼
 OctantBlock (src/data/octant_block.rs)
@@ -137,6 +139,7 @@ Every backend submodule is strictly modularized into single-responsibility files
 
 1. **Zero-Copy Tensor Memory (`Arc<[f32]>`)**:
    - Store all block values in `Arc<[f32]>` for $O(1)$ sharing between cache, resamplers, and GPU render pipelines.
+   - Copy a tensor slice zero-copy only after checking its strides (`stride_x == 1`, `stride_y == nx`, `stride_z == nx * ny`).
 2. **Checked Arithmetic on Tensor Dimensions**:
    - Always use checked operations when multiplying tensor shapes:
      ```rust
