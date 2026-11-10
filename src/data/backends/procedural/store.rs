@@ -35,21 +35,15 @@ impl BlockStore for ProceduralBlockStore {
 
         if let Some((size, values, (xs, ys))) = grid_2d(&request.variable) {
             let coords = (xs.as_slice(), ys.as_slice());
-            return Ok(slice_2d_grid_block(
-                &request.variable,
-                size,
-                &values,
-                coords,
-                request,
-            ));
+            return slice_2d_grid_block(&request.variable, size, &values, coords, request);
         }
 
         if request.variable == "procedural_matrix_2d" {
-            return Ok(slice_procedural_matrix_block(request));
+            return slice_procedural_matrix_block(request);
         }
 
         // Default 4D Known-Truth Block slicing
-        Ok(slice_gaussian_wave_packet_4d(request))
+        slice_gaussian_wave_packet_4d(request)
     }
 }
 

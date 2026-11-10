@@ -22,7 +22,8 @@ fn block() -> OctantBlock {
         values,
         coordinates,
         attributes,
-    );
+    )
+    .expect("block");
     block.flipped_dims = vec!["lat".into()];
     block
 }
@@ -70,7 +71,8 @@ fn a_block_without_finite_values_keeps_its_nan_range() {
         vec![f32::NAN],
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
     let (min, max) = (block.min_value, block.max_value);
     let (header, values, numbers) = BlockHeader::split(block);
     let back = header.join(values, &numbers).unwrap();

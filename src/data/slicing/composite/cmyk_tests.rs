@@ -23,6 +23,7 @@ fn ink_block(cmyk: bool) -> OctantBlock {
         HashMap::new(),
         attributes,
     )
+    .expect("block")
 }
 
 fn nd(block: &OctantBlock) -> Vec<f32> {
@@ -86,7 +87,8 @@ fn nd_cmyk_composite_reads_only_the_requested_window() {
         pixels,
         HashMap::new(),
         block.attributes.clone(),
-    );
+    )
+    .expect("block");
     let expected = slice_cmyk_composite(&cropped, 2, 1, 2, 1).expect("cropped composite");
     assert_eq!(window.values.to_vec(), expected.values.to_vec());
 }

@@ -131,7 +131,8 @@ fn flipped_block(origin: usize, rows: usize, cols: usize) -> crate::data::Octant
         values,
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
-    );
+    )
+    .expect("block");
     block.flipped_dims = vec!["lat".into()];
     block
 }

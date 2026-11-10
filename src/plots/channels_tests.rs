@@ -20,6 +20,7 @@ pub(super) fn block() -> crate::data::octant_block::OctantBlock {
         Default::default(),
         std::collections::HashMap::new(),
     )
+    .expect("block")
 }
 
 /// Every curve family, a window, an inversion and distinct tints.

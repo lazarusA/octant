@@ -8,7 +8,7 @@ use super::reader::{NcReader, NcVar};
 use crate::data::metadata::{DatasetMetadata, VariableInfo};
 
 fn variable_info(var: &NcVar, global_attrs: &HashMap<String, String>) -> VariableInfo {
-    let attributes = var.attributes.clone();
+    let attributes = (*var.attributes).clone();
     let shape: Vec<u64> = var.shape().map(|len| len as u64).collect();
     let data_type = var.data_type.to_string();
     let own_or_global = |key: &str| {

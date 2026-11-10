@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::data::coordinates::naming::contains_ascii_case_insensitive;
+use crate::data::coordinates::naming::{is_lat_name, is_lon_name};
 
 /// What orientation reads besides the block itself: the variable's attributes and the
 /// first and last coordinate of the whole latitude and longitude dimensions. Deciding the
@@ -11,30 +11,20 @@ use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 /// variable alike, including edge blocks one row or column long.
 #[derive(Clone, Copy)]
 pub struct OrientHints<'a> {
-    pub attributes: &'a serde_json::Map<String, serde_json::Value>,
+    pub attributes: &'a HashMap<String, String>,
     pub lat_extent: Option<(f64, f64)>,
     pub lon_extent: Option<(f64, f64)>,
 }
 
 impl<'a> OrientHints<'a> {
     /// Hints without dimension extents: flips are judged from the block's coordinates.
-    pub fn new(attributes: &'a serde_json::Map<String, serde_json::Value>) -> Self {
+    pub fn new(attributes: &'a HashMap<String, String>) -> Self {
         Self {
             attributes,
             lat_extent: None,
             lon_extent: None,
         }
     }
-}
-
-/// Whether a dimension or coordinate name denotes latitude (`*lat*` or `y`).
-pub fn is_lat_name(name: &str) -> bool {
-    contains_ascii_case_insensitive(name, "lat") || name.eq_ignore_ascii_case("y")
-}
-
-/// Whether a dimension or coordinate name denotes longitude (`*lon*` or `x`).
-pub fn is_lon_name(name: &str) -> bool {
-    contains_ascii_case_insensitive(name, "lon") || name.eq_ignore_ascii_case("x")
 }
 
 /// Whether orientation applies to the last two dimensions: no latitude or longitude
@@ -75,13 +65,13 @@ fn ends(coords: &[f64]) -> (f64, f64) {
 /// `latitude_orientation`, else `positive = "up"`, else whenever a latitude dimension exists.
 fn lat_flip(
     dim_names: &[String],
-    attributes: &serde_json::Map<String, serde_json::Value>,
+    attributes: &HashMap<String, String>,
     lat: Option<(f64, f64)>,
 ) -> bool {
     if let Some((first, last)) = lat {
         return first < last;
     }
-    let attr = |key: &str| attributes.get(key).and_then(|v| v.as_str());
+    let attr = |key: &str| attributes.get(key);
     if let Some(orientation) = attr("latitude_orientation") {
         return orientation.eq_ignore_ascii_case("ascending");
     }
@@ -93,15 +83,11 @@ fn lat_flip(
 
 /// Columns flip when longitude descends, so west renders on the left: from the
 /// coordinates, else `longitude_orientation = "descending"`.
-fn lon_flip(
-    attributes: &serde_json::Map<String, serde_json::Value>,
-    lon: Option<(f64, f64)>,
-) -> bool {
+fn lon_flip(attributes: &HashMap<String, String>, lon: Option<(f64, f64)>) -> bool {
     match lon {
         Some((first, last)) => first > last,
         None => attributes
             .get("longitude_orientation")
-            .and_then(|v| v.as_str())
             .is_some_and(|o| o.eq_ignore_ascii_case("descending")),
     }
 }

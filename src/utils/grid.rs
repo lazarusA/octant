@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use super::grid_flips::{
-    OrientHints, axis_flips, flipped_dims, is_lat_name, is_lon_name, needs_transpose,
-    reverse_flipped_coordinates, spatial_dims_last,
+    OrientHints, axis_flips, flipped_dims, needs_transpose, reverse_flipped_coordinates,
+    spatial_dims_last,
 };
+use crate::data::coordinates::naming::{is_lat_name, is_lon_name};
 
 /// Function for checking axes order and orientation.
 ///
@@ -17,7 +18,7 @@ pub fn check_and_orient_axes_with_coords(
     in_width: usize,
     in_height: usize,
     dim_names: &[String],
-    attributes: &serde_json::Map<String, serde_json::Value>,
+    attributes: &HashMap<String, String>,
     lat_coords: Option<&[f64]>,
     lon_coords: Option<&[f64]>,
 ) -> (Vec<f32>, usize, usize) {
@@ -156,7 +157,7 @@ mod tests {
         // Ascending lat axis data: [-89.875, ..., 89.875] (Row 0 = South [10.0, 20.0], Row 1 = North [30.0, 40.0])
         let raw = vec![10.0, 20.0, 30.0, 40.0];
         let dim_names = vec!["lat".to_string(), "lon".to_string()];
-        let attrs = serde_json::Map::new();
+        let attrs = HashMap::new();
         let lat_axis = vec![-89.875, 89.875];
 
         let (oriented, w, h) =
@@ -172,7 +173,7 @@ mod tests {
         // Descending lat axis data: [89.875, ..., -89.875] (Row 0 = North [10.0, 20.0], Row 1 = South [30.0, 40.0])
         let raw = vec![10.0, 20.0, 30.0, 40.0];
         let dim_names = vec!["latitude".to_string(), "longitude".to_string()];
-        let attrs = serde_json::Map::new();
+        let attrs = HashMap::new();
         let lat_axis = vec![89.875, -89.875];
 
         let (oriented, w, h) = check_and_orient_axes_with_coords(

@@ -25,6 +25,9 @@ pub mod wasm;
 
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
+mod calibration_tests;
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod classic_tests;
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]

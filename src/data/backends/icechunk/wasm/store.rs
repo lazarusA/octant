@@ -2,8 +2,6 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-#[cfg(not(target_arch = "wasm32"))]
-use std::sync::{Mutex, OnceLock};
 
 use icechunk_format::manifest::ManifestRef;
 
@@ -15,15 +13,10 @@ use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
-#[cfg(target_arch = "wasm32")]
 thread_local! {
     static WASM_ICECHUNK_STORES: std::cell::RefCell<HashMap<String, Arc<WasmIcechunkBlockStore>>> =
         std::cell::RefCell::new(HashMap::new());
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-static WASM_ICECHUNK_STORES_DESKTOP: OnceLock<Mutex<HashMap<String, Arc<WasmIcechunkBlockStore>>>> =
-    OnceLock::new();
 
 /// Manifest references and node ID recorded for a specific Icechunk array.
 pub struct ArrayManifestInfo {
@@ -40,7 +33,6 @@ pub struct WasmIcechunkBlockStore {
 }
 
 impl WasmIcechunkBlockStore {
-    #[cfg(target_arch = "wasm32")]
     pub fn get_or_create(url: &str) -> Arc<Self> {
         let clean_url = url
             .trim_start_matches("icechunk+")
@@ -64,42 +56,11 @@ impl WasmIcechunkBlockStore {
         })
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url
-            .trim_start_matches("icechunk+")
-            .trim_end_matches('/')
-            .to_string();
-        let stores = WASM_ICECHUNK_STORES_DESKTOP.get_or_init(|| Mutex::new(HashMap::new()));
-        let mut guard = stores.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(store) = guard.get(&clean_url) {
-            store.clone()
-        } else {
-            let inner = WasmZarrBlockStore::get_or_create(&clean_url);
-            let new_store = Arc::new(Self {
-                base_url: clean_url.clone(),
-                inner,
-                array_manifests: RwLock::new(HashMap::new()),
-                cached_manifests: ManifestCache::new(),
-            });
-            guard.insert(clean_url, new_store.clone());
-            new_store
-        }
-    }
-
     /// Drops the store of `url`, and the Zarr store it reads through, from
     /// their registries (its dataset closed).
     pub fn release(url: &str) {
         let clean_url = url.trim_start_matches("icechunk+").trim_end_matches('/');
-        #[cfg(target_arch = "wasm32")]
         let _released = WASM_ICECHUNK_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
-        #[cfg(not(target_arch = "wasm32"))]
-        let _released = WASM_ICECHUNK_STORES_DESKTOP.get().and_then(|stores| {
-            stores
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .remove(clean_url)
-        });
         WasmZarrBlockStore::release(clean_url);
     }
 }

@@ -35,6 +35,4 @@ pub mod tests;
 
 pub use inspect::inspect_tiff;
 pub use store::GeoTiffBlockStore;
-pub use wasm::{
-    WasmGeoTiffBlockStore, inspect_wasm_remote_geotiff, load_one_geotiff_wasm_with_progress,
-};
+pub use wasm::{WasmGeoTiffBlockStore, inspect_wasm_remote_geotiff};

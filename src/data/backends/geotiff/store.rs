@@ -45,6 +45,14 @@ impl GeoTiffBlockStore {
         &self.tiff
     }
 
+    /// Forgets the opened file at `uri` (its dataset closed).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn release(uri: &str) {
+        if let Some(cache) = GEOTIFF_STORE_CACHE.get() {
+            cache.write().unwrap_or_else(|p| p.into_inner()).remove(uri);
+        }
+    }
+
     /// Open a TIFF/GeoTIFF dataset from a URI (file path or HTTP URL).
     pub fn open(uri: &str) -> Result<Self, BlockStoreError> {
         #[cfg(not(target_arch = "wasm32"))]
@@ -140,7 +148,7 @@ impl GeoTiffBlockStore {
     }
 
     /// The IFD variable `var` reads, its bounds and its bands' transforms.
-    pub(crate) fn resolve_ifd(
+    fn resolve_ifd(
         &self,
         var: &str,
     ) -> Option<(
@@ -158,6 +166,23 @@ impl GeoTiffBlockStore {
             GeoSpatialBounds::of_ifd_in(ifds, idx)?,
             self.scales.get(idx).cloned().unwrap_or_default(),
         ))
+    }
+
+    /// The block `req` asks for, its tiles or strips read by range.
+    pub async fn fetch_async(&self, req: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
+        let (ifd, bounds, scales) = self
+            .resolve_ifd(&req.variable)
+            .ok_or_else(|| format!("Variable '{}' not found in TIFF", req.variable))?;
+        fetch_geotiff_block(
+            ifd,
+            &bounds,
+            &scales,
+            self.tiff.endianness(),
+            req,
+            self.reader.as_ref(),
+            &self.decoder_registry,
+        )
+        .await
     }
 }
 
@@ -178,39 +203,9 @@ impl BlockStore for GeoTiffBlockStore {
     }
 
     fn fetch_block(&self, req: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        let (ifd, bounds, scales) = self
-            .resolve_ifd(&req.variable)
-            .ok_or_else(|| format!("Variable '{}' not found in TIFF", req.variable))?;
         #[cfg(not(target_arch = "wasm32"))]
-        {
-            let rt = crate::utils::executor::get_shared_tokio_rt();
-            rt.block_on(async {
-                fetch_geotiff_block(
-                    ifd,
-                    &bounds,
-                    &scales,
-                    self.tiff.endianness(),
-                    req,
-                    self.reader.as_ref(),
-                    &self.decoder_registry,
-                )
-                .await
-            })
-        }
+        return crate::utils::executor::get_shared_tokio_rt().block_on(self.fetch_async(req));
         #[cfg(target_arch = "wasm32")]
-        {
-            futures::executor::block_on(async {
-                fetch_geotiff_block(
-                    ifd,
-                    &bounds,
-                    &scales,
-                    self.tiff.endianness(),
-                    req,
-                    self.reader.as_ref(),
-                    &self.decoder_registry,
-                )
-                .await
-            })
-        }
+        futures::executor::block_on(self.fetch_async(req))
     }
 }

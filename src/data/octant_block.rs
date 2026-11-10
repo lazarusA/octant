@@ -7,6 +7,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::data::blocks::BlockStoreError;
+
 #[derive(Debug, Clone)]
 pub struct OctantBlock {
     pub variable_name: String,
@@ -50,22 +52,15 @@ impl OctantBlock {
         values: impl Into<Arc<[f32]>>,
         coordinates: HashMap<String, Vec<f64>>,
         attributes: impl Into<Arc<HashMap<String, String>>>,
-    ) -> Self {
+    ) -> Result<Self, BlockStoreError> {
         let values: Arc<[f32]> = values.into();
-        debug_assert_eq!(
-            values.len(),
-            shape
-                .iter()
-                .copied()
-                .try_fold(1usize, |acc, d| acc.checked_mul(d))
-                .unwrap_or(usize::MAX),
-            "OctantBlock: values length does not match shape"
-        );
+        Self::check_volume(&shape, values.len())
+            .map_err(|e| format!("Block of '{variable_name}': {e}"))?;
 
         let strides = Self::row_major_strides(&shape);
         let (min_value, max_value) = crate::utils::compute_finite_min_max(&values);
 
-        Self {
+        Ok(Self {
             variable_name,
             shape,
             dimension_names,
@@ -77,6 +72,15 @@ impl OctantBlock {
             min_value,
             max_value,
             flipped_dims: Vec::new(),
+        })
+    }
+
+    /// Whether `len` values fill `shape` exactly (its volume computed checked).
+    pub(crate) fn check_volume(shape: &[usize], len: usize) -> Result<(), String> {
+        let volume = shape.iter().try_fold(1usize, |acc, &d| acc.checked_mul(d));
+        match volume == Some(len) {
+            true => Ok(()),
+            false => Err(format!("{len} values for shape {shape:?}")),
         }
     }
 

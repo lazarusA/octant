@@ -30,6 +30,7 @@ fn block(cmyk: bool) -> OctantBlock {
         HashMap::new(),
         attributes,
     )
+    .expect("block")
 }
 
 /// The right half of the top two rows.

@@ -34,6 +34,7 @@ fn block_with(attributes: HashMap<String, String>) -> OctantBlock {
         HashMap::new(),
         attributes,
     )
+    .expect("block")
 }
 
 fn metadata(labels: Option<&[&str]>) -> DatasetMetadata {

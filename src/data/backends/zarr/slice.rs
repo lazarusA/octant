@@ -101,16 +101,6 @@ fn decode_other<R: SubsetRetriever>(
     }
 }
 
-/// The window `origin..origin + shape` as an array subset.
-pub(super) fn window_subset(origin: &[usize], shape: &[usize]) -> ArraySubset {
-    let ranges: Vec<_> = origin
-        .iter()
-        .zip(shape)
-        .map(|(&start, &len)| start as u64..(start + len) as u64)
-        .collect();
-    ArraySubset::new_with_ranges(&ranges)
-}
-
 /// Dtype-conversion and calibration helper for reading array subsets as f32 through `reader`.
 pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
@@ -164,6 +154,20 @@ pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTra
         ChunkReader::Cached(c) => label_bits(c, dt, subset),
         ChunkReader::Sharded(cache) => label_bits(&Sharded { array, cache }, dt, subset),
     }
+}
+
+/// Whether [`retrieve_array_subset_as_f64`] reads `dt`: floats and integers.
+pub fn is_numeric(dt: &DataType) -> bool {
+    macro_rules! yes {
+        ($t:ty) => {
+            true
+        };
+    }
+    dt.is::<Float64DataType>()
+        || dt.is::<Float32DataType>()
+        || dt.is::<Float16DataType>()
+        || dt.is::<BFloat16DataType>()
+        || by_int_type!(dt, yes, false)
 }
 
 /// Reads an array subset as `f64`, applying CF scale, offset and masking, for coordinates

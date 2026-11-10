@@ -23,9 +23,7 @@ impl DataCalibration {
     /// cannot hold exactly (e.g. seconds since an epoch).
     #[inline]
     pub fn transform_f64(&self, val: f64) -> f64 {
-        if let Some(fv) = self.fill_value
-            && ((val - fv).abs() <= 1e-5 * fv.abs() || (val.is_nan() && fv.is_nan()))
-        {
+        if self.fill_value.is_some_and(|fv| matches_fill(val, fv)) {
             return f64::NAN;
         }
         if let Some(vmin) = self.valid_min
@@ -41,56 +39,38 @@ impl DataCalibration {
         val * self.scale_factor.unwrap_or(1.0) + self.add_offset.unwrap_or(0.0)
     }
 
-    /// Transforms a slice of values in-place if any transformation is active.
-    /// Uses an optimized branchless loop for standard scale/offset transformations to enable SIMD vectorization.
+    /// Transforms a slice of values in-place if any transformation is active, in `f64` as
+    /// [`Self::transform`] does for every other data type. Pure scale and offset take a
+    /// branchless loop the compiler vectorizes.
     pub fn transform_slice_in_place(&self, slice: &mut [f32]) {
         if !self.has_transformation() {
             return;
         }
-
-        let scale = self.scale_factor.map(|s| s as f32);
-        let offset = self.add_offset.map(|o| o as f32);
-        let fill = self.fill_value.map(|f| f as f32);
-        let valid_min = self.valid_min.map(|m| m as f32);
-        let valid_max = self.valid_max.map(|m| m as f32);
-
-        // Fast-path: pure linear scale & offset without fill masking (SIMD-vectorizable)
-        if fill.is_none() && valid_min.is_none() && valid_max.is_none() {
-            let s = scale.unwrap_or(1.0);
-            let o = offset.unwrap_or(0.0);
+        if self.fill_value.is_none() && self.valid_min.is_none() && self.valid_max.is_none() {
+            let s = self.scale_factor.unwrap_or(1.0);
+            let o = self.add_offset.unwrap_or(0.0);
             for elem in slice.iter_mut() {
-                *elem = *elem * s + o;
+                *elem = (f64::from(*elem) * s + o) as f32;
             }
             return;
         }
-
-        // Masking path with nodata / fill value and valid range checks
+        // `f32` values meet `f32` bounds, so one at a bound `f32` cannot hold stays.
+        let bound = |b: Option<f64>| b.map(|b| f64::from(b as f32));
+        let cal = Self {
+            valid_min: bound(self.valid_min),
+            valid_max: bound(self.valid_max),
+            ..*self
+        };
         for elem in slice.iter_mut() {
-            let val = *elem;
-            if let Some(fv) = fill
-                && ((val - fv).abs() <= 1e-5 * fv.abs() || (val.is_nan() && fv.is_nan()))
-            {
-                *elem = f32::NAN;
-                continue;
-            }
-            if let Some(vmin) = valid_min
-                && val < vmin
-            {
-                *elem = f32::NAN;
-                continue;
-            }
-            if let Some(vmax) = valid_max
-                && val > vmax
-            {
-                *elem = f32::NAN;
-                continue;
-            }
-
-            if let Some(s) = scale {
-                *elem = val * s + offset.unwrap_or(0.0);
-            } else if let Some(o) = offset {
-                *elem = val + o;
-            }
+            *elem = cal.transform(f64::from(*elem));
         }
     }
+}
+
+/// Whether `val` is the fill (nodata) value `fill`: equal within a relative 1e-5, so a
+/// fill stored in another precision than the data still matches, or both NaN. The one
+/// fill rule of every reader (CF attributes and GeoTIFF nodata alike).
+#[inline]
+pub fn matches_fill(val: f64, fill: f64) -> bool {
+    val == fill || (val - fill).abs() <= 1e-5 * fill.abs() || (val.is_nan() && fill.is_nan())
 }

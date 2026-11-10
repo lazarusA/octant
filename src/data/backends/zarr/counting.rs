@@ -122,7 +122,10 @@ pub(super) fn plan(
         return;
     };
     let chunk: Vec<u64> = chunk.iter().map(|c| c.get()).collect();
-    let chunks = chunks_over(&request.to_array_subset(shape).to_ranges(), &chunk);
+    let Ok(subset) = request.to_array_subset(shape) else {
+        return;
+    };
+    let chunks = chunks_over(&subset.to_ranges(), &chunk);
     progress::plan_array(&key_prefix(array.path().as_str()), chunks);
 }
 

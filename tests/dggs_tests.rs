@@ -81,7 +81,8 @@ fn test_detect_grid_from_block_with_dggs() {
         vec![0.5f32; 49152],
         HashMap::new(),
         attrs,
-    );
+    )
+    .expect("block");
 
     let grid = detect_grid_from_block(&block, "cells", "time", None, None, 49152, 1);
     match grid {

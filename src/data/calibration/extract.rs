@@ -1,99 +1,43 @@
-//! CF conventions metadata attribute parsers for calibration rules.
-
-#[cfg(test)]
-use std::collections::HashMap;
+//! CF conventions attributes read into calibration rules, alike for every format.
 
 use super::types::DataCalibration;
 
-fn parse_f64_from_json(val: &serde_json::Value) -> Option<f64> {
-    match val {
-        serde_json::Value::Number(n) => n.as_f64(),
-        serde_json::Value::String(s) => s.trim().parse::<f64>().ok(),
-        serde_json::Value::Array(arr) => arr.first().and_then(parse_f64_from_json),
+/// The `i`-th number of a JSON attribute: a number or numeric text (`i == 0`), or an
+/// array's element.
+fn nth_json(value: &serde_json::Value, i: usize) -> Option<f64> {
+    match value {
+        serde_json::Value::Number(n) if i == 0 => n.as_f64(),
+        serde_json::Value::String(s) if i == 0 => s.trim().parse().ok(),
+        serde_json::Value::Array(values) => nth_json(values.get(i)?, 0),
         _ => None,
     }
 }
 
-#[cfg(test)]
-fn parse_f64_from_str(s: &str) -> Option<f64> {
-    s.trim().parse::<f64>().ok()
-}
-
 impl DataCalibration {
-    /// Creates a `DataCalibration` from each attribute's number, `get` reading it (NetCDF,
-    /// HDF5 and MATLAB readers).
-    pub fn from_numbers(get: impl Fn(&str) -> Option<f64>) -> Self {
+    /// CF scale, offset, fill and valid range, `get(name, i)` reading attribute `name`'s
+    /// `i`-th number: the one reader of every format (NetCDF, HDF5 and MATLAB readers,
+    /// and through [`Self::from_json_map`] Zarr and Icechunk). `valid_range` wins over
+    /// `valid_min`/`valid_max`.
+    pub fn from_numbers(get: impl Fn(&str, usize) -> Option<f64>) -> Self {
+        let first = |name: &str| get(name, 0);
+        // An inverted range is a packed unsigned one read as signed (`_Unsigned`, GOES-R):
+        // ignored rather than masking everything.
+        let range = get("valid_range", 0)
+            .zip(get("valid_range", 1))
+            .filter(|(min, max)| min <= max);
         Self {
-            scale_factor: get("scale_factor"),
-            add_offset: get("add_offset"),
-            fill_value: get("_FillValue").or_else(|| get("missing_value")),
-            valid_min: get("valid_min"),
-            valid_max: get("valid_max"),
+            scale_factor: first("scale_factor"),
+            add_offset: first("add_offset"),
+            fill_value: first("_FillValue")
+                .or_else(|| first("missing_value"))
+                .or_else(|| first("fill_value")),
+            valid_min: range.map(|r| r.0).or_else(|| first("valid_min")),
+            valid_max: range.map(|r| r.1).or_else(|| first("valid_max")),
         }
     }
 
-    /// Creates a `DataCalibration` from a JSON key-value map (Zarr v2, Zarr v3, Icechunk).
+    /// [`Self::from_numbers`] over a JSON attribute map (Zarr v2, Zarr v3, Icechunk).
     pub fn from_json_map(attributes: &serde_json::Map<String, serde_json::Value>) -> Self {
-        let scale_factor = attributes.get("scale_factor").and_then(parse_f64_from_json);
-        let add_offset = attributes.get("add_offset").and_then(parse_f64_from_json);
-        let fill_value = attributes
-            .get("_FillValue")
-            .or_else(|| attributes.get("missing_value"))
-            .or_else(|| attributes.get("fill_value"))
-            .and_then(parse_f64_from_json);
-
-        let mut valid_min = attributes.get("valid_min").and_then(parse_f64_from_json);
-        let mut valid_max = attributes.get("valid_max").and_then(parse_f64_from_json);
-
-        if let Some(range) = attributes.get("valid_range").and_then(|v| v.as_array())
-            && range.len() >= 2
-        {
-            if let Some(min_v) = parse_f64_from_json(&range[0]) {
-                valid_min = Some(min_v);
-            }
-            if let Some(max_v) = parse_f64_from_json(&range[1]) {
-                valid_max = Some(max_v);
-            }
-        }
-
-        Self {
-            scale_factor,
-            add_offset,
-            fill_value,
-            valid_min,
-            valid_max,
-        }
-    }
-
-    #[cfg(test)]
-    /// Creates a `DataCalibration` from a string HashMap (GeoTIFF, NetCDF, GRIB, generic stores).
-    pub fn from_string_map(attributes: &HashMap<String, String>) -> Self {
-        let scale_factor = attributes
-            .get("scale_factor")
-            .and_then(|s| parse_f64_from_str(s));
-        let add_offset = attributes
-            .get("add_offset")
-            .and_then(|s| parse_f64_from_str(s));
-        let fill_value = attributes
-            .get("_FillValue")
-            .or_else(|| attributes.get("missing_value"))
-            .or_else(|| attributes.get("fill_value"))
-            .or_else(|| attributes.get("nodata"))
-            .and_then(|s| parse_f64_from_str(s));
-
-        let valid_min = attributes
-            .get("valid_min")
-            .and_then(|s| parse_f64_from_str(s));
-        let valid_max = attributes
-            .get("valid_max")
-            .and_then(|s| parse_f64_from_str(s));
-
-        Self {
-            scale_factor,
-            add_offset,
-            fill_value,
-            valid_min,
-            valid_max,
-        }
+        Self::from_numbers(|name, i| nth_json(attributes.get(name)?, i))
     }
 }

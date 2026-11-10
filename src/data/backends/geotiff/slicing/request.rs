@@ -33,36 +33,10 @@ pub fn parse_slice_request(request: &SliceRequest, ifd: &ImageFileDirectory) -> 
         None
     };
 
-    let (row_sel, col_sel) = if band_idx.is_some() || request.selections.len() <= 2 {
-        let r = request
-            .selections
-            .first()
-            .map(|s| s.bounds())
-            .unwrap_or((0, img_h));
-        let c = request
-            .selections
-            .get(1)
-            .map(|s| s.bounds())
-            .unwrap_or((0, img_w));
-        (r, c)
-    } else {
-        let r = request
-            .selections
-            .get(1)
-            .map(|s| s.bounds())
-            .unwrap_or((0, img_h));
-        let c = request
-            .selections
-            .get(2)
-            .map(|s| s.bounds())
-            .unwrap_or((0, img_w));
-        (r, c)
-    };
-
-    let row_start = row_sel.0.min(img_h);
-    let row_end = row_sel.1.max(row_start + 1).min(img_h);
-    let col_start = col_sel.0.min(img_w);
-    let col_end = col_sel.1.max(col_start + 1).min(img_w);
+    // Rows and columns are the first two selections, or the last two of a multi-band raster.
+    let skip = usize::from(band_idx.is_none() && request.selections.len() > 2);
+    let (row_start, row_end) = request.clamped(skip, img_h);
+    let (col_start, col_end) = request.clamped(skip + 1, img_w);
 
     ParsedSlice {
         band_idx,
@@ -77,12 +51,10 @@ pub fn parse_slice_request(request: &SliceRequest, ifd: &ImageFileDirectory) -> 
 /// first selection when it selects bands, rows and columns, else every band;
 /// at least one band.
 pub fn band_window(request: &SliceRequest, total: usize) -> (usize, usize) {
-    let (start, end) = match request.selections.as_slice() {
-        [band, _, _] => band.bounds(),
+    match request.selections.as_slice() {
+        [band, _, _] => band.clamp(total),
         _ => (0, total),
-    };
-    let start = start.min(total.saturating_sub(1));
-    (start, end.clamp(start + 1, total.max(start + 1)))
+    }
 }
 
 /// Identify the RGB channel index (0 = Red, 1 = Green, 2 = Blue) from a variable name.

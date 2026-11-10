@@ -36,8 +36,8 @@ pub async fn fetch_geotiff_block(
     decoder_registry: &DecoderRegistry,
 ) -> Result<OctantBlock, BlockStoreError> {
     let parsed = parse_slice_request(request, ifd);
-    let out_h = parsed.row_end.saturating_sub(parsed.row_start).max(1);
-    let out_w = parsed.col_end.saturating_sub(parsed.col_start).max(1);
+    let out_h = parsed.row_end - parsed.row_start;
+    let out_w = parsed.col_end - parsed.col_start;
     let plane_len = out_h
         .checked_mul(out_w)
         .ok_or_else(|| BlockStoreError::from("Hyperslab shape arithmetic overflow"))?;
@@ -151,7 +151,7 @@ pub async fn fetch_geotiff_block(
         attributes.insert("color_space".into(), "cmyk".into());
     }
 
-    Ok(OctantBlock::new(
+    OctantBlock::new(
         request.variable.clone(),
         out_shape,
         out_dims,
@@ -159,5 +159,5 @@ pub async fn fetch_geotiff_block(
         Arc::from(buffer.into_boxed_slice()),
         coords,
         attributes,
-    ))
+    )
 }

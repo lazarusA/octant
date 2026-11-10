@@ -18,6 +18,7 @@ pub(super) fn test_block(origin0: usize) -> OctantBlock {
         StdHashMap::new(),
         StdHashMap::new(),
     )
+    .expect("block")
 }
 
 fn test_key(source_id: &str, variable: &str, start: usize) -> BlockCacheKey {
@@ -155,4 +156,28 @@ fn a_block_larger_than_the_cache_stays_resident() {
     assert!(!cache.contains(&old));
     assert!(cache.contains(&big));
     assert_eq!(cache.cached_count(), 1);
+}
+
+/// A block whose values do not fill its shape is an error in every build, not only under
+/// `debug_assert` (B15).
+#[test]
+fn short_blocks_are_errors() {
+    use crate::data::octant_block::OctantBlock;
+    use std::collections::HashMap;
+    let block = |shape: Vec<usize>, len: usize| {
+        let dims = vec!["y".to_string(); shape.len()];
+        let origin = vec![0; shape.len()];
+        OctantBlock::new(
+            "v".into(),
+            shape,
+            dims,
+            origin,
+            vec![0.0; len],
+            HashMap::new(),
+            HashMap::new(),
+        )
+    };
+    assert!(block(vec![2, 3], 6).is_ok());
+    assert!(block(vec![2, 3], 5).is_err(), "too few values");
+    assert!(block(vec![usize::MAX, 2], 0).is_err(), "volume overflows");
 }

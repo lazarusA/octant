@@ -1,20 +1,10 @@
 //! Coordinate extraction for NetCDF sliced hyperslabs.
 
-use std::collections::HashMap;
-
 use super::coord_read::{group_ancestors, group_of, read_numbers_f64, text_dimension};
 use super::reader::{NcReader, NcVar};
+use crate::data::block_orientation::BlockCoords;
 use crate::data::blocks::BlockStoreError;
-use crate::utils::grid_flips::{is_lat_name, is_lon_name};
-
-/// Window coordinates of a block, keyed by dimension name (and its lowercase form), plus
-/// the first and last coordinate of the whole latitude and longitude dimensions.
-#[derive(Default)]
-pub struct SlicedCoordinates {
-    pub coordinates: HashMap<String, Vec<f64>>,
-    pub lat_extent: Option<(f64, f64)>,
-    pub lon_extent: Option<(f64, f64)>,
-}
+use crate::data::slice_request::DimensionSelection;
 
 /// A numeric coordinate's block window and the whole coordinate's first and last value.
 struct WindowRead {
@@ -40,8 +30,8 @@ pub fn extract_sliced_coordinates(
     dim_names: &[String],
     origin: &[usize],
     block_shape: &[usize],
-) -> SlicedCoordinates {
-    let mut out = SlicedCoordinates::default();
+) -> BlockCoords {
+    let mut out = BlockCoords::default();
     for (i, name) in dim_names.iter().enumerate() {
         let window = (
             origin.get(i).copied().unwrap_or(0),
@@ -50,16 +40,8 @@ pub fn extract_sliced_coordinates(
         let Some(read) = find_coordinate(reader, var_path, name, window) else {
             continue;
         };
-        if is_lat_name(name) && out.lat_extent.is_none() {
-            out.lat_extent = read.extent;
-        } else if is_lon_name(name) && out.lon_extent.is_none() {
-            out.lon_extent = read.extent;
-        }
-        let clean = name.trim().to_lowercase();
-        if clean != *name {
-            out.coordinates.insert(clean, read.values.clone());
-        }
-        out.coordinates.insert(name.clone(), read.values);
+        out.note_extent(name, read.extent);
+        out.insert(name, read.values);
     }
     out
 }
@@ -116,10 +98,10 @@ fn read_window(
         return Err("coordinate variable is not 1D".into());
     };
     let dim_len = *dim_len;
-    let start = start.min(dim_len.saturating_sub(1));
-    let end = start.saturating_add(count).min(dim_len);
+    let window = DimensionSelection::range(start, start.saturating_add(count));
+    let (start, end) = window.clamp(dim_len);
     let read = |start: usize, count: usize| read_numbers_f64(reader, var, &[start], &[count]);
-    let values = read(start, end.saturating_sub(start).max(1))?;
+    let values = read(start, end - start)?;
     let (Some(&first), Some(&last)) = (values.first(), values.last()) else {
         return Err("empty coordinate window".into());
     };

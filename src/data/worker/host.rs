@@ -1,6 +1,6 @@
 //! The worker's side: loads blocks as the page would (`BlockLoader::load_one_wasm`),
 //! from stores it opens itself, once each, by inspecting them as the page
-//! does (`backends::inspect_web`), and keeps until their dataset closes. Every `REPORT_MS` it sends the
+//! does (`WebFormat::inspect`), and keeps until their dataset closes. Every `REPORT_MS` it sends the
 //! page what its fetches counted and the toasts reported here. Local files
 //! are read through the page ([`read_from_page`]).
 
@@ -176,14 +176,14 @@ async fn open(source: &DataSource) -> Opened {
             .unwrap_or_else(|_| Err("The store did not open".to_owned()));
     }
     OPENING.with_borrow_mut(|o| o.insert(source.clone(), Vec::new()));
-    // NetCDF files are opened here, never on the page, which keeps `hdf5-pure` out of the
-    // app's `.wasm`; their store inspects them.
-    let inspected = match source.kind {
-        crate::data::DataSourceKind::NetCdf => crate::data::backends::netcdf::wasm::open(source)
+    use crate::data::backends::web::WebFormat;
+    // NetCDF opens here, never through `WebFormat::inspect`, which the page links.
+    let inspected = match WebFormat::of(source) {
+        WebFormat::NetCdf => crate::data::backends::netcdf::wasm::open(source)
             .await
             .err()
             .map(Err),
-        _ => crate::data::backends::inspect_web(source).await,
+        format => format.inspect(source).await,
     };
     let opened = match inspected {
         Some(Err(e)) => Err(e),

@@ -15,6 +15,7 @@ fn block(origin: [usize; 3]) -> OctantBlock {
         HashMap::new(),
         HashMap::new(),
     )
+    .expect("block")
 }
 
 fn names() -> Vec<String> {

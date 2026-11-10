@@ -113,7 +113,7 @@ pub fn generate_known_truth_4d_block(
     nz: usize,
     ny: usize,
     nx: usize,
-) -> OctantBlock {
+) -> Result<OctantBlock, crate::data::blocks::BlockStoreError> {
     let (values, _, _) = super::fields::generate_procedural_volume_4d(nt, nz, ny, nx);
     let mut coords = HashMap::new();
     coords.insert("lon".to_string(), vec![-180.0, 180.0]);

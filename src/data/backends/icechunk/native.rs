@@ -21,6 +21,17 @@ use zarrs_icechunk::AsyncIcechunkStore;
 static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> =
     OnceLock::new();
 
+/// Forgets the opened repository at `location` (its dataset closed), so opening it again
+/// reads the branch's latest commit.
+pub fn release(location: &str) {
+    if let Some(cache) = ICECHUNK_STORE_CACHE.get() {
+        cache
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(location);
+    }
+}
+
 /// Helper function to build a synchronous Zarr storage adapter over an Icechunk repository.
 /// By default, opens a readonly session for the "main" branch. Caches stores by URL location.
 pub fn build_sync_icechunk_store(

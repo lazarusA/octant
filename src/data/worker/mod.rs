@@ -42,16 +42,7 @@ pub async fn load(
     request: &crate::data::blocks::BlockRequest,
     on_progress: crate::data::blocks::ProgressCallback<'_>,
 ) -> Result<crate::data::octant_block::OctantBlock, crate::data::blocks::BlockStoreError> {
-    use crate::data::DataSourceKind as Kind;
-    let in_worker = matches!(
-        request.store.source().kind,
-        Kind::RemoteZarr
-            | Kind::RemoteIcechunk
-            | Kind::RemoteGeoTiff
-            | Kind::Procedural
-            | Kind::NetCdf
-    );
-    if in_worker {
+    if crate::data::backends::web::WebFormat::of(request.store.source()).in_worker() {
         match pool::load(request).await {
             pool::Outcome::Block(block) => return Ok(block),
             pool::Outcome::Failed(error) => return Err(error.into()),

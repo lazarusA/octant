@@ -16,25 +16,14 @@ impl BlockLoader {
         request.store.fetch(&request.slice)
     }
 
-    /// The browser's [`load_one`](Self::load_one), reporting downloaded bytes:
-    /// each format's async loader fetches the block's chunks, then decodes them.
+    /// The browser's [`load_one`](Self::load_one), reporting downloaded bytes
+    /// (`WebFormat::load_block`).
     #[cfg(target_arch = "wasm32")]
     pub async fn load_one_wasm(
         request: &BlockRequest,
         on_progress: super::store::ProgressCallback<'_>,
     ) -> Result<OctantBlock, BlockStoreError> {
-        use crate::data::DataSourceKind as Kind;
-        use crate::data::backends::{geotiff, icechunk, zarr};
-        match request.store.source().kind {
-            Kind::RemoteIcechunk | Kind::LocalIcechunk => {
-                icechunk::wasm::load_one_icechunk_wasm_with_progress(request, on_progress).await
-            }
-            Kind::RemoteGeoTiff | Kind::LocalGeoTiff => {
-                geotiff::wasm::load_one_geotiff_wasm_with_progress(request, on_progress).await
-            }
-            // NetCDF reads synchronously, in a data worker (`netcdf/wasm.rs`).
-            Kind::Procedural | Kind::NetCdf => request.store.fetch(&request.slice),
-            _ => zarr::load_one_wasm_with_progress(request, on_progress).await,
-        }
+        let format = crate::data::backends::web::WebFormat::of(request.store.source());
+        format.load_block(request, on_progress).await
     }
 }

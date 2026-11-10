@@ -14,6 +14,70 @@ pub fn contains_ascii_case_insensitive(haystack: &str, needle: &str) -> bool {
         .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
+/// Latitude and longitude words, matched by [`has_token`].
+const LAT_WORDS: &[&str] = &["lat", "latitude"];
+const LON_WORDS: &[&str] = &["lon", "long", "longitude"];
+
+/// Whether a token of `name` names `words`: tokens are runs of ASCII letters, also split
+/// where a lowercase letter meets an uppercase one (`nav_lat`, `lat_0`, `gridLat`), so
+/// `simulation` and `along_track` hold none. A word may be plural (`lats`) or end in `c`
+/// for cell centres (`latc`, FVCOM), and follow the prefixes models use: one letter, as
+/// `rlat` (rotated), `nlat` (counts), `XLAT` (WRF), `TLAT` (POP), `clat`/`elat` (ICON), or
+/// `geolat` (MOM6), `lsmlat` (CLM), `gridlat_0` (NCL's GRIB).
+fn has_token(name: &str, words: &[&str]) -> bool {
+    let is_word = |t: &[u8]| words.iter().any(|w| t.eq_ignore_ascii_case(w.as_bytes()));
+    let names = |token: &[u8]| {
+        let one = match token.split_first() {
+            Some((p, rest)) if b"cegnrtuvx".contains(&p.to_ascii_lowercase()) => rest,
+            _ => token,
+        };
+        let long = (["geo", "lsm", "grid"].iter())
+            .find_map(|p| match token.split_at_checked(p.len()) {
+                Some((head, rest)) if head.eq_ignore_ascii_case(p.as_bytes()) => Some(rest),
+                _ => None,
+            })
+            .unwrap_or(token);
+        [token, one, long].into_iter().any(|t| {
+            let suffixed = match t.split_last() {
+                Some((last, rest)) if b"sScC".contains(last) => Some(rest),
+                _ => None,
+            };
+            is_word(t) || suffixed.is_some_and(is_word)
+        })
+    };
+    let b = name.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let start = i;
+        i += 1;
+        if !b[start].is_ascii_alphabetic() {
+            continue;
+        }
+        while i < b.len()
+            && b[i].is_ascii_alphabetic()
+            && !(b[i].is_ascii_uppercase() && b[i - 1].is_ascii_lowercase())
+        {
+            i += 1;
+        }
+        if names(&b[start..i]) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether a dimension or coordinate name denotes latitude (a latitude token, or `y`).
+pub fn is_lat_name(name: &str) -> bool {
+    let name = name.trim();
+    name.eq_ignore_ascii_case("y") || has_token(name, LAT_WORDS)
+}
+
+/// Whether a dimension or coordinate name denotes longitude (a longitude token, or `x`).
+pub fn is_lon_name(name: &str) -> bool {
+    let name = name.trim();
+    name.eq_ignore_ascii_case("x") || has_token(name, LON_WORDS)
+}
+
 /// Checks if a dimension name matches HEALPix discrete cell heuristics with zero allocation.
 #[inline]
 pub fn is_healpix_dim_name(dim_name: &str) -> bool {
@@ -30,8 +94,7 @@ pub fn is_healpix_dim_name(dim_name: &str) -> bool {
 #[inline]
 pub fn is_spatial_x_name(dim_name: &str) -> bool {
     let clean = dim_name.trim();
-    clean.eq_ignore_ascii_case("x")
-        || contains_ascii_case_insensitive(clean, "lon")
+    is_lon_name(clean)
         || contains_ascii_case_insensitive(clean, "col")
         || is_healpix_dim_name(clean)
 }
@@ -40,9 +103,7 @@ pub fn is_spatial_x_name(dim_name: &str) -> bool {
 #[inline]
 pub fn is_spatial_y_name(dim_name: &str) -> bool {
     let clean = dim_name.trim();
-    clean.eq_ignore_ascii_case("y")
-        || contains_ascii_case_insensitive(clean, "lat")
-        || contains_ascii_case_insensitive(clean, "row")
+    is_lat_name(clean) || contains_ascii_case_insensitive(clean, "row")
 }
 
 /// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / Z) with zero allocation.
@@ -98,9 +159,9 @@ pub fn format_dimension_axis_title<'a>(dim_name: &'a str) -> Cow<'a, str> {
         Cow::Borrowed("Channel")
     } else if is_healpix_dim_name(clean) {
         Cow::Owned(format!("{dim_name} [Cell Index]"))
-    } else if contains_ascii_case_insensitive(clean, "lon") {
+    } else if has_token(clean, LON_WORDS) {
         Cow::Owned(format!("{dim_name} [°E]"))
-    } else if contains_ascii_case_insensitive(clean, "lat") {
+    } else if has_token(clean, LAT_WORDS) {
         Cow::Owned(format!("{dim_name} [°N]"))
     } else if contains_ascii_case_insensitive(clean, "depth")
         || contains_ascii_case_insensitive(clean, "height")

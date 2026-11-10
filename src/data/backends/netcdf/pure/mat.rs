@@ -100,7 +100,7 @@ fn variable(
         path: path.clone(),
         data_type: type_name(&ds.dtype()?, ds.datatype()?.type_size()),
         dims,
-        attributes: texts(attrs, |_| false),
+        attributes: texts(attrs, |_| false).into(),
         calibration: calibration(attrs),
     };
     Ok(Entry { var, dataset: path })

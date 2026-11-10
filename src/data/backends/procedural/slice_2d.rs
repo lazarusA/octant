@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use crate::data::blocks::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
@@ -11,25 +12,12 @@ pub fn slice_2d_grid_block(
     full_data: &[f32],
     coords: (&[f64], &[f64]),
     request: &SliceRequest,
-) -> OctantBlock {
+) -> Result<OctantBlock, BlockStoreError> {
     let (w_full, h_full) = shape;
     let (xs, ys) = coords;
 
-    let (y_start, y_end) = request
-        .selections
-        .first()
-        .map(|s| s.bounds())
-        .unwrap_or((0, h_full));
-    let (x_start, x_end) = request
-        .selections
-        .get(1)
-        .map(|s| s.bounds())
-        .unwrap_or((0, w_full));
-
-    let y_start = y_start.min(h_full);
-    let y_end = y_end.min(h_full).max(y_start);
-    let x_start = x_start.min(w_full);
-    let x_end = x_end.min(w_full).max(x_start);
+    let (y_start, y_end) = request.clamped(0, h_full);
+    let (x_start, x_end) = request.clamped(1, w_full);
 
     let block_h = y_end - y_start;
     let block_w = x_end - x_start;

@@ -1,11 +1,9 @@
 //! Async chunk preloading and progress reporting for WebAssembly Zarr.
 
 use super::WasmZarrBlockStore;
-use super::partial_store::{Lease, array_prefixes};
-use crate::data::backends::coord_bounds::CoordPreload;
+use super::partial_store::Lease;
 use crate::data::backends::http::{fetch_url_bytes, is_not_found};
-use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback, progress};
-use crate::data::octant_block::OctantBlock;
+use crate::data::blocks::{BlockStoreError, ProgressCallback, progress};
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 use futures::StreamExt;
 use zarrs::array::ArraySubset;
@@ -124,127 +122,21 @@ impl WasmZarrBlockStore {
         }
         Ok(())
     }
-
-    /// Preloads the coordinate arrays a block for `request` reads (those of its
-    /// range-selected dimensions), so its coordinates decode from memory; the
-    /// lease keeps them until the block is decoded.
-    pub async fn preload_block_coordinates(
-        &self,
-        request: &crate::data::slice_request::SliceRequest,
-    ) -> Lease {
-        let arrays = super::coord_paths::block_coordinate_arrays(&self.memory_store, request);
-        let lease = self
-            .partial_store
-            .lease(Vec::new(), array_prefixes(&arrays));
-        for (path, len) in arrays {
-            let state = self.preload_coordinate_chunks_1d(&path, len).await;
-            if state != CoordPreload::Complete {
-                log::warn!("[WASM Zarr] Coordinate '{path}' {state:?}");
-            }
-        }
-        lease
-    }
 }
 
-/// Asynchronously loads one block on WASM, preloading required chunk bytes over HTTP if needed.
-pub async fn load_one_wasm_with_progress(
-    request: &BlockRequest,
-    on_progress: ProgressCallback<'_>,
-) -> Result<OctantBlock, BlockStoreError> {
-    let source_uri = &request.store.source().uri;
-
-    // Route Icechunk data sources to Icechunk WASM loader
-    if request.store.source().kind == crate::data::DataSourceKind::RemoteIcechunk
-        || request.store.source().kind == crate::data::DataSourceKind::LocalIcechunk
-        || source_uri.starts_with("icechunk+")
-    {
-        return crate::data::backends::icechunk::wasm::load_one_icechunk_wasm_with_progress(
-            request,
-            on_progress,
-        )
-        .await;
+#[cfg(target_arch = "wasm32")]
+impl super::chunk_source::ChunkSource for WasmZarrBlockStore {
+    fn zarr(&self) -> &WasmZarrBlockStore {
+        self
     }
 
-    // If it's a procedural dataset or non-HTTP store, fetch directly
-    if source_uri.starts_with("procedural://") || source_uri.starts_with("test://") {
-        return request.store.fetch(&request.slice);
-    }
-
-    let clean_url = source_uri.trim_end_matches('/');
-    let store = WasmZarrBlockStore::get_or_create(clean_url);
-
-    let mut shape = request
-        .store
-        .inspect()
-        .map(|meta| {
-            meta.variables
-                .iter()
-                .find(|v| v.name == request.slice.variable)
-                .map(|v| v.shape.clone())
-                .unwrap_or_default()
-        })
-        .unwrap_or_default();
-
-    if shape.is_empty() {
-        let clean_var = request.slice.variable.trim_matches('/');
-        let var_path = format!("/{clean_var}");
-        if let Ok(array) =
-            open_or_instantiate_array_normalized(store.memory_store.clone(), &var_path)
-        {
-            shape = array.shape().to_vec();
-        }
-    }
-
-    let subset = request.slice.to_array_subset(&shape);
-    log::info!(
-        "[WASM Zarr] Preloading chunks for '{}', subset: {:?}",
-        request.slice.variable,
-        subset.to_ranges()
-    );
-
-    // Asynchronously download any missing chunks for this slice, kept until decoded
-    let _chunks = match store
-        .preload_chunks_for_subset(&request.slice.variable, &subset, on_progress)
-        .await
-    {
-        Ok(lease) => lease,
-        Err(e) => {
-            log::error!(
-                "[WASM Zarr] Failed downloading chunks for '{}': {e}",
-                request.slice.variable
-            );
-            return Err(e);
-        }
-    };
-
-    // A quantised embedding block multiplies by its scale array's window.
-    let _scales = match store.generic_store.scale_window(&request.slice) {
-        Some((path, subset)) => Some(
-            store
-                .preload_chunks_for_subset(&path, &subset, None)
-                .await?,
-        ),
-        None => None,
-    };
-    let _coords = store.preload_block_coordinates(&request.slice).await;
-
-    // Now decode the slice synchronously from in-memory chunks
-    match store.fetch_block(&request.slice) {
-        Ok(block) => {
-            log::info!(
-                "[WASM Zarr] Successfully decoded block for '{}' ({} values, shape: {:?})",
-                request.slice.variable,
-                block.values.len(),
-                block.shape
-            );
-            Ok(block)
-        }
-        Err(e) => {
-            log::error!(
-                "[WASM Zarr] Failed decoding block for '{}': {e}",
-                request.slice.variable
-            );
-            Err(e)
-        }
+    async fn preload(
+        &self,
+        var: &str,
+        subset: &ArraySubset,
+        on_progress: ProgressCallback<'_>,
+    ) -> Result<Lease, BlockStoreError> {
+        self.preload_chunks_for_subset(var, subset, on_progress)
+            .await
     }
 }

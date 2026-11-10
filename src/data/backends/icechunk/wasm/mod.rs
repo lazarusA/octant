@@ -7,18 +7,21 @@
 mod chunks;
 pub mod discovery;
 pub mod header;
+#[cfg(target_arch = "wasm32")]
 pub mod inspect;
-pub mod loader;
 pub mod manifest_cache;
 pub mod manifests;
+#[cfg(target_arch = "wasm32")]
 pub mod preload;
 #[cfg(target_arch = "wasm32")]
 mod shards;
+#[cfg(target_arch = "wasm32")]
 pub mod store;
 #[cfg(test)]
 mod tests;
 
 pub use header::decompress_icechunk_file;
+#[cfg(target_arch = "wasm32")]
 pub use inspect::inspect_wasm_remote_icechunk;
-pub use loader::load_one_icechunk_wasm_with_progress;
+#[cfg(target_arch = "wasm32")]
 pub use store::{ArrayManifestInfo, WasmIcechunkBlockStore};

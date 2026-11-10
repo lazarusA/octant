@@ -64,15 +64,15 @@ pub fn text(attr: &Attr) -> String {
     }
 }
 
-/// The first number of `attr`, or text that parses as one.
-fn number(attr: &Attr) -> Option<f64> {
+/// The `i`-th number of `attr`, or of its text (numbers separated by commas).
+fn nth_number(attr: &Attr, i: usize) -> Option<f64> {
     match attr.ty {
-        NcType::Char => text(attr).trim().parse().ok(),
-        ty => numbers(ty, &attr.bytes).first().copied(),
+        NcType::Char => text(attr).split(',').nth(i)?.trim().parse().ok(),
+        ty => numbers(ty, &attr.bytes).get(i).copied(),
     }
 }
 
 /// CF scale, offset, fill and valid range from `attrs`, read as netCDF-C's reader does.
 pub fn calibration(attrs: &[Attr]) -> DataCalibration {
-    DataCalibration::from_numbers(|name| attrs.iter().find(|a| a.name == name).and_then(number))
+    DataCalibration::from_numbers(|name, i| nth_number(attrs.iter().find(|a| a.name == name)?, i))
 }

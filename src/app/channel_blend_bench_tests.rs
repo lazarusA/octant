@@ -41,6 +41,7 @@ pub(super) fn block() -> crate::data::octant_block::OctantBlock {
         Default::default(),
         std::collections::HashMap::new(),
     )
+    .expect("block")
 }
 
 pub(super) fn median(mut v: Vec<Duration>) -> Duration {
