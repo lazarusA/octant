@@ -1,5 +1,5 @@
 //! OME-Zarr images in 3D and their channel axis: a volume keeps its z
-//! range and reads the level a volume fits on; a channel axis animates.
+//! range and reads the level a volume fits on; without t, z animates.
 
 use serde_json::json;
 
@@ -47,12 +47,45 @@ fn czyx(model: &str, z_scales: [f64; 3]) -> crate::data::DatasetMetadata {
 }
 
 #[test]
-fn an_animated_channel_axis_starts_on_its_active_channel() {
+fn without_t_z_animates_and_c_pins_on_its_active_channel() {
     let meta = czyx("greyscale", [1.0; 3]);
     let app = defaults_for(&meta.variables[0]);
-    assert_eq!(app.selected.animated_dim(), Some(0), "no t: c animates");
+    assert_eq!(app.selected.animated_dim(), Some(1), "no t: z animates");
+    assert_eq!(app.selected.dim_config[1].index, 10, "from defaultZ");
+    assert_eq!(app.playback.current_timestep, 10);
     assert_eq!(app.selected.dim_config[0].index, 1);
-    assert_eq!(app.selected.dim_config[0].range, (0, 1), "the range stays");
+    assert_eq!(app.selected.dim_config[0].range, (1, 1), "one channel");
+}
+
+#[test]
+fn a_zyx_image_animates_z() {
+    use crate::data::ome::test_support::multiscale_v04;
+    let axes = json!([
+        { "name": "z", "type": "space" },
+        { "name": "y", "type": "space" },
+        { "name": "x", "type": "space" }
+    ]);
+    let attrs = json!({ "multiscales": [multiscale_v04(axes, &[vec![1.0; 3]])] });
+    let found = Fixture::default()
+        .v2_group("", attrs)
+        .v2_array("0", &[8, 16, 16])
+        .discover()
+        .expect("ome");
+    let app = defaults_for(&found.variables[0]);
+    assert_eq!(app.selected.animated_dim(), Some(0));
+}
+
+#[test]
+fn a_z_the_pyramid_downsamples_stays_pinned_so_coarse_levels_read() {
+    let meta = czyx("greyscale", [1.0, 2.0, 4.0]);
+    let var = meta.variables[0].clone();
+    let mut app = OctantApp::default();
+    app.selected.metadata = Some(meta);
+    crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
+    app.layout.canvas_px = [1024, 1024];
+    assert_eq!(app.selected.animated_dim(), None, "neither z nor c");
+    assert_eq!(app.selected.dim_config[1].range, (10, 10), "defaultZ");
+    assert_eq!(app.selection_level(&app.selected), Some(1));
 }
 
 #[test]

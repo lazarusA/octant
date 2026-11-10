@@ -111,3 +111,19 @@ fn the_last_chunk_ends_at_the_dimension() {
     apply_role_change(0, SpatialRole::Z, AnimationRole::Animated, &mut app);
     assert_eq!(app.selected.dim_config[0].range, (984, 999));
 }
+
+#[test]
+fn a_4d_variable_without_time_never_animates_its_band() {
+    let var = VariableInfo {
+        name: "v".to_string(),
+        shape: vec![3, 5, 10, 20],
+        dimension_names: vec!["band".into(), "member".into(), "lat".into(), "lon".into()],
+        chunk_shape: vec![3, 1, 10, 20],
+        ..Default::default()
+    };
+    let mut app = OctantApp::default();
+    crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
+    // member takes Z, so the band, the only dimension left, stays still.
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Z);
+    assert_eq!(app.selected.animated_dim(), None, "never the band");
+}

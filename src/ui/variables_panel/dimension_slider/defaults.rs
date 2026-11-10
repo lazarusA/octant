@@ -110,33 +110,46 @@ fn init_rank1_defaults(
 }
 
 /// The OMERO default plane (`rdefs.defaultZ`) and time point (`defaultT`)
-/// of an OME-Zarr image: z collapses to its plane; time keeps its window,
-/// moved to hold the default step, and playback starts there.
+/// of an OME-Zarr image: z collapses to its plane unless animated; an
+/// animated z or t keeps its window, moved to hold the default step, and
+/// playback starts there.
 fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     let Some(ome) = &var_info.ome else {
         return;
     };
     let image = &ome.image;
     if let (Some(dz), Some(z)) = (image.default_z, image.z_axis()) {
-        pin_dim(app, var_info, z, dz);
+        if app.selected.animated_dim() == Some(z) {
+            hold_and_play(app, var_info, z, dz);
+        } else {
+            pin_dim(app, var_info, z, dz);
+        }
     }
     if let (Some(dt), Some(t)) = (
         image.default_t,
         image.axis_of_kind(crate::data::ome::AxisKind::Time),
-    ) && let Some(&size) = var_info.shape.get(t)
-    {
-        let last = (size as usize).saturating_sub(1);
-        app.selected.hold_step(t, dt, last);
-        if app.selected.animated_dim() == Some(t) {
-            app.playback.current_timestep = dt.min(last);
-        }
+    ) {
+        hold_and_play(app, var_info, t, dt);
+    }
+}
+
+/// Moves dimension `dim`'s window to hold step `k`; playback starts there
+/// when `dim` is the animated one.
+fn hold_and_play(app: &mut OctantApp, var_info: &VariableInfo, dim: usize, k: usize) {
+    let Some(&size) = var_info.shape.get(dim) else {
+        return;
+    };
+    let last = (size as usize).saturating_sub(1);
+    app.selected.hold_step(dim, k, last);
+    if app.selected.animated_dim() == Some(dim) {
+        app.playback.current_timestep = k.min(last);
     }
 }
 
 /// A channel dimension opens on OMERO's first active channel within its
 /// range, else the range's first, unless the variable opens in color
-/// (`composite::opens_in_color`): pinned there without a role or as Z (one
-/// plane), started there when animated, left alone as a plot axis.
+/// (`composite::opens_in_color`): pinned there (one plane) unless it is a
+/// plot axis. Defaults never animate a channel.
 fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
     let Some(c) = var_info.channel_axis() else {
         return;
@@ -165,12 +178,7 @@ fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
             .is_some_and(|ch| ch.active)
     };
     let k = (lo.min(hi)..=hi.max(lo)).find(active).unwrap_or(lo.min(hi));
-    if cfg.animation != AnimationRole::Animated {
-        pin_dim(app, var_info, c, k);
-    } else {
-        app.selected.set_range(c, (lo, hi), k);
-        app.playback.current_timestep = k;
-    }
+    pin_dim(app, var_info, c, k);
 }
 
 /// Pins dimension `dim` of the selection to index `k`, clamped into its size.
