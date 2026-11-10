@@ -18,6 +18,11 @@ const DEPTH: usize = 3;
 /// `pr(time, lat, lon)` (8x5x4, four steps per chunk) plotted as a volume of
 /// three steps.
 fn volume_app() -> OctantApp {
+    volume_app_from(OctantApp::default())
+}
+
+/// `volume_app`, starting from `app` (one with a GPU render state).
+fn volume_app_from(mut app: OctantApp) -> OctantApp {
     let store = Arc::new(MemoryStore::new());
     write_array(
         &store,
@@ -26,7 +31,6 @@ fn volume_app() -> OctantApp {
         &[STEPS as u64, 5, 4],
         &[4, 5, 4],
     );
-    let mut app = OctantApp::default();
     let meta = register_store(&mut app, store, TARGET);
     let var = meta.variables[0].clone();
     app.selected.store_kind = StoreKind::RemoteZarr;
@@ -129,4 +133,27 @@ fn playback_waits_for_the_window_s_last_plane() {
     app.playback.is_playing = true;
     app.playback.buffer_secs = 0.0;
     assert!(!app.may_show(2), "step 4 is not loaded");
+}
+
+/// Browsing another variable, the plot-type picker stages a point cloud
+/// while the canvas still plays the plotted volume: its planes must still
+/// reach the volume renderer. Skipped without a GPU.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn planes_upload_to_the_plotted_plot_type() {
+    let Some(rs) = crate::app::test_support::render_state() else {
+        eprintln!("SKIPPED planes_upload_to_the_plotted_plot_type: no GPU device");
+        return;
+    };
+    let mut app = volume_app_from(OctantApp {
+        wgpu_render_state: Some(rs),
+        ..Default::default()
+    });
+    assert!(app.layers.base.renderers.volume.is_some());
+    app.selected.plot_type = PlotType::PointCloud;
+    assert_eq!(app.effective_canvas_plot_type(), PlotType::Volume);
+    app.layers.base.renderers.volume_dirty = Some(0..1);
+    app.flush_volume_uploads();
+    let dirty = app.layers.base.renderers.volume_dirty.clone();
+    assert_eq!(dirty, None, "the shown volume uploads its planes");
 }
