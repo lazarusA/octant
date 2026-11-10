@@ -109,7 +109,8 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         initial_values,
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
-    );
+    )
+    .expect("block");
     app.plot_selection();
     app.apply_block_projection(octant::app::layers::LayerId::BASE, &initial_block);
 
@@ -132,7 +133,8 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         step10_values,
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
-    );
+    )
+    .expect("block");
     app.apply_block_projection(octant::app::layers::LayerId::BASE, &step10_block);
     assert!(
         app.layers.base.data.matrix.is_some(),

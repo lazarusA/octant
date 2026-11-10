@@ -17,7 +17,8 @@ fn block(flipped: &[&str]) -> OctantBlock {
         vec![0.0; 40],
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
     b.flipped_dims = flipped.iter().map(|s| s.to_string()).collect();
     b
 }
@@ -57,7 +58,7 @@ fn square_lon_first_grids_swap_their_names_and_origins() {
         ("lat".to_string(), vec![30.0, 20.0, 10.0]),
         ("lon".to_string(), vec![0.0, 1.0, 2.0]),
     ]);
-    let attrs = serde_json::Map::new();
+    let attrs = HashMap::new();
     let (out, flipped) = check_and_orient_block_grid(
         values,
         &mut shape,
@@ -87,7 +88,7 @@ fn rows_and_columns_flip_together_with_an_odd_row_count() {
         ("lat".to_string(), vec![-10.0, 0.0, 10.0]),
         ("lon".to_string(), vec![20.0, 10.0]),
     ]);
-    let attrs = serde_json::Map::new();
+    let attrs = HashMap::new();
     let (out, flipped) = check_and_orient_block_grid(
         values,
         &mut shape,
@@ -123,7 +124,7 @@ fn orient_edge(
     let values: Vec<f32> = (0..shape[0] * shape[1]).map(|v| v as f32).collect();
     let mut dims = ["lat", "lon"].map(String::from).to_vec();
     let mut coords = HashMap::from(coords.map(|(k, v)| (k.to_string(), v)));
-    let attrs = serde_json::Map::new();
+    let attrs = HashMap::new();
     let hints = OrientHints {
         attributes: &attrs,
         lat_extent: Some(lat_extent),
@@ -175,7 +176,7 @@ fn spatial_dimensions_before_the_last_two_are_left_as_stored() {
     let mut shape = vec![2, 3, 2];
     let mut dims = ["y", "x", "band"].map(String::from).to_vec();
     let mut coords = HashMap::from([("y".to_string(), vec![-10.0, 10.0])]);
-    let attrs = serde_json::Map::new();
+    let attrs = HashMap::new();
     let (out, flipped) = check_and_orient_block_grid(
         values.clone(),
         &mut shape,
@@ -187,4 +188,60 @@ fn spatial_dimensions_before_the_last_two_are_left_as_stored() {
     assert_eq!(out, values);
     assert!(flipped.is_empty());
     assert_eq!(dims, ["y", "x", "band"]);
+}
+
+/// Names holding "lat" or "lon" inside other words are no latitude or longitude (B4).
+#[test]
+fn words_containing_lat_or_lon_are_not_axes() {
+    use crate::data::coordinates::naming::{is_lat_name, is_lon_name};
+    for name in ["simulation", "translation", "plate", "along_track", "salon"] {
+        assert!(!is_lat_name(name) && !is_lon_name(name), "{name}");
+    }
+    for name in [
+        "lat",
+        "Latitude",
+        "nav_lat",
+        "lat_0",
+        "y",
+        "rlat",
+        "XLAT",
+        "gridLat",
+        "clat",
+        "geolat",
+        "lsmlat",
+        "gridlat_0",
+        "latc",
+    ] {
+        assert!(is_lat_name(name), "{name}");
+    }
+    for name in [
+        "lon",
+        "longitude",
+        "nav_lon",
+        "lon_0",
+        "x",
+        "rlon",
+        "XLONG",
+        "elon",
+        "geolon",
+        "lsmlon",
+        "gridlon_0",
+        "lonc",
+    ] {
+        assert!(is_lon_name(name), "{name}");
+    }
+    // A south-up (simulation, lat, lon) block still turns north-up.
+    let mut shape = vec![1, 2, 1];
+    let mut dims = ["simulation", "lat", "lon"].map(String::from).to_vec();
+    let mut coords = HashMap::from([("lat".to_string(), vec![-10.0, 10.0])]);
+    let attrs = HashMap::new();
+    let (out, flipped) = check_and_orient_block_grid(
+        vec![1.0, 2.0],
+        &mut shape,
+        &mut dims,
+        &mut [0, 0, 0],
+        OrientHints::new(&attrs),
+        &mut coords,
+    );
+    assert_eq!((out, flipped), (vec![2.0, 1.0], vec!["lat".to_string()]));
 }

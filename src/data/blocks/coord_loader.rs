@@ -102,32 +102,8 @@ async fn load_wasm(
     store: &StoreHandle,
     variable: &VariableInfo,
 ) -> Result<HashMap<String, CoordValues>, String> {
-    use crate::data::DataSourceKind;
-    use crate::data::backends::icechunk::wasm::WasmIcechunkBlockStore;
-    use crate::data::backends::zarr::WasmZarrBlockStore;
-    let source = store.source();
-    let url = source
-        .uri
-        .trim_start_matches("icechunk+")
-        .trim_end_matches('/');
-    let icechunk = source.uri.starts_with("icechunk+");
-    match source.kind {
-        DataSourceKind::RemoteIcechunk | DataSourceKind::LocalIcechunk => {
-            let store = WasmIcechunkBlockStore::get_or_create(url);
-            Ok(store.load_variable_coordinates(variable).await)
-        }
-        DataSourceKind::RemoteZarr | DataSourceKind::LocalZarr if icechunk => {
-            let store = WasmIcechunkBlockStore::get_or_create(url);
-            Ok(store.load_variable_coordinates(variable).await)
-        }
-        DataSourceKind::RemoteZarr | DataSourceKind::LocalZarr => {
-            let store = WasmZarrBlockStore::get_or_create(url);
-            Ok(store.load_variable_coordinates(variable).await)
-        }
-        _ => store
-            .variable_coordinates(variable)
-            .map_err(|e| e.to_string()),
-    }
+    let format = crate::data::backends::web::WebFormat::of(store.source());
+    format.load_coordinates(store, variable).await
 }
 
 #[cfg(test)]

@@ -2,6 +2,8 @@
 
 use async_tiff::tags::SampleFormat;
 
+use crate::data::calibration::transform::matches_fill;
+
 /// Sliced hyperslab window coordinate ranges.
 #[derive(Debug, Clone, Copy)]
 pub struct ReadWindow {
@@ -226,20 +228,9 @@ fn read_array<const N: usize>(raw: &[u8], offset: usize) -> Option<[u8; N]> {
     raw.get(offset..offset + N).and_then(|s| s.try_into().ok())
 }
 
-/// Check if sample equals the specified nodata sentinel value.
+/// Whether a sample is missing: NaN, or the nodata value (only NaN samples when nodata
+/// is NaN).
 #[inline]
 pub fn is_nodata(val: f32, nodata: Option<f64>) -> bool {
-    if val.is_nan() {
-        return true;
-    }
-    if let Some(nd) = nodata {
-        let nd_f32 = nd as f32;
-        if nd_f32.is_nan() || val.to_bits() == nd_f32.to_bits() {
-            true
-        } else {
-            (val - nd_f32).abs() <= nd_f32.abs() * 1e-5
-        }
-    } else {
-        false
-    }
+    val.is_nan() || nodata.is_some_and(|nd| matches_fill(f64::from(val), nd))
 }

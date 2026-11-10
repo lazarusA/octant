@@ -1,8 +1,6 @@
 //! NetCDF hyperslab reading and the `BlockStore` implementation, over whichever reader the
 //! store opens (`NetCdfBlockStore::with_reader`).
 
-use std::sync::Arc;
-
 use super::NetCdfBlockStore;
 use super::inspect::inspect_reader;
 use super::reader::{NcReader, NcVar, Raw};
@@ -10,8 +8,6 @@ use crate::data::blocks::{BlockStore, BlockStoreError};
 use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
-use crate::utils::grid::check_and_orient_block_grid;
-use crate::utils::grid_flips::OrientHints;
 
 /// Reads the window of `var` as `f32`, applying scale/offset/fill masking.
 pub fn read_variable_hyperslab_as_f32(
@@ -59,7 +55,7 @@ impl BlockStore for NetCdfBlockStore {
             let window = selection_window(&var, request)?;
             let values =
                 read_variable_hyperslab_as_f32(reader, &var, &window.origin, &window.shape)?;
-            Ok(oriented_block(reader, request, &var, values, window))
+            oriented_block(reader, request, &var, values, window)
         })
     }
 }
@@ -71,31 +67,16 @@ struct BlockWindow {
     shape: Vec<usize>,
 }
 
-/// The window `request` reads from `var`, clamped to its dimensions.
+/// The window `request` reads from `var` (`SliceRequest::window`).
 fn selection_window(var: &NcVar, request: &SliceRequest) -> Result<BlockWindow, BlockStoreError> {
-    if request.selections.len() != var.dims.len() {
-        return Err(format!(
-            "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
-            request.selections.len(),
-            request.variable,
-            var.dims.len()
-        )
-        .into());
-    }
-    let mut window = BlockWindow {
-        dim_names: Vec::with_capacity(var.dims.len()),
-        origin: Vec::with_capacity(var.dims.len()),
-        shape: Vec::with_capacity(var.dims.len()),
-    };
-    for ((name, dim_len), sel) in var.dims.iter().zip(&request.selections) {
-        let (start, end) = sel.bounds();
-        let start = start.min(dim_len.saturating_sub(1));
-        let end = end.max(start.saturating_add(1)).min(*dim_len);
-        window.dim_names.push(name.clone());
-        window.origin.push(start);
-        window.shape.push(end.saturating_sub(start).max(1));
-    }
-    Ok(window)
+    let lens: Vec<u64> = var.dims.iter().map(|(_, len)| *len as u64).collect();
+    let (origin, shape) = request.window(&lens)?;
+    let dim_names = var.dims.iter().map(|(name, _)| name.clone()).collect();
+    Ok(BlockWindow {
+        dim_names,
+        origin,
+        shape,
+    })
 }
 
 /// The block of `raw_values` read from `var` over `window`, with its window coordinates,
@@ -105,42 +86,19 @@ fn oriented_block(
     request: &SliceRequest,
     var: &NcVar,
     raw_values: Vec<f32>,
-    mut window: BlockWindow,
-) -> OctantBlock {
-    let attributes = var.attributes.clone();
-    let mut coords = super::coords::extract_sliced_coordinates(
+    window: BlockWindow,
+) -> Result<OctantBlock, BlockStoreError> {
+    let coords = super::coords::extract_sliced_coordinates(
         reader,
         &request.variable,
         &window.dim_names,
         &window.origin,
         &window.shape,
     );
-    let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
-        .iter()
-        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-        .collect();
-    let hints = OrientHints {
-        attributes: &json_attrs,
-        lat_extent: coords.lat_extent,
-        lon_extent: coords.lon_extent,
-    };
-    let (oriented_values, flipped_dims) = check_and_orient_block_grid(
-        raw_values,
-        &mut window.shape,
-        &mut window.dim_names,
-        &mut window.origin,
-        hints,
-        &mut coords.coordinates,
-    );
-    let mut block = OctantBlock::new(
+    coords.oriented_block(
         request.variable.clone(),
-        window.shape,
-        window.dim_names,
-        window.origin,
-        Arc::from(oriented_values.into_boxed_slice()),
-        coords.coordinates,
-        attributes,
-    );
-    block.flipped_dims = flipped_dims;
-    block
+        raw_values,
+        (window.dim_names, window.origin, window.shape),
+        var.attributes.clone(),
+    )
 }

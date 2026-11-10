@@ -85,7 +85,7 @@ pub(super) fn catalog(
                 path: f.path.clone(),
                 data_type: f.data_type,
                 dims: dimensions(f, &dimids, &scales),
-                attributes: texts(&f.attrs, hidden),
+                attributes: texts(&f.attrs, hidden).into(),
                 calibration: calibration(&f.attrs),
             },
             dataset: f.dataset.clone(),

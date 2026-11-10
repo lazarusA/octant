@@ -68,7 +68,8 @@ fn a_partial_selection_of_a_flipped_extent_gets_its_own_coordinates() {
         vec![0.0; 181 * 4],
         coords,
         HashMap::new(),
-    );
+    )
+    .expect("block");
     block.flipped_dims = vec!["lat".into()];
     let rows = block.oriented_range(0, (0, 10));
     let lat = crate::data::slicing::coords::extract_sliced_coords_for_dim(

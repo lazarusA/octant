@@ -1,9 +1,9 @@
-//! Thread-safe WebAssembly GeoTIFF store cache and background loader registry.
+//! The browser's GeoTIFF stores, one per URL, each opened once.
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-#[cfg(not(target_arch = "wasm32"))]
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
+
+use futures::channel::oneshot;
 
 use crate::data::DatasetMetadata;
 use crate::data::blocks::{BlockStore, BlockStoreError};
@@ -13,25 +13,88 @@ use crate::data::slice_request::SliceRequest;
 use super::super::reader::WasmHttpTiffReader;
 use super::super::store::GeoTiffBlockStore;
 
-#[cfg(target_arch = "wasm32")]
+// Per thread: the browser has one; the desktop uses these stores only in tests.
 thread_local! {
     static WASM_GEOTIFF_STORES: std::cell::RefCell<HashMap<String, Arc<WasmGeoTiffBlockStore>>> =
         std::cell::RefCell::new(HashMap::new());
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-static WASM_GEOTIFF_STORES_DESKTOP: OnceLock<Mutex<HashMap<String, Arc<WasmGeoTiffBlockStore>>>> =
-    OnceLock::new();
+/// What a store's file is: unread, being opened (with the opens waiting for it), or open.
+enum State {
+    Closed,
+    Opening(Vec<oneshot::Sender<Opened>>),
+    Open(Arc<GeoTiffBlockStore>),
+}
 
-/// WASM-compatible GeoTIFF/COG BlockStore backed by background HTTP range streaming.
+type Opened = Result<Arc<GeoTiffBlockStore>, String>;
+
+/// The browser's GeoTIFF/COG store: its headers read by HTTP ranges once, by the first
+/// inspection or block load, every other caller waiting for that read (`open`).
 pub struct WasmGeoTiffBlockStore {
     pub url: String,
-    pub inner: Arc<RwLock<Option<GeoTiffBlockStore>>>,
-    pub load_error: Arc<RwLock<Option<String>>>,
+    state: Mutex<State>,
 }
 
 impl WasmGeoTiffBlockStore {
-    #[cfg(target_arch = "wasm32")]
+    fn new(url: &str) -> Arc<Self> {
+        Arc::new(Self {
+            url: url.to_string(),
+            state: Mutex::new(State::Closed),
+        })
+    }
+
+    /// The opened file, reading its headers unless another caller is reading them, then
+    /// waiting for that read. A failed read is not kept: the next caller reads again.
+    pub async fn open(&self) -> Opened {
+        let joined = {
+            let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            match &mut *state {
+                State::Open(store) => return Ok(store.clone()),
+                State::Opening(waiting) => {
+                    let (tx, rx) = oneshot::channel();
+                    waiting.push(tx);
+                    Some(rx)
+                }
+                State::Closed => {
+                    *state = State::Opening(Vec::new());
+                    None
+                }
+            }
+        };
+        if let Some(rx) = joined {
+            return rx
+                .await
+                .unwrap_or_else(|_| Err(format!("'{}' did not open", self.url)));
+        }
+        let reader = Arc::new(WasmHttpTiffReader::new(&self.url));
+        let opened = GeoTiffBlockStore::from_reader(&self.url, reader)
+            .await
+            .map(Arc::new)
+            .map_err(|e| format!("Failed to load GeoTIFF at '{}': {e}", self.url));
+        let next = match &opened {
+            Ok(store) => State::Open(store.clone()),
+            Err(_) => State::Closed,
+        };
+        let previous = {
+            let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+            std::mem::replace(&mut *state, next)
+        };
+        if let State::Opening(waiting) = previous {
+            for tx in waiting {
+                let _ = tx.send(opened.clone());
+            }
+        }
+        opened
+    }
+
+    /// The store once open.
+    fn opened(&self) -> Result<Arc<GeoTiffBlockStore>, BlockStoreError> {
+        match &*self.state.lock().unwrap_or_else(|p| p.into_inner()) {
+            State::Open(store) => Ok(store.clone()),
+            _ => Err(format!("Metadata for '{}' is loading...", self.url).into()),
+        }
+    }
+
     pub fn get_or_create(url: &str) -> Arc<Self> {
         let clean_url = url.trim().to_string();
         WASM_GEOTIFF_STORES.with(|stores| {
@@ -39,71 +102,17 @@ impl WasmGeoTiffBlockStore {
             if let Some(store) = map.get(&clean_url) {
                 store.clone()
             } else {
-                let new_store = Self::spawn_loader(&clean_url);
+                let new_store = Self::new(&clean_url);
                 map.insert(clean_url, new_store.clone());
                 new_store
             }
         })
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url.trim().to_string();
-        let mutex = WASM_GEOTIFF_STORES_DESKTOP.get_or_init(|| Mutex::new(HashMap::new()));
-        let mut map = mutex.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(store) = map.get(&clean_url) {
-            store.clone()
-        } else {
-            let new_store = Self::spawn_loader(&clean_url);
-            map.insert(clean_url, new_store.clone());
-            new_store
-        }
-    }
-
     /// Drops the store of `url` from the registry (its dataset closed).
     pub fn release(url: &str) {
         let clean_url = url.trim();
-        #[cfg(target_arch = "wasm32")]
         let _released = WASM_GEOTIFF_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
-        #[cfg(not(target_arch = "wasm32"))]
-        let _released = WASM_GEOTIFF_STORES_DESKTOP.get().and_then(|stores| {
-            stores
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .remove(clean_url)
-        });
-    }
-
-    fn spawn_loader(url: &str) -> Arc<Self> {
-        let inner = Arc::new(RwLock::new(None));
-        let load_error = Arc::new(RwLock::new(None));
-        let store = Arc::new(Self {
-            url: url.to_string(),
-            inner: inner.clone(),
-            load_error: load_error.clone(),
-        });
-
-        let target_url = url.to_string();
-        let loader_fut = async move {
-            let reader = Arc::new(WasmHttpTiffReader::new(&target_url));
-            match GeoTiffBlockStore::from_reader(&target_url, reader).await {
-                Ok(geo_store) => {
-                    let mut guard = inner.write().unwrap_or_else(|p| p.into_inner());
-                    *guard = Some(geo_store);
-                }
-                Err(e) => {
-                    let mut guard = load_error.write().unwrap_or_else(|p| p.into_inner());
-                    *guard = Some(e.to_string());
-                }
-            }
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        wasm_bindgen_futures::spawn_local(loader_fut);
-        #[cfg(not(target_arch = "wasm32"))]
-        crate::utils::executor::get_shared_tokio_rt().spawn(loader_fut);
-
-        store
     }
 }
 
@@ -113,39 +122,14 @@ impl BlockStore for WasmGeoTiffBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        let guard = self.inner.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(ref store) = *guard {
-            store.variables()
-        } else {
-            Ok(Vec::new())
-        }
+        self.opened()?.variables()
     }
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
-        let guard = self.inner.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(ref store) = *guard {
-            return store.inspect();
-        }
-        drop(guard);
-
-        let err_guard = self.load_error.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(ref e) = *err_guard {
-            return Err(format!("Failed to load GeoTIFF at '{}': {e}", self.url).into());
-        }
-
-        Err(format!(
-            "Metadata for '{}' is loading in the background...",
-            self.url
-        )
-        .into())
+        self.opened()?.inspect()
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        let guard = self.inner.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(ref store) = *guard {
-            store.fetch_block(request)
-        } else {
-            Err("GeoTIFF dataset is still loading metadata...".into())
-        }
+        self.opened()?.fetch_block(request)
     }
 }

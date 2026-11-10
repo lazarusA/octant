@@ -132,18 +132,7 @@ impl BlockHeader {
 
     /// The block [`split`](Self::split) took apart, checked against its parts.
     pub fn join(self, values: Arc<[f32]>, numbers: &[f64]) -> Result<OctantBlock, String> {
-        let volume = self
-            .shape
-            .iter()
-            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
-            .ok_or("Block shape overflows")?;
-        if volume != values.len() {
-            return Err(format!(
-                "Block of {} values for shape {:?}",
-                values.len(),
-                self.shape
-            ));
-        }
+        OctantBlock::check_volume(&self.shape, values.len())?;
         let [min, max, rest @ ..] = numbers else {
             return Err("Block without its value range".into());
         };

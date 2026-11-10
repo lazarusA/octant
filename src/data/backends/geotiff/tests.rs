@@ -211,15 +211,10 @@ fn test_wasm_geotiff_store_behavior() {
 
     let store = WasmGeoTiffBlockStore::get_or_create("https://example.com/test.tif");
     assert_eq!(store.backend_name(), "GeoTIFF (Web COG)");
-    assert_eq!(store.variables().unwrap(), Vec::<String>::new());
-    // Initial state returns loading error
+    assert!(store.variables().is_err(), "not open yet");
+    // Until opened, inspecting says it is loading.
     let inspect_err = store.inspect().unwrap_err();
-    assert!(
-        inspect_err
-            .to_string()
-            .contains("loading in the background")
-            || inspect_err.to_string().contains("Failed to load")
-    );
+    assert!(inspect_err.to_string().contains("loading"));
 }
 
 /// A GeoTIFF's GeoKeys name its CRS by EPSG code (ProjectedCSTypeGeoKey).

@@ -34,6 +34,7 @@ fn block_of(shape: [usize; 4]) -> OctantBlock {
         Default::default(),
         std::collections::HashMap::new(),
     )
+    .expect("block")
 }
 
 /// The block projected as a point cloud composite of three tinted

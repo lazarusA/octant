@@ -19,8 +19,8 @@ pub struct NcVar {
     pub data_type: &'static str,
     /// Each dimension's name and length, in storage order.
     pub dims: Vec<(String, usize)>,
-    /// Its attributes as text, bookkeeping ones left out.
-    pub attributes: HashMap<String, String>,
+    /// Its attributes as text, bookkeeping ones left out; shared by its blocks.
+    pub attributes: std::sync::Arc<HashMap<String, String>>,
     /// CF scale, offset and masking, from its numeric attributes.
     pub calibration: DataCalibration,
 }

@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use zarrs::array::ArraySubset;
 
 use super::block::{ArrayCachedState, read_window};
-use super::slice::window_subset;
 use crate::data::blocks::BlockStoreError;
+use crate::data::slice_request::window_subset;
 
 /// How an embedding array's stored codes become values.
 #[derive(Debug, PartialEq)]

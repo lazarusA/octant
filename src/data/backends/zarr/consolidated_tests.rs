@@ -116,7 +116,10 @@ fn a_root_known_unconsolidated_is_not_read_for_coordinates() {
     let root_reads = |known| {
         let log = Arc::new(Mutex::new(Vec::<u8>::new()));
         let logged = UsageLogStorageAdapter::new(memory.clone(), log.clone(), String::new);
-        assert!(discover_coord_array(Arc::new(logged), known, &[], true).is_none());
+        assert!(matches!(
+            discover_coord_array(Arc::new(logged), known, &[], true),
+            Ok(None)
+        ));
         (documents_read(&log).iter())
             .filter(|k| *k == "zarr.json")
             .count()
@@ -140,7 +143,8 @@ fn a_missing_coordinate_reads_each_key_once() {
     let log = Arc::new(Mutex::new(Vec::<u8>::new()));
     let logged = UsageLogStorageAdapter::new(memory, log.clone(), String::new);
     let candidates = ["g/row".to_string(), "row".to_string()];
-    assert!(discover_coord_array(Arc::new(logged), Some(None), &candidates, false).is_none());
+    let found = discover_coord_array(Arc::new(logged), Some(None), &candidates, false);
+    assert!(matches!(found, Ok(None)));
     let log = log.lock().unwrap_or_else(|p| p.into_inner());
     let text = String::from_utf8_lossy(&log);
     let mut keys: Vec<&str> = (text.lines())
@@ -175,6 +179,8 @@ fn a_v2_coordinate_is_found_where_missing_keys_fail() {
         );
         let storage = FailingStore::new(memory.clone(), FailingStore::missing_v3);
         let lat = discover_coord_array(storage, Some(None), &["lat".to_string()], true)
+            .ok()
+            .flatten()
             .unwrap_or_else(|| panic!("lat, from its .zarray with filters {filters}"));
         let values = super::read_coordinate(&lat).expect("values");
         assert_eq!(
@@ -190,7 +196,10 @@ fn a_root_array_is_no_coordinate() {
     let memory = Arc::new(MemoryStore::new());
     array(&memory, "/", &[2, 2], &["row", "col"], &[0.0; 4]);
     let candidates = ["row".to_string()];
-    assert!(discover_coord_array(memory, Some(None), &candidates, true).is_none());
+    assert!(matches!(
+        discover_coord_array(memory, Some(None), &candidates, true),
+        Ok(None)
+    ));
 }
 
 #[test]
@@ -213,6 +222,8 @@ fn root_variables_find_coordinates_in_a_child_group() {
         &[],
         Some(Some(&metadata)),
     )
+    .ok()
+    .flatten()
     .expect("time");
     assert_eq!(
         (time.first_number(), time.last_number()),

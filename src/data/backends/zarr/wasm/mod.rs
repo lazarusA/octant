@@ -11,6 +11,8 @@ use zarrs::storage::{ReadableWritableListableStorage, StoreKey, WritableStorageT
 
 #[cfg(test)]
 mod budget_tests;
+#[cfg(target_arch = "wasm32")]
+pub(crate) mod chunk_source;
 mod consolidated;
 pub mod coord_paths;
 pub mod inspect;
@@ -19,7 +21,7 @@ pub mod ome;
 pub mod partial_store;
 pub mod preload;
 #[cfg(all(test, not(target_arch = "wasm32")))]
-mod range_server;
+pub(crate) mod range_server;
 pub(crate) mod shard_fetch;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod shard_fetch_tests;
@@ -31,7 +33,6 @@ pub mod store;
 pub use inspect::inspect_wasm_remote_zarr;
 #[cfg(target_arch = "wasm32")]
 pub(crate) use loader::CONCURRENT_FETCHES;
-pub use loader::load_one_wasm_with_progress;
 use partial_store::PartialStore;
 
 /// Metadata keys fetched at once while discovering OME-Zarr stores.

@@ -6,49 +6,17 @@ use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 
 use super::block_coords::{BlockWindow, StoreSource, block_coordinates};
 use super::quantization::Quantization;
-use super::slice::{ChunkReader, retrieve_array_subset_as_f32, window_subset};
+use super::slice::{ChunkReader, retrieve_array_subset_as_f32};
 use super::storage::ZarrArrayHandle;
 use crate::data::blocks::BlockStoreError;
 use crate::data::coordinates::affine::GridAffine;
 use crate::data::octant_block::OctantBlock;
 use crate::data::ome::MetaReader;
 use crate::data::ome::level::LevelArray;
-use crate::data::slice_request::{DimensionSelection, SliceRequest};
-use crate::utils::grid::check_and_orient_block_grid;
-use crate::utils::grid_flips::OrientHints;
+use crate::data::slice_request::{SliceRequest, window_subset};
 use crate::utils::metadata::attr_string;
 use crate::utils::metadata::cf::is_spatial_key;
 use zarrs::array::ArrayShardedReadableExtCache;
-
-/// The clamped `(origin, shape)` window of every dimension selected by `request`.
-pub(super) fn selection_window(
-    request: &SliceRequest,
-    shape: &[u64],
-) -> Result<(Vec<usize>, Vec<usize>), BlockStoreError> {
-    if request.selections.len() != shape.len() {
-        return Err(format!(
-            "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
-            request.selections.len(),
-            request.variable,
-            shape.len()
-        )
-        .into());
-    }
-    let mut origin = Vec::with_capacity(shape.len());
-    let mut block_shape = Vec::with_capacity(shape.len());
-    for (sel, &dim_len) in request.selections.iter().zip(shape) {
-        let dim_len = usize::try_from(dim_len).unwrap_or(usize::MAX);
-        let (start, end) = match sel {
-            DimensionSelection::Index(idx) => (*idx, idx.saturating_add(1)),
-            DimensionSelection::Range { start, end } => (*start, *end),
-        };
-        let start = start.min(dim_len.saturating_sub(1));
-        let end = end.max(start.saturating_add(1)).min(dim_len);
-        origin.push(start);
-        block_shape.push(end - start);
-    }
-    Ok((origin, block_shape))
-}
 
 /// OME-Zarr group metadata, read by `ome::level` from the groups themselves
 /// and large (a plate lists every well): not copied into blocks.
@@ -166,7 +134,7 @@ pub(super) fn fetch_block_from_cached_array(
     source: StoreSource<'_>,
     request: &SliceRequest,
 ) -> Result<OctantBlock, BlockStoreError> {
-    let (origin, block_shape) = selection_window(request, cached.array.shape())?;
+    let (origin, block_shape) = request.window(cached.array.shape())?;
     let mut raw_values = read_window(
         &cached.array,
         cached.reader.chunk_reader(),
@@ -178,7 +146,7 @@ pub(super) fn fetch_block_from_cached_array(
         q.apply(scales, (&origin, &block_shape), &mut raw_values)?;
     }
     if let Some(level) = &cached.ome {
-        return Ok(OctantBlock::new(
+        return OctantBlock::new(
             request.variable.clone(),
             block_shape,
             level.dim_names.clone(),
@@ -186,7 +154,7 @@ pub(super) fn fetch_block_from_cached_array(
             raw_values,
             HashMap::new(),
             cached.attributes.clone(),
-        ));
+        );
     }
     orient_and_build_block(cached, source, request, (origin, block_shape), raw_values)
 }
@@ -197,11 +165,11 @@ fn orient_and_build_block(
     cached: &ArrayCachedState,
     source: StoreSource<'_>,
     request: &SliceRequest,
-    (mut origin, mut block_shape): (Vec<usize>, Vec<usize>),
+    (origin, block_shape): (Vec<usize>, Vec<usize>),
     raw_values: Vec<f32>,
 ) -> Result<OctantBlock, BlockStoreError> {
     let full_shape = cached.array.shape();
-    let mut dim_names = crate::utils::resolve_array_dimension_names(&cached.array);
+    let dim_names = crate::utils::resolve_array_dimension_names(&cached.array);
     let window = BlockWindow {
         dim_names: &dim_names,
         full_shape,
@@ -213,29 +181,11 @@ fn orient_and_build_block(
         .affine
         .map(|a| a.coordinates(&dim_names, full_shape))
         .unwrap_or_default();
-    let mut coords = block_coordinates(source, &request.variable, &window, &placed);
-    let hints = OrientHints {
-        attributes: cached.array.attributes(),
-        lat_extent: coords.lat_extent,
-        lon_extent: coords.lon_extent,
-    };
-    let (raw_values, flipped_dims) = check_and_orient_block_grid(
-        raw_values,
-        &mut block_shape,
-        &mut dim_names,
-        &mut origin,
-        hints,
-        &mut coords.coordinates,
-    );
-    let mut block = OctantBlock::new(
+    let coords = block_coordinates(source, &request.variable, &window, &placed);
+    coords.oriented_block(
         request.variable.clone(),
-        block_shape,
-        dim_names,
-        origin,
         raw_values,
-        coords.coordinates,
+        (dim_names, origin, block_shape),
         cached.attributes.clone(),
-    );
-    block.flipped_dims = flipped_dims;
-    Ok(block)
+    )
 }

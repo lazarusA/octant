@@ -138,7 +138,8 @@ fn first_show(device: &wgpu::Device, queue: &wgpu::Queue) {
         values(shape.iter().product()),
         Default::default(),
         std::collections::HashMap::new(),
-    );
+    )
+    .expect("block");
     let (mut project, mut upload) = (vec![], vec![]);
     let mut dims = (0, 0, 0);
     for _ in 0..RUNS {

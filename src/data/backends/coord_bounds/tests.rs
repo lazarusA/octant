@@ -147,3 +147,74 @@ fn scoped_lookups_read_their_group_before_any_cached_one() {
         "slashes trimmed, group b read"
     );
 }
+
+/// A coordinate whose chunk failed to read is read again by the next lookup (B5).
+#[test]
+fn failed_coordinate_reads_are_not_cached() {
+    use crate::data::test_stores::FailingStore;
+    use std::sync::atomic::Ordering;
+    let inner = Arc::new(MemoryStore::new());
+    axis(&inner, "/lat", &[1.0, 2.0]);
+    let store = FailingStore::new(inner, |key, _| key.as_str().starts_with("lat/c"));
+    let read = || {
+        get_cached_coord_values_scoped(store.clone(), "failing_store", "lat", None, &[], None)
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(read(), None, "the chunk fails");
+    store.failing.store(false, Ordering::SeqCst);
+    assert_eq!(read(), Some(2.0), "read again once the store answers");
+
+    // A metadata read that times out is no missing coordinate either.
+    let inner = Arc::new(MemoryStore::new());
+    axis(&inner, "/lat", &[1.0, 2.0]);
+    let store = FailingStore::new(inner, |key, _| key.as_str() == "lat/zarr.json");
+    let read = || {
+        get_cached_coord_values_scoped(store.clone(), "timing_out_store", "lat", None, &[], None)
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(read(), None, "the metadata read times out");
+    store.failing.store(false, Ordering::SeqCst);
+    assert_eq!(read(), Some(2.0), "asked again once the store answers");
+}
+
+/// A coordinate of a type with no number reader is remembered as absent, not read again
+/// for every block as a failed read is.
+#[test]
+fn unreadable_coordinate_types_are_cached_as_absent() {
+    let store = Arc::new(MemoryStore::new());
+    let bool_dt =
+        DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("bool")).expect("bool type");
+    let lat = ArrayBuilder::new(vec![2], vec![2], bool_dt, FillValue::from(false))
+        .build(store.clone(), "/lat")
+        .expect("bool lat");
+    lat.store_metadata().expect("metadata");
+    lat.store_array_subset(&ArraySubset::new_with_shape(vec![2]), &[true, false])
+        .expect("values");
+    let read = || {
+        get_cached_coord_values_scoped(store.clone(), "bool_lat_store", "lat", None, &[], None)
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(read(), None, "bool is no coordinate");
+    // Were it read again, the numeric array now at its path would answer.
+    axis(&store, "/lat", &[1.0, 2.0]);
+    assert_eq!(read(), None, "remembered as absent");
+}
+
+/// Without a scope, the coordinate cached for the first group in sorted order answers,
+/// whatever order the cache holds them in (B5).
+#[test]
+fn unscoped_lookups_pick_one_group_every_time() {
+    let store = Arc::new(MemoryStore::new());
+    axis(&store, "/a/lat", &[1.0, 2.0]);
+    axis(&store, "/b/lat", &[5.0, 6.0, 7.0]);
+    for run in 0..50 {
+        let url = format!("unscoped_store_{run}");
+        let read = |scope: Option<&str>| {
+            get_cached_coord_values_scoped(store.clone(), &url, "lat", scope, &[], None)
+                .and_then(|c| c.last_number())
+        };
+        read(Some("b"));
+        read(Some("a"));
+        assert_eq!(read(None), Some(2.0), "run {run}");
+    }
+}

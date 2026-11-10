@@ -2,27 +2,17 @@
 
 use std::collections::HashMap;
 
+use crate::data::blocks::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::procedural::{eval_known_truth_4d, generate_procedural_matrix};
 use crate::data::slice_request::SliceRequest;
 
-pub fn slice_procedural_matrix_block(request: &SliceRequest) -> OctantBlock {
+pub fn slice_procedural_matrix_block(
+    request: &SliceRequest,
+) -> Result<OctantBlock, BlockStoreError> {
     let (h_full, w_full) = (64, 64);
-    let (y_start, y_end) = request
-        .selections
-        .first()
-        .map(|s| s.bounds())
-        .unwrap_or((0, h_full));
-    let (x_start, x_end) = request
-        .selections
-        .get(1)
-        .map(|s| s.bounds())
-        .unwrap_or((0, w_full));
-
-    let y_start = y_start.min(h_full);
-    let y_end = y_end.min(h_full).max(y_start);
-    let x_start = x_start.min(w_full);
-    let x_end = x_end.min(w_full).max(x_start);
+    let (y_start, y_end) = request.clamped(0, h_full);
+    let (x_start, x_end) = request.clamped(1, w_full);
 
     let block_h = y_end - y_start;
     let block_w = x_end - x_start;
@@ -78,43 +68,20 @@ pub fn slice_procedural_matrix_block(request: &SliceRequest) -> OctantBlock {
     )
 }
 
-pub fn slice_gaussian_wave_packet_4d(request: &SliceRequest) -> OctantBlock {
+pub fn slice_gaussian_wave_packet_4d(
+    request: &SliceRequest,
+) -> Result<OctantBlock, BlockStoreError> {
     let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
 
-    let (t_start, t_end) = request
-        .selections
-        .first()
-        .map(|s| s.bounds())
-        .unwrap_or((0, nt_full));
-    let (z_start, z_end) = request
-        .selections
-        .get(1)
-        .map(|s| s.bounds())
-        .unwrap_or((0, nz_full));
-    let (y_start, y_end) = request
-        .selections
-        .get(2)
-        .map(|s| s.bounds())
-        .unwrap_or((0, ny_full));
-    let (x_start, x_end) = request
-        .selections
-        .get(3)
-        .map(|s| s.bounds())
-        .unwrap_or((0, nx_full));
+    let (t_start, t_end) = request.clamped(0, nt_full);
+    let (z_start, z_end) = request.clamped(1, nz_full);
+    let (y_start, y_end) = request.clamped(2, ny_full);
+    let (x_start, x_end) = request.clamped(3, nx_full);
 
-    let t_start = t_start.min(nt_full);
-    let t_end = t_end.min(nt_full).max(t_start);
-    let z_start = z_start.min(nz_full);
-    let z_end = z_end.min(nz_full).max(z_start);
-    let y_start = y_start.min(ny_full);
-    let y_end = y_end.min(ny_full).max(y_start);
-    let x_start = x_start.min(nx_full);
-    let x_end = x_end.min(nx_full).max(x_start);
-
-    let dt = (t_end - t_start).max(1);
-    let dz = (z_end - z_start).max(1);
-    let dy = (y_end - y_start).max(1);
-    let dx = (x_end - x_start).max(1);
+    let dt = t_end - t_start;
+    let dz = z_end - z_start;
+    let dy = y_end - y_start;
+    let dx = x_end - x_start;
 
     let total = dt * dz * dy * dx;
     let mut values = Vec::with_capacity(total);

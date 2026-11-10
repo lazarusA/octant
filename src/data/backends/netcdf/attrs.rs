@@ -35,31 +35,32 @@ pub fn attribute_value_to_string(attr: &AttributeValue) -> String {
     }
 }
 
-/// Helper to convert a NetCDF `AttributeValue` into an `f64` for scale/offset/fill calculations.
-pub fn attribute_value_to_f64(attr: &AttributeValue) -> Option<f64> {
+/// The `i`-th number of `attr`, or of its text (numbers separated by commas).
+fn nth_number(attr: &AttributeValue, i: usize) -> Option<f64> {
+    let one = |v: f64| (i == 0).then_some(v);
     match attr {
-        AttributeValue::Double(d) => Some(*d),
-        AttributeValue::Float(f) => Some(*f as f64),
-        AttributeValue::Int(i) => Some(*i as f64),
-        AttributeValue::Uint(u) => Some(*u as f64),
-        AttributeValue::Short(s) => Some(*s as f64),
-        AttributeValue::Ushort(u) => Some(*u as f64),
-        AttributeValue::Schar(i) => Some(*i as f64),
-        AttributeValue::Uchar(u) => Some(*u as f64),
-        AttributeValue::Longlong(l) => Some(*l as f64),
-        AttributeValue::Ulonglong(u) => Some(*u as f64),
-        AttributeValue::Doubles(v) => v.first().copied(),
-        AttributeValue::Floats(v) => v.first().map(|&f| f as f64),
-        AttributeValue::Ints(v) => v.first().map(|&i| i as f64),
-        AttributeValue::Uints(v) => v.first().map(|&u| u as f64),
-        AttributeValue::Shorts(v) => v.first().map(|&s| s as f64),
-        AttributeValue::Ushorts(v) => v.first().map(|&u| u as f64),
-        AttributeValue::Schars(v) => v.first().map(|&i| i as f64),
-        AttributeValue::Uchars(v) => v.first().map(|&u| u as f64),
-        AttributeValue::Longlongs(v) => v.first().map(|&l| l as f64),
-        AttributeValue::Ulonglongs(v) => v.first().map(|&u| u as f64),
-        AttributeValue::Str(s) => s.trim().parse::<f64>().ok(),
-        AttributeValue::Strs(v) => v.first().and_then(|s| s.trim().parse::<f64>().ok()),
+        AttributeValue::Double(x) => one(*x),
+        AttributeValue::Float(x) => one(*x as f64),
+        AttributeValue::Int(x) => one(*x as f64),
+        AttributeValue::Uint(x) => one(*x as f64),
+        AttributeValue::Short(x) => one(*x as f64),
+        AttributeValue::Ushort(x) => one(*x as f64),
+        AttributeValue::Schar(x) => one(*x as f64),
+        AttributeValue::Uchar(x) => one(*x as f64),
+        AttributeValue::Longlong(x) => one(*x as f64),
+        AttributeValue::Ulonglong(x) => one(*x as f64),
+        AttributeValue::Doubles(v) => v.get(i).copied(),
+        AttributeValue::Floats(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Ints(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Uints(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Shorts(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Ushorts(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Schars(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Uchars(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Longlongs(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Ulonglongs(v) => v.get(i).map(|&x| x as f64),
+        AttributeValue::Str(s) => s.split(',').nth(i)?.trim().parse().ok(),
+        AttributeValue::Strs(v) => v.get(i)?.trim().parse().ok(),
     }
 }
 
@@ -109,5 +110,5 @@ pub fn var_type_to_string(vartype: &NcVariableType) -> &'static str {
 
 /// CF scale, offset, fill and valid range from `var`'s attributes.
 pub fn extract_variable_calibration(var: &netcdf::Variable<'_>) -> DataCalibration {
-    DataCalibration::from_numbers(|name| attribute_value_to_f64(&var.attribute_value(name)?.ok()?))
+    DataCalibration::from_numbers(|name, i| nth_number(&var.attribute_value(name)?.ok()?, i))
 }

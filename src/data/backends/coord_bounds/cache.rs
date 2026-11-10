@@ -69,19 +69,22 @@ pub fn get_cached_coord_values_scoped(
         if let Some(values) = cache.get(&key) {
             return values.clone();
         }
-        // Without a scope, a coordinate already read for any group of the store will do; a
-        // scoped lookup reads its own group's coordinate first.
+        // Without a scope, a coordinate already read for any group of the store will do: the
+        // first group in sorted order, whatever order the map holds them in. A scoped lookup
+        // reads its own group's coordinate first.
         if scope.is_none()
-            && let Some(values) = cache
+            && let Some((_, values)) = cache
                 .iter()
-                .find(|((url, _, dim), v)| *url == key.0 && *dim == key.2 && v.is_some())
-                .map(|(_, v)| v.clone())
+                .filter(|((url, _, dim), v)| *url == key.0 && *dim == key.2 && v.is_some())
+                .min_by(|a, b| a.0.1.cmp(&b.0.1))
         {
-            return values;
+            return values.clone();
         }
     }
 
-    let values = read_coord_values_scoped(store, dim_name, scope, known_groups, consolidated);
+    // A failed read is not cached: the next lookup reads it again.
+    let values =
+        read_coord_values_scoped(store, dim_name, scope, known_groups, consolidated).ok()?;
     let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());
     cache.insert(key, values.clone());
     values

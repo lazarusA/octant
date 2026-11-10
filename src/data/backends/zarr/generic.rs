@@ -5,7 +5,6 @@ use std::sync::{Arc, OnceLock};
 
 use super::block::{
     ArrayCachedState, ArrayReader, fetch_block_from_cached_array, inherited_attributes,
-    selection_window,
 };
 use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::quantization::{self, PixelScale, Quantization};
@@ -105,7 +104,7 @@ impl GenericZarrBlockStore {
     pub fn scale_window(&self, request: &SliceRequest) -> Option<(String, ArraySubset)> {
         let cached = self.get_or_open_array(&request.variable).ok()?;
         let q = cached.quantization.as_ref()?.scale_array()?;
-        let (origin, shape) = selection_window(request, cached.array.shape()).ok()?;
+        let (origin, shape) = request.window(cached.array.shape()).ok()?;
         Some((q.path.clone(), q.subset(&origin, &shape)))
     }
 

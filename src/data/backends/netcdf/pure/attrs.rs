@@ -47,31 +47,32 @@ pub fn text(value: &AttrValue) -> Option<String> {
     })
 }
 
-/// The first number of `value`, or text that parses as one.
-pub fn number(value: &AttrValue) -> Option<f64> {
+/// The `i`-th number of `value`, or of its text (numbers separated by commas).
+fn nth_number(value: &AttrValue, i: usize) -> Option<f64> {
     use AttrValue as A;
+    let one = |v: f64| (i == 0).then_some(v);
     match value {
-        A::F32(v) => Some(f64::from(*v)),
-        A::F64(v) => Some(*v),
-        A::I8(v) => Some(f64::from(*v)),
-        A::I16(v) => Some(f64::from(*v)),
-        A::I32(v) => Some(f64::from(*v)),
-        A::I64(v) => Some(*v as f64),
-        A::U8(v) => Some(f64::from(*v)),
-        A::U16(v) => Some(f64::from(*v)),
-        A::U32(v) => Some(f64::from(*v)),
-        A::U64(v) => Some(*v as f64),
-        A::F32Array(v) => v.first().map(|&x| f64::from(x)),
-        A::F64Array(v) => v.first().copied(),
-        A::I8Array(v) => v.first().map(|&x| f64::from(x)),
-        A::I16Array(v) => v.first().map(|&x| f64::from(x)),
-        A::I32Array(v) => v.first().map(|&x| f64::from(x)),
-        A::I64Array(v) => v.first().map(|&x| x as f64),
-        A::U8Array(v) => v.first().map(|&x| f64::from(x)),
-        A::U16Array(v) => v.first().map(|&x| f64::from(x)),
-        A::U32Array(v) => v.first().map(|&x| f64::from(x)),
-        A::U64Array(v) => v.first().map(|&x| x as f64),
-        other => text(other)?.split(',').next()?.trim().parse().ok(),
+        A::F32(v) => one(f64::from(*v)),
+        A::F64(v) => one(*v),
+        A::I8(v) => one(f64::from(*v)),
+        A::I16(v) => one(f64::from(*v)),
+        A::I32(v) => one(f64::from(*v)),
+        A::I64(v) => one(*v as f64),
+        A::U8(v) => one(f64::from(*v)),
+        A::U16(v) => one(f64::from(*v)),
+        A::U32(v) => one(f64::from(*v)),
+        A::U64(v) => one(*v as f64),
+        A::F32Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::F64Array(v) => v.get(i).copied(),
+        A::I8Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::I16Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::I32Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::I64Array(v) => v.get(i).map(|&x| x as f64),
+        A::U8Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::U16Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::U32Array(v) => v.get(i).map(|&x| f64::from(x)),
+        A::U64Array(v) => v.get(i).map(|&x| x as f64),
+        other => text(other)?.split(',').nth(i)?.trim().parse().ok(),
     }
 }
 
@@ -102,5 +103,5 @@ pub fn texts(
 
 /// CF scale, offset, fill and valid range from `raw`, read as netCDF-C's reader does.
 pub fn calibration(raw: &HashMap<String, AttrValue>) -> DataCalibration {
-    DataCalibration::from_numbers(|name| raw.get(name).and_then(number))
+    DataCalibration::from_numbers(|name, i| nth_number(raw.get(name)?, i))
 }

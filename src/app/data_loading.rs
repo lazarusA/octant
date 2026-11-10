@@ -65,7 +65,8 @@ impl OctantApp {
                             let refused = crate::i18n::DatasetKey::BrowserLocalPaths;
                             return Err(crate::i18n::tr(refused).to_owned());
                         }
-                        let inspected = crate::data::backends::inspect_web(&source).await;
+                        let format = crate::data::backends::web::WebFormat::of(&source);
+                        let inspected = format.inspect(&source).await;
                         let handle =
                             crate::data::SourceFactory::open(source).map_err(|e| e.to_string())?;
                         let meta = match inspected {

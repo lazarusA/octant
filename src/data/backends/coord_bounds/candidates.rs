@@ -28,7 +28,7 @@ pub fn block_coordinate_candidates(
 }
 
 fn coordinate_candidates(dims: &[String], variable: &VariableInfo) -> Vec<String> {
-    use crate::utils::grid_flips::{is_lat_name, is_lon_name};
+    use crate::data::coordinates::naming::{is_lat_name, is_lon_name};
     let spatial = |name: &str| is_lat_name(name) || is_lon_name(name);
     let mut names: Vec<String> = Vec::new();
     let mut push = |name: &str| {

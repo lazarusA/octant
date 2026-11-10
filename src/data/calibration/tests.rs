@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::types::DataCalibration;
 
 #[test]
@@ -39,22 +37,41 @@ fn test_data_calibration_json_extraction_and_transform() {
     assert!(out_max_transformed.is_nan());
 }
 
+/// Numbers written as text read as numbers; `valid_range` gives both bounds.
 #[test]
-fn test_data_calibration_string_map_extraction() {
-    let mut map = HashMap::new();
-    map.insert("scale_factor".to_string(), "0.5".to_string());
-    map.insert("add_offset".to_string(), "-5.0".to_string());
-    map.insert("missing_value".to_string(), "-32768".to_string());
-
-    let cal = DataCalibration::from_string_map(&map);
-    assert!(cal.has_transformation());
+fn text_attributes_and_valid_range() {
+    let attrs = serde_json::json!({
+        "scale_factor": "0.5",
+        "add_offset": "-5.0",
+        "missing_value": "-32768",
+        "valid_range": [-40000, 100],
+    });
+    let cal = DataCalibration::from_json_map(attrs.as_object().expect("map"));
     assert_eq!(cal.scale_factor, Some(0.5));
     assert_eq!(cal.add_offset, Some(-5.0));
     assert_eq!(cal.fill_value, Some(-32768.0));
+    assert_eq!(
+        (cal.valid_min, cal.valid_max),
+        (Some(-40000.0), Some(100.0))
+    );
 
     // 10 * 0.5 - 5.0 = 0.0
     assert_eq!(cal.transform(10.0), 0.0);
     assert!(cal.transform(-32768.0).is_nan());
+    assert!(cal.transform(101.0).is_nan());
+
+    // An inverted range (GOES-R's unsigned `0, -6` read as signed) masks nothing.
+    let attrs = serde_json::json!({ "valid_range": [0, -6] });
+    let cal = DataCalibration::from_json_map(attrs.as_object().expect("map"));
+    assert_eq!((cal.valid_min, cal.valid_max), (None, None));
+    // An `f32` value at a bound `f32` cannot hold is kept.
+    let cal = DataCalibration {
+        valid_max: Some(0.3),
+        ..Default::default()
+    };
+    let mut slice = [0.3f32, 0.4];
+    cal.transform_slice_in_place(&mut slice);
+    assert!(!slice[0].is_nan() && slice[1].is_nan(), "{slice:?}");
 }
 
 #[test]
@@ -83,4 +100,40 @@ fn zero_fill_keeps_tiny_values() {
     assert!(is_nodata(0.0, Some(0.0)));
     assert!(!is_nodata(5e-7, Some(0.0)));
     assert!(is_nodata(-9999.0, Some(-9999.0)));
+}
+
+/// GDAL's `nan` nodata masks only NaN samples, never finite ones (B1).
+#[test]
+fn nan_nodata_keeps_finite_samples() {
+    use crate::data::backends::geotiff::blit::{ReadWindow, blit_chunk_to_window};
+    use async_tiff::tags::SampleFormat;
+    let raw: Vec<u8> = [1.0f32, f32::NAN, 3.0, 4.0]
+        .iter()
+        .flat_map(|v| v.to_ne_bytes())
+        .collect();
+    let win = ReadWindow {
+        row_start: 0,
+        row_end: 2,
+        col_start: 0,
+        col_end: 2,
+        nodata_val: Some(f64::NAN),
+    };
+    let mut out = [0.0f32; 4];
+    let (fmt, bits) = (SampleFormat::Float, 32);
+    blit_chunk_to_window(
+        &raw,
+        2,
+        2,
+        1,
+        false,
+        0,
+        0,
+        fmt,
+        bits,
+        false,
+        &win,
+        &[0],
+        &mut [&mut out],
+    );
+    assert_eq!(out.map(f32::is_nan), [false, true, false, false], "{out:?}");
 }

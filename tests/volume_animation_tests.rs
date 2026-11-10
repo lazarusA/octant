@@ -205,7 +205,8 @@ fn test_octant_block_volume_extraction() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let fixed_indices = vec![0, 0, 0];
     let vdata = block
@@ -649,7 +650,7 @@ fn test_4d_octant_block_volume_extraction_at_timesteps() {
     use octant::data::{VolumeData, generate_known_truth_4d_block, generate_procedural_volume_3d};
 
     let (nt, nz, ny, nx) = (4, 6, 8, 10);
-    let block = generate_known_truth_4d_block("test_4d_var", nt, nz, ny, nx);
+    let block = generate_known_truth_4d_block("test_4d_var", nt, nz, ny, nx).expect("block");
 
     // Dim order: 0=time (T), 1=depth (Z), 2=lat (Y), 3=lon (X)
     // x_dim=3, y_dim=2, z_dim=1
@@ -684,7 +685,7 @@ fn test_volume_animation_timeline_progression() {
 
     let mut app = OctantApp::default();
     let (nt, nz, ny, nx) = (6, 5, 8, 10);
-    let block = generate_known_truth_4d_block("animated_salinity", nt, nz, ny, nx);
+    let block = generate_known_truth_4d_block("animated_salinity", nt, nz, ny, nx).expect("block");
 
     // Setup dimension configs: dim 0 = Animated, dim 1 = Z, dim 2 = Y, dim 3 = X
     app.selected.dim_config = vec![
@@ -808,7 +809,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
 
     let mut app = OctantApp::default();
     let (nt, nz, ny, nx) = (5, 6, 8, 10);
-    let block = generate_known_truth_4d_block("pulse_4d", nt, nz, ny, nx);
+    let block = generate_known_truth_4d_block("pulse_4d", nt, nz, ny, nx).expect("block");
 
     app.selected.dim_config = vec![
         octant::app::DimConfig {
@@ -913,7 +914,8 @@ fn test_exact_2d_slice_range_extraction() {
         10, // Z
         20, // Y
         30, // X
-    );
+    )
+    .expect("block");
 
     // Full 2D slice along X (dim 3) and Y (dim 2), with T=0, Z=0 fixed
     let full_slice = block
@@ -949,7 +951,8 @@ fn test_exact_3d_volume_range_extraction() {
         10, // Z
         16, // Y
         16, // X
-    );
+    )
+    .expect("block");
 
     // Sub-range for X in [2, 10), Y in [4, 12), Z in [1, 6)
     let sub_vol = block

@@ -242,7 +242,8 @@ fn test_healpix_nested_highres_compatibility() {
         values,
         HashMap::new(),
         attributes,
-    );
+    )
+    .expect("block");
 
     let matrix = block
         .slice_2d(0, 0, &[0], 1, "pr", true)

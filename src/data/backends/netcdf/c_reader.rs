@@ -32,7 +32,7 @@ fn describe(var: &netcdf::Variable<'_>, path: String) -> NcVar {
         dims: (var.dimensions().iter())
             .map(|d| (d.name(), d.len()))
             .collect(),
-        attributes: extract_variable_attributes(var),
+        attributes: extract_variable_attributes(var).into(),
         calibration: extract_variable_calibration(var),
     }
 }

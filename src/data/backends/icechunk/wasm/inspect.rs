@@ -189,11 +189,3 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
 
     Ok(dataset_metadata)
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, String> {
-    use crate::data::blocks::BlockStore;
-    let clean_url = url.trim_start_matches("icechunk+").trim_end_matches('/');
-    let store = WasmIcechunkBlockStore::get_or_create(clean_url);
-    store.inner.inspect().map_err(|e| e.to_string())
-}

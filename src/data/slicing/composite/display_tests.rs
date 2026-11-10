@@ -73,6 +73,7 @@ fn ramp() -> OctantBlock {
         HashMap::new(),
         HashMap::new(),
     )
+    .expect("block")
 }
 
 #[test]
@@ -109,7 +110,8 @@ fn quantiles_read_the_composite_window() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
     let probe = CompositeProbe::new(&block, 0, 2, 1, (0, 101), (0, 1), &[0, 0, 0]);
     assert_eq!(probe.channel_quantiles(0, 0.0, 1.0), Some((0.0, 99.0)));
     let (lo, hi) = probe.channel_quantiles(0, 0.1, 0.9).expect("quantiles");

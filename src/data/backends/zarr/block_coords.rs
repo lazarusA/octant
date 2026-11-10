@@ -1,16 +1,14 @@
 //! Coordinates of a Zarr block's window, and the extents of the whole latitude and
 //! longitude dimensions that decide how the block is oriented.
 
-use std::collections::HashMap;
-
 use zarrs::storage::ReadableWritableListableStorage;
 
 use crate::data::CoordValues;
 use crate::data::backends::coord_bounds::discover::RootListing;
 use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
+use crate::data::block_orientation::BlockCoords;
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name};
 use crate::data::slice_request::DimensionSelection;
-use crate::utils::grid_flips::{is_lat_name, is_lon_name};
 
 /// Where a block's coordinates are searched: the store, its URL (the
 /// coordinate cache's key) and what is known of its consolidated metadata.
@@ -67,35 +65,6 @@ impl BlockWindow<'_> {
     }
 }
 
-/// Window coordinates of a block, keyed by dimension name (and its lowercase form), plus
-/// the first and last coordinate of the whole latitude and longitude dimensions.
-#[derive(Default)]
-pub(super) struct BlockCoords {
-    pub coordinates: HashMap<String, Vec<f64>>,
-    pub lat_extent: Option<(f64, f64)>,
-    pub lon_extent: Option<(f64, f64)>,
-}
-
-impl BlockCoords {
-    fn insert(&mut self, name: &str, values: Vec<f64>) {
-        let clean = name.trim().to_lowercase();
-        if clean != name {
-            self.coordinates.insert(clean, values.clone());
-        }
-        self.coordinates.insert(name.to_string(), values);
-    }
-
-    /// Records the extent of `coords` when `name` is the first latitude or longitude seen.
-    fn note_extent(&mut self, name: &str, coords: &CoordValues) {
-        let extent = coords.first_number().zip(coords.last_number());
-        if is_lat_name(name) && self.lat_extent.is_none() {
-            self.lat_extent = extent;
-        } else if is_lon_name(name) && self.lon_extent.is_none() {
-            self.lon_extent = extent;
-        }
-    }
-}
-
 /// Reads the window coordinates of the range-selected dimensions of a block of array
 /// `variable`, from its group up, falling back to the store's spatial coordinates for generic (`dim_N`)
 /// dimension names. Dimensions in `placed` (the coordinates the array's metadata
@@ -127,7 +96,7 @@ pub(super) fn block_coordinates(
         let Some(coords) = own.map(|(_, c)| c.clone()).or_else(|| coord_values(name)) else {
             continue;
         };
-        out.note_extent(name, &coords);
+        out.note_extent(name, coords.first_number().zip(coords.last_number()));
         if let Some(values) = window.coords(i, &coords) {
             out.insert(name, values);
         }
@@ -155,7 +124,7 @@ fn add_spatial_fallback(
         let Some(coords) = coord_values(candidate) else {
             continue;
         };
-        out.note_extent(candidate, &coords);
+        out.note_extent(candidate, coords.first_number().zip(coords.last_number()));
         let is_x = is_spatial_x_name(candidate);
         let dim_i = window
             .dim_names

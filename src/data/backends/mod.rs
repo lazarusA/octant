@@ -5,20 +5,32 @@ pub mod icechunk;
 pub mod local;
 pub mod netcdf;
 pub mod procedural;
+pub mod web;
 pub mod zarr;
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod release_tests;
 
 pub use coord_bounds::fetch_all_dimension_coordinates_for_variables;
 pub use geotiff::GeoTiffBlockStore;
+#[cfg(not(target_arch = "wasm32"))]
 pub use icechunk::IcechunkBlockStore;
 pub use netcdf::NetCdfBlockStore;
 pub use procedural::ProceduralBlockStore;
 pub use zarr::{GenericZarrBlockStore, WasmZarrBlockStore, ZarrBlockStore};
 
-/// Lets go of what the browser's stores keep for the dataset at `uri`, once
-/// it is closed: metadata, headers, downloaded chunks and manifests, the
-/// data workers' too (`data::worker`).
+/// Lets go of what the stores keep for the dataset at `uri`, once it is closed:
+/// metadata, headers, downloaded chunks and manifests, the data workers' too
+/// (`data::worker`), and on the desktop its opened TIFF and Icechunk session, so
+/// opening it again reads the file or repository anew.
 pub fn release_stores(uri: &str) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        geotiff::GeoTiffBlockStore::release(uri);
+        icechunk::release(uri);
+    }
     WasmZarrBlockStore::release(uri);
+    #[cfg(target_arch = "wasm32")]
     icechunk::wasm::WasmIcechunkBlockStore::release(uri);
     geotiff::WasmGeoTiffBlockStore::release(uri);
     #[cfg(target_arch = "wasm32")]
@@ -27,23 +39,4 @@ pub fn release_stores(uri: &str) {
     if !crate::data::worker::in_worker() {
         crate::data::worker::release(uri);
     }
-}
-
-/// Reads the metadata of the browser store `source` into its store registry,
-/// as both the page (opening a dataset) and a data worker (opening the store
-/// for its loads) do; `None` for stores whose `StoreHandle::inspect` reads it.
-#[cfg(target_arch = "wasm32")]
-pub async fn inspect_web(
-    source: &crate::data::DataSource,
-) -> Option<Result<crate::data::DatasetMetadata, String>> {
-    use crate::data::DataSourceKind as Kind;
-    let uri = &source.uri;
-    Some(match source.kind {
-        Kind::RemoteZarr => zarr::inspect_wasm_remote_zarr(uri).await,
-        Kind::RemoteIcechunk => icechunk::wasm::inspect_wasm_remote_icechunk(uri).await,
-        Kind::RemoteGeoTiff => geotiff::wasm::inspect_wasm_remote_geotiff(uri).await,
-        // Only workers read NetCDF (`netcdf/wasm.rs`): the page asks one.
-        Kind::NetCdf => crate::data::worker::inspect(source).await,
-        _ => return None,
-    })
 }

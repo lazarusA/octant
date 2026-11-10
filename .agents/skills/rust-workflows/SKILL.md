@@ -10,6 +10,8 @@ description: >-
 
 This skill provides the standard runbooks for checking, building, linting, testing, and debugging Octant.
 
+**Reference**: `build.md` (the release profile, `wasm-opt` flags, the CI's wasm size budgets, third-party licenses and packaging).
+
 ## 1. Code Quality & Linting
 
 Always run formatting and clippy before submitting changes.

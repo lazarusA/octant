@@ -42,4 +42,4 @@ pub use generic::GenericZarrBlockStore;
 pub use slice::{ChunkReader, retrieve_array_subset_as_f32, retrieve_array_subset_as_f64};
 pub use storage::{build_sync_store, open_local_storage};
 pub use store::ZarrBlockStore;
-pub use wasm::{WasmZarrBlockStore, inspect_wasm_remote_zarr, load_one_wasm_with_progress};
+pub use wasm::{WasmZarrBlockStore, inspect_wasm_remote_zarr};

@@ -7,37 +7,20 @@ description: >-
 
 # Octant WGPU Rendering Skill
 
-This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management, polymorphic renderer traits, and integration with `egui` inside `src/plots/`.
+This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management, and integration with `egui` inside `src/plots/`.
 
-## Renderers Architecture & Polymorphism
+**Reference**: `plots.md` (every renderer, the volume raymarcher, OIT, frame caches, the camera, the slicer's shaders, buffer limits), `colormaps.md` (the colormap atlas, registry and `fetch_colormaps`), `export.md`. Update them with the code they describe.
 
-Octant organizes WGPU renderers in `src/plots/`, all implementing the polymorphic `crate::plots::traits::PlotRenderer` trait:
-1. **`HeatmapRenderer` (`src/plots/heatmap.rs`)**: 2D heatmaps and raster scalar fields with bilinear/nearest interpolation and coordinate lookups.
-2. **`LineRenderer` (`src/plots/line.rs`)**: 1D time-series and profile line plots with dynamic capacity reallocation.
-3. **`Mesh3DRenderer` (`src/plots/mesh.rs`)**: Unified GPU instanced 3D surface, globe, terrain, and voxel cube mesh renderer.
-   - **`SphereRenderer` (`src/plots/sphere.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/sphere.wgsl` and backface culling.
-   - **`SurfaceRenderer` (`src/plots/surface.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/surface.wgsl`.
-4. **`PointCloudRenderer` (`src/plots/point_cloud.rs`)**: 3D point cloud billboard particles with coordinate/shift offsets.
-5. **`VolumeRenderer` (`src/plots/volume.rs`)**: 3D raymarched volumetric data with transfer functions (DVR, MIP, Isosurface).
+## Renderers
 
-## `PlotRenderer` Trait (`src/plots/traits.rs`)
+Each renderer in `src/plots/` owns its GPU buffers and upload methods (`update_data` over `&[f32]`, and its own range and channel uploads) and is drawn by its egui paint callback (`prepare` uploads and bakes, `paint` draws), built per layer in `src/app/pipeline/paint_layer.rs`. They share no trait (an earlier `PlotRenderer` trait, which nothing called, was removed):
+1. **`HeatmapRenderer` (`heatmap.rs`, `heatmap_draw.rs`)**: 2D heatmaps, with `LabelRenderer` (`labels.rs`) and `ChannelRenderer` (`channels.rs`) drawn over its quad.
+2. **`LineRenderer` (`line.rs`, `line/payload.rs`)**: 1D lines and series.
+3. **`Mesh3DRenderer` (`mesh.rs`, `mesh_draw.rs`)**: the surface and the sphere (`shaders/surface.wgsl`, `shaders/sphere.wgsl`), GPU instanced, steps, blocks and smooth modes.
+4. **`PointCloudRenderer` (`point_cloud.rs`, `point_cloud_draw.rs`)**.
+5. **`VolumeRenderer` (`volume/`)**: the raymarcher (DVR, MIP, label surfaces, classic modes).
 
-All plot renderers implement `PlotRenderer` to allow polymorphic data and uniform updates:
-```rust
-pub trait PlotRenderer: Send + Sync {
-    fn update_data(&self, queue: &wgpu::Queue, data: &RenderData);
-    fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, params: &PlotRenderParams);
-    fn inspect_hover(
-        &self,
-        pointer_pos: egui::Pos2,
-        rect: egui::Rect,
-        data: &RenderData,
-        params: &PlotRenderParams,
-    ) -> Option<HoverSample>;
-}
-```
-
-Every `PlotRenderer` in `src/plots/` is paired with a corresponding `PlotController` in `src/app/controllers/` (`controller_for(plot_type)`), separating GPU draw calls from UI input handling, uniform uploads, and data arrival hooks.
+Canvas interaction (drag, pan, zoom, view reset) and each plot's resolution demand live in `src/app/controllers/` (`controller_for(plot_type)`: `HeatmapController`, `LineController`, `Orbit3DController`), never in a renderer.
 
 ## Adding New 3D Geometries (Hexagons, Prisms, Custom Meshes)
 
@@ -77,7 +60,7 @@ To add a new 3D geometry shape (such as Hexagonal columns, icosahedra, or discre
    ```
 2. Register `PlotType::<NewGeom>` in `src/plots/mod.rs`.
 3. Add a dispatch match arm in `OctantApp::paint_active_plot()` in `src/app/pipeline/paint.rs`.
-4. Implement `PlotController` in `src/app/controllers/<geom>.rs` (or map to an existing controller) and register it in `src/app/controllers/mod.rs` `controller_for()` for UI interaction, uniform calculation, and data load lifecycle hooks.
+4. Map the plot type to its `PlotController` in `src/app/controllers/mod.rs` `controller_for()` (`Orbit3DController` for a 3D plot), which handles its canvas interaction.
 
 ## Best Practices & Invariants
 

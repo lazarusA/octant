@@ -66,7 +66,7 @@ pub fn slice_healpix_block(request: &SliceRequest) -> Result<OctantBlock, BlockS
             .collect(),
     };
 
-    Ok(OctantBlock::new(
+    OctantBlock::new(
         request.variable.clone(),
         vec![npix],
         vec!["cell".to_string()],
@@ -74,5 +74,5 @@ pub fn slice_healpix_block(request: &SliceRequest) -> Result<OctantBlock, BlockS
         values,
         coords_map,
         HashMap::new(),
-    ))
+    )
 }

@@ -69,7 +69,8 @@ fn test_multichannel_additive_composite() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![
         ChannelColorConfig {
@@ -142,7 +143,8 @@ fn test_standard_rgb_composite_preserved() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let composite =
         slice_rgb_composite(&block, [0, 1, 2], 1).expect("standard rgb composite should succeed");
@@ -180,7 +182,8 @@ fn test_multichannel_volume_additive_composite() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![
         ChannelColorConfig {
@@ -248,7 +251,8 @@ fn test_multichannel_composite_with_offset_channels() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![
         ChannelColorConfig {
@@ -337,7 +341,8 @@ fn test_multichannel_volume_with_offset_channels() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![
         ChannelColorConfig {
@@ -394,7 +399,8 @@ fn test_multichannel_composite_none_selected_draws_the_first_channel() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![ChannelColorConfig {
         index: 0,
@@ -435,7 +441,8 @@ fn test_multichannel_volume_none_selected_draws_the_first_channel() {
         values,
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let configs = vec![ChannelColorConfig {
         index: 0,
@@ -491,7 +498,8 @@ fn test_rgb_volume_composite_slicing() {
         Arc::from(raw_vals),
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let vdata = super::slice_rgb_volume_composite_nd(
         &block,
@@ -537,7 +545,8 @@ fn test_rgb_volume_composite_geotiff_3band_distinct_colors() {
         Arc::from(raw_vals),
         HashMap::new(),
         HashMap::new(),
-    );
+    )
+    .expect("block");
 
     let vdata = super::slice_rgb_volume_composite_nd(
         &block,

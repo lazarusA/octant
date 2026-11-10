@@ -60,9 +60,11 @@ pub fn describe(header: &Header, numrecs: u64) -> Result<Vec<NcVar>, String> {
                 path: v.name.clone(),
                 data_type: v.ty.name(),
                 dims,
-                attributes: (v.attrs.iter())
-                    .map(|a| (a.name.clone(), values::text(a)))
-                    .collect(),
+                attributes: std::sync::Arc::new(
+                    (v.attrs.iter())
+                        .map(|a| (a.name.clone(), values::text(a)))
+                        .collect(),
+                ),
                 calibration: values::calibration(&v.attrs),
             })
         })
