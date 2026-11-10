@@ -47,7 +47,7 @@ impl OctantApp {
         adapt(self.layers.base.selection_mut(), composite);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
-        let cur_var = self.plotted_variable_info();
+        let cur_var = self.effective_variable_info();
         let cur_name = cur_var.map(|v| v.name.as_str());
         let data = &self.layers.base.data;
         let shown = if to_3d {
@@ -75,26 +75,22 @@ fn channel_of(sel: &VariableSelection, composite: bool) -> Option<usize> {
 
 fn adapt_sel_to_2d(sel: &mut VariableSelection, composite: bool) {
     let channel_dim = channel_of(sel, composite);
-    for (z_idx, c) in sel.dim_config.iter_mut().enumerate() {
-        if c.spatial == SpatialRole::Z {
-            c.spatial = SpatialRole::None;
-            if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
-                c.active = true;
-            } else {
-                let current_z = sel.dim_indices.get(z_idx).copied().unwrap_or(0);
-                c.active = false;
-                c.range = (current_z, current_z);
-                if let Some(r) = sel.dim_ranges.get_mut(z_idx) {
-                    *r = (current_z, current_z);
-                }
-            }
+    for z_idx in 0..sel.dim_config.len() {
+        let c = &mut sel.dim_config[z_idx];
+        if c.spatial != SpatialRole::Z {
+            continue;
+        }
+        c.spatial = SpatialRole::None;
+        c.active = c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim;
+        if !c.active {
+            let current_z = sel.dim_config.get(z_idx).map(|c| c.index).unwrap_or(0);
+            sel.set_index(z_idx, current_z);
         }
     }
     // A composite's channels keep their selected range.
     if let Some(c) = channel_dim.and_then(|ch| sel.dim_config.get_mut(ch)) {
         c.active = true;
     }
-    sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }
 
 /// The dimension `sel` stacks along Z in 3D: an explicit Z, else the first
@@ -106,7 +102,7 @@ fn z_dim_of(sel: &VariableSelection, channel_dim: Option<usize>) -> Option<usize
         })
     };
     let fallback_anim = (sel.dim_config.len() >= 3)
-        .then_some(sel.animated_dim)
+        .then_some(sel.animated_dim())
         .flatten()
         .filter(|&d| Some(d) != channel_dim);
     free(SpatialRole::Z)
@@ -122,5 +118,4 @@ fn adapt_sel_to_3d(sel: &mut VariableSelection, composite: bool) {
         c.spatial = SpatialRole::Z;
         c.active = true;
     }
-    sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }

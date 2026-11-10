@@ -87,9 +87,9 @@ fn an_animated_x_axis_draws_every_voxel() {
     // Animated along x, the cloud's ring shifts move whole voxels.
     app.selected.dim_config = vec![crate::app::DimConfig {
         spatial: crate::app::SpatialRole::X,
+        animation: crate::app::AnimationRole::Animated,
         ..Default::default()
     }];
-    app.selected.animated_dim = Some(0);
     app.rethin_points();
     assert_eq!(app.layers.base.data.points, None);
     assert_eq!(instances(&app), Some(200 * 100 * 40));

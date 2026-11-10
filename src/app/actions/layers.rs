@@ -70,9 +70,7 @@ impl OctantApp {
         let id = self.layer_named(name)?;
         let (min, max) = (min.min(max), min.max(max));
         if let Some(layer) = self.layers.get_mut(id) {
-            layer.color.range_min = min;
-            layer.color.range_max = max;
-            layer.color.lock_bounds = true;
+            layer.color.set_range(min, max, true);
         }
         Ok(Done::ColorRange {
             layer: layer_name(self, id),

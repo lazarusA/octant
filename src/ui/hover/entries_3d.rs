@@ -26,58 +26,18 @@ pub(crate) fn resolve_3d_dim_entries(
     let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
 
     if let Some(v) = var {
-        let (explicit_x, explicit_y, explicit_z) =
-            v.resolve_spatial_dim_indices(app.effective_dim_config());
-
-        let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
-        let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
+        let (x_idx, y_idx, explicit_z) = super::entries::plane_dims(app, v);
         let z_idx =
             explicit_z.or_else(|| (0..v.dimension_names.len()).find(|&i| i != x_idx && i != y_idx));
-
         used_dims.insert(x_idx);
         used_dims.insert(y_idx);
-
-        let dim_y_name = explicit_y
-            .and_then(|i| v.dimension_names.get(i).cloned())
-            .or_else(|| app.get_spatial_dim_name(1))
-            .unwrap_or_else(|| "y".to_string());
-
-        let dim_x_name = explicit_x
-            .and_then(|i| v.dimension_names.get(i).cloned())
-            .or_else(|| app.get_spatial_dim_name(0))
-            .unwrap_or_else(|| "x".to_string());
-
         let dim_z_name = z_idx
             .and_then(|i| v.dimension_names.get(i).cloned())
             .or_else(|| app.get_spatial_dim_name(2))
             .unwrap_or_else(|| "z".to_string());
-
-        let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
-        let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
-
-        let x_offset = stored_offset(app, &dim_x_name, data_x, sampler.width);
-        let y_offset = stored_offset(app, &dim_y_name, data_y, sampler.height);
-        let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
-        let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
-
-        let loc_y = format_dimension_coord(
-            meta,
-            Some(v),
-            Some(&app.plotted().store_target),
-            &dim_y_name,
-            global_y,
-            full_y_len,
-            None,
-        );
-        let loc_x = format_dimension_coord(
-            meta,
-            Some(v),
-            Some(&app.plotted().store_target),
-            &dim_x_name,
-            global_x,
-            full_x_len,
-            None,
-        );
+        let cells = (data_x, data_y, sampler.width, sampler.height);
+        let [loc_y, loc_x] =
+            super::entries::plane_fields(app, meta, v, (x_idx, y_idx), cells, None);
 
         let mut list = vec![loc_y, loc_x];
 

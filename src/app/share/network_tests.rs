@@ -18,7 +18,7 @@ fn settle(app: &mut OctantApp, done: impl Fn(&OctantApp) -> bool) {
         app.poll_inspection(&ctx);
         app.poll_coordinate_results();
         app.poll_block_prefetch_results();
-        app.run_commands(&ctx);
+        app.run_commands();
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
 }

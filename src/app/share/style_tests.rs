@@ -3,10 +3,11 @@
 //! scale, opacity, reversal and NaN and clip colors.
 
 use super::parse_share;
-use super::tests::{app_of, apply};
+use super::tests::{app_of, apply, replay};
 use crate::app::OctantApp;
 use crate::app::actions::{AppAction, ChannelSetting, CompositeSetting};
 use crate::data::ome::ChannelFamily;
+use crate::utils::colormap::ColorScale;
 
 /// `refl(band, lat, lon)`, its bands named by wavelength.
 fn bands_app(target: &str) -> OctantApp {
@@ -46,7 +47,7 @@ fn a_composite_and_its_colors_plot_the_same_again() {
     cfg.display.coefficient = 2.5;
     cfg.display.inverted = true;
     let color = &mut base.color;
-    (color.scale_type, color.scale_param) = (2, 0.5);
+    (color.scale, color.scale_param) = (ColorScale::Symlog, 0.5);
     color.opacity = 0.5;
     color.reversed = true;
     (color.use_nan_color, color.nan_color) = (true, [1.0, 0.0, 0.0, 1.0]);
@@ -74,10 +75,7 @@ fn a_composite_and_its_colors_plot_the_same_again() {
     assert!(b.composite.enabled);
     assert_eq!(b.composite.channel_configs, a.composite.channel_configs);
     let (ca, cb) = (&a.color, &b.color);
-    assert_eq!(
-        (cb.scale_type, cb.scale_param),
-        (ca.scale_type, ca.scale_param)
-    );
+    assert_eq!((cb.scale, cb.scale_param), (ca.scale, ca.scale_param));
     assert_eq!((cb.opacity, cb.reversed), (ca.opacity, ca.reversed));
     assert_eq!(
         (cb.use_nan_color, cb.nan_color),
@@ -178,4 +176,27 @@ fn a_failing_channel_changes_nothing() {
     };
     assert!(app.dispatch(AppAction::SetComposite { composite }).is_err());
     assert_eq!(app.layers.base.composite, before);
+}
+
+#[test]
+fn a_log_scale_over_a_range_through_zero_stays_linear() {
+    let src = "https://share.test/bands.zarr";
+    let mut app = bands_app(src);
+    replay(
+        &mut app,
+        &format!("?src={src}&var=refl&range=-5..5&scale=log&opacity=0.5&reverse=on"),
+    );
+    let color = &app.layers.base.color;
+    assert_eq!((color.range_min, color.range_max), (-5.0, 5.0));
+    assert_eq!(color.scale, ColorScale::Linear, "no log scale below zero");
+    assert_eq!(
+        (color.opacity, color.reversed),
+        (0.5, true),
+        "the rest applies"
+    );
+    let warned = app.toasts.items().iter().map(|t| t.notice.severity);
+    assert!(
+        warned.eq([crate::ui::toast::Severity::Warning]),
+        "and says why"
+    );
 }

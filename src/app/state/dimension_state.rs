@@ -79,20 +79,6 @@ impl DimConfig {
             .iter()
             .position(|c| c.animation == AnimationRole::Animated)
     }
-
-    pub fn spatial_dims(configs: &[DimConfig]) -> Vec<usize> {
-        let mut list = Vec::new();
-        if let Some(i) = Self::x_dim(configs) {
-            list.push(i);
-        }
-        if let Some(i) = Self::y_dim(configs) {
-            list.push(i);
-        }
-        if let Some(i) = Self::z_dim(configs) {
-            list.push(i);
-        }
-        list
-    }
 }
 
 impl crate::app::OctantApp {
@@ -121,63 +107,42 @@ impl crate::app::OctantApp {
         }
     }
 
-    /// Layer `id`'s `field`, or its staged one while the shown one is empty;
-    /// empty once the layer is gone.
-    fn shown_or_staged<T>(&self, id: LayerId, field: fn(&VariableSelection) -> &[T]) -> &[T] {
-        let Some((shown, staged)) = self.layer_selections(id) else {
-            return &[];
-        };
-        let values = field(shown);
-        if values.is_empty() {
-            field(staged)
+    /// What layer `id` shows: its plotted selection once it has one, else
+    /// the staged one (the base layer before its first plot). Every `layer_*`
+    /// and `effective_*` accessor reads this one view, never a mix of both.
+    pub(crate) fn layer_view(&self, id: LayerId) -> Option<&VariableSelection> {
+        let (shown, staged) = self.layer_selections(id)?;
+        Some(if shown.metadata.is_some() {
+            shown
         } else {
-            values
-        }
+            staged
+        })
     }
 
-    /// Layer `id`'s dimension configs, falling back to its staged ones.
+    /// Layer `id`'s dimension configs (`layer_view`).
     pub fn layer_dim_config(&self, id: LayerId) -> &[DimConfig] {
-        self.shown_or_staged(id, |s| &s.dim_config)
+        self.layer_view(id).map_or(&[], |s| &s.dim_config)
     }
 
-    /// Layer `id`'s dimension ranges, falling back to its staged ones.
-    pub fn layer_dim_ranges(&self, id: LayerId) -> &[(usize, usize)] {
-        self.shown_or_staged(id, |s| &s.dim_ranges)
-    }
-
-    /// Layer `id`'s dimension indices, falling back to its staged ones.
-    pub fn layer_dim_indices(&self, id: LayerId) -> &[usize] {
-        self.shown_or_staged(id, |s| &s.dim_indices)
-    }
-
-    /// Layer `id`'s animated dimension, falling back to its staged one.
+    /// Layer `id`'s animated dimension (`layer_view`).
     pub fn layer_animated_dim(&self, id: LayerId) -> Option<usize> {
-        let (shown, staged) = self.layer_selections(id)?;
-        shown.animated_dim.or(staged.animated_dim)
+        self.layer_view(id)?.animated_dim()
     }
 
-    /// Layer `id`'s dataset metadata, falling back to its staged one.
+    /// Layer `id`'s dataset metadata (`layer_view`).
     pub fn layer_dataset_metadata(&self, id: LayerId) -> Option<&crate::data::DatasetMetadata> {
-        let (shown, staged) = self.layer_selections(id)?;
-        shown.metadata.as_ref().or(staged.metadata.as_ref())
+        self.layer_view(id)?.metadata.as_ref()
     }
 
-    /// Layer `id`'s variable, falling back to its staged one.
+    /// Layer `id`'s variable (`layer_view`).
     pub fn layer_variable_info(&self, id: LayerId) -> Option<&crate::data::VariableInfo> {
-        let (shown, staged) = self.layer_selections(id)?;
-        shown.variable_info().or_else(|| staged.variable_info())
+        self.layer_view(id)?.variable_info()
     }
 
     /// Returns the active dimension configs: plotted if present, falling back to selected.
     #[inline]
     pub fn effective_dim_config(&self) -> &[DimConfig] {
         self.layer_dim_config(LayerId::BASE)
-    }
-
-    /// Returns the active dimension ranges: plotted if present, falling back to selected.
-    #[inline]
-    pub fn effective_selected_dim_ranges(&self) -> &[(usize, usize)] {
-        self.layer_dim_ranges(LayerId::BASE)
     }
 
     /// Returns the active animated dimension: plotted if present, falling back to selected.

@@ -53,3 +53,37 @@ pub(crate) fn resolve_cell_value_and_dim_entries(
         (f32::NAN, Vec::new(), 0, 0)
     }
 }
+
+/// The X and Y dimensions of `v` a 2D or 3D hover reads (explicit roles or
+/// names, else the last two dimensions), and its Z role.
+pub(crate) fn plane_dims(app: &OctantApp, v: &VariableInfo) -> (usize, usize, Option<usize>) {
+    let (x, y, z) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let rank = v.dimension_names.len();
+    let x = x.unwrap_or(rank.saturating_sub(1));
+    (x, y.unwrap_or(rank.saturating_sub(2)), z)
+}
+
+/// The Y and X coordinate rows of cell `(cx, cy)` of a `w` x `h` plane over
+/// `v`'s dimensions `(x, y)`, named by those dimensions (so flipped ones map
+/// back to stored rows), with the `geo` latitude and longitude when known.
+pub(crate) fn plane_fields(
+    app: &OctantApp,
+    meta: Option<&DatasetMetadata>,
+    v: &VariableInfo,
+    (x, y): (usize, usize),
+    (cx, cy, w, h): (usize, usize, usize, usize),
+    geo: Option<(f32, f32)>,
+) -> [HoverField; 2] {
+    let store = Some(app.plotted().store_target.as_str());
+    let row = |d: usize, fallback: &str, cell: usize, len: usize, geo: Option<f32>| {
+        let name = v.dimension_names.get(d).map_or(fallback, String::as_str);
+        let (origin, full) = super::enrich::get_dimension_origin_and_full_len(app, Some(v), d);
+        let offset = super::enrich::stored_offset(app, name, cell, len);
+        let at = (origin + offset).min(full.saturating_sub(1));
+        super::format::format_dimension_coord(meta, Some(v), store, name, at, full, geo)
+    };
+    [
+        row(y, "y", cy, h, geo.map(|g| g.0)),
+        row(x, "x", cx, w, geo.map(|g| g.1)),
+    ]
+}

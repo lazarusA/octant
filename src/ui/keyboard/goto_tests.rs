@@ -75,3 +75,25 @@ fn a_focused_grip_moves_its_panel_and_enter_docks_it() {
     press(&mut h, &mut app, Key::Enter, NONE);
     assert_eq!(app.layout.panel_positions.settings, None);
 }
+
+#[test]
+fn plotting_by_keys_enters_settings() {
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::A, NONE);
+    press(&mut h, &mut app, Key::Enter, Modifiers::COMMAND);
+    assert!(app.layout.show_settings_panel && !app.layout.show_variable_controls);
+    assert!(
+        h.focus_in(Panel::Settings.area_id()),
+        "focus follows the plot"
+    );
+}
+
+#[test]
+fn picking_a_variable_by_keys_enters_the_dimensions() {
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::V, NONE);
+    press(&mut h, &mut app, Key::ArrowDown, NONE);
+    press(&mut h, &mut app, Key::Enter, NONE);
+    assert!(app.layout.show_variable_controls, "a variable was picked");
+    assert!(h.focus_in(Panel::Dimensions.area_id()));
+}

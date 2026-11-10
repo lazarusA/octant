@@ -24,10 +24,6 @@ pub fn overlay_selection(
         metadata_generation: dataset.metadata_generation,
         variable_idx: var_idx,
         dim_config: Vec::new(),
-        dim_indices: Vec::new(),
-        dim_ranges: Vec::new(),
-        spatial_dims: Vec::new(),
-        animated_dim: None,
         plot_type: PlotType::Heatmap,
         level: Default::default(),
         level0: None,
@@ -41,8 +37,8 @@ pub fn overlay_selection(
 /// overlay's sizes); the others keep their index and range (0 when new; a
 /// channel range follows the composite, `fit_overlay_channels`), with no role.
 /// Whether the window moved:
-/// other roles, ranges or fixed indices (the animated index alone, a playback
-/// step, does not count). Allocates only when the roles change.
+/// other roles, ranges or fixed indices (a playback step, the animated index
+/// or a collapsed animated range, does not count). Allocates only when the roles change.
 pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelection) -> bool {
     let (Some(base_var), Some(var)) = (
         base.variable_info(),
@@ -56,37 +52,26 @@ pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelect
     let rank = var.shape.len();
     let mut changed = overlay.dim_config.len() != rank;
     overlay.dim_config.resize(rank, DimConfig::default());
-    overlay.dim_indices.resize(rank, 0);
-    overlay.dim_ranges.resize(rank, (0, 0));
     for (i, name) in var.dimension_names.iter().enumerate().take(rank) {
         let last = var
             .shape
             .get(i)
             .map_or(0, |&n| (n as usize).saturating_sub(1));
+        let old = overlay.dim_config[i];
         // Dimensions the base lacks keep their own index and range, no role.
-        let (config, index, range) = base_dim(base, base_var, name, last).unwrap_or((
-            DimConfig::default(),
-            overlay.dim_indices[i].min(last),
-            (
-                overlay.dim_ranges[i].0.min(last),
-                overlay.dim_ranges[i].1.min(last),
-            ),
-        ));
-        let old = (
-            overlay.dim_config[i],
-            overlay.dim_indices[i],
-            overlay.dim_ranges[i],
-        );
+        let config = base_dim(base, base_var, name, last).unwrap_or(DimConfig {
+            index: old.index.min(last),
+            range: (old.range.0.min(last), old.range.1.min(last)),
+            ..DimConfig::default()
+        });
         let roles = |c: DimConfig| (c.spatial, c.animation, c.active);
         let animated = config.animation == AnimationRole::Animated;
-        changed |= roles(old.0) != roles(config) || old.2 != range || (!animated && old.1 != index);
+        // A collapsed animated range is the playback step, like its index.
+        let step_only = animated && !config.active;
+        changed |= roles(old) != roles(config)
+            || (!step_only && old.range != config.range)
+            || (!animated && old.index != config.index);
         overlay.dim_config[i] = config;
-        overlay.dim_indices[i] = index;
-        overlay.dim_ranges[i] = range;
-    }
-    if changed {
-        overlay.spatial_dims = DimConfig::spatial_dims(&overlay.dim_config);
-        overlay.animated_dim = DimConfig::animated_dim(&overlay.dim_config);
     }
     changed
 }
@@ -99,18 +84,15 @@ fn base_dim(
     base_var: &crate::data::VariableInfo,
     name: &str,
     last: usize,
-) -> Option<(DimConfig, usize, (usize, usize))> {
+) -> Option<DimConfig> {
     let b = dim_named(base_var, name)?;
-    let clamp = |(s, e): (usize, usize)| (s.min(last), e.min(last));
     let config = base
         .dim_config
         .get(b)
         .map_or(DimConfig::default(), |c| DimConfig {
-            range: clamp(c.range),
+            range: (c.range.0.min(last), c.range.1.min(last)),
             index: c.index.min(last),
             ..*c
         });
-    let index = base.dim_indices.get(b).map_or(0, |&n| n.min(last));
-    let range = base.dim_ranges.get(b).map_or((0, 0), |&r| clamp(r));
-    Some((config, index, range))
+    Some(config)
 }

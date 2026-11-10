@@ -33,10 +33,10 @@ fn open_tas(store: Arc<MemoryStore>, target: &str) -> OctantApp {
 
 fn time_step(app: &OctantApp) -> usize {
     let time = dim_index(app, "time");
-    if app.selected.animated_dim == Some(time) {
+    if app.selected.animated_dim() == Some(time) {
         app.playback.current_timestep
     } else {
-        app.selected.dim_indices[time]
+        app.selected.dim_config[time].index
     }
 }
 

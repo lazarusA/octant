@@ -26,16 +26,8 @@ pub struct VariableSelection {
     /// caches and focus that belong to one loaded dataset.
     pub metadata_generation: u64,
     pub variable_idx: usize,
-    /// One per dimension.
+    /// One per dimension: its roles, index and range.
     pub dim_config: Vec<DimConfig>,
-    /// Collapsed index per dimension.
-    pub dim_indices: Vec<usize>,
-    /// Range per dimension.
-    pub dim_ranges: Vec<(usize, usize)>,
-    /// Dimensions assigned X, Y, Z.
-    pub spatial_dims: Vec<usize>,
-    /// Dimension assigned Animated.
-    pub animated_dim: Option<usize>,
     pub plot_type: PlotType,
     /// The level read when the variable is a multiscale stack's level 0;
     /// dimension indices and ranges stay on level 0 (the plotted copy holds
@@ -59,10 +51,6 @@ impl Default for VariableSelection {
             metadata_generation: 0,
             variable_idx: 0,
             dim_config: Vec::new(),
-            dim_indices: Vec::new(),
-            dim_ranges: Vec::new(),
-            spatial_dims: Vec::new(),
-            animated_dim: None,
             plot_type: PlotType::Heatmap,
             level: LevelChoice::Auto,
             level0: None,
@@ -71,6 +59,11 @@ impl Default for VariableSelection {
 }
 
 impl VariableSelection {
+    /// The dimension assigned Animated.
+    pub fn animated_dim(&self) -> Option<usize> {
+        DimConfig::animated_dim(&self.dim_config)
+    }
+
     /// Dimension `i` reads one `index`: what its collapsed slider sets.
     pub fn set_index(&mut self, i: usize, index: usize) {
         self.set_range(i, (index, index), index);
@@ -79,13 +72,42 @@ impl VariableSelection {
     /// Dimension `i` reads `range` at `index` within it: what its range
     /// slider sets.
     pub fn set_range(&mut self, i: usize, range: (usize, usize), index: usize) {
-        if i >= self.dim_config.len() || i >= self.dim_ranges.len() || i >= self.dim_indices.len() {
-            return;
+        if let Some(c) = self.dim_config.get_mut(i) {
+            c.range = range;
+            c.index = index;
         }
-        self.dim_ranges[i] = range;
-        self.dim_indices[i] = index;
-        self.dim_config[i].range = range;
-        self.dim_config[i].index = index;
+    }
+
+    /// Dimension `i` (animated) shows step `step`: an expanded one keeps its
+    /// range, a collapsed one reads only the step.
+    pub fn set_step(&mut self, i: usize, step: usize) {
+        if let Some(c) = self.dim_config.get_mut(i) {
+            c.index = step;
+            if !c.active {
+                c.range = (step, step);
+            }
+        }
+    }
+
+    /// Dimension `i` (of last index `last`) shows `step`; a range that
+    /// misses it moves to hold it, keeping its width.
+    pub fn hold_step(&mut self, i: usize, step: usize, last: usize) {
+        let Some(&DimConfig {
+            range: (start, end),
+            ..
+        }) = self.dim_config.get(i)
+        else {
+            return;
+        };
+        let step = step.min(last);
+        let width = end.saturating_sub(start).min(last);
+        let range = if (start..=end).contains(&step) {
+            (start, end)
+        } else {
+            let start = step.min(last - width);
+            (start, start + width)
+        };
+        self.set_range(i, range, step);
     }
 
     /// The selected variable's metadata.
@@ -100,11 +122,11 @@ impl VariableSelection {
     /// range like any dimension. A dimension without a range (ranges of another
     /// variable) reads index 0, never the whole dimension, and is logged.
     pub fn slice_request(&self, var_name: &str, shape: &[u64]) -> SliceRequest {
-        if self.dim_ranges.len() < shape.len() {
+        if self.dim_config.len() < shape.len() {
             log::warn!(
                 "Request for '{var_name}' has {} ranges for {} dimensions; \
                  the missing ones read index 0",
-                self.dim_ranges.len(),
+                self.dim_config.len(),
                 shape.len()
             );
         }
@@ -113,7 +135,8 @@ impl VariableSelection {
             .enumerate()
             .map(|(i, &s)| {
                 let dim_size = s as usize;
-                let (mut start, mut end) = self.dim_ranges.get(i).copied().unwrap_or((0, 0));
+                let (mut start, mut end) =
+                    self.dim_config.get(i).map(|c| c.range).unwrap_or((0, 0));
                 if start > end {
                     std::mem::swap(&mut start, &mut end);
                 }

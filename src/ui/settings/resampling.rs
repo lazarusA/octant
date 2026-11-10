@@ -60,7 +60,7 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.enable_pyramid_resampling != prev_resampling || app.pyramid_aggregation_op != prev_op {
         if app.enable_pyramid_resampling {
             // Aggregation is heatmap only; keep a staged plot type in line.
-            app.selected.plot_type = crate::plots::PlotType::Heatmap;
+            app.switch_plot_type(crate::plots::PlotType::Heatmap);
         }
         app.rebuild_layer_pyramids();
     }

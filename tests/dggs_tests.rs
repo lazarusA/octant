@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use octant::app::{OctantApp, SpatialRole};
+use octant::app::{DimConfig, OctantApp, SpatialRole};
 use octant::data::coordinates::detect_grid_from_block;
 use octant::data::coordinates::dggs::DggsMetadata;
 use octant::data::coordinates::healpix::HealpixOrder;
@@ -138,7 +138,7 @@ fn test_dimension_slider_defaults_with_dggs_custom_dim_name() {
 
     // Dimension 0 ("time") should be animated, Dimension 1 ("my_custom_cells") should be SpatialRole::Grid
     assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Grid);
-    assert_eq!(app.selected.spatial_dims, vec![1]);
+    assert_eq!(DimConfig::x_dim(&app.selected.dim_config), Some(1));
 }
 
 #[test]

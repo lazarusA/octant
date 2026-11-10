@@ -15,8 +15,8 @@ const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
 #[test]
 fn without_a_3d_variable_volumes_are_offered() {
-    let mut app = OctantApp::default();
-    let options = plot_options(&mut app);
+    let app = OctantApp::default();
+    let options = plot_options(&app);
     assert_eq!(options.map(|o| o.plot_type), ORDER);
     let blocked = |t: PlotType| {
         options
@@ -100,4 +100,24 @@ fn the_picker_keeps_its_width_in_every_language() {
         make_app,
         show_plot_type_picker,
     );
+}
+
+#[test]
+fn a_volume_whose_data_is_gone_falls_back_to_a_heatmap_without_a_z_role() {
+    use crate::app::SpatialRole;
+    use crate::app::test_support::{memory_app, selection_of};
+    let (mut app, meta) = memory_app();
+    app.selected = selection_of(&mut app, &meta, "t2m");
+    app.switch_plot_type(PlotType::Volume);
+    let has_z =
+        |app: &OctantApp| (app.selected.dim_config.iter()).any(|c| c.spatial == SpatialRole::Z);
+    assert!(has_z(&app), "the volume stacks a dimension along Z");
+    // Plotted, but its volume is gone (released) and nothing loads.
+    app.sync_plotted_state_from_selected();
+    app.layers.base.data.volume = None;
+
+    super::options::fall_back_to_heatmap(&mut app);
+
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
+    assert!(!has_z(&app), "a heatmap has no Z");
 }

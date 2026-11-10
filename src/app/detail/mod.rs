@@ -134,8 +134,6 @@ pub struct PendingDetail {
     /// The level's dimension names, roles, indices and ranges.
     pub dims: Vec<String>,
     pub config: Vec<crate::app::DimConfig>,
-    pub indices: Vec<usize>,
-    pub ranges: Vec<(usize, usize)>,
     pub anim_dim: Option<usize>,
     pub step: usize,
 }

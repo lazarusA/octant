@@ -59,7 +59,7 @@ impl Facts {
     fn of(app: &OctantApp) -> Self {
         let var = app
             .selected_variable_info()
-            .or_else(|| app.plotted_variable_info());
+            .or_else(|| app.effective_variable_info());
         let has_3d = var.is_some_and(|v| v.shape.len() >= 3 || v.dimension_names.len() >= 3);
         // 3D types read their own level of a multiscale variable: measured
         // there, and never aggregated like the heatmap.
@@ -148,27 +148,27 @@ fn supported_plots(app: &OctantApp, discrete: bool) -> (Option<&'static [PlotTyp
 fn plotted_grid(app: &OctantApp) -> Option<&CoordinateGrid> {
     let var = app
         .selected_variable_info()
-        .or_else(|| app.plotted_variable_info());
-    let plotted = app.plotted_variable_info().map(|p| &p.name);
+        .or_else(|| app.effective_variable_info());
+    let plotted = app.effective_variable_info().map(|p| &p.name);
     let matrix = app.layers.base.data.matrix.as_ref()?;
     (var.map(|v| &v.name) == plotted).then_some(&matrix.grid)
 }
 
-/// Every plot type and whether it can be picked. A plotted type whose data
-/// is gone (or that a label image or aggregation rules out) falls back to
-/// the heatmap first.
-pub fn plot_options(app: &mut OctantApp) -> [PlotOption; 6] {
+/// Every plot type and whether it can be picked (menus run
+/// `fall_back_to_heatmap` first).
+pub fn plot_options(app: &OctantApp) -> [PlotOption; 6] {
     let facts = Facts::of(app);
-    fall_back_to_heatmap(app, facts.label_image);
     ORDER.map(|plot_type| PlotOption {
         plot_type,
         blocked: facts.blocked(plot_type),
     })
 }
 
-/// The heatmap, once the plotted type lost what it draws (and no new
-/// variable is staged or loading).
-fn fall_back_to_heatmap(app: &mut OctantApp, label_image: bool) {
+/// The heatmap, once the plotted type lost what it draws, or a label image
+/// or aggregation rules it out (and no new variable is staged or loading).
+pub fn fall_back_to_heatmap(app: &mut OctantApp) {
+    let var = (app.selected_variable_info()).or_else(|| app.effective_variable_info());
+    let label_image = var.is_some_and(crate::data::VariableInfo::is_label_image);
     let loading =
         app.layers.base.load.block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if app.is_exploring_unplotted_variable() || loading {
@@ -185,7 +185,7 @@ fn fall_back_to_heatmap(app: &mut OctantApp, label_image: bool) {
         PlotType::Line => false,
     };
     if lost {
-        app.selected.plot_type = PlotType::Heatmap;
+        app.switch_plot_type(PlotType::Heatmap);
     }
 }
 

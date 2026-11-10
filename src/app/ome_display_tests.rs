@@ -50,15 +50,15 @@ fn defaults_for(var: &VariableInfo) -> OctantApp {
 fn default_time_point_and_plane_are_selected() {
     let var = image("color");
     let app = defaults_for(&var);
-    assert_eq!(app.selected.animated_dim, Some(0));
-    assert_eq!(app.selected.dim_indices[0], 7);
-    let (start, end) = app.selected.dim_ranges[0];
+    assert_eq!(app.selected.animated_dim(), Some(0));
+    assert_eq!(app.selected.dim_config[0].index, 7);
+    let (start, end) = app.selected.dim_config[0].range;
     assert!(start <= 7 && 7 <= end);
     assert_eq!(app.playback.current_timestep, 7);
-    assert_eq!(app.selected.dim_indices[2], 3);
-    assert_eq!(app.selected.dim_ranges[2], (3, 3));
+    assert_eq!(app.selected.dim_config[2].index, 3);
+    assert_eq!(app.selected.dim_config[2].range, (3, 3));
     // A colour image keeps every channel.
-    assert_eq!(app.selected.dim_ranges[1], (0, 1));
+    assert_eq!(app.selected.dim_config[1].range, (0, 1));
 }
 
 #[test]
@@ -89,8 +89,8 @@ fn colour_images_overlay_their_channels_with_omero_settings() {
 fn greyscale_images_show_their_first_active_channel() {
     let var = image("greyscale");
     let mut app = defaults_for(&var);
-    assert_eq!(app.selected.dim_ranges[1], (1, 1));
-    assert_eq!(app.selected.dim_indices[1], 1);
+    assert_eq!(app.selected.dim_config[1].range, (1, 1));
+    assert_eq!(app.selected.dim_config[1].index, 1);
     crate::ui::variables_panel::dimension_slider::init_layer_composite_defaults(
         &mut app,
         LayerId::BASE,
@@ -128,7 +128,7 @@ fn a_channel_axis_named_otherwise_takes_z_and_is_still_pinned() {
         .expect("ome");
     let app = defaults_for(&found.variables[0]);
     assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::Z);
-    assert_eq!(app.selected.dim_ranges[0], (1, 1));
+    assert_eq!(app.selected.dim_config[0].range, (1, 1));
 }
 
 #[test]
@@ -143,13 +143,13 @@ fn physical_units_reach_the_dimensions() {
 fn greyscale_window_follows_the_shown_channel() {
     let var = image("greyscale");
     let mut app = defaults_for(&var);
-    let indices = app.selected.dim_indices.clone();
+    let config = app.selected.dim_config.clone();
     let sel = app.layers.base.selection_mut();
+    sel.dim_config = config;
     sel.metadata = Some(crate::data::DatasetMetadata {
         variables: vec![var],
         ..Default::default()
     });
-    sel.dim_indices = indices;
     let apply = |app: &mut OctantApp, step| {
         crate::app::pipeline::greyscale::apply_greyscale_display(
             &mut app.layers.base,
@@ -160,10 +160,12 @@ fn greyscale_window_follows_the_shown_channel() {
         (c.range_min, c.range_max, c.reversed, c.lock_bounds)
     };
     assert_eq!(apply(&mut app, 0), (10.0, 900.0, true, true));
-    app.layers.base.selection_mut().dim_indices[1] = 0;
+    app.layers.base.selection_mut().dim_config[1].index = 0;
     assert_eq!(apply(&mut app, 0), (0.0, 100.0, false, true));
     // Played across channels, the step is the channel shown.
-    app.layers.base.selection_mut().animated_dim = Some(1);
+    let dims = &mut app.layers.base.selection_mut().dim_config;
+    dims[0].animation = crate::app::AnimationRole::None;
+    dims[1].animation = crate::app::AnimationRole::Animated;
     assert_eq!(apply(&mut app, 1), (10.0, 900.0, true, true));
 }
 
@@ -202,5 +204,15 @@ fn colour_overlays_open_on_their_active_channels() {
         .map(|c| c.index)
         .collect();
     assert_eq!(ticked, [1], "OMERO's active channel, not channel 0");
-    assert_eq!(overlay.selection().dim_ranges[1], (1, 1));
+    assert_eq!(overlay.selection().dim_config[1].range, (1, 1));
+}
+
+#[test]
+fn default_plane_time_and_channel_reach_the_dimension_configs() {
+    let app = defaults_for(&image("greyscale"));
+    let s = &app.selected;
+    for (d, c) in s.dim_config.iter().enumerate() {
+        assert_eq!(c.index, s.dim_config[d].index, "index of dimension {d}");
+        assert_eq!(c.range, s.dim_config[d].range, "range of dimension {d}");
+    }
 }

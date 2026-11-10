@@ -2,7 +2,7 @@
 //! buttons step the plotted view while another variable is staged.
 
 use crate::app::OctantApp;
-use crate::app::test_support::{make_resident, memory_app, poll_until, selection_of};
+use crate::app::test_support::{make_resident, memory_app, poll_until, ranges, selection_of};
 use crate::data::SliceRequest;
 
 fn name(selection: &crate::app::layers::VariableSelection) -> Option<String> {
@@ -109,15 +109,35 @@ fn a_multiscale_plot_steps_on_its_level_while_another_variable_is_staged() {
     app.step_next();
     poll_until(&mut app, |app| app.playback.current_timestep == 1);
     assert_eq!(plotted_name(&app).as_deref(), Some("2/t2m"));
-    assert_eq!(app.plotted().dim_ranges[1..], before.dim_ranges[1..]);
+    assert_eq!(ranges(app.plotted())[1..], ranges(&before)[1..]);
     assert_eq!(name(&app.selected).as_deref(), Some("0/sst"));
 }
 
 #[test]
 fn a_step_pressed_while_a_new_range_loads_keeps_the_new_range() {
     let (mut app, _) = t2m_fetched();
-    app.selected.dim_ranges[1] = (1, 3);
+    app.selected.dim_config[1].range = (1, 3);
     app.plot_selection();
     app.step_next();
-    poll_until(&mut app, |app| app.plotted().dim_ranges[1] == (1, 3));
+    poll_until(&mut app, |app| app.plotted().dim_config[1].range == (1, 3));
+}
+
+#[test]
+fn the_staged_time_follows_the_step_with_the_dimensions_panel_closed() {
+    let (mut app, meta) = memory_app();
+    app.selected = selection_of(&mut app, &meta, "t2m");
+    // Time collapsed to one index, as its slider's Range toggle leaves it.
+    app.selected.dim_config[0].active = false;
+    app.selected.set_index(0, 0);
+    app.plot_selection();
+    poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
+
+    app.step_next();
+    poll_until(&mut app, |app| app.playback.current_timestep == 1);
+    let time = app.selected.dim_config[0];
+    assert_eq!((time.index, time.range), (1, (1, 1)));
+    assert_eq!(app.plotted().dim_config[0], time, "the plot shows the same");
+    // Plotting again keeps the step it shows.
+    app.plot_selection();
+    assert_eq!(app.playback.current_timestep, 1);
 }

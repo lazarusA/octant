@@ -65,13 +65,12 @@ fn a_zoomed_plot_s_link_shows_the_same_window() {
     let mut receiver = plotted_pyramid();
     let actions = parse_share(&link).unwrap_or_default();
     receiver.queue_actions(actions[1..].to_vec(), Origin::Link);
-    let ctx = egui::Context::default();
     let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
     while receiver.nav.pending_view.is_none() {
         assert!(web_time::Instant::now() < deadline, "the view never came");
         receiver.poll_block_prefetch_results();
         receiver.poll_coordinate_results();
-        receiver.run_commands(&ctx);
+        receiver.run_commands();
         std::thread::yield_now();
     }
     receiver.apply_pending_view(CANVAS, PlotType::Heatmap);

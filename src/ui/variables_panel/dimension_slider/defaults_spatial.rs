@@ -34,7 +34,6 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             && crate::data::coordinates::naming::is_animated_time_name(dim_name)
         {
             app.selected.dim_config[i].animation = AnimationRole::Animated;
-            app.selected.animated_dim = Some(i);
             anim_assigned = true;
         }
     }
@@ -95,6 +94,5 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
         })
     {
         app.selected.dim_config[unassigned].animation = AnimationRole::Animated;
-        app.selected.animated_dim = Some(unassigned);
     }
 }

@@ -71,7 +71,10 @@ fn regions_app(labels: &[&str]) -> OctantApp {
     let mut app = OctantApp::default();
     *app.layers.base.selection_mut() = VariableSelection {
         metadata: Some(meta),
-        animated_dim: Some(0),
+        dim_config: vec![crate::app::DimConfig {
+            animation: crate::app::AnimationRole::Animated,
+            ..Default::default()
+        }],
         ..Default::default()
     };
     app

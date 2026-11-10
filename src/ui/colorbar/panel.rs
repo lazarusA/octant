@@ -236,6 +236,6 @@ fn paint_bar(
     }
     let t = axis.t_at(hover?);
     let (min, max) = (style.range_min, style.range_max);
-    let value = unscale_norm_to_value(t, min, max, style.scale_type, style.scale_param);
+    let value = unscale_norm_to_value(t, min, max, style.scale.code(), style.scale_param);
     Some(value)
 }

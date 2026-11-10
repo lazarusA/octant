@@ -116,9 +116,7 @@ impl OctantApp {
             matrix.or(volume)
         };
         let (min, max) = extent.unwrap_or((0.0, 100.0));
-        layer.color.range_min = min;
-        layer.color.range_max = max;
-        layer.color.lock_bounds = false;
+        layer.color.set_range(min, max, false);
     }
 
     /// Returns the source_id string for the currently selected (UI active) store.
@@ -129,11 +127,8 @@ impl OctantApp {
     /// Returns the effective plot type that is currently plotted and rendered on canvas.
     #[inline]
     pub fn effective_canvas_plot_type(&self) -> crate::plots::PlotType {
-        if self.plotted().metadata.is_some() {
-            self.plotted().plot_type
-        } else {
-            self.selected.plot_type
-        }
+        self.layer_view(crate::app::layers::LayerId::BASE)
+            .map_or(self.selected.plot_type, |s| s.plot_type)
     }
 
     /// Returns true if the user is currently browsing/configuring a variable or dataset that has not been plotted yet.
@@ -176,7 +171,7 @@ impl OctantApp {
             } else {
                 self.layers.base.clear_3d();
             }
-            if let Some(var_info) = self.plotted_variable_info().cloned() {
+            if let Some(var_info) = self.effective_variable_info().cloned() {
                 crate::ui::variables_panel::dimension_slider::init_composite_defaults(
                     self, &var_info,
                 );
@@ -190,8 +185,8 @@ impl OctantApp {
         self.sync_overlays_to_base();
     }
 
-    /// Returns VariableInfo for the currently plotted variable, if available.
-    pub fn plotted_variable_info(&self) -> Option<&crate::data::VariableInfo> {
+    /// The base layer's variable: plotted if present, falling back to selected.
+    pub fn effective_variable_info(&self) -> Option<&crate::data::VariableInfo> {
         self.layer_variable_info(crate::app::layers::LayerId::BASE)
     }
 

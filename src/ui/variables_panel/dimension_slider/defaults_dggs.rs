@@ -9,8 +9,8 @@ pub fn assign_dggs_roles(app: &mut OctantApp, var_info: &VariableInfo, grid_i: u
     app.selected.dim_config[grid_i].spatial = SpatialRole::Grid;
     let grid_size = var_info.shape[grid_i] as usize;
     let max_selectable = grid_size.min(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
-    app.selected.dim_ranges[grid_i] = (0, max_selectable.saturating_sub(1));
-    app.selected.dim_config[grid_i].range = app.selected.dim_ranges[grid_i];
+    app.selected
+        .set_range(grid_i, (0, max_selectable.saturating_sub(1)), 0);
 
     let mut z_assigned = false;
     let mut anim_assigned = false;
@@ -30,7 +30,6 @@ pub fn assign_dggs_roles(app: &mut OctantApp, var_info: &VariableInfo, grid_i: u
         }
         if !anim_assigned && crate::data::coordinates::naming::is_animated_time_name(dim_name) {
             app.selected.dim_config[i].animation = AnimationRole::Animated;
-            app.selected.animated_dim = Some(i);
             anim_assigned = true;
         }
     }
@@ -39,7 +38,6 @@ pub fn assign_dggs_roles(app: &mut OctantApp, var_info: &VariableInfo, grid_i: u
         for i in 0..rank {
             if i != grid_i && app.selected.dim_config[i].spatial == SpatialRole::None {
                 app.selected.dim_config[i].animation = AnimationRole::Animated;
-                app.selected.animated_dim = Some(i);
                 break;
             }
         }

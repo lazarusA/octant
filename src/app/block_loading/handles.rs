@@ -39,12 +39,11 @@ impl OctantApp {
             return Some(d.store.clone());
         }
 
-        // Fallback: match by URI in dataset_manager
-        let target_uri = target_input.trim().trim_end_matches('/');
-        if let Some(d) = self.dataset_manager.iter().find(|d| {
-            let d_uri = d.source.uri.trim().trim_end_matches('/');
-            d_uri == target_uri || d.id == source_id || d.id.ends_with(target_uri)
-        }) {
+        // Fallback: the same store under another id, matched by its address.
+        let same = crate::app::state::dataset_activation::same_target;
+        if let Some(d) = (self.dataset_manager.iter())
+            .find(|d| same(&d.source.uri, target_input) || d.id == source_id)
+        {
             return Some(d.store.clone());
         }
 

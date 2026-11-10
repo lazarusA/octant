@@ -19,6 +19,7 @@ mod stack;
 #[cfg(test)]
 mod stack_tests;
 mod style;
+mod style_range;
 #[cfg(test)]
 mod style_tests;
 mod window;

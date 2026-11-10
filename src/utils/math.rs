@@ -128,14 +128,14 @@ pub fn calculate_max_animated_steps(
 }
 
 /// The cells and bytes a download requests over the dimensions `is_active`
-/// says are read (their `selected_ranges`, the others one index), and the
+/// says are read (their `range_of`, the others one index), and the
 /// variable's total bytes (`file_size` when known).
 pub fn calculate_download_sizes(
     shape: &[u64],
     file_size: u64,
     dtype_bytes: u64,
     is_active: impl Fn(usize) -> bool,
-    selected_ranges: &[(usize, usize)],
+    range_of: impl Fn(usize) -> Option<(usize, usize)>,
 ) -> (u64, u64, u64) {
     let total_elements: u64 = shape
         .iter()
@@ -153,7 +153,7 @@ pub fn calculate_download_sizes(
     for (i, &size) in shape.iter().enumerate() {
         let dim_size = size as usize;
         if is_active(i) {
-            let span = if let Some(&(start, end)) = selected_ranges.get(i) {
+            let span = if let Some((start, end)) = range_of(i) {
                 (end.saturating_sub(start) + 1).min(dim_size)
             } else {
                 dim_size
@@ -170,16 +170,13 @@ pub fn calculate_download_sizes(
 pub fn calculate_volume_elements(
     shape: &[u64],
     is_active: impl Fn(usize) -> bool,
-    selected_ranges: &[(usize, usize)],
+    range_of: impl Fn(usize) -> Option<(usize, usize)>,
 ) -> usize {
     let mut total_elements = 1usize;
     let mut counted = 0;
     for (i, &size) in shape.iter().enumerate() {
         if is_active(i) {
-            let (start, end) = selected_ranges
-                .get(i)
-                .copied()
-                .unwrap_or((0, (size as usize).saturating_sub(1)));
+            let (start, end) = range_of(i).unwrap_or((0, (size as usize).saturating_sub(1)));
             let span = (end.saturating_sub(start) + 1).min(size as usize);
             total_elements = total_elements.saturating_mul(span.max(1));
             counted += 1;
@@ -201,7 +198,7 @@ pub fn calculate_2d_elements(
     shape: &[u64],
     x_dim: usize,
     y_dim: usize,
-    selected_ranges: &[(usize, usize)],
+    range_of: impl Fn(usize) -> Option<(usize, usize)>,
 ) -> usize {
     let rank = shape.len();
     let get_span = |d: usize| -> usize {
@@ -209,7 +206,7 @@ pub fn calculate_2d_elements(
             return 1;
         }
         let size = shape[d] as usize;
-        if let Some(&(start, end)) = selected_ranges.get(d) {
+        if let Some((start, end)) = range_of(d) {
             (end.saturating_sub(start) + 1).min(size)
         } else {
             size
@@ -300,11 +297,12 @@ mod tests {
     #[test]
     fn test_calculate_volume_and_2d_elements() {
         let shape = vec![10, 32, 64];
-        let ranges = vec![(0, 9), (0, 31), (0, 63)];
+        let ranges = [(0, 9), (0, 31), (0, 63)];
         assert_eq!(
-            calculate_volume_elements(&shape, |_| true, &ranges),
+            calculate_volume_elements(&shape, |_| true, |i| ranges.get(i).copied()),
             10 * 32 * 64
         );
-        assert_eq!(calculate_2d_elements(&shape, 2, 1, &ranges), 64 * 32);
+        let range_of = |i: usize| ranges.get(i).copied();
+        assert_eq!(calculate_2d_elements(&shape, 2, 1, range_of), 64 * 32);
     }
 }

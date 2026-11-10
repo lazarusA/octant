@@ -12,18 +12,10 @@ impl OctantApp {
         if input_target.is_empty() {
             return false;
         }
-        let expanded = crate::utils::expand_tilde_str(input_target);
-        let clean_expanded = expanded.trim_end_matches('/');
-
         let existing = self.dataset_manager.iter().find(|d| {
-            let d_uri = d.source.uri.trim().trim_end_matches('/');
-            let d_id = d.id.trim().trim_end_matches('/');
-            d_uri == input_target
-                || d_uri == clean_expanded
-                || d_id == input_target
-                || d_id == clean_expanded
+            same_target(&d.source.uri, input_target)
+                || same_target(&d.id, input_target)
                 || d.source.display_name == input_target
-                || d_id.ends_with(input_target)
         });
 
         if let Some(dataset) = existing {
@@ -37,13 +29,11 @@ impl OctantApp {
             self.selected.store_target = uri;
             self.selected.store_kind = kind;
             if let Some(meta) = meta {
-                self.status_message = format!(
-                    "Activated dataset '{}' (Found {} variables)",
-                    meta.name,
-                    meta.variables.len()
-                );
                 self.follow_plate(&meta);
-                self.layout.show_variables_overlay = !meta.variables.is_empty();
+                self.show_panel(
+                    crate::ui::panel_layout::Panel::Variables,
+                    !meta.variables.is_empty(),
+                );
                 self.load_new_metadata(meta);
                 return true;
             }
@@ -83,7 +73,7 @@ impl OctantApp {
     /// Quick save shortcut (Cmd+S): saves to export_dir with auto-generated filename.
     pub fn quick_save_canvas(&mut self) {
         let var_name = self
-            .plotted_variable_info()
+            .effective_variable_info()
             .map(|v| v.name.as_str())
             .unwrap_or("plot");
         let filename =
@@ -144,7 +134,7 @@ impl OctantApp {
 
     /// Whether the plotted variable is an OME-Zarr image (bioimaging, never geographic).
     pub fn is_ome_dataset(&self) -> bool {
-        self.plotted_variable_info()
+        self.effective_variable_info()
             .is_some_and(|v| v.ome.is_some())
     }
 
@@ -189,17 +179,10 @@ impl OctantApp {
     /// Layer `id`'s `(start, end)` selection of dimension `dim_idx`: its
     /// range while expanded, else its single index.
     pub fn layer_dim_range(&self, id: LayerId, dim_idx: usize) -> (usize, usize) {
-        let range = self.layer_dim_ranges(id).get(dim_idx).copied();
         match self.layer_dim_config(id).get(dim_idx) {
-            Some(cfg) if !cfg.active => {
-                let idx = self
-                    .layer_dim_indices(id)
-                    .get(dim_idx)
-                    .copied()
-                    .unwrap_or(0);
-                (idx, idx)
-            }
-            _ => range.unwrap_or((0, usize::MAX)),
+            Some(cfg) if !cfg.active => (cfg.index, cfg.index),
+            Some(cfg) => cfg.range,
+            None => (0, usize::MAX),
         }
     }
 }
@@ -214,7 +197,7 @@ pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
 
 /// Whether two dataset targets name the same store (ignoring surrounding
 /// whitespace, trailing slashes and a leading `~`).
-pub(super) fn same_target(a: &str, b: &str) -> bool {
+pub(crate) fn same_target(a: &str, b: &str) -> bool {
     let clean = |t: &str| crate::utils::expand_tilde_str(t.trim().trim_end_matches('/'));
     clean(a).trim_end_matches('/') == clean(b).trim_end_matches('/')
 }

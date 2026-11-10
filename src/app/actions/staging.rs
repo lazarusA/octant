@@ -24,6 +24,7 @@ impl OctantApp {
         }
         if let Some(text) = plot_type {
             let plot_type = resolved(self.vocabulary().plot_type(text), NameKind::PlotType, text)?;
+            crate::ui::plot_type::options::fall_back_to_heatmap(self);
             let options = crate::ui::plot_type::options::plot_options(self);
             if let Some(blocked) = options
                 .iter()
@@ -62,8 +63,6 @@ impl OctantApp {
         plotted.metadata.is_some()
             && !self.is_exploring_unplotted_variable()
             && staged.dim_config == plotted.dim_config
-            && staged.dim_ranges == plotted.dim_ranges
-            && staged.dim_indices == plotted.dim_indices
     }
 
     pub(super) fn staged_name(&self) -> String {
@@ -74,7 +73,7 @@ impl OctantApp {
 
     /// Whether the plot has an animated dimension to play or step along.
     pub(super) fn base_animates(&self) -> Result<(), Failure> {
-        match self.layers.base.selection().animated_dim {
+        match self.layers.base.selection().animated_dim() {
             Some(_) if self.plotted().metadata.is_some() => Ok(()),
             _ => Err(Failure::NothingToAnimate),
         }

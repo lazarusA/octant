@@ -44,7 +44,7 @@ fn tiff(bands: u64, attrs: &[(&str, &str)]) -> OctantApp {
 fn a_zarr_band_dimension_opens_on_one_band_with_the_composite_off() {
     let var = variable(["y", "x", "band"], [256, 256, 128], &[]);
     let app = staged(StoreKind::RemoteZarr, &var);
-    assert_eq!(app.selected.dim_ranges[2], (0, 0));
+    assert_eq!(app.selected.dim_config[2].range, (0, 0));
     let composite = &app.layers.base.composite;
     assert!(!composite.enabled);
     assert_eq!(composite.channel_configs.len(), 128);
@@ -61,7 +61,6 @@ fn a_zarr_band_dimension_opens_on_one_band_with_the_composite_off() {
 fn a_composite_reads_only_the_selected_bands() {
     let var = variable(["y", "x", "band"], [256, 256, 128], &[]);
     let mut app = staged(StoreKind::RemoteZarr, &var);
-    app.selected.dim_ranges[2] = (0, 8);
     app.selected.dim_config[2].range = (0, 8);
     let off = app.staged_layer_request(LayerId::BASE).expect("request");
     app.layers.base.composite.enabled = true;
@@ -78,11 +77,11 @@ fn a_composite_reads_only_the_selected_bands() {
 fn only_rgb_rgba_and_cmyk_tiffs_open_in_color() {
     let rgb = tiff(3, &[]);
     assert!(rgb.layers.base.composite.enabled);
-    assert_eq!(rgb.selected.dim_ranges[0], (0, 2));
+    assert_eq!(rgb.selected.dim_config[0].range, (0, 2));
 
     let rgba = tiff(4, &[("alpha_band", "last")]);
     assert!(rgba.layers.base.composite.enabled);
-    assert_eq!(rgba.selected.dim_ranges[0], (0, 3));
+    assert_eq!(rgba.selected.dim_config[0].range, (0, 3));
 
     let cmyk = tiff(4, &[("photometric", "cmyk")]);
     assert!(cmyk.layers.base.composite.enabled);
@@ -90,7 +89,7 @@ fn only_rgb_rgba_and_cmyk_tiffs_open_in_color() {
     for bands in [4, 12] {
         let app = tiff(bands, &[]);
         assert!(!app.layers.base.composite.enabled, "{bands} bands");
-        assert_eq!(app.selected.dim_ranges[0], (0, 0), "{bands} bands");
+        assert_eq!(app.selected.dim_config[0].range, (0, 0), "{bands} bands");
     }
 }
 
@@ -99,5 +98,5 @@ fn a_three_band_zarr_is_not_rgb() {
     let var = variable(["band", "y", "x"], [3, 64, 64], &[]);
     let app = staged(StoreKind::RemoteZarr, &var);
     assert!(!app.layers.base.composite.enabled);
-    assert_eq!(app.selected.dim_ranges[0], (0, 0));
+    assert_eq!(app.selected.dim_config[0].range, (0, 0));
 }

@@ -18,7 +18,8 @@ impl OctantApp {
         } else if plot_shown && self.has_animated_dimension() {
             crate::ui::bottom_bar::show_bottom_bar(self, ui);
         }
-        self.run_commands(&ctx);
+        self.run_commands();
+        self.follow_panel_focus(&ctx);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);

@@ -168,7 +168,7 @@ fn panel_button(
     }
     let response = ui.add(btn);
     if response.clicked() {
-        app.toggle_panel(ui.ctx(), panel);
+        app.toggle_panel(panel);
     }
     (response, Stop::Button)
 }

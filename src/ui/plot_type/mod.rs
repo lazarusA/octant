@@ -51,6 +51,7 @@ pub fn show_plot_type_menu(
 
 /// One row per plot type: pickable ones select it, the others say why not.
 fn menu_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
+    options::fall_back_to_heatmap(app);
     let options = plot_options(app);
     ui.set_min_width(220.0);
     ui.label(

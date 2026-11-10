@@ -26,7 +26,13 @@ impl BarStyle<'_> {
     /// `value`'s position on the bar's scale.
     fn scaled(&self, value: f32) -> f32 {
         let c = self.color;
-        apply_color_scale_cpu(value, c.range_min, c.range_max, c.scale_type, c.scale_param)
+        apply_color_scale_cpu(
+            value,
+            c.range_min,
+            c.range_max,
+            c.scale.code(),
+            c.scale_param,
+        )
     }
 }
 
@@ -96,12 +102,12 @@ pub fn draw_continuous(ui: &egui::Ui, axis: BarAxis, bar: &BarStyle<'_>, colors:
     let c = bar.color;
     let mut mesh = Mesh::default();
     push_gradient(&mut mesh, axis, registry::is_stepped(bar.colormap), |t| {
-        let raw = unscale_norm_to_value(t, c.range_min, c.range_max, c.scale_type, c.scale_param);
+        let raw = unscale_norm_to_value(t, c.range_min, c.range_max, c.scale.code(), c.scale_param);
         bar.color_at(bar.scaled(raw))
     });
     paint_bar(ui, axis.rect, bar, mesh, colors.border);
 
-    let ticks = generate_colorbar_ticks(c.range_min, c.range_max, c.scale_type, c.scale_param);
+    let ticks = generate_colorbar_ticks(c.range_min, c.range_max, c.scale.code(), c.scale_param);
     for tick in ticks.iter() {
         let t = tick.t_pos;
         if tick.is_major {

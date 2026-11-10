@@ -23,17 +23,13 @@ pub fn calculate_max_animated_steps(
 
 /// The cells and bytes the selection over `selected_ranges` downloads from
 /// `var_info` (its active dimensions), and the variable's total bytes.
-pub fn calculate_download_sizes(
-    var_info: &VariableInfo,
-    dim_config: &[DimConfig],
-    selected_ranges: &[(usize, usize)],
-) -> (u64, u64, u64) {
+pub fn calculate_download_sizes(var_info: &VariableInfo, dims: &[DimConfig]) -> (u64, u64, u64) {
     crate::utils::math::calculate_download_sizes(
         &var_info.shape,
         var_info.file_size,
         crate::utils::data_type_bytes(&var_info.data_type),
-        |i| dim_config.get(i).is_some_and(|c| c.active),
-        selected_ranges,
+        |i| dims.get(i).is_some_and(|c| c.active),
+        |i| dims.get(i).map(|c| c.range),
     )
 }
 
@@ -47,19 +43,22 @@ pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
 /// cloud reads (whatever its plot is now), over its active dimensions.
 fn selection_volume_elements(app: &OctantApp, selection: &VariableSelection) -> usize {
     app.read_window_as(selection, crate::plots::PlotType::Volume)
-        .map_or(0, |w| window_volume_elements(selection, &w))
+        .map_or(0, |w| window_volume_elements(&w))
 }
 
-/// The 3D volume elements `selection` reads over `window`
+/// The 3D volume elements a selection reads over its `window`
 /// (`OctantApp::read_window`), over its active dimensions.
-fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
-    let (var_info, ranges) = window;
+fn window_volume_elements(window: &ReadWindow) -> usize {
+    let (var_info, dims) = window;
     let is_active = |i: usize| {
-        selection.dim_config.get(i).is_some_and(|c| c.active)
-            || selection.spatial_dims.contains(&i)
-            || selection.animated_dim == Some(i)
+        dims.get(i).is_some_and(|c| {
+            c.active
+                || c.spatial != crate::app::SpatialRole::None
+                || c.animation == crate::app::AnimationRole::Animated
+        })
     };
-    crate::utils::math::calculate_volume_elements(&var_info.shape, is_active, ranges)
+    let range_of = |i: usize| dims.get(i).map(|c| c.range);
+    crate::utils::math::calculate_volume_elements(&var_info.shape, is_active, range_of)
 }
 
 /// The spatial X and Y plane elements the staged selection reads, on its
@@ -78,14 +77,15 @@ pub fn calculate_selected_surface_elements(app: &OctantApp) -> usize {
 
 /// The spatial X and Y plane elements `selection` reads over `window`.
 pub fn window_2d_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
-    let (var_info, ranges) = window;
+    let (var_info, dims) = window;
     let (x_dim, y_dim, _) = OctantApp::resolve_spatial_axes(
         var_info.shape.len(),
         &var_info.dimension_names,
         &var_info.dimension_names,
         &selection.dim_config,
     );
-    crate::utils::math::calculate_2d_elements(&var_info.shape, x_dim, y_dim, ranges)
+    let range_of = |i: usize| dims.get(i).map(|c| c.range);
+    crate::utils::math::calculate_2d_elements(&var_info.shape, x_dim, y_dim, range_of)
 }
 
 /// `var`'s size in bytes: its stored size when known, else its shape times

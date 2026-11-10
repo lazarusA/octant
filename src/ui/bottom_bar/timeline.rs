@@ -39,7 +39,7 @@ impl TimelineKey {
         (app.plotted().metadata_generation, app.coordinates_revision).hash(&mut hasher);
         Self {
             variable: app.plotted().variable_idx,
-            animated_dim: app.plotted().animated_dim,
+            animated_dim: app.plotted().animated_dim(),
             step: app.playback.current_timestep,
             extent: app.animated_dim_extent(),
             dataset: hasher.finish(),
@@ -145,7 +145,7 @@ pub(super) fn dim_name(app: &OctantApp) -> &str {
         .and_then(|m| m.variables.get(app.plotted().variable_idx))
         .and_then(|v| {
             v.dimension_names
-                .get(app.plotted().animated_dim.unwrap_or(0))
+                .get(app.plotted().animated_dim().unwrap_or(0))
         })
         .map_or("step", String::as_str)
 }

@@ -21,6 +21,7 @@ impl OctantApp {
             } else {
                 show(self);
             }
+            self.stage_current_step();
         } else if !self.new_plot_pending() {
             // A new plot's block keeps the base layer's request: it shows
             // when it arrives, and only then do steps fetch.
@@ -86,6 +87,20 @@ impl OctantApp {
         } else {
             self.play_step(next_ts);
         }
+        self.stage_current_step();
+    }
+
+    /// The staged animated dimension shows the current step, as its slider
+    /// does, whether or not the Dimensions panel is drawn.
+    pub(crate) fn stage_current_step(&mut self) {
+        let sel = &mut self.selected;
+        let Some(a) = sel.animated_dim() else {
+            return;
+        };
+        let len = sel.variable_info().and_then(|v| v.shape.get(a)).copied();
+        let step = self.playback.current_timestep;
+        let step = len.map_or(step, |n| step.min((n as usize).saturating_sub(1)));
+        sel.set_step(a, step);
     }
 
     /// Shows step `next_ts` when every drawn animated layer holds it, else
@@ -109,7 +124,11 @@ impl OctantApp {
 
     /// Full size of layer `id`'s animated dimension, or 1 without one.
     pub fn layer_animated_dim_extent(&self, id: LayerId) -> usize {
-        let Some(anim_dim) = self.layers.get(id).and_then(|l| l.selection().animated_dim) else {
+        let Some(anim_dim) = self
+            .layers
+            .get(id)
+            .and_then(|l| l.selection().animated_dim())
+        else {
             return 1;
         };
         self.layer_variable_info(id)
@@ -120,6 +139,6 @@ impl OctantApp {
 
     /// Returns true if an animated dimension is currently selected and plotted.
     pub fn has_animated_dimension(&self) -> bool {
-        self.plotted().animated_dim.is_some()
+        self.plotted().animated_dim().is_some()
     }
 }

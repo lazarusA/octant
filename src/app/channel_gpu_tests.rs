@@ -20,8 +20,6 @@ pub(super) fn plotted(gpu: bool) -> Option<OctantApp> {
     let mut sel = selection_of(&mut app, &meta, "0/t2m");
     sel.dim_config[0].animation = AnimationRole::None;
     sel.dim_config[0].range = (0, 2);
-    sel.dim_ranges[0] = (0, 2);
-    sel.animated_dim = None;
     app.selected = sel;
     app.plot_selection();
     poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());

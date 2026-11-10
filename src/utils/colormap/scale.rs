@@ -1,5 +1,47 @@
 //! Forward and inverse color scale transformations (linear, log, symlog, sqrt, exp).
 
+/// A color scale. Its `code` is the number the shaders and the CPU
+/// transforms below read (`PlotColorParams::scale_type`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorScale {
+    #[default]
+    Linear,
+    Log,
+    Symlog,
+    Sqrt,
+    Exponential,
+}
+
+impl ColorScale {
+    pub const ALL: [Self; 5] = [
+        Self::Linear,
+        Self::Log,
+        Self::Symlog,
+        Self::Sqrt,
+        Self::Exponential,
+    ];
+
+    pub fn code(self) -> u32 {
+        self as u32
+    }
+
+    /// Its name in share links and commands.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Linear => "linear",
+            Self::Log => "log",
+            Self::Symlog => "symlog",
+            Self::Sqrt => "sqrt",
+            Self::Exponential => "exponential",
+        }
+    }
+
+    /// Whether it reads `scale_param`.
+    pub fn has_param(self) -> bool {
+        matches!(self, Self::Log | Self::Symlog | Self::Exponential)
+    }
+}
+
 /// Unscales a normalized colorbar position t in [0.0, 1.0] back to the exact data value v(t) for tick labeling.
 pub fn unscale_norm_to_value(
     t: f32,

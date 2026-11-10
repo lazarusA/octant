@@ -31,4 +31,4 @@ pub use eval::evaluate_color_cpu;
 pub use kind::ColormapKind;
 pub use lut::{LUT_SIZE, Lut, orient};
 pub use registry::COLORMAP_RGB_COMPOSITE;
-pub use scale::{apply_color_scale_cpu, unscale_norm_to_value};
+pub use scale::{ColorScale, apply_color_scale_cpu, unscale_norm_to_value};

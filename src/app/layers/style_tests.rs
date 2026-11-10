@@ -17,7 +17,7 @@ fn params_carry_the_range_clips_and_clamped_opacity() {
         range_max: 7.0,
         use_lowclip: true,
         opacity: 1.5,
-        scale_type: 2,
+        scale: crate::utils::colormap::ColorScale::Symlog,
         scale_param: 3.0,
         reversed: true,
         ..Default::default()
@@ -122,4 +122,19 @@ fn follow_extent_widens_the_seen_extent_and_moves_an_unlocked_range() {
         (2.0, 12.0),
         "a locked range stays"
     );
+}
+
+#[test]
+fn a_log_scale_needs_a_range_above_zero_whichever_comes_first() {
+    use crate::utils::colormap::ColorScale;
+    let mut style = ColorStyle::default();
+    style.set_range(-5.0, 5.0, true);
+    style.set_scale(ColorScale::Log);
+    assert_eq!(style.scale, ColorScale::Linear, "refused below zero");
+    style.set_range(1.0, 5.0, true);
+    style.set_scale(ColorScale::Log);
+    assert_eq!(style.scale, ColorScale::Log);
+    style.set_range(-1.0, 5.0, true);
+    assert_eq!(style.scale, ColorScale::Linear, "the range turns it linear");
+    assert!(style.lock_bounds);
 }

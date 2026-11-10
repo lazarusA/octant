@@ -48,7 +48,7 @@ impl OctantApp {
         let Some(target) = layer.load.pending_target_step.take() else {
             return false;
         };
-        let Some(dim) = layer.selection().animated_dim else {
+        let Some(dim) = layer.selection().animated_dim() else {
             return false;
         };
         if !super::view_filter::covers_step(block, dim, target) {
@@ -59,13 +59,16 @@ impl OctantApp {
         if id == LayerId::BASE {
             self.playback.current_timestep = target;
         }
-        let selection = if !layer.selection().dim_indices.is_empty() {
+        let selection = if !layer.selection().dim_config.is_empty() {
             Some(layer.selection_mut())
         } else {
             self.staged_selection_mut(id)
         };
-        if let Some(index) = selection.and_then(|s| s.dim_indices.get_mut(dim)) {
-            *index = target;
+        if let Some(s) = selection {
+            s.set_step(dim, target);
+        }
+        if id == LayerId::BASE {
+            self.stage_current_step();
         }
         true
     }

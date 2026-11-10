@@ -9,9 +9,7 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::data::ome::ChannelFamily;
 use crate::data::slicing::ChannelColorConfig;
-
-/// Color scales by name, in `ColorStyle::scale_type` order.
-pub const SCALES: [&str; 5] = ["linear", "log", "symlog", "sqrt", "exponential"];
+use crate::utils::colormap::ColorScale;
 
 /// Channel curves by name, as OMERO names its families.
 pub const CURVES: [(ChannelFamily, &str); 4] = [
@@ -143,9 +141,8 @@ impl OctantApp {
     pub(super) fn set_color_style(&mut self, s: &ColorSetting) -> Outcome {
         let scale = match s.scale.as_deref() {
             Some(name) => Some(
-                SCALES
-                    .iter()
-                    .position(|k| k.eq_ignore_ascii_case(name.trim()))
+                (ColorScale::ALL.into_iter())
+                    .find(|k| k.name().eq_ignore_ascii_case(name.trim()))
                     .ok_or_else(|| no_value("scale", name))?,
             ),
             None => None,
@@ -153,9 +150,11 @@ impl OctantApp {
         let nan = switchable(s.nan_color.as_deref(), "nan")?;
         let low = switchable(s.low_color.as_deref(), "low")?;
         let high = switchable(s.high_color.as_deref(), "high")?;
+        // A log scale the range cannot draw is left out; the rest applies.
+        let refused = scale == Some(ColorScale::Log) && !self.layers.base.color.allows_log();
         let style = &mut self.layers.base.color;
-        if let Some(t) = scale {
-            style.scale_type = t as u32;
+        if let Some(t) = scale.filter(|_| !refused) {
+            style.set_scale(t);
         }
         if let Some(p) = s.scale_param.filter(|p| p.is_finite()) {
             style.scale_param = p.clamp(0.0001, 100.0);
@@ -178,7 +177,18 @@ impl OctantApp {
                 None => {}
             }
         }
+        if refused {
+            return self.refuse_log_scale();
+        }
         Ok(Done::ColorStyleSet)
+    }
+
+    /// Says why a log scale was not set, as the Settings menu greys it out.
+    fn refuse_log_scale(&mut self) -> Outcome {
+        use crate::i18n::{SettingsKey as K, tr};
+        let (title, why) = (tr(K::ScaleLog), tr(K::ScaleLogDisabledHover));
+        self.notify(crate::ui::toast::Severity::Warning, title, why);
+        Err(Failure::Refused)
     }
 
     /// The index `value` names along the base layer's channel dimension.

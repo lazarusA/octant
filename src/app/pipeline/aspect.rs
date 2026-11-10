@@ -9,9 +9,7 @@ impl OctantApp {
         let y_idx = self.get_spatial_dim_index(1);
         let z_idx = self.get_spatial_dim_index(2);
         // OME-Zarr physical voxel size along each spatial axis.
-        let var = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info());
+        let var = self.effective_variable_info();
         let scale = |idx: usize| var.and_then(|v| v.ome_scale(idx)).map_or(1.0, |s| s as f32);
         let (scale_x, scale_y, scale_z) = (scale(x_idx), scale(y_idx), scale(z_idx));
 
@@ -25,9 +23,9 @@ impl OctantApp {
             return (w / max_dim, h / max_dim, d / max_dim);
         }
 
-        let sel_ranges = &self.selected.dim_ranges;
+        let sel_dims = &self.selected.dim_config;
         let get_extent = |dim: usize| -> usize {
-            if let Some(&(start, end)) = sel_ranges.get(dim) {
+            if let Some((start, end)) = sel_dims.get(dim).map(|c| c.range) {
                 (end + 1).saturating_sub(start).max(1)
             } else if let Some(meta) = self.selected.metadata.as_ref()
                 && let Some(var) = meta.variables.get(self.selected.variable_idx)
@@ -70,10 +68,9 @@ impl OctantApp {
         };
 
         let origin = self
-            .effective_selected_dim_ranges()
+            .effective_dim_config()
             .get(anim_dim)
-            .map(|r| r.0)
-            .unwrap_or(0);
+            .map_or(0, |c| c.range.0);
 
         let local_step = (self.playback.current_timestep.saturating_sub(origin)) as u32;
 
@@ -92,16 +89,9 @@ impl OctantApp {
 
     /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
-        let meta = self.effective_dataset_metadata();
-        let var_idx = if self.plotted().metadata.is_some() {
-            self.plotted().variable_idx
-        } else {
-            self.selected.variable_idx
-        };
+        let var = self.effective_variable_info();
         let configs = self.effective_dim_config();
-        if let Some(meta) = meta
-            && let Some(var) = meta.variables.get(var_idx)
-        {
+        if let Some(var) = var {
             let (x, y, z) = Self::resolve_spatial_axes(
                 var.shape.len(),
                 &var.dimension_names,
@@ -121,14 +111,8 @@ impl OctantApp {
     /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
         let idx = self.get_spatial_dim_index(axis);
-        let meta = self.effective_dataset_metadata();
-        let var_idx = if self.plotted().metadata.is_some() {
-            self.plotted().variable_idx
-        } else {
-            self.selected.variable_idx
-        };
-        meta.and_then(|m| m.variables.get(var_idx))
-            .and_then(|v| v.dimension_names.get(idx).cloned())
+        let var = self.effective_variable_info();
+        var.and_then(|v| v.dimension_names.get(idx).cloned())
     }
 
     /// Returns the effective original (width, height) of the active 2D data or pyramid.
@@ -151,7 +135,7 @@ impl OctantApp {
     /// Physical width over height of one pixel of the plotted OME-Zarr level
     /// (anisotropic pixels), 1 for other data.
     fn pixel_aspect_2d(&self) -> f32 {
-        let Some(var) = self.plotted_variable_info() else {
+        let Some(var) = self.effective_variable_info() else {
             return 1.0;
         };
         let step = |axis: usize| var.ome_scale(self.get_spatial_dim_index(axis));

@@ -17,7 +17,6 @@ impl Default for OctantApp {
             layers: LayerStack::default(),
             preview_colormap: None,
             colormaps: super::ColormapState::default(),
-            status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),
             is_loading: false,
             nav: super::NavigationState::default(),
             plot_configs: super::PlotConfigs::default(),

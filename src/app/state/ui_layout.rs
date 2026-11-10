@@ -41,6 +41,9 @@ pub struct UiLayoutState {
     pub show_plot_picker: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
+    /// Panels opened (`true`) or closed since keyboard focus last followed
+    /// them (`OctantApp::follow_panel_focus`).
+    pub(crate) panel_focus: Vec<(Panel, bool)>,
 }
 
 impl Default for UiLayoutState {
@@ -73,6 +76,7 @@ impl Default for UiLayoutState {
             show_plot_picker: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
+            panel_focus: Vec::new(),
         }
     }
 }
@@ -96,23 +100,20 @@ impl UiLayoutState {
             Panel::Dimensions => &mut self.show_variable_controls,
         }
     }
-
-    /// Opens the Settings panel and closes Dataset, Variables, Controls, and Catalog.
-    pub fn open_only_settings_panel(&mut self) {
-        self.show_settings_panel = true;
-        self.show_dataset_panel = false;
-        self.show_variables_overlay = false;
-        self.show_variable_controls = false;
-        self.show_catalog_window = false;
-        self.show_about_window = false;
-        self.show_shortcuts = false;
-        self.show_plot_picker = false;
-    }
 }
 
 impl super::app_state::OctantApp {
-    /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
+    /// Opens the Settings panel and closes the other panels (keeping the
+    /// staged selection) and the windows.
     pub fn open_only_settings_panel(&mut self) {
-        self.layout.open_only_settings_panel();
+        for panel in [Panel::Dataset, Panel::Variables, Panel::Dimensions] {
+            self.show_panel(panel, false);
+        }
+        self.show_panel(Panel::Settings, true);
+        let layout = &mut self.layout;
+        layout.show_catalog_window = false;
+        layout.show_about_window = false;
+        layout.show_shortcuts = false;
+        layout.show_plot_picker = false;
     }
 }

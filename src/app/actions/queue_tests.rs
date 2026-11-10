@@ -22,7 +22,7 @@ fn link_commands_run_with_the_voice_bar_closed() {
     let (mut app, _) = active_app();
     assert!(!app.voice.is_open());
     app.queue_actions(plot_t2m(), Origin::Link);
-    app.run_commands(&egui::Context::default());
+    app.run_commands();
     assert!(app.layers.base.data.matrix.is_some(), "t2m is drawn");
     assert!(app.commands.waiting.is_empty());
 }
@@ -34,7 +34,7 @@ fn a_closed_voice_bar_drops_only_voice_commands() {
     app.run_utterance("open procedural 4d, then plot");
     app.queue_actions(plot_t2m(), Origin::Link);
     assert!(origins(&app).contains(&Origin::Voice));
-    app.run_commands(&egui::Context::default());
+    app.run_commands();
     assert_eq!(origins(&app), vec![Origin::Link, Origin::Link]);
 }
 
@@ -55,7 +55,7 @@ fn a_failing_link_command_is_a_toast_and_drops_the_rest() {
     }];
     actions.extend(plot_t2m());
     app.queue_actions(actions, Origin::Link);
-    app.run_commands(&egui::Context::default());
+    app.run_commands();
     assert!(!app.toasts.is_empty());
     assert!(app.commands.waiting.is_empty());
     assert!(app.layers.base.data.matrix.is_none(), "nothing plotted");
@@ -69,7 +69,7 @@ fn a_link_replacing_one_whose_dataset_fails_still_runs() {
         source: "/no/such/raster.tif".into(),
     };
     app.queue_actions(vec![failing, AppAction::Play], Origin::Link);
-    app.run_commands(&ctx);
+    app.run_commands();
     assert!(app.metadata_rx.is_some(), "the first link's dataset loads");
     let open = AppAction::OpenSource {
         source: "procedural://volume4d".into(),
@@ -82,7 +82,7 @@ fn a_link_replacing_one_whose_dataset_fails_still_runs() {
             "the second link was dropped"
         );
         app.poll_inspection(&ctx);
-        app.run_commands(&ctx);
+        app.run_commands();
         std::thread::yield_now();
     }
 }
@@ -91,7 +91,7 @@ fn a_link_replacing_one_whose_dataset_fails_still_runs() {
 fn a_plot_last_in_the_queue_leaves_nothing_waiting_on_it() {
     let (mut app, _) = active_app();
     app.queue_actions(plot_t2m(), Origin::Link);
-    app.run_commands(&egui::Context::default());
+    app.run_commands();
     assert!(
         !app.commands.plotting,
         "a plot started by hand later must not hold questions"

@@ -59,7 +59,7 @@ impl OctantApp {
         let axis = |d: usize| {
             let name = var.dimension_names.get(d);
             let flipped = name.is_some_and(|n| flips.iter().any(|f| f.eq_ignore_ascii_case(n)));
-            let (start, end) = *plotted.dim_ranges.get(d)?;
+            let (start, end) = plotted.dim_config.get(d)?.range;
             match &var.multiscale {
                 Some(r) => Axis::plotted(&r.set, r.level, d, (start, end), flipped),
                 None => Some(Axis {
@@ -172,7 +172,7 @@ fn level0_window(
                 lo.floor().max(0.0) as u64..hi.ceil().max(lo.floor() + 1.0) as u64
             }
             None => {
-                let (s, e) = plotted.dim_ranges.get(d).copied().unwrap_or((0, 0));
+                let (s, e) = plotted.dim_config.get(d).map(|c| c.range).unwrap_or((0, 0));
                 set.to_base(level, d, s as u64..e as u64 + 1)
                     .unwrap_or(0..1)
             }
@@ -199,8 +199,9 @@ pub(super) fn plot_hash(
     let mut h = std::collections::hash_map::DefaultHasher::new();
     sel.metadata_generation.hash(&mut h);
     sel.variable_idx.hash(&mut h);
-    sel.dim_ranges.hash(&mut h);
-    sel.dim_indices.hash(&mut h);
+    for c in &sel.dim_config {
+        (c.index, c.range).hash(&mut h);
+    }
     step.hash(&mut h);
     flips.hash(&mut h);
     composite.is_some().hash(&mut h);

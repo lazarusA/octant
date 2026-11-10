@@ -81,9 +81,9 @@ fn a_replot_of_the_same_variable_keeps_a_locked_range() {
     app.layers.base.color.range_min = -5.0;
     app.layers.base.color.range_max = 5.0;
 
-    let anim = app.selected.animated_dim.expect("animated dimension");
+    let anim = app.selected.animated_dim().expect("animated dimension");
     app.playback.current_timestep = 7;
-    app.selected.dim_indices[anim] = 7;
+    app.selected.dim_config[anim].index = 7;
     app.plot_selection();
     drain(&mut app);
 

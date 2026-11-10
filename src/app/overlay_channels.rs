@@ -18,7 +18,7 @@ impl OctantApp {
         let c = var.channel_axis()?;
         let name = var.dimension_names.get(c)?;
         let shared = self
-            .plotted_variable_info()
+            .effective_variable_info()
             .is_some_and(|base| dim_named(base, name).is_some());
         (!shared).then_some(c)
     }
@@ -51,7 +51,12 @@ impl OctantApp {
             return;
         };
         let composite = &layer.composite;
-        let index = layer.selection().dim_indices.get(c).copied().unwrap_or(0);
+        let index = layer
+            .selection()
+            .dim_config
+            .get(c)
+            .map(|c| c.index)
+            .unwrap_or(0);
         let ticked = composite.channel_configs.iter().filter(|c| c.visible);
         let range = if !composite.enabled {
             Some((index, index))
@@ -65,9 +70,10 @@ impl OctantApp {
         let Some((lo, hi)) = range else {
             return;
         };
-        if let Some(r) = layer.selection_mut().dim_ranges.get_mut(c) {
-            *r = (lo.min(last), hi.min(last));
-        }
+        let sel = layer.selection_mut();
+        let (lo, hi) = (lo.min(last), hi.min(last));
+        let index = sel.dim_config.get(c).map_or(lo, |d| d.index.clamp(lo, hi));
+        sel.set_range(c, (lo, hi), index);
     }
 }
 

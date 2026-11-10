@@ -9,13 +9,12 @@ use crate::data::VariableInfo;
 /// Initializes default dimension roles (spatial X, Y, Z and animation) for a selected variable.
 pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
-    app.selected.dim_config = vec![DimConfig::default(); rank];
-    app.selected.dim_indices = vec![0; rank];
-    app.selected.dim_ranges.clear();
-    app.selected.spatial_dims.clear();
-    app.selected.animated_dim = None;
-
-    init_initial_ranges(app, var_info, rank);
+    app.selected.dim_config = (0..rank)
+        .map(|d| DimConfig {
+            range: chunk_window(var_info, d, 0),
+            ..DimConfig::default()
+        })
+        .collect();
 
     let dggs_opt =
         crate::data::coordinates::dggs::DggsMetadata::from_attributes(&var_info.attributes);
@@ -49,13 +48,14 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     } else {
         clamp_2d_selection_to_gpu_limits(app, var_info);
     }
-    sort_spatial_dims(app);
+    app.stage_current_step();
 }
 
 /// A multiscale variable shows its whole x and y extent: the plot reads it
 /// at a level that fits (`app::multiscale`), so level 0's size never limits it.
 fn whole_spatial_extent(app: &mut OctantApp, var_info: &VariableInfo) {
-    for (d, config) in app.selected.dim_config.iter_mut().enumerate() {
+    for d in 0..app.selected.dim_config.len() {
+        let config = app.selected.dim_config[d];
         if !matches!(config.spatial, SpatialRole::X | SpatialRole::Y) {
             continue;
         }
@@ -63,16 +63,7 @@ fn whole_spatial_extent(app: &mut OctantApp, var_info: &VariableInfo) {
             .shape
             .get(d)
             .map_or(0, |&n| (n as usize).saturating_sub(1));
-        config.range = (0, last);
-        if let Some(range) = app.selected.dim_ranges.get_mut(d) {
-            *range = (0, last);
-        }
-    }
-}
-
-fn init_initial_ranges(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
-    for i in 0..rank {
-        app.selected.dim_ranges.push(chunk_window(var_info, i, 0));
+        app.selected.set_range(d, (0, last), config.index.min(last));
     }
 }
 
@@ -113,10 +104,9 @@ fn init_rank1_defaults(
     };
     let dim_size = var_info.shape[0] as usize;
     let max_selectable = dim_size.min(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
-    app.selected.dim_ranges[0] = (0, max_selectable.saturating_sub(1));
+    app.selected
+        .set_range(0, (0, max_selectable.saturating_sub(1)), 0);
     app.selected.dim_config[0].active = true;
-    app.selected.dim_config[0].range = app.selected.dim_ranges[0];
-    app.selected.spatial_dims.push(0);
 }
 
 /// The OMERO default plane (`rdefs.defaultZ`) and time point (`defaultT`)
@@ -136,17 +126,9 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     ) && let Some(&size) = var_info.shape.get(t)
     {
         let last = (size as usize).saturating_sub(1);
-        let dt = dt.min(last);
-        let (start, end) = app.selected.dim_ranges[t];
-        if dt < start || dt > end {
-            let width = end.saturating_sub(start).min(last);
-            let start = dt.min(last - width);
-            app.selected.dim_ranges[t] = (start, start + width);
-            app.selected.dim_config[t].range = (start, start + width);
-        }
-        app.selected.dim_indices[t] = dt;
-        if app.selected.animated_dim == Some(t) {
-            app.playback.current_timestep = dt;
+        app.selected.hold_step(t, dt, last);
+        if app.selected.animated_dim() == Some(t) {
+            app.playback.current_timestep = dt.min(last);
         }
     }
 }
@@ -170,7 +152,12 @@ fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
     if plot_axis || super::composite::opens_in_color(var_info, is_tiff) {
         return;
     }
-    let (lo, hi) = app.selected.dim_ranges.get(c).copied().unwrap_or((0, 0));
+    let (lo, hi) = app
+        .selected
+        .dim_config
+        .get(c)
+        .map(|c| c.range)
+        .unwrap_or((0, 0));
     let active = |i: &usize| {
         let channels = var_info.ome.as_ref().map(|o| o.image.channels.as_slice());
         channels
@@ -180,8 +167,8 @@ fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
     let k = (lo.min(hi)..=hi.max(lo)).find(active).unwrap_or(lo.min(hi));
     if cfg.animation != AnimationRole::Animated {
         pin_dim(app, var_info, c, k);
-    } else if let Some(i) = app.selected.dim_indices.get_mut(c) {
-        *i = k;
+    } else {
+        app.selected.set_range(c, (lo, hi), k);
         app.playback.current_timestep = k;
     }
 }
@@ -191,10 +178,8 @@ fn pin_dim(app: &mut OctantApp, var_info: &VariableInfo, dim: usize, k: usize) {
     let Some(&size) = var_info.shape.get(dim) else {
         return;
     };
-    let k = k.min((size as usize).saturating_sub(1));
-    app.selected.dim_indices[dim] = k;
-    app.selected.dim_ranges[dim] = (k, k);
-    app.selected.dim_config[dim].range = (k, k);
+    app.selected
+        .set_index(dim, k.min((size as usize).saturating_sub(1)));
 }
 
 fn finalize_active_configs(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
@@ -208,7 +193,6 @@ fn finalize_active_configs(app: &mut OctantApp, var_info: &VariableInfo, rank: u
         let dim_size = var_info.shape[i] as usize;
 
         if app.selected.dim_config[i].spatial != SpatialRole::None {
-            app.selected.spatial_dims.push(i);
             app.selected.dim_config[i].active = true;
         }
         if app.selected.dim_config[i].animation == AnimationRole::Animated {
@@ -217,20 +201,5 @@ fn finalize_active_configs(app: &mut OctantApp, var_info: &VariableInfo, rank: u
         if is_channel && dim_size >= 2 {
             app.selected.dim_config[i].active = true;
         }
-        if let Some(&r) = app.selected.dim_ranges.get(i) {
-            app.selected.dim_config[i].range = r;
-        }
     }
-}
-
-fn sort_spatial_dims(app: &mut OctantApp) {
-    app.selected
-        .spatial_dims
-        .sort_by_key(|&d| match app.selected.dim_config[d].spatial {
-            SpatialRole::Grid => 0,
-            SpatialRole::X => 1,
-            SpatialRole::Y => 2,
-            SpatialRole::Z => 3,
-            SpatialRole::None => 99,
-        });
 }

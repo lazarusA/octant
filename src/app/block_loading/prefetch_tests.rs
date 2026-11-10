@@ -28,14 +28,13 @@ fn heatmap_app() -> OctantApp {
     app.load_new_metadata(meta);
     app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
-    assert_eq!(app.selected.animated_dim, Some(0));
+    assert_eq!(app.selected.animated_dim(), Some(0));
     assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::None);
     app
 }
 
 /// Selects steps `start..=end` of the time axis.
 fn select_time(app: &mut OctantApp, (start, end): (usize, usize)) {
-    app.selected.dim_ranges[0] = (start, end);
     app.selected.dim_config[0].range = (start, end);
 }
 

@@ -17,7 +17,6 @@ pub struct OctantApp {
     pub layers: LayerStack,
     pub preview_colormap: Option<u32>,
     pub colormaps: super::ColormapState,
-    pub status_message: String,
     pub is_loading: bool,
     pub nav: super::NavigationState,
     pub plot_configs: super::PlotConfigs,

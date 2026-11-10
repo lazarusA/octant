@@ -49,6 +49,7 @@ pub fn show_plot_type_picker(app: &mut OctantApp, ctx: &egui::Context) {
     if !open {
         return;
     }
+    super::options::fall_back_to_heatmap(app);
     let options = plot_options(app);
     let current = app.selected.plot_type;
     let mut picked = None;

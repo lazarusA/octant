@@ -34,7 +34,6 @@ fn press_plot(app: &mut OctantApp) {
 
 /// Sets the slider range of `dim` the way `slider_row.rs` does.
 fn set_range(app: &mut OctantApp, dim: usize, range: (usize, usize)) {
-    app.selected.dim_ranges[dim] = range;
     app.selected.dim_config[dim].range = range;
 }
 
@@ -122,7 +121,7 @@ fn assert_volume_planes(
 fn volume_replot_with_smaller_then_larger_spatial_ranges() {
     let mut app = new_volume_app();
     // dims: time(0, animated), depth(1, Z), lat(2, Y), lon(3, X)
-    assert_eq!(app.selected.animated_dim, Some(0));
+    assert_eq!(app.selected.animated_dim(), Some(0));
 
     press_plot(&mut app);
     assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
@@ -188,10 +187,6 @@ fn new_depth_animated_app(chunk: u64) -> OctantApp {
         role(SpatialRole::X, AnimationRole::None, (0, 31)),
     ];
     app.selected.dim_config[0].active = false;
-    app.selected.animated_dim = Some(1);
-    app.selected.spatial_dims = vec![3, 2, 1];
-    app.selected.dim_indices = vec![0; 4];
-    app.selected.dim_ranges = vec![(0, 0), (0, 31), (0, 31), (0, 31)];
     app.playback.current_timestep = 0;
     app
 }
