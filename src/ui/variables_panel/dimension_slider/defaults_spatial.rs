@@ -85,14 +85,36 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
         }
     }
 
-    // 4. For 4D+ datasets without an explicit time axis, default animation to an unassigned dimension
-    if rank >= 4
-        && !anim_assigned
-        && let Some(unassigned) = (0..rank).find(|&i| {
-            app.selected.dim_config[i].spatial == SpatialRole::None
-                && app.selected.dim_config[i].animation == AnimationRole::None
-        })
-    {
-        app.selected.dim_config[unassigned].animation = AnimationRole::Animated;
+    // 4. Without an explicit time axis, an OME-Zarr image animates its Z unless
+    // its pyramid downsamples Z; other 4D+ datasets animate an unassigned
+    // dimension. Never the channel.
+    if anim_assigned {
+        return;
     }
+    let pick = if var_info.ome.is_some() {
+        (0..rank).find(|&i| {
+            app.selected.dim_config[i].spatial == SpatialRole::Z && !downsampled(var_info, i)
+        })
+    } else if rank >= 4 {
+        (0..rank).find(|&i| {
+            let name = var_info.dimension_names.get(i).map_or("", |s| s.as_str());
+            app.selected.dim_config[i].spatial == SpatialRole::None
+                && !crate::data::coordinates::naming::is_channel_dim_name(name)
+        })
+    } else {
+        None
+    };
+    if let Some(i) = pick {
+        app.selected.dim_config[i].animation = AnimationRole::Animated;
+    }
+}
+
+/// Whether a level of `var_info`'s stack downsamples dimension `dim`: an
+/// animated dimension reads every level-0 index, so such levels are never read.
+fn downsampled(var_info: &VariableInfo, dim: usize) -> bool {
+    var_info.multiscale.as_ref().is_some_and(|r| {
+        (0..r.set.len())
+            .filter_map(|l| r.set.level(l))
+            .any(|l| l.factor.get(dim).is_some_and(|&f| f > 1.0))
+    })
 }
