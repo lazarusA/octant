@@ -49,6 +49,28 @@ impl BakeId {
     }
 }
 
+/// A plot buffer's id, renewed when raw values overwrite its bake, so no
+/// remembered bake matches it any more.
+#[derive(Debug)]
+pub struct BakeSlot(AtomicU64);
+
+impl Default for BakeSlot {
+    fn default() -> Self {
+        Self(AtomicU64::new(BakeId::next().0))
+    }
+}
+
+impl BakeSlot {
+    pub fn id(&self) -> BakeId {
+        BakeId(self.0.load(Ordering::Relaxed))
+    }
+
+    /// The buffer holds raw values again.
+    pub fn renew(&self) {
+        self.0.store(BakeId::next().0, Ordering::Relaxed);
+    }
+}
+
 /// Targets whose last bake is remembered (a mesh and its 3D coastlines).
 const REMEMBERED: usize = 4;
 

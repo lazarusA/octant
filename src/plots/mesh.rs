@@ -15,7 +15,7 @@ pub struct Mesh3DRenderer {
     pub cube_index_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
     /// Names `data_buffer` to the channel bake.
-    pub bake_id: super::BakeId,
+    pub bake_id: super::BakeSlot,
     pub coord_x_buffer: wgpu::Buffer,
     pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
@@ -83,11 +83,10 @@ impl Mesh3DRenderer {
             width: width as u32,
             height: height as u32,
             coord_mode: 0,
-            has_reference_globe: 0,
+            flip_height: 0,
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
-            flip_height: 0,
-            _pad: 0,
+            _pad: [0; 2],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -174,7 +173,7 @@ impl Mesh3DRenderer {
             cube_vertex_buffer,
             cube_index_buffer,
             data_buffer,
-            bake_id: super::BakeId::next(),
+            bake_id: super::BakeSlot::default(),
             coord_x_buffer,
             coord_y_buffer,
             uniform_buffer,
@@ -199,11 +198,10 @@ impl Mesh3DRenderer {
             width: self.width as u32,
             height: self.height as u32,
             coord_mode: params.coord_mode,
-            has_reference_globe: if params.has_reference_globe { 1 } else { 0 },
+            flip_height: u32::from(params.flip_height),
             lon_bounds: params.lon_bounds,
             lat_bounds: params.lat_bounds,
-            flip_height: u32::from(params.flip_height),
-            _pad: 0,
+            _pad: [0; 2],
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -232,6 +230,7 @@ impl Mesh3DRenderer {
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
         self.inputs.data_changed();
+        self.bake_id.renew();
         super::common::safe_write_buffer(
             queue,
             &self.data_buffer,
@@ -254,17 +253,9 @@ fn create_template_buffers(
     device: &wgpu::Device,
 ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
     let (quad_verts, quad_idx) =
-        super::common::build_unit_quad_mesh(|position, uv, normal| MeshVertex3D {
-            position,
-            uv,
-            normal,
-        });
+        super::common::build_unit_quad_mesh(|position, normal| MeshVertex3D { position, normal });
     let (cube_verts, cube_idx) =
-        super::common::build_unit_cube_mesh(|position, uv, normal| MeshVertex3D {
-            position,
-            uv,
-            normal,
-        });
+        super::common::build_unit_cube_mesh(|position, normal| MeshVertex3D { position, normal });
     let buf = |label, contents, usage| {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),

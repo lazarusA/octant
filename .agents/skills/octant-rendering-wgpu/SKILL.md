@@ -16,7 +16,7 @@ This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management
 Each renderer in `src/plots/` owns its GPU buffers and upload methods (`update_data` over `&[f32]`, and its own range and channel uploads) and is drawn by its egui paint callback (`prepare` uploads and bakes, `paint` draws), built per layer in `src/app/pipeline/paint_layer.rs`. They share no trait (an earlier `PlotRenderer` trait, which nothing called, was removed):
 1. **`HeatmapRenderer` (`heatmap.rs`, `heatmap_draw.rs`)**: 2D heatmaps, with `LabelRenderer` (`labels.rs`) and `ChannelRenderer` (`channels.rs`) drawn over its quad.
 2. **`LineRenderer` (`line.rs`, `line/payload.rs`)**: 1D lines and series.
-3. **`Mesh3DRenderer` (`mesh.rs`, `mesh_draw.rs`)**: the surface and the sphere (`shaders/surface.wgsl`, `shaders/sphere.wgsl`), GPU instanced, steps, blocks and smooth modes.
+3. **`Mesh3DRenderer` (`mesh.rs`, `mesh_draw.rs`)**: the surface and the sphere (`shaders/surface.wgsl`, `shaders/sphere.wgsl`, each with its `vs_main`, mode numbers, `SCREEN_NORMAL_MODE` and `LIGHT_DIR` after `shaders/common/mesh3d.wgsl`: their uniforms, bindings, vertex structs, `shade()` and fragment entry points; `mesh_draw.rs` `SPHERE_WGSL`/`SURFACE_WGSL`; `uniform_layout_tests.rs` checks `Mesh3DUniforms` field by field), GPU instanced, steps, blocks and smooth modes.
 4. **`PointCloudRenderer` (`point_cloud.rs`, `point_cloud_draw.rs`)**.
 5. **`VolumeRenderer` (`volume/`)**: the raymarcher (DVR, MIP, label surfaces, classic modes).
 

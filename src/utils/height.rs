@@ -117,7 +117,7 @@ mod tests {
         }
         assert!(sphere.contains("h * 0.4 * uniforms.displacement_strength"));
         assert!(coastline.contains("* 0.4 * coastline_uniforms.displacement_strength"));
-        assert!(surface.contains("select(0.8, 0.6, uniforms.surface_mode == 1u)"));
+        assert!(surface.contains("select(0.8, 0.6, uniforms.mode == 1u)"));
         assert!(sphere.contains("let height_scale = 0.4 * uniforms.displacement_strength;"));
         let factors = [
             (false, 0),

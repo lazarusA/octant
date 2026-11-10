@@ -61,7 +61,6 @@ pub(super) fn surface_callback(
             displacement_strength: 0.5,
             mode,
             coord_mode: 0,
-            has_reference_globe: false,
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             flip_height: false,

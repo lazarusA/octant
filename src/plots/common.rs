@@ -75,15 +75,13 @@ impl Default for PlotColorParams {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct MeshVertex3D {
     pub position: [f32; 3],
-    pub uv: [f32; 2],
     pub normal: [f32; 3],
 }
 
 impl MeshVertex3D {
-    pub const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    pub const ATTRIBS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
         0 => Float32x3,
-        1 => Float32x2,
-        2 => Float32x3,
+        1 => Float32x3,
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -106,12 +104,11 @@ pub struct Mesh3DUniforms {
     pub width: u32,
     pub height: u32,
     pub coord_mode: u32,
-    pub has_reference_globe: u32,
-    pub lon_bounds: [f32; 2],
-    pub lat_bounds: [f32; 2],
     /// 1 when heights are flipped (`utils::height::HeightScale::flip`).
     pub flip_height: u32,
-    pub _pad: u32,
+    pub lon_bounds: [f32; 2],
+    pub lat_bounds: [f32; 2],
+    pub _pad: [u32; 2],
     pub color: PlotColorParams,
 }
 
@@ -125,7 +122,6 @@ pub struct Mesh3DUniformParams {
     pub displacement_strength: f32,
     pub mode: u32,
     pub coord_mode: u32,
-    pub has_reference_globe: bool,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
     pub flip_height: bool,
@@ -417,7 +413,7 @@ pub fn default_depth_stencil_state(
 /// Reusable unit cube mesh generator (24 vertices, 36 indices) for instanced 3D rendering.
 pub fn build_unit_cube_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
 where
-    F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
+    F: FnMut([f32; 3], [f32; 3]) -> V,
 {
     let faces: [([[f32; 3]; 4], [f32; 3]); 6] = [
         (
@@ -479,10 +475,10 @@ where
     let mut indices = Vec::with_capacity(36);
     for (pts, norm) in faces {
         let base = vertices.len() as u32;
-        vertices.push(make_vertex(pts[0], [0.0, 0.0], norm));
-        vertices.push(make_vertex(pts[1], [1.0, 0.0], norm));
-        vertices.push(make_vertex(pts[2], [0.0, 1.0], norm));
-        vertices.push(make_vertex(pts[3], [1.0, 1.0], norm));
+        vertices.push(make_vertex(pts[0], norm));
+        vertices.push(make_vertex(pts[1], norm));
+        vertices.push(make_vertex(pts[2], norm));
+        vertices.push(make_vertex(pts[3], norm));
         indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 1, base + 3]);
     }
     (vertices, indices)
@@ -491,14 +487,14 @@ where
 /// Reusable unit quad mesh generator (4 vertices, 6 indices) for instanced 2D/3D quad grid rendering.
 pub fn build_unit_quad_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
 where
-    F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
+    F: FnMut([f32; 3], [f32; 3]) -> V,
 {
     let norm = [0.0, 1.0, 0.0];
     let vertices = vec![
-        make_vertex([0.0, 0.0, 0.0], [0.0, 0.0], norm),
-        make_vertex([1.0, 0.0, 0.0], [1.0, 0.0], norm),
-        make_vertex([0.0, 1.0, 0.0], [0.0, 1.0], norm),
-        make_vertex([1.0, 1.0, 0.0], [1.0, 1.0], norm),
+        make_vertex([0.0, 0.0, 0.0], norm),
+        make_vertex([1.0, 0.0, 0.0], norm),
+        make_vertex([0.0, 1.0, 0.0], norm),
+        make_vertex([1.0, 1.0, 0.0], norm),
     ];
     let indices = vec![0, 2, 1, 1, 2, 3];
     (vertices, indices)

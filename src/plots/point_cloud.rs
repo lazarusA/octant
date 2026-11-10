@@ -15,7 +15,7 @@ pub struct PointCloudRenderer {
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
     /// Names `data_buffer` to the channel bake.
-    pub bake_id: super::BakeId,
+    pub bake_id: super::BakeSlot,
     /// How `data_buffer` thins the volume, for the channel bake.
     pub thinning: super::Thinning,
     pub bind_group: wgpu::BindGroup,
@@ -156,7 +156,7 @@ impl PointCloudRenderer {
             index_count: indices.len() as u32,
             uniform_buffer,
             data_buffer,
-            bake_id: super::BakeId::next(),
+            bake_id: super::BakeSlot::default(),
             thinning: super::Thinning::NONE,
             bind_group,
             instance_count: AtomicU32::new(instance_count),
@@ -175,6 +175,7 @@ impl PointCloudRenderer {
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
         self.inputs.data_changed();
+        self.bake_id.renew();
         if !data.is_empty()
             && super::common::safe_write_buffer(
                 queue,
@@ -191,6 +192,7 @@ impl PointCloudRenderer {
     /// Uploads `data` at element `offset` without touching the rest of the volume.
     pub fn update_data_range(&self, queue: &wgpu::Queue, offset: usize, data: &[f32]) {
         self.inputs.data_changed();
+        self.bake_id.renew();
         super::common::safe_write_buffer_range(
             queue,
             &self.data_buffer,

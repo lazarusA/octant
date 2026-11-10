@@ -92,7 +92,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         self.renderer.update_uniforms(queue, &self.params);
         if let Some(channels) = &self.channels {
             let r = &self.renderer;
-            let target = (r.bake_id, &r.data_buffer, r.thinning);
+            let target = (r.bake_id.id(), &r.data_buffer, r.thinning);
             if channels.bake_into(device, queue, encoder, target) {
                 r.inputs.data_changed();
             }

@@ -45,11 +45,13 @@ mod slice_gpu_tests;
 pub(crate) mod test_frame;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
+#[cfg(test)]
+mod uniform_layout_tests;
 pub mod volume;
 
 use crate::i18n::{PlotKey, tr};
 
-pub use channel_bake::{BakeId, Thinning};
+pub use channel_bake::{BakeId, BakeSlot, Thinning};
 pub use channel_bake_targets::validity_bytes;
 pub use channel_bake_volume::VolumeTargets;
 pub use channel_params::{ChannelParams, MAX_CHANNELS};
