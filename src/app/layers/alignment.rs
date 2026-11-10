@@ -19,6 +19,9 @@ pub enum Alignment {
     IndexOnly,
     /// Nothing places it on the base layer's canvas.
     Incompatible,
+    /// A label image over a sphere or surface: label images draw only on
+    /// the heatmap.
+    LabelsHeatmapOnly,
 }
 
 impl Alignment {
@@ -34,6 +37,7 @@ impl Alignment {
             Self::Geo { .. } => Some(tr(PlotKey::AlignGeo)),
             Self::IndexOnly => Some(tr(PlotKey::AlignIndexOnly)),
             Self::Incompatible => Some(tr(PlotKey::AlignIncompatible)),
+            Self::LabelsHeatmapOnly => Some(tr(PlotKey::LabelsHeatmapOnly)),
         }
     }
 }
@@ -48,14 +52,19 @@ enum AxisMatch {
 }
 
 /// Classifies `overlay` against the `base` selection, which must be a 2D
-/// heatmap (an X and a Y dimension) to place anything.
+/// grid (an X and a Y dimension) drawn as a heatmap, sphere or surface to
+/// place anything.
 pub fn classify(base: &VariableSelection, overlay: &VariableSelection) -> Alignment {
     let (Some(base_var), Some(overlay_var)) = (base.variable_info(), overlay.variable_info())
     else {
         return Alignment::Incompatible;
     };
-    if base.plot_type != PlotType::Heatmap || overlay.plot_type != PlotType::Heatmap {
+    if !base.plot_type.draws_overlays() || overlay.plot_type != PlotType::Heatmap {
         return Alignment::Incompatible;
+    }
+    // Label images have no sphere or surface mesh.
+    if base.plot_type != PlotType::Heatmap && overlay_var.label_info().is_some() {
+        return Alignment::LabelsHeatmapOnly;
     }
     let (Some(x), Some(y)) = (
         DimConfig::x_dim(&base.dim_config),

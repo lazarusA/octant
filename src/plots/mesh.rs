@@ -20,6 +20,8 @@ pub struct Mesh3DRenderer {
     pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
+    /// Where the heights come from (bind group 2).
+    pub(crate) heights: super::mesh_heights::HeightSlot,
     pub num_instances: u32,
     pub width: usize,
     pub height: usize,
@@ -83,10 +85,10 @@ impl Mesh3DRenderer {
             width: width as u32,
             height: height as u32,
             coord_mode: 0,
-            flip_height: 0,
+            height_flags: 0,
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
-            _pad: [0; 2],
+            height_range: [0.0, 1.0],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -134,10 +136,15 @@ impl Mesh3DRenderer {
             &coord_y_buffer,
         );
 
+        let heights = super::mesh_heights::HeightSlot::new(device, &data_buffer);
         let colormap_layout = super::colormap_atlas::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Mesh 3D Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
+            bind_group_layouts: &[
+                Some(&bind_group_layout),
+                Some(&colormap_layout),
+                Some(heights.layout()),
+            ],
             immediate_size: 0,
         });
 
@@ -178,6 +185,7 @@ impl Mesh3DRenderer {
             coord_y_buffer,
             uniform_buffer,
             bind_group,
+            heights,
             num_instances,
             width,
             height,
@@ -198,10 +206,10 @@ impl Mesh3DRenderer {
             width: self.width as u32,
             height: self.height as u32,
             coord_mode: params.coord_mode,
-            flip_height: u32::from(params.flip_height),
+            height_flags: u32::from(params.flip_height) | (u32::from(params.height_composite) << 1),
             lon_bounds: params.lon_bounds,
             lat_bounds: params.lat_bounds,
-            _pad: [0; 2],
+            height_range: params.height_range,
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

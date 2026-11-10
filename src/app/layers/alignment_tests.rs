@@ -133,12 +133,22 @@ fn a_different_window_or_grid_is_not_drawn() {
 }
 
 #[test]
-fn only_heatmaps_align() {
+fn only_heatmaps_spheres_and_surfaces_align() {
+    use crate::plots::PlotType;
     let data = dataset("a", &[]);
     let mut base = base_of(&data);
     let overlay = overlay_selection(&base, &data, 1).expect("overlay");
-    base.plot_type = crate::plots::PlotType::Volume;
-    assert_eq!(classify(&base, &overlay), Alignment::Incompatible);
+    let drawn = classify(&base, &overlay);
+    assert!(drawn.is_drawn(), "the heatmap");
+    for plot_type in [PlotType::Sphere, PlotType::Surface] {
+        base.plot_type = plot_type;
+        assert_eq!(classify(&base, &overlay), drawn, "{plot_type:?}");
+    }
+    for plot_type in [PlotType::Volume, PlotType::PointCloud, PlotType::Line] {
+        base.plot_type = plot_type;
+        let alignment = classify(&base, &overlay);
+        assert_eq!(alignment, Alignment::Incompatible, "{plot_type:?}");
+    }
 }
 
 #[test]

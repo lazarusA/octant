@@ -3,16 +3,6 @@
 const SCREEN_NORMAL_MODE: u32 = 0u;
 const LIGHT_DIR = vec3<f32>(0.4, 0.8, 0.6);
 
-fn get_normalized_height(val: f32) -> f32 {
-    return normalized_height(
-        val,
-        uniforms.color.cmin,
-        uniforms.color.cmax,
-        uniforms.color.colormap == COLORMAP_RGB_COMPOSITE,
-        uniforms.flip_height == 1u,
-    );
-}
-
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -29,6 +19,7 @@ fn vs_main(
     let safe_idx = min(instance_idx, max_idx);
 
     var raw_val = data_buffer[safe_idx];
+    var height_val = height_value(safe_idx);
     let grid = vec2<f32>(f32(grid_w), f32(grid_h));
     var slice_xy = (vec2<f32>(f32(cell_x), f32(cell_y)) + model.position.xy) / grid;
 
@@ -85,11 +76,15 @@ fn vs_main(
         if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
             let nside = healpix_nside(grid_w * grid_h);
             let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
-            raw_val = healpix_get_interpolated_corner_val(safe_idx, healpix_uv, nside, uniforms.coord_mode == 5u, max_idx);
+            let nested = uniforms.coord_mode == 5u;
+            raw_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, false);
+            height_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, true);
         } else {
             let sx = smooth_corner(cell_x, model.position.x, grid_w, false);
             let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
-            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            let corner_idx = min(sy.cell * grid_w + sx.cell, max_idx);
+            raw_val = data_buffer[corner_idx];
+            height_val = height_value(corner_idx);
             let bounds_u = get_cell_normalized_bounds_x(sx.at_cell, grid_w, uniforms.coord_mode);
             let bounds_v = get_cell_normalized_bounds_y(sy.at_cell, grid_h, uniforms.coord_mode);
             let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
@@ -98,19 +93,19 @@ fn vs_main(
             slice_xy = (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid;
         }
 
-        let norm_h = get_normalized_height(raw_val);
+        let norm_h = height_of(height_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(world_x, height, world_z);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else if (uniforms.mode == 1u) {
         // Mode 1: Flat Steps
-        let norm_h = get_normalized_height(raw_val);
+        let norm_h = height_of(height_val);
         let height = norm_h * 0.6 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(world_x, height, world_z);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else {
         // Mode 2: 3D Lego Cubes
-        let norm_h = get_normalized_height(raw_val);
+        let norm_h = height_of(height_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
 
         let y_base = min(0.0, height);
@@ -134,7 +129,7 @@ fn vs_main(
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.
         let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
-        out.slice_at = vec3<f32>(center, get_normalized_height(raw_val));
+        out.slice_at = vec3<f32>(center, height_of(height_val));
     }
     out.normal = norm_rot;
     out.world_pos = pos_rot;

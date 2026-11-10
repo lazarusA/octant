@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::AlignIndexOnly => "Samma rutnätsform, men inga koordinater matchar diagrammet",
         PlotKey::AlignIncompatible => "Delar inget rutnät med diagrammet",
         PlotKey::OverlayPlotFirst => "Plotta en variabel först",
-        PlotKey::OverlayHeatmapOnly => "Överlägg ritas över värmekartor",
+        PlotKey::OverlayPlotTypes => "Överlägg ritas över värmekartor, sfärer och ytor",
         PlotKey::OverlayStackFull => "Högst 4 överlägg",
         PlotKey::OverlayAlreadyLayer => "Redan ett lager i diagrammet",
         PlotKey::OverlayCantAdd => "Kan inte lägga till överlägg",

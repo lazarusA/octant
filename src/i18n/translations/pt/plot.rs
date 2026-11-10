@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Não compartilha grade com o gráfico",
         PlotKey::OverlayPlotFirst => "Plote uma variável primeiro",
-        PlotKey::OverlayHeatmapOnly => "Sobreposições são desenhadas sobre mapas de calor",
+        PlotKey::OverlayPlotTypes => "Sobreposições são desenhadas sobre mapas de calor, esferas e superfícies",
         PlotKey::OverlayStackFull => "No máximo 4 sobreposições",
         PlotKey::OverlayAlreadyLayer => "Já é uma camada do gráfico",
         PlotKey::OverlayCantAdd => "Não é possível adicionar a sobreposição",

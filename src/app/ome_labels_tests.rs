@@ -77,6 +77,34 @@ fn label_overlay(app: &mut OctantApp, meta: &DatasetMetadata) -> LayerId {
     app.add_overlay(idx).expect("overlay")
 }
 
+/// Label images draw only on the heatmap: none is added over a sphere, and
+/// one added over the heatmap is hidden once the plot turns into a sphere.
+#[test]
+fn label_images_overlay_no_sphere() {
+    let (mut app, meta) = ome_app();
+    let shown = label_overlay(&mut app, &meta);
+    app.layers.base.selection_mut().plot_type = crate::plots::PlotType::Sphere;
+    app.refresh_alignments();
+    let layer = app.layers.get(shown).expect("layer");
+    assert_eq!(layer.alignment, Alignment::LabelsHeatmapOnly);
+    assert!(!layer.is_drawn(), "no mesh draws it");
+    app.remove_overlay(shown);
+    app.switch_plot_type(crate::plots::PlotType::Sphere);
+    app.layers.base.selection_mut().plot_type = crate::plots::PlotType::Sphere;
+    let idx = meta
+        .variables
+        .iter()
+        .position(|v| v.name == "labels/cells/0");
+    assert_eq!(app.add_overlay(idx.expect("label variable")), None);
+    assert!(app.layers.overlays().is_empty());
+    let said = app.toasts.items().last().map(|t| t.notice.detail.clone());
+    let why = crate::i18n::tr(crate::i18n::PlotKey::LabelsHeatmapOnly);
+    assert!(
+        said.is_some_and(|s| s.ends_with(why)),
+        "why, not \"no shared grid\""
+    );
+}
+
 #[test]
 fn label_images_overlay_their_image_with_exact_ids() {
     let (mut app, meta) = ome_app();

@@ -81,12 +81,15 @@ fn mesh(
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             flip_height: false,
+            height_range: [color().cmin, color().cmax],
+            height_composite: false,
         },
         cube_mode_idx: if sphere { 3 } else { 2 },
         rect: rect(),
         transparency: Default::default(),
         channels: None,
         thinning: super::Thinning::NONE,
+        heights: None,
     }
 }
 

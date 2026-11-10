@@ -31,6 +31,9 @@ mod limits_tests;
 pub mod line;
 pub mod mesh;
 mod mesh_draw;
+mod mesh_heights;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod mesh_heights_tests;
 pub mod oit;
 pub mod point_cloud;
 mod point_cloud_draw;
@@ -97,6 +100,15 @@ impl PlotType {
             PlotType::Sphere => tr(PlotKey::Sphere),
             PlotType::PointCloud => tr(PlotKey::PointCloud),
         }
+    }
+
+    /// Whether overlays draw over this plot type: the heatmap, and the
+    /// sphere and surface draped with them.
+    pub fn draws_overlays(&self) -> bool {
+        matches!(
+            self,
+            PlotType::Heatmap | PlotType::Sphere | PlotType::Surface
+        )
     }
 
     /// Whether the coastline overlay is drawn over this plot type.

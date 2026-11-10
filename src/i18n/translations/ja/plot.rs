@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::AlignIndexOnly => "グリッドの形状は同じですが、プロットと一致する座標がありません",
         PlotKey::AlignIncompatible => "プロットと共通のグリッドがありません",
         PlotKey::OverlayPlotFirst => "先に変数をプロットしてください",
-        PlotKey::OverlayHeatmapOnly => "オーバーレイはヒートマップ上に描画されます",
+        PlotKey::OverlayPlotTypes => "オーバーレイはヒートマップ、球体、サーフェス上に描画されます",
         PlotKey::OverlayStackFull => "オーバーレイは最大4つです",
         PlotKey::OverlayAlreadyLayer => "すでにプロットのレイヤーです",
         PlotKey::OverlayCantAdd => "オーバーレイを追加できません",

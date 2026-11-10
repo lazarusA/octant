@@ -16,7 +16,7 @@ crate::i18n::keys::define_keys! {
     AlignIndexOnly,
     AlignIncompatible,
     OverlayPlotFirst,
-    OverlayHeatmapOnly,
+    OverlayPlotTypes,
     OverlayStackFull,
     OverlayAlreadyLayer,
     OverlayCantAdd,

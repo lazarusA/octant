@@ -160,3 +160,60 @@ fn following_the_base_window_ignores_playback_steps() {
     );
     assert_eq!(overlay.selection().dim_config[lon].range, (0, 1));
 }
+
+#[test]
+fn translucent_overlays_blend_with_plot_transparency_off() {
+    use crate::plots::oit::Transparency;
+    let (mut app, meta) = plotted_app();
+    app.plot_configs.plot_transparency = false;
+    let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    let overlay = app.layers.get(id).expect("overlay");
+    assert!(
+        overlay.color.is_translucent(),
+        "overlay has default opacity"
+    );
+    assert_eq!(
+        app.transparency_mode(&app.layers.base),
+        Transparency::Off,
+        "base is opaque with plot_transparency off"
+    );
+    assert_ne!(
+        app.transparency_mode(overlay),
+        Transparency::Off,
+        "overlay blends even with plot_transparency off"
+    );
+}
+
+#[test]
+fn switch_plot_type_updates_base_layer_in_place_for_mesh_plots() {
+    let (mut app, meta) = plotted_app();
+    let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    assert_eq!(app.plotted().plot_type, PlotType::Heatmap);
+    assert_eq!(app.effective_canvas_plot_type(), PlotType::Heatmap);
+
+    app.switch_plot_type(PlotType::Sphere);
+    assert_eq!(
+        app.plotted().plot_type,
+        PlotType::Sphere,
+        "base layer plot type updated in place"
+    );
+    assert_eq!(
+        app.effective_canvas_plot_type(),
+        PlotType::Sphere,
+        "effective plot type follows immediately"
+    );
+    let overlay = app.layers.get(id).expect("overlay");
+    assert_eq!(
+        overlay.alignment,
+        Alignment::SameGrid,
+        "overlay stays aligned over sphere"
+    );
+    assert!(overlay.is_drawn());
+
+    app.switch_plot_type(PlotType::Heatmap);
+    assert_eq!(app.plotted().plot_type, PlotType::Heatmap);
+    assert_eq!(app.effective_canvas_plot_type(), PlotType::Heatmap);
+    let overlay = app.layers.get(id).expect("overlay");
+    assert_eq!(overlay.alignment, Alignment::SameGrid);
+    assert!(overlay.is_drawn());
+}

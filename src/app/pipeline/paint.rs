@@ -129,7 +129,9 @@ impl OctantApp {
         }
     }
 
-    /// Assembles `layer`'s Mesh3DUniformParams for Sphere and Surface heightfields (zero allocation).
+    /// Assembles `layer`'s Mesh3DUniformParams for Sphere and Surface
+    /// heightfields (zero allocation). Heights and the slicer's height range
+    /// are the base layer's: overlays drape on its relief.
     pub fn get_mesh_3d_uniform_params(
         &self,
         layer: &Layer,
@@ -159,16 +161,23 @@ impl OctantApp {
                 [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             ));
 
+        let base = &self.layers.base;
+        let color = self.get_color_params(layer);
+        let height_color = self.get_color_params(base);
+        let heights = (mode, displacement_strength, flip_height);
         crate::plots::Mesh3DUniformParams {
-            color: self.get_color_params(layer),
+            color,
             camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
-            slice: self.mesh_slice(layer, sphere, (mode, displacement_strength, flip_height)),
+            slice: self.mesh_slice(base, sphere, heights),
             displacement_strength,
             mode,
             coord_mode,
             lon_bounds,
             lat_bounds,
             flip_height,
+            height_range: [height_color.cmin, height_color.cmax],
+            height_composite: height_color.colormap
+                == crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
         }
     }
 

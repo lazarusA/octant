@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Нет общей сетки с графиком",
         PlotKey::OverlayPlotFirst => "Сначала постройте переменную",
-        PlotKey::OverlayHeatmapOnly => "Наложения рисуются поверх тепловых карт",
+        PlotKey::OverlayPlotTypes => "Наложения рисуются поверх тепловых карт, сфер и поверхностей",
         PlotKey::OverlayStackFull => "Не более 4 наложений",
         PlotKey::OverlayAlreadyLayer => "Уже является слоем графика",
         PlotKey::OverlayCantAdd => "Не удалось добавить наложение",

@@ -104,11 +104,13 @@ pub struct Mesh3DUniforms {
     pub width: u32,
     pub height: u32,
     pub coord_mode: u32,
-    /// 1 when heights are flipped (`utils::height::HeightScale::flip`).
-    pub flip_height: u32,
+    /// Bit 0 when heights are flipped (`utils::height::HeightScale::flip`),
+    /// bit 1 when they read packed RGB composites.
+    pub height_flags: u32,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
-    pub _pad: [u32; 2],
+    /// The color range of the layer whose values make the heights.
+    pub height_range: [f32; 2],
     pub color: PlotColorParams,
 }
 
@@ -125,6 +127,10 @@ pub struct Mesh3DUniformParams {
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
     pub flip_height: bool,
+    /// The color range and composite flag of the layer whose values make
+    /// the heights: the base layer's, also under an overlay draped on it.
+    pub height_range: [f32; 2],
+    pub height_composite: bool,
 }
 
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and PaintCallbackInfo,

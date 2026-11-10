@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Не має спільної сітки з графіком",
         PlotKey::OverlayPlotFirst => "Спочатку побудуйте змінну",
-        PlotKey::OverlayHeatmapOnly => "Накладання малюються поверх теплових карт",
+        PlotKey::OverlayPlotTypes => "Накладання малюються поверх теплових карт, сфер і поверхонь",
         PlotKey::OverlayStackFull => "Не більше 4 накладань",
         PlotKey::OverlayAlreadyLayer => "Уже є шаром графіка",
         PlotKey::OverlayCantAdd => "Не вдалося додати накладання",

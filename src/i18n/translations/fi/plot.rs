@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Ei yhteistä ruudukkoa kuvaajan kanssa",
         PlotKey::OverlayPlotFirst => "Piirrä ensin muuttuja",
-        PlotKey::OverlayHeatmapOnly => "Päällystasot piirretään lämpökarttojen päälle",
+        PlotKey::OverlayPlotTypes => "Päällystasot piirretään lämpökarttojen, pallojen ja pintojen päälle",
         PlotKey::OverlayStackFull => "Enintään 4 päällystasoa",
         PlotKey::OverlayAlreadyLayer => "Jo kuvaajan taso",
         PlotKey::OverlayCantAdd => "Päällystasoa ei voi lisätä",

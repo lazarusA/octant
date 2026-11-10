@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Tidak berbagi grid dengan plot",
         PlotKey::OverlayPlotFirst => "Plot sebuah variabel terlebih dahulu",
-        PlotKey::OverlayHeatmapOnly => "Overlay digambar di atas peta panas",
+        PlotKey::OverlayPlotTypes => "Overlay digambar di atas peta panas, bola, dan permukaan",
         PlotKey::OverlayStackFull => "Paling banyak 4 overlay",
         PlotKey::OverlayAlreadyLayer => "Sudah menjadi lapisan plot",
         PlotKey::OverlayCantAdd => "Tidak dapat menambahkan overlay",

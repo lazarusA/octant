@@ -1,23 +1,27 @@
 // Interpolation routine across HEALPix diamond boundaries
 
-fn healpix_get_interpolated_corner_val(
+// No cell: a corner neighbour off the face.
+const HEALPIX_NO_CELL: u32 = 0xFFFFFFFFu;
+
+// The (up to) four pixels around corner `corner_uv` of pixel `pix`, within
+// its face and clamped to `max_idx`; `HEALPIX_NO_CELL` where there is none.
+// The mesh shaders average a buffer over them (`common/mesh3d.wgsl`).
+fn healpix_corner_cells(
     pix: u32,
     corner_uv: vec2<f32>,
     nside: u32,
     is_nested: bool,
     max_idx: u32,
-) -> f32 {
+) -> vec4<u32> {
     let ns = max(nside, 1u);
     let fc = healpix_pixel_to_face_coords(pix, ns, is_nested);
     let nside_sq = ns * ns;
     let cx = fc.x + u32(round(corner_uv.x));
     let cy = fc.y + u32(round(corner_uv.y));
 
-    var sum: f32 = 0.0;
-    var count: f32 = 0.0;
-
     let offsets_x = array<i32, 4>(-1, 0, -1, 0);
     let offsets_y = array<i32, 4>(-1, -1, 0, 0);
+    var cells = vec4<u32>(HEALPIX_NO_CELL);
 
     for (var k = 0u; k < 4u; k = k + 1u) {
         let px_cand = i32(cx) + offsets_x[k];
@@ -29,17 +33,8 @@ fn healpix_get_interpolated_corner_val(
             if (!is_nested) {
                 cand_pix = healpix_nest2ring(ns, cand_pix);
             }
-            let safe_cand = min(cand_pix, max_idx);
-            let v = data_buffer[safe_cand];
-            if (v == v && abs(v) < 1e30) {
-                sum = sum + v;
-                count = count + 1.0;
-            }
+            cells[k] = min(cand_pix, max_idx);
         }
     }
-
-    if (count > 0.0) {
-        return sum / count;
-    }
-    return data_buffer[min(pix, max_idx)];
+    return cells;
 }

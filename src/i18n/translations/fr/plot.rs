@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Ne partage aucune grille avec le graphique",
         PlotKey::OverlayPlotFirst => "Tracez d'abord une variable",
-        PlotKey::OverlayHeatmapOnly => "Les superpositions se dessinent sur les cartes de chaleur",
+        PlotKey::OverlayPlotTypes => "Les superpositions se dessinent sur les cartes de chaleur, sphères et surfaces",
         PlotKey::OverlayStackFull => "4 superpositions au maximum",
         PlotKey::OverlayAlreadyLayer => "Déjà une couche du graphique",
         PlotKey::OverlayCantAdd => "Impossible d'ajouter la superposition",

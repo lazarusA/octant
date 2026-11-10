@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Deler ikke rutenett med plottet",
         PlotKey::OverlayPlotFirst => "Plott en variabel først",
-        PlotKey::OverlayHeatmapOnly => "Overlegg tegnes over varmekart",
+        PlotKey::OverlayPlotTypes => "Overlegg tegnes over varmekart, kuler og overflater",
         PlotKey::OverlayStackFull => "Høyst 4 overlegg",
         PlotKey::OverlayAlreadyLayer => "Allerede et lag i plottet",
         PlotKey::OverlayCantAdd => "Kan ikke legge til overlegg",

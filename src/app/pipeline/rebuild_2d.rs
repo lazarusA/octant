@@ -1,13 +1,12 @@
 //! GPU renderers of a layer's 2D matrix data: heatmap, labels, line, and the
 //! sphere, surface and 3D coastlines built from the same grid.
 
-use super::mesh_grid::mesh_budget;
+use super::mesh_grid::{mesh_budget, mesh_grid};
 use super::rebuild::follow_variable;
 use super::shown::{needs_pyramid, shown_data};
 use crate::app::OctantApp;
-use crate::app::layers::{Layer, LayerId, MeshGrid};
+use crate::app::layers::{Layer, LayerId};
 use crate::data::MatrixData;
-use crate::data::render::decimate::stride_for;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 use crate::plots::{
     Coastline3DRenderer, CoastlineLod, CoastlineRenderer, HeatmapRenderer, LabelRenderer,
@@ -39,6 +38,7 @@ impl OctantApp {
         let resample = needs_pyramid(self.enable_pyramid_resampling, total_elements);
         let pyramid = resample.then_some(self.pyramid_aggregation_op);
         let shown = shown_data(layer, &data, pyramid, &self.nav);
+        let mut base_rebuilt = false;
         if let Some(rs) = &self.wgpu_render_state {
             // Coastlines follow the base layer's grid.
             let coastline = is_base.then_some(&mut self.coastline_3d_renderer);
@@ -46,6 +46,7 @@ impl OctantApp {
             let reuse = !is_new_variable;
             let mesh_budget = mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
             let rebuilt = sync_renderers(layer, rs, base, (&shown, &data), mesh_budget, reuse);
+            base_rebuilt = rebuilt && is_base;
             if rebuilt && data.height == 1 {
                 let plot_type = &mut layer.selection_mut().plot_type;
                 follow_row_plot_type(plot_type, data.grid.is_healpix());
@@ -56,6 +57,9 @@ impl OctantApp {
         }
         layer.data.matrix = Some(data);
         layer.data.touch_matrix();
+        if base_rebuilt {
+            release_draped_heights(self.layers.overlays());
+        }
         self.ensure_coastline_renderer();
     }
 
@@ -102,14 +106,14 @@ fn sync_renderers(
         &rs.device,
         rs.target_format,
     );
-    // Label images are drawn only as heatmaps, and overlays never as meshes.
+    // Label images are drawn only as heatmaps. Overlays get meshes too,
+    // draped on the base's (`Mesh3DCallback::heights`).
     // HEALPix grids are never thinned: their meshes take every cell.
     let cells = data.width.saturating_mul(data.height);
     let fits = !data.grid.is_healpix() || cells <= MAX_GPU_STORAGE_BUFFER_ELEMENTS;
-    let has_3d = base.is_some() && layer.labels().is_none() && fits;
-    let stride = stride_for(data.width, data.height, mesh_budget);
-    let thinned = has_3d.then(|| data.decimated(stride)).flatten();
-    let mesh = thinned.as_ref().unwrap_or(data);
+    let has_3d = layer.labels().is_none() && fits;
+    let grid = has_3d.then(|| mesh_grid(data, mesh_budget)).flatten();
+    let mesh = grid.as_ref().map_or(data, |g| &g.matrix);
     let rebuilt = if reuse && can_update(layer, shown, mesh, has_3d) {
         let coastline = base.as_ref().and_then(|(slot, _)| slot.as_deref());
         update_renderers(layer, coastline, rs, shown, mesh);
@@ -118,7 +122,7 @@ fn sync_renderers(
         build_renderers(layer, base, rs, (shown, mesh), has_3d);
         true
     };
-    layer.data.mesh = thinned.map(|matrix| MeshGrid { matrix, stride });
+    layer.data.mesh = grid;
     rebuilt
 }
 
@@ -211,6 +215,16 @@ pub(super) fn build_meshes(
         let buf = crate::plots::load_coastline_sync(lod);
         let coast = Coastline3DRenderer::new(device, format, buf.as_slice(), values, w, h, cx, cy);
         *slot = Some(Arc::new(coast));
+    }
+}
+
+/// Lets `overlays` drop the base meshes they drape on, now replaced.
+fn release_draped_heights(overlays: &[Layer]) {
+    let meshes = overlays
+        .iter()
+        .flat_map(|l| [&l.renderers.sphere, &l.renderers.surface]);
+    for mesh in meshes.flatten() {
+        mesh.heights.release();
     }
 }
 

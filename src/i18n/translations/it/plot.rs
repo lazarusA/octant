@@ -20,7 +20,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "Non condivide alcuna griglia con il grafico",
         PlotKey::OverlayPlotFirst => "Prima traccia una variabile",
-        PlotKey::OverlayHeatmapOnly => "Le sovrapposizioni si disegnano sulle mappe di calore",
+        PlotKey::OverlayPlotTypes => "Le sovrapposizioni si disegnano su mappe di calore, sfere e superfici",
         PlotKey::OverlayStackFull => "Al massimo 4 sovrapposizioni",
         PlotKey::OverlayAlreadyLayer => "Già un livello del grafico",
         PlotKey::OverlayCantAdd => "Impossibile aggiungere la sovrapposizione",

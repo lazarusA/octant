@@ -4,14 +4,9 @@
 const SCREEN_NORMAL_MODE: u32 = 1u;
 const LIGHT_DIR = vec3<f32>(0.5, 0.7, 0.9);
 
-fn get_normalized_radial_dr(val: f32) -> f32 {
-    let h = normalized_height(
-        val,
-        uniforms.color.cmin,
-        uniforms.color.cmax,
-        uniforms.color.colormap == COLORMAP_RGB_COMPOSITE,
-        uniforms.flip_height == 1u,
-    );
+// Radial displacement of `height_val`, a `height_buffer` value.
+fn get_normalized_radial_dr(height_val: f32) -> f32 {
+    let h = height_of(height_val);
     return h * 0.4 * uniforms.displacement_strength;
 }
 
@@ -31,6 +26,7 @@ fn vs_main(
     let safe_idx = min(instance_idx, max_idx);
 
     var raw_val = data_buffer[safe_idx];
+    var height_val = height_value(safe_idx);
 
     let coords = get_lon_lat(
         cell_x, cell_y, model.position.xy, grid_w, grid_h,
@@ -50,7 +46,6 @@ fn vs_main(
 
     if (uniforms.mode == 0u) {
         // Mode 0: Smooth Sphere Projection (unit sphere)
-        raw_val = data_buffer[safe_idx];
         pos_3d = lon_lat_to_cartesian(1.0, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.mode == 1u) {
@@ -58,11 +53,15 @@ fn vs_main(
         if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
             let nside = healpix_nside(grid_w * grid_h);
             let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
-            raw_val = healpix_get_interpolated_corner_val(safe_idx, healpix_uv, nside, uniforms.coord_mode == 5u, max_idx);
+            let nested = uniforms.coord_mode == 5u;
+            raw_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, false);
+            height_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, true);
         } else {
             let sx = smooth_corner(cell_x, model.position.x, grid_w, uniforms.coord_mode == 0u);
             let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
-            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            let corner_idx = min(sy.cell * grid_w + sx.cell, max_idx);
+            raw_val = data_buffer[corner_idx];
+            height_val = height_value(corner_idx);
             let corner = get_lon_lat(
                 sx.at_cell, sy.at_cell, vec2<f32>(sx.frac, sy.frac), grid_w, grid_h,
                 uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
@@ -72,13 +71,12 @@ fn vs_main(
             slice_xy = (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid;
         }
 
-        let dr = get_normalized_radial_dr(raw_val);
+        let dr = get_normalized_radial_dr(height_val);
         pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.mode == 2u) {
         // Mode 2: Flat Steps
-        raw_val = data_buffer[safe_idx];
-        let dr = get_normalized_radial_dr(raw_val);
+        let dr = get_normalized_radial_dr(height_val);
         let center_coords = get_lon_lat(
             cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h,
             uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
@@ -87,8 +85,7 @@ fn vs_main(
         normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
     } else {
         // Mode 3: 3D Radial Lego Cubes
-        raw_val = data_buffer[safe_idx];
-        let dr = get_normalized_radial_dr(raw_val);
+        let dr = get_normalized_radial_dr(height_val);
         var radius: f32;
         if (dr >= 0.0) {
             radius = mix(1.0, 1.0 + dr, model.position.z);
@@ -114,7 +111,7 @@ fn vs_main(
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.
         let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
-        out.slice_at = vec3<f32>(center, select(0.0, get_normalized_radial_dr(raw_val) / height_scale, height_scale > 0.0));
+        out.slice_at = vec3<f32>(center, select(0.0, get_normalized_radial_dr(height_val) / height_scale, height_scale > 0.0));
     }
     out.normal = norm_rot;
     out.world_pos = pos_rot;
