@@ -20,6 +20,8 @@ impl OctantApp {
     /// Rebuilds or updates layer `id`'s GPU buffers for 2D matrix data.
     pub fn rebuild_pipeline_with_matrix_data(&mut self, id: LayerId, data: MatrixData) {
         let is_base = id == LayerId::BASE;
+        // The staged plot type follows the plot unless another variable is staged.
+        let staged_follows = is_base && !self.is_exploring_unplotted_variable();
         let step = self.layer_step(id);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
@@ -45,13 +47,11 @@ impl OctantApp {
             let mesh_budget = mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
             let rebuilt = sync_renderers(layer, rs, base, (&shown, &data), mesh_budget, reuse);
             if rebuilt && data.height == 1 {
-                // The base layer's plot type is staged in `selected`.
-                let plot_type = if is_base {
-                    &mut self.selected.plot_type
-                } else {
-                    &mut layer.selection_mut().plot_type
-                };
+                let plot_type = &mut layer.selection_mut().plot_type;
                 follow_row_plot_type(plot_type, data.grid.is_healpix());
+                if staged_follows {
+                    self.selected.plot_type = *plot_type;
+                }
             }
         }
         layer.data.matrix = Some(data);

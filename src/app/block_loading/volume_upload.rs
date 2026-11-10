@@ -17,7 +17,8 @@ impl OctantApp {
         let Some(render_state) = &self.wgpu_render_state else {
             return;
         };
-        let plot_type = self.selected.plot_type;
+        // The canvas's plot type: a staged one may not be plotted yet.
+        let plot_type = self.effective_canvas_plot_type();
         for layer in self.layers.iter_mut() {
             flush_layer(layer, &render_state.queue, plot_type);
         }

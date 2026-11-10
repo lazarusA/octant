@@ -17,6 +17,8 @@ mod point_grid;
 mod point_grid_tests;
 pub mod rebuild;
 mod rebuild_2d;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod row_plot_type_tests;
 mod shown;
 mod slice_params;
 
