@@ -60,7 +60,7 @@ impl OctantApp {
             source_id: self.selection_source_id(selection),
             store_kind: selection.store_kind,
             store_target: selection.store_target.clone(),
-            anim_dim: selection.animated_dim,
+            anim_dim: selection.animated_dim(),
             var,
             request,
         }
@@ -152,18 +152,11 @@ impl OctantApp {
 
     /// Puts `step` into layer `id`'s staged and shown index along `anim_dim`.
     fn set_layer_step_index(&mut self, id: LayerId, anim_dim: usize, step: usize) {
-        if let Some(index) = self
-            .staged_selection_mut(id)
-            .and_then(|s| s.dim_indices.get_mut(anim_dim))
-        {
-            *index = step;
+        if let Some(s) = self.staged_selection_mut(id) {
+            s.set_step(anim_dim, step);
         }
-        if let Some(index) = self
-            .layers
-            .get_mut(id)
-            .and_then(|l| l.selection_mut().dim_indices.get_mut(anim_dim))
-        {
-            *index = step;
+        if let Some(l) = self.layers.get_mut(id) {
+            l.selection_mut().set_step(anim_dim, step);
         }
     }
 }

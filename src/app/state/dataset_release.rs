@@ -26,7 +26,6 @@ impl OctantApp {
                 self.plate = None;
             }
             self.release_dataset_memory(&removed.source.id, &removed.source.uri);
-            self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
         }
     }
 
@@ -45,7 +44,6 @@ impl OctantApp {
         for (id, uri) in &sources {
             self.release_dataset_memory(id, uri);
         }
-        self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }
 
     /// Drops the blocks of `source_id` and the stores of `uri` once nothing

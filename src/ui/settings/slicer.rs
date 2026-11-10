@@ -82,7 +82,7 @@ fn plane_toggles(app: &mut OctantApp, ui: &mut egui::Ui) {
         let on = app.plot_configs.slice.planes[k].is_some();
         let dim = app.get_spatial_dim_index(k);
         let name = app
-            .plotted_variable_info()
+            .effective_variable_info()
             .and_then(|v| v.dimension_names.get(dim))
             .map_or("", String::as_str);
         let clicked = ui

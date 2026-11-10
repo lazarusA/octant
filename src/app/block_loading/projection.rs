@@ -67,6 +67,19 @@ impl OctantApp {
         (x_dim, y_dim, z_dim)
     }
 
+    /// The base layer's 3D plot type, beyond the GPU's limits, becomes a
+    /// heatmap through `switch_plot_type`, which loads it (then `true`:
+    /// nothing is left to project), unless another variable is staged: that
+    /// one keeps its plot type, and the block draws in 2D. Overlays are
+    /// always heatmaps.
+    fn fall_back_from_3d(&mut self) -> bool {
+        if self.is_exploring_unplotted_variable() {
+            return false;
+        }
+        self.switch_plot_type(PlotType::Heatmap);
+        true
+    }
+
     /// Projects a resident block into layer `id`'s 2D or 3D view.
     pub fn apply_block_projection(&mut self, id: LayerId, block: &OctantBlock) {
         let Some(layer) = self.layers.get(id) else {
@@ -75,10 +88,7 @@ impl OctantApp {
         let compute_bounds = !layer.color.lock_bounds;
         let composite = layer.composite.enabled;
         let dim_configs = self.layer_dim_config(id);
-        let anim_dim = layer
-            .selection()
-            .animated_dim
-            .or_else(|| crate::app::DimConfig::animated_dim(dim_configs));
+        let anim_dim = crate::app::DimConfig::animated_dim(dim_configs);
         let orig_dim_names = self.resolve_orig_dim_names(id, block);
 
         let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
@@ -92,10 +102,10 @@ impl OctantApp {
             block,
             &orig_dim_names,
             anim_dim,
-            self.layer_dim_indices(id),
+            dim_configs,
             self.layer_step(id),
         );
-        let ranges = self.layer_dim_ranges(id);
+        let ranges = dim_configs;
         let (req_x, local_x_range) = block_axes::dim_bounds(block, &orig_dim_names, x_dim, ranges);
         let (req_y, local_y_range) = block_axes::dim_bounds(block, &orig_dim_names, y_dim, ranges);
         let c_dim = self.layer_channel_dim(id).unwrap_or(0);
@@ -104,18 +114,16 @@ impl OctantApp {
         } else {
             ((0, 0), (0, 1))
         };
-        let Some((_, staged)) = self.layer_selections(id) else {
+        // What the layer shows, not a variable only staged beside it.
+        let Some(shown) = self.layer_view(id) else {
             return;
         };
         let is_vol_allowed =
-            crate::ui::variables_panel::is_volume_allowed(self, staged, layer.data.volume.as_ref());
-        let is_3d_type = matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud);
+            crate::ui::variables_panel::is_volume_allowed(self, shown, layer.data.volume.as_ref());
+        let is_3d_type = matches!(shown.plot_type, PlotType::Volume | PlotType::PointCloud);
 
-        if !is_vol_allowed
-            && is_3d_type
-            && let Some(staged) = self.staged_selection_mut(id)
-        {
-            staged.plot_type = PlotType::Heatmap;
+        if !is_vol_allowed && is_3d_type && id == LayerId::BASE && self.fall_back_from_3d() {
+            return;
         }
 
         let is_3d_plot = is_3d_type && is_vol_allowed;

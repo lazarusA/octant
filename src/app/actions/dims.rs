@@ -53,7 +53,7 @@ impl OctantApp {
         let meta = self.selected.metadata.as_ref()?;
         let config = &self.selected.dim_config;
         let is_axis = |i: usize| axis_of(meta, var, i, config.get(i)) == Some(axis);
-        let animated = self.selected.animated_dim;
+        let animated = self.selected.animated_dim();
         animated
             .filter(|&a| is_axis(a))
             .or_else(|| (0..var.dimension_names.len()).find(|&i| is_axis(i)))
@@ -122,17 +122,13 @@ impl OctantApp {
             return;
         }
         let sel = &mut self.selected;
-        if let Some(a) = sel.animated_dim
-            && let Some(&(start, end)) = sel.dim_ranges.get(a)
-            && !(start..=end).contains(&step)
-        {
+        if let Some(a) = sel.animated_dim() {
             let len = sel.variable_info().and_then(|v| v.shape.get(a)).copied();
-            let last = len.unwrap_or(0).saturating_sub(1) as usize;
-            let width = end.saturating_sub(start);
-            let start = step.min(last.saturating_sub(width));
-            sel.set_range(a, (start, start + width), step);
+            let last = len.map_or(usize::MAX, |n| (n as usize).saturating_sub(1));
+            sel.hold_step(a, step, last);
         }
         self.playback.current_timestep = step;
+        self.stage_current_step();
     }
 
     pub(super) fn set_dim(&mut self, dim: Option<&str>, value: &str) -> Outcome {

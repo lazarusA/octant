@@ -58,33 +58,56 @@ fn an_animated_z_time_axis_keeps_its_chunk_range_across_frames() {
         (time.spatial, time.animation),
         (SpatialRole::Z, AnimationRole::Animated)
     );
-    assert_eq!(app.selected.dim_ranges[0], (0, 0));
+    assert_eq!(app.selected.dim_config[0].range, (0, 0));
     for _ in 0..3 {
         frame(&mut app);
     }
-    assert_eq!(app.selected.dim_ranges[0], (0, 0), "time stays one chunk");
-    assert_eq!(app.selected.dim_ranges[1], (0, 720));
+    assert_eq!(
+        app.selected.dim_config[0].range,
+        (0, 0),
+        "time stays one chunk"
+    );
+    assert_eq!(app.selected.dim_config[1].range, (0, 720));
 }
 
 #[test]
 fn a_dimension_made_spatial_spans_the_chunk_holding_its_index() {
     let mut app = era5_like(24);
     assert_eq!(
-        app.selected.dim_ranges[0],
+        app.selected.dim_config[0].range,
         (0, 23),
         "the default is one chunk"
     );
     apply_role_change(0, SpatialRole::None, AnimationRole::Animated, &mut app);
-    app.selected.dim_ranges[0] = (30, 30);
+    app.selected.set_index(0, 30);
     apply_role_change(0, SpatialRole::Z, AnimationRole::Animated, &mut app);
-    assert_eq!(app.selected.dim_ranges[0], (24, 47));
+    assert_eq!(app.selected.dim_config[0].range, (24, 47));
+    assert_eq!(app.selected.dim_config[0].range, (24, 47), "the config too");
+}
+
+#[test]
+fn a_z_dimension_dropped_for_2d_collapses_in_its_config_too() {
+    use crate::plots::PlotType;
+    let mut app = era5_like(24);
+    apply_role_change(0, SpatialRole::None, AnimationRole::None, &mut app);
+    app.selected.set_index(0, 30);
+    app.switch_plot_type(PlotType::Volume);
+    app.switch_plot_type(PlotType::Heatmap);
+    let s = &app.selected;
+    for (d, c) in s.dim_config.iter().enumerate() {
+        assert_eq!(
+            (c.index, c.range),
+            (s.dim_config[d].index, s.dim_config[d].range)
+        );
+    }
+    assert_eq!(s.dim_config[0].range, (30, 30));
 }
 
 #[test]
 fn the_last_chunk_ends_at_the_dimension() {
     let mut app = era5_like(24);
     apply_role_change(0, SpatialRole::None, AnimationRole::Animated, &mut app);
-    app.selected.dim_ranges[0] = (995, 995);
+    app.selected.set_index(0, 995);
     apply_role_change(0, SpatialRole::Z, AnimationRole::Animated, &mut app);
-    assert_eq!(app.selected.dim_ranges[0], (984, 999));
+    assert_eq!(app.selected.dim_config[0].range, (984, 999));
 }

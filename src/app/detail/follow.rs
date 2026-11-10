@@ -97,7 +97,9 @@ impl OctantApp {
             dims[i] = d;
         }
         for (i, &d) in dims.iter().enumerate() {
-            *moved.dim_ranges.get_mut(d)? = (base.origin[i] as usize, base.end[i] as usize - 1);
+            let range = (base.origin[i] as usize, base.end[i] as usize - 1);
+            (d < moved.dim_config.len()).then_some(())?;
+            moved.set_range(d, range, range.0);
         }
         let tile = DetailTile {
             level,

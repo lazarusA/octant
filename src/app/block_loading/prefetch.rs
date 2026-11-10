@@ -176,9 +176,9 @@ impl OctantApp {
             return playing_chunks(current, max_chunk, budget, wraps);
         }
         let (start, end) = shown
-            .dim_ranges
+            .dim_config
             .get(anim_dim)
-            .copied()
+            .map(|c| c.range)
             .unwrap_or((0, last_step));
         let range = (start.min(last_step) / cs, end.min(last_step) / cs);
         let mut chunks = self.ring_chunks(id, cs);

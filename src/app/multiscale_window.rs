@@ -4,14 +4,14 @@
 
 use std::borrow::Cow;
 
-use crate::app::OctantApp;
 use crate::app::layers::VariableSelection;
 use crate::app::multiscale::{level_range, variable_index};
+use crate::app::{DimConfig, OctantApp};
 use crate::data::VariableInfo;
 
-/// The variable a selection reads and its inclusive ranges on that
-/// variable's cells (`OctantApp::read_window`).
-pub(crate) type ReadWindow<'a> = (&'a VariableInfo, Cow<'a, [(usize, usize)]>);
+/// The variable a selection reads and its dimensions, their inclusive ranges
+/// on that variable's cells (`OctantApp::read_window`).
+pub(crate) type ReadWindow<'a> = (&'a VariableInfo, Cow<'a, [DimConfig]>);
 
 impl OctantApp {
     /// What `selection` reads, for its sizes and GPU limits: the variable of
@@ -33,7 +33,7 @@ impl OctantApp {
         plot_type: crate::plots::PlotType,
     ) -> Option<ReadWindow<'a>> {
         let var = selection.variable_info()?;
-        let own = Some((var, Cow::Borrowed(selection.dim_ranges.as_slice())));
+        let own = Some((var, Cow::Borrowed(selection.dim_config.as_slice())));
         let Some(level) = self
             .selection_level_as(selection, plot_type)
             .filter(|&l| l > 0)
@@ -51,9 +51,12 @@ impl OctantApp {
         let Some(read) = read else {
             return own;
         };
-        let ranges = (selection.dim_ranges.iter().enumerate())
-            .map(|(d, &r)| level_range(set, level, d, r))
+        let dims = (selection.dim_config.iter().enumerate())
+            .map(|(d, c)| DimConfig {
+                range: level_range(set, level, d, c.range),
+                ..*c
+            })
             .collect();
-        Some((read, Cow::Owned(ranges)))
+        Some((read, Cow::Owned(dims)))
     }
 }

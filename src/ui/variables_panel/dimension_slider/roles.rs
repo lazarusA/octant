@@ -55,7 +55,7 @@ pub fn apply_role_change(
     // frame) keeps the range it has.
     if spatial != SpatialRole::None
         && spatial != old_spatial
-        && let Some(&(st, en)) = app.selected.dim_ranges.get(dim)
+        && let Some((st, en)) = app.selected.dim_config.get(dim).map(|c| c.range)
         && st == en
         && let Some(var_info) = app
             .selected
@@ -63,28 +63,7 @@ pub fn apply_role_change(
             .as_ref()
             .and_then(|meta| meta.variables.get(app.selected.variable_idx))
     {
-        app.selected.dim_ranges[dim] = super::defaults::chunk_window(var_info, dim, st);
+        let window = super::defaults::chunk_window(var_info, dim, st);
+        app.selected.set_range(dim, window, st);
     }
-
-    app.selected.spatial_dims.clear();
-    for j in 0..app.selected.dim_config.len() {
-        if app.selected.dim_config[j].spatial != SpatialRole::None {
-            app.selected.spatial_dims.push(j);
-        }
-    }
-    app.selected
-        .spatial_dims
-        .sort_by_key(|&d| match app.selected.dim_config[d].spatial {
-            SpatialRole::Grid => 0,
-            SpatialRole::X => 1,
-            SpatialRole::Y => 2,
-            SpatialRole::Z => 3,
-            SpatialRole::None => 99,
-        });
-
-    app.selected.animated_dim = app
-        .selected
-        .dim_config
-        .iter()
-        .position(|c| c.animation == AnimationRole::Animated);
 }

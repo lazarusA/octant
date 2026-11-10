@@ -169,6 +169,6 @@ fn finish(app: &mut OctantApp, panel: Panel, header: PanelHeader, area: &Respons
         );
     }
     if header.close {
-        app.set_panel_open(&area.ctx, panel, false);
+        app.set_panel_open(panel, false);
     }
 }

@@ -22,12 +22,7 @@ pub fn get_dimension_origin_and_full_len(
             DimensionSelection::Index(idx) => *idx,
         }
     } else {
-        app.plotted()
-            .dim_ranges
-            .get(dim_idx)
-            .or_else(|| app.selected.dim_ranges.get(dim_idx))
-            .map(|(start, _)| *start)
-            .unwrap_or(0)
+        (app.effective_dim_config().get(dim_idx)).map_or(0, |c| c.range.0)
     };
 
     (origin, full_len)
@@ -112,13 +107,7 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
     // 2. Insert all remaining Collapsed Dimensions
     for d in 0..v.dimension_names.len() {
         if !used_dims.contains(&d) {
-            let sel_idx = app
-                .plotted()
-                .dim_indices
-                .get(d)
-                .or_else(|| app.selected.dim_indices.get(d))
-                .copied()
-                .unwrap_or(0);
+            let sel_idx = (app.effective_dim_config().get(d)).map_or(0, |c| c.index);
             let total_len = v.shape.get(d).copied().unwrap_or(1) as usize;
             let dim_name = &v.dimension_names[d];
             let loc_collapsed = format_dimension_coord(

@@ -73,7 +73,7 @@ fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTupl
     let profile_len = line_profile_len(app, matrix);
 
     let y_name = app
-        .plotted_variable_info()
+        .effective_variable_info()
         .map(|var| {
             if let Some(u) = &var.units {
                 format!("{} [{u}]", var.name)

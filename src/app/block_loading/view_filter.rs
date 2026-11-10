@@ -98,11 +98,6 @@ impl OctantApp {
         selections: &[DimensionSelection],
         anim_dim: Option<usize>,
     ) {
-        self.status_message = format!(
-            "Block cache HIT for '{}' ({} bytes resident)",
-            block.variable_name,
-            block.bytes_size()
-        );
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };

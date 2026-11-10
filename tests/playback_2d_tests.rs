@@ -43,8 +43,8 @@ fn assert_slice(app: &OctantApp, t: usize, z: usize, label: &str) {
 
 fn play(plot: PlotType) {
     let mut app = app_with(plot);
-    assert_eq!(app.selected.animated_dim, Some(0));
-    let z = app.selected.dim_indices[1];
+    assert_eq!(app.selected.animated_dim(), Some(0));
+    let z = app.selected.dim_config[1].index;
     app.plot_selection();
     drain(&mut app);
     assert_slice(&app, 0, z, "first plot");
@@ -79,8 +79,7 @@ fn play_past_window(plot: PlotType, cache_blocks: usize) {
     // Room for `cache_blocks` per-step slabs (each 32^3 f32 values).
     app.block_cache
         .set_max_bytes(cache_blocks * N * N * N * 4 + 1024);
-    let z = app.selected.dim_indices[1];
-    app.selected.dim_ranges[0] = (0, 3);
+    let z = app.selected.dim_config[1].index;
     app.selected.dim_config[0].range = (0, 3);
     app.plot_selection();
     drain(&mut app);
@@ -92,8 +91,7 @@ fn play_past_window(plot: PlotType, cache_blocks: usize) {
         }
         app.advance_playback(Instant::now());
         // What the open variables panel writes every frame (`slider_row.rs`).
-        app.selected.dim_indices[0] = app.playback.current_timestep.clamp(0, 3);
-        app.selected.dim_config[0].index = app.selected.dim_indices[0];
+        app.selected.dim_config[0].index = app.playback.current_timestep.clamp(0, 3);
         for _ in 0..5 {
             app.poll_block_prefetch_results();
             std::thread::sleep(Duration::from_millis(1));

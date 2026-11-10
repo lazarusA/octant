@@ -29,11 +29,10 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     // Sizes of what the plot reads: its level of a multiscale variable.
     let window = app.read_window(&app.selected).unwrap_or((
         var_info,
-        std::borrow::Cow::Borrowed(&app.selected.dim_ranges),
+        std::borrow::Cow::Borrowed(&app.selected.dim_config),
     ));
-    let (read_info, read_ranges) = (window.0, &window.1);
     let (requested_cells, requested_bytes, total_bytes) =
-        calculate_download_sizes(read_info, &app.selected.dim_config, read_ranges);
+        calculate_download_sizes(window.0, &window.1);
 
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(tr(K::Download)).strong());
@@ -103,7 +102,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             ui.add_space(4.0);
 
             if app.selected.dim_config[i].active {
-                let (mut start, mut end) = app.selected.dim_ranges[i];
+                let (mut start, mut end) = app.selected.dim_config[i].range;
                 double_slider_with_inputs(
                     ui,
                     dim_name,
@@ -113,16 +112,9 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     dim_size.saturating_sub(1),
                 );
 
+                // The step code keeps an animated index on the shown step.
                 let index = if is_animated {
-                    let max_idx = dim_size.saturating_sub(1);
-                    if app.playback.is_playing
-                        || app.playback.current_timestep > end
-                        || app.playback.current_timestep < start
-                    {
-                        app.playback.current_timestep.min(max_idx)
-                    } else {
-                        app.playback.current_timestep.clamp(start, end)
-                    }
+                    app.selected.dim_config[i].index
                 } else {
                     start
                 };
@@ -130,19 +122,14 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                 show_coord_label(app, ui, var_info, i, (start, end));
             } else {
                 let max_index = dim_size.saturating_sub(1);
-                if is_animated
-                    && (app.playback.is_playing
-                        || app.playback.current_timestep != app.selected.dim_indices[i])
-                {
-                    app.selected.dim_indices[i] = app.playback.current_timestep.min(max_index);
-                }
+                let mut index = app.selected.dim_config[i].index;
                 let mut changed = false;
                 ui.horizontal(|ui| {
                     ui.label(tr(K::Index));
                     // Slider fills the row up to a fixed-width value box,
                     // matching the range rows. The slider runs first so the box
                     // shows the dragged value on the same frame.
-                    let index = &mut app.selected.dim_indices[i];
+                    let index = &mut index;
                     ui.spacing_mut().slider_width = flow_row::track_width(ui, VALUE_BOX_W);
                     let s_resp = ui.add(
                         egui::Slider::new(index, 0..=max_index)
@@ -160,10 +147,10 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });
                 if changed && is_animated {
-                    app.playback.current_timestep = app.selected.dim_indices[i];
+                    app.playback.current_timestep = index;
                 }
-                app.selected.set_index(i, app.selected.dim_indices[i]);
-                show_coord_label(app, ui, var_info, i, app.selected.dim_ranges[i]);
+                app.selected.set_index(i, index);
+                show_coord_label(app, ui, var_info, i, (index, index));
             }
         });
 

@@ -90,8 +90,8 @@ impl OctantApp {
         let meta = plotted.metadata.as_ref()?;
         let var = meta.variables.get(plotted.variable_idx)?;
         let size = *var.shape.get(dim_idx)? as usize;
-        let range =
-            (plotted.dim_ranges.get(dim_idx).copied()).unwrap_or((0, size.saturating_sub(1)));
+        let range = (plotted.dim_config.get(dim_idx).map(|c| c.range))
+            .unwrap_or((0, size.saturating_sub(1)));
         Some((meta, var, size, range))
     }
 
@@ -143,7 +143,7 @@ mod tests {
         let var = &mut selection.metadata.as_mut().expect("metadata").variables;
         let idx = selection.variable_idx;
         var[idx].shape[0] = 1;
-        selection.dim_ranges[0] = (0, 0);
+        selection.dim_config[0].range = (0, 0);
         *app.layers.base.selection_mut() = selection;
         let (bounds, _, _) = app.resolve_axis_bounds_and_title(0, "Y", 1, true);
         assert_eq!(bounds, (44.5, 45.5));

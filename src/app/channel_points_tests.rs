@@ -185,8 +185,8 @@ fn a_narrow_point_cloud_blends_on_the_gpu_until_drawn_as_a_volume() {
     app.layout.show_hero = false;
     app.selected.plot_type = PlotType::PointCloud;
     crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
-    app.selected.dim_ranges[1] = (0, 1023);
-    app.selected.dim_ranges[2] = (0, 1023);
+    app.selected.dim_config[1].range = (0, 1023);
+    app.selected.dim_config[2].range = (0, 1023);
     app.plot_selection();
     poll_until(&mut app, |a| a.layers.base.data.volume.is_some());
     // The composite turned on as its Settings toggle does: then a reload.
@@ -200,7 +200,7 @@ fn a_narrow_point_cloud_blends_on_the_gpu_until_drawn_as_a_volume() {
     // A range in the next channel chunk reads a new block window: a new
     // volume, holding only its channels.
     let allocations = app.layers.base.data.volume_allocations;
-    app.selected.dim_ranges[0] = (3, 5);
+    app.selected.dim_config[0].range = (3, 5);
     app.plot_selection();
     let window = |a: &OctantApp| {
         let cv = a.layers.base.data.channel_volume.as_ref();

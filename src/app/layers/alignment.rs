@@ -93,7 +93,8 @@ fn axis_match(
     let len = base_var.shape.get(dim).copied();
     if len.is_none()
         || len != overlay_var.shape.get(odim).copied()
-        || base.dim_ranges.get(dim) != overlay.dim_ranges.get(odim)
+        || base.dim_config.get(dim).map(|c| c.range)
+            != overlay.dim_config.get(odim).map(|c| c.range)
     {
         return AxisMatch::Differs;
     }

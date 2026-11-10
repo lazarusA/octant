@@ -36,7 +36,7 @@ fn volume_app() -> OctantApp {
     app.selected.variable_idx = 0;
     app.selected.plot_type = PlotType::Volume;
     crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
-    app.selected.dim_ranges[0] = (0, DEPTH - 1);
+    app.selected.dim_config[0].range = (0, DEPTH - 1);
     app.plot_selection();
     poll_until(&mut app, |a| {
         a.layers.base.data.volume.is_some() && a.ring_missing_steps(LayerId::BASE).is_empty()
@@ -96,7 +96,7 @@ fn play(app: &mut OctantApp, steps: usize) {
 #[test]
 fn each_step_writes_only_the_plane_the_window_gains() {
     let mut app = volume_app();
-    assert_eq!(app.selected.animated_dim, Some(0), "time animates");
+    assert_eq!(app.selected.animated_dim(), Some(0), "time animates");
     assert!(app.animates_along_z(LayerId::BASE), "time is the Z axis");
     assert_eq!(
         app.layers.base.data.volume.as_ref().map(|v| v.depth),

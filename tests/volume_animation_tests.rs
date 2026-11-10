@@ -1,8 +1,15 @@
 use octant::app::layers::LayerId;
-use octant::app::{AnimationRole, OctantApp, SpatialRole};
+use octant::app::{AnimationRole, DimConfig, OctantApp, SpatialRole};
 use octant::data::{OctantBlock, VariableInfo, VolumeData};
 use std::collections::HashMap;
 
+fn xyz(c: &[DimConfig]) -> (Option<usize>, Option<usize>, Option<usize>) {
+    (
+        DimConfig::x_dim(c),
+        DimConfig::y_dim(c),
+        DimConfig::z_dim(c),
+    )
+}
 #[test]
 fn test_init_dimension_defaults_2d_dataset() {
     let mut app = OctantApp::default();
@@ -35,10 +42,10 @@ fn test_init_dimension_defaults_2d_dataset() {
     // Neither dimension should be Animated
     assert_eq!(app.selected.dim_config[0].animation, AnimationRole::None);
     assert_eq!(app.selected.dim_config[1].animation, AnimationRole::None);
-    assert_eq!(app.selected.animated_dim, None);
+    assert_eq!(app.selected.animated_dim(), None);
 
-    // spatial_dims should contain 2 dimensions in X, Y order: [1, 0]
-    assert_eq!(app.selected.spatial_dims, vec![1, 0]);
+    // The X, Y and Z dimensions.
+    assert_eq!(xyz(&app.selected.dim_config), (Some(1), Some(0), None));
 }
 
 #[test]
@@ -76,10 +83,10 @@ fn test_init_dimension_defaults_3d_dataset() {
         app.selected.dim_config[0].animation,
         AnimationRole::Animated
     );
-    assert_eq!(app.selected.animated_dim, Some(0));
+    assert_eq!(app.selected.animated_dim(), Some(0));
 
-    // spatial_dims should contain 3 dimensions in X, Y, Z order: [2, 1, 0]
-    assert_eq!(app.selected.spatial_dims, vec![2, 1, 0]);
+    // The X, Y and Z dimensions.
+    assert_eq!(xyz(&app.selected.dim_config), (Some(2), Some(1), Some(0)));
 }
 
 #[test]
@@ -120,10 +127,10 @@ fn test_init_dimension_defaults_4d_dataset() {
         app.selected.dim_config[0].animation,
         AnimationRole::Animated
     );
-    assert_eq!(app.selected.animated_dim, Some(0));
+    assert_eq!(app.selected.animated_dim(), Some(0));
 
-    // spatial_dims in X, Y, Z order: [3, 2, 1]
-    assert_eq!(app.selected.spatial_dims, vec![3, 2, 1]);
+    // The X, Y and Z dimensions.
+    assert_eq!(xyz(&app.selected.dim_config), (Some(3), Some(2), Some(1)));
 }
 
 #[test]
@@ -160,7 +167,9 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
             ..Default::default()
         },
     ];
-    app.layers.base.selection_mut().animated_dim = Some(0);
+
+    // A plotted selection carries its dataset.
+    app.layers.base.selection_mut().metadata = Some(Default::default());
 
     app.playback.current_timestep = 5;
     assert_eq!(app.get_volume_shifts(), (0, 0, 5));
@@ -171,7 +180,6 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     // Case 2: X is animated (dim 2)
     app.layers.base.selection_mut().dim_config[0].animation = AnimationRole::None;
     app.layers.base.selection_mut().dim_config[2].animation = AnimationRole::Animated;
-    app.layers.base.selection_mut().animated_dim = Some(2);
 
     app.playback.current_timestep = 4;
     assert_eq!(app.get_volume_shifts(), (4, 0, 0));
@@ -182,7 +190,6 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     // Case 3: Y is animated (dim 1)
     app.layers.base.selection_mut().dim_config[2].animation = AnimationRole::None;
     app.layers.base.selection_mut().dim_config[1].animation = AnimationRole::Animated;
-    app.layers.base.selection_mut().animated_dim = Some(1);
 
     app.playback.current_timestep = 7;
     assert_eq!(app.get_volume_shifts(), (0, 7, 0));
@@ -459,26 +466,27 @@ fn test_format_byte_size_and_calculate_download_sizes() {
             active: true,
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
+            range: (0, 9),
             ..Default::default()
         },
         DimConfig {
             active: true,
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
+            range: (0, 999),
             ..Default::default()
         },
         DimConfig {
             active: true,
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
+            range: (0, 999),
             ..Default::default()
         },
     ];
 
     // Requesting 10 time steps out of 100 (full spatial)
-    let selected_ranges = vec![(0, 9), (0, 999), (0, 999)];
-    let (cells, requested, total) =
-        calculate_download_sizes(&var_info, &dim_config, &selected_ranges);
+    let (cells, requested, total) = calculate_download_sizes(&var_info, &dim_config);
 
     assert_eq!(cells, 10 * 1000 * 1000);
 
@@ -519,7 +527,6 @@ fn test_selected_volume_elements_and_limit() {
         ome: None,
     });
     app.selected.variable_idx = 0;
-    app.selected.dim_ranges = vec![(0, 49), (0, 999), (0, 999)];
     app.selected.dim_config = vec![
         octant::app::DimConfig {
             active: true,
@@ -540,6 +547,10 @@ fn test_selected_volume_elements_and_limit() {
             ..Default::default()
         },
     ];
+    let ranges = [(0, 49), (0, 999), (0, 999)];
+    for (c, range) in app.selected.dim_config.iter_mut().zip(ranges) {
+        c.range = range;
+    }
 
     // 50 * 1000 * 1000 = 50,000,000 floats (200 MB) > 33,554,432 (128 MB)
     let elements = calculate_selected_volume_elements(&app);
@@ -547,7 +558,7 @@ fn test_selected_volume_elements_and_limit() {
     assert!(!is_volume_allowed(&app, &app.selected, None));
 
     // Reducing Z range to 10 slices: 10 * 1000 * 1000 = 10,000,000 floats (40 MB) <= 128 MB
-    app.selected.dim_ranges[0] = (0, 9);
+    app.selected.dim_config[0].range = (0, 9);
     let elements_small = calculate_selected_volume_elements(&app);
     assert_eq!(elements_small, 10_000_000);
     assert!(is_volume_allowed(&app, &app.selected, None));
@@ -714,16 +725,16 @@ fn test_volume_animation_timeline_progression() {
             ..Default::default()
         },
     ];
-    app.selected.animated_dim = Some(0);
-    app.selected.spatial_dims = vec![3, 2, 1]; // X, Y, Z
-    app.selected.dim_indices = vec![0, 0, 0, 0];
+    for (c, n) in app.selected.dim_config.iter_mut().zip([nt, nz, ny, nx]) {
+        c.range = (0, n - 1);
+    }
     app.selected.plot_type = octant::plots::PlotType::Volume;
     app.sync_plotted_state_from_selected();
 
     // Simulate stepping through all timesteps in OctantApp
     for step in 0..nt {
         app.playback.current_timestep = step;
-        app.selected.dim_indices[0] = step;
+        app.selected.dim_config[0].index = step;
         app.sync_plotted_state_from_selected();
         app.apply_block_projection(LayerId::BASE, &block);
 
@@ -837,9 +848,6 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
             ..Default::default()
         },
     ];
-    app.selected.animated_dim = Some(0);
-    app.selected.spatial_dims = vec![3, 2, 1];
-    app.selected.dim_indices = vec![0, 0, 0, 0];
     app.selected.plot_type = octant::plots::PlotType::Volume;
     app.sync_plotted_state_from_selected();
 
@@ -848,7 +856,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
 
     for step in 0..nt {
         app.playback.current_timestep = step;
-        app.layers.base.selection_mut().dim_indices[0] = step;
+        app.layers.base.selection_mut().dim_config[0].index = step;
         app.apply_block_projection(LayerId::BASE, &block);
 
         let vdata = app.layers.base.data.volume.as_ref().unwrap();
@@ -863,7 +871,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
 
     for step in 0..nt {
         app.playback.current_timestep = step;
-        app.layers.base.selection_mut().dim_indices[0] = step;
+        app.layers.base.selection_mut().dim_config[0].index = step;
         app.apply_block_projection(LayerId::BASE, &block);
 
         assert_eq!(app.layers.base.color.range_min, 10.0);
@@ -1011,8 +1019,8 @@ fn test_2d_and_3d_selected_elements_and_limits() {
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
 
     // Sub-range selection for X and Y in sliders: 100x100
-    app.selected.dim_ranges[2] = (10, 109); // span 100
-    app.selected.dim_ranges[1] = (20, 119); // span 100
+    app.selected.dim_config[2].range = (10, 109); // span 100
+    app.selected.dim_config[1].range = (20, 119); // span 100
 
     let elements_2d = octant::ui::variables_panel::calculate_selected_2d_elements(&app);
     assert_eq!(elements_2d, 100 * 100);

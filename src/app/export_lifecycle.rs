@@ -44,7 +44,7 @@ impl OctantApp {
         );
 
         let var_name = self
-            .plotted_variable_info()
+            .effective_variable_info()
             .map(|v| v.name.as_str())
             .unwrap_or("plot");
         let title = format!("Octant - {}", var_name);
@@ -61,27 +61,15 @@ impl OctantApp {
             Ok(data) => {
                 if req.copy_to_clipboard {
                     #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                            let img_data = arboard::ImageData {
-                                width: final_w as usize,
-                                height: final_h as usize,
-                                bytes: std::borrow::Cow::Borrowed(&cropped_rgba),
-                            };
-                            let _ = clipboard.set_image(img_data);
-                        }
-                    }
-                    self.status_message = "Copied figure to clipboard".to_string();
+                    self.copy_figure(&cropped_rgba, final_w, final_h);
                 } else if let Some(ref path) = req.output_path {
                     if let Err(e) = crate::export::save_exported_file(&data, path, req.format) {
-                        self.status_message = format!("Export error: {}", e);
                         self.notify(Severity::Error, tr(ExportKey::ExportFailed), e);
                     } else {
                         let filename = path
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or_else(|| tr(ExportKey::FallbackFilename).to_string());
-                        self.status_message = format!("Saved figure to {}", path.display());
                         let notice = Notice::new(Severity::Success, tr(ExportKey::Saved), filename);
                         // The browser keeps its downloads: there is no file to reveal.
                         #[cfg(not(target_arch = "wasm32"))]
@@ -91,13 +79,27 @@ impl OctantApp {
                 }
             }
             Err(err) => {
-                self.status_message = format!("Encoding error: {}", err);
                 self.notify(
                     Severity::Error,
                     tr(ExportKey::ExportFailed),
                     filled(tr(ExportKey::EncodingError), &[&err]),
                 );
             }
+        }
+    }
+
+    /// Copies the `width` x `height` RGBA figure to the clipboard; a failure
+    /// is a toast.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn copy_figure(&mut self, rgba: &[u8], width: u32, height: u32) {
+        let image = arboard::ImageData {
+            width: width as usize,
+            height: height as usize,
+            bytes: std::borrow::Cow::Borrowed(rgba),
+        };
+        let copied = arboard::Clipboard::new().and_then(|mut c| c.set_image(image));
+        if let Err(e) = copied {
+            self.notify(Severity::Error, tr(ExportKey::ExportFailed), e.to_string());
         }
     }
 }

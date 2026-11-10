@@ -129,27 +129,34 @@ fn removing_the_picked_overlay_drops_its_preview() {
 fn following_the_base_window_ignores_playback_steps() {
     let (mut app, meta) = plotted_app();
     let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
-    let anim = app.plotted().animated_dim.expect("animated");
+    let anim = app.plotted().animated_dim().expect("animated");
     let Some((base, overlay)) = app.layers.base_and_overlay_mut(id) else {
         panic!("overlay");
     };
     let mut base = base.selection().clone();
-    base.dim_indices[anim] = 2;
+    base.dim_config[anim].index = 2;
     assert!(
         !follow_base_window(&base, overlay.selection_mut()),
         "a step is no move"
     );
     assert_eq!(
-        overlay.selection().dim_indices[anim],
+        overlay.selection().dim_config[anim].index,
         2,
         "but it is followed"
     );
+    // Collapsed, a step moves the time range too: still no move.
+    base.dim_config[anim].active = false;
+    base.set_step(anim, 2);
+    follow_base_window(&base, overlay.selection_mut());
+    base.set_step(anim, 1);
+    assert!(!follow_base_window(&base, overlay.selection_mut()));
+    assert_eq!(overlay.selection().dim_config[anim].range, (1, 1));
 
     let lon = 2;
-    base.dim_ranges[lon] = (0, 1);
+    base.dim_config[lon].range = (0, 1);
     assert!(
         follow_base_window(&base, overlay.selection_mut()),
         "a new window moves"
     );
-    assert_eq!(overlay.selection().dim_ranges[lon], (0, 1));
+    assert_eq!(overlay.selection().dim_config[lon].range, (0, 1));
 }

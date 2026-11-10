@@ -152,7 +152,7 @@ impl OctantApp {
         let (Some(meta), Some(var)) = (plotted.metadata.as_ref(), plotted.variable_info()) else {
             return self.describe_dataset(None);
         };
-        let step = plotted.animated_dim.and_then(|i| {
+        let step = plotted.animated_dim().and_then(|i| {
             let name = var.dimension_names.get(i)?;
             let len = *var.shape.get(i)? as usize;
             let dim = Dim {

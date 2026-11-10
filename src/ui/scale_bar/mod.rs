@@ -32,7 +32,7 @@ const PAD: f32 = 6.0;
 /// Meters per data pixel along x of the plotted OME-Zarr level, when its x
 /// axis has a length unit.
 pub(crate) fn meters_per_pixel(app: &OctantApp) -> Option<f64> {
-    let var = app.plotted_variable_info()?;
+    let var = app.effective_variable_info()?;
     let x = app.get_spatial_dim_index(0);
     let unit = var.ome.as_ref()?.image.axes.get(x)?.unit.as_deref()?;
     let meters = meters_per_unit(unit)? * var.ome_scale(x)?;

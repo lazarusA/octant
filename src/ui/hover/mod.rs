@@ -183,18 +183,8 @@ fn detail_overrides(
 fn resolve_hover_target_info(
     app: &OctantApp,
 ) -> (Option<&DatasetMetadata>, Option<&VariableInfo>, &str, &str) {
-    let meta = app
-        .plotted()
-        .metadata
-        .as_ref()
-        .or(app.selected.metadata.as_ref());
-
-    let var = meta.and_then(|m| {
-        m.variables
-            .get(app.plotted().variable_idx)
-            .or_else(|| m.variables.get(app.selected.variable_idx))
-            .or_else(|| m.variables.first())
-    });
+    let meta = app.effective_dataset_metadata();
+    let var = (app.effective_variable_info()).or_else(|| meta?.variables.first());
 
     let default_name = app
         .layers

@@ -30,7 +30,6 @@ fn create_volume_app() -> OctantApp {
 #[test]
 fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_volume() {
     let mut app = create_volume_app();
-    app.selected.dim_ranges[0] = (0, 3);
     app.selected.dim_config[0].range = (0, 3);
     app.plot_selection();
     drain(&mut app);
@@ -98,7 +97,6 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     app.selected.dim_config[0].spatial = octant::app::SpatialRole::Z;
     app.selected.dim_config[0].animation = octant::app::AnimationRole::Animated;
     app.selected.dim_config[0].range = (0, 3);
-    app.selected.dim_ranges[0] = (0, 3);
 
     let initial_values = vec![100.0f32; 4 * 32 * 32];
     let initial_block = OctantBlock::new(

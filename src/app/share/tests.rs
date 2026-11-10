@@ -112,7 +112,7 @@ fn a_link_typed_as_a_source_opens_its_store() {
         None,
     );
     assert_ne!(app.selected.store_target, "procedural://volume4d", "queued");
-    app.run_commands(&ctx);
+    app.run_commands();
     assert_eq!(app.selected.store_target, "procedural://volume4d");
     let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
     while app.metadata_rx.is_some() {
@@ -156,8 +156,14 @@ pub(super) fn app_of(
 }
 
 /// Types `link` as a source and runs its commands until it plots and none
-/// is left.
+/// is left, none failing.
 pub(super) fn apply(app: &mut crate::app::OctantApp, link: &str) {
+    replay(app, link);
+    assert!(app.toasts.is_empty(), "a command failed");
+}
+
+/// `apply`, whatever its commands' outcome.
+pub(super) fn replay(app: &mut crate::app::OctantApp, link: &str) {
     let ctx = egui::Context::default();
     app.submit_or_activate_source(link, None);
     let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
@@ -166,10 +172,9 @@ pub(super) fn apply(app: &mut crate::app::OctantApp, link: &str) {
         app.poll_inspection(&ctx);
         app.poll_coordinate_results();
         app.poll_block_prefetch_results();
-        app.run_commands(&ctx);
+        app.run_commands();
         std::thread::yield_now();
     }
-    assert!(app.toasts.is_empty(), "a command failed");
 }
 
 #[test]

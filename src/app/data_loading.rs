@@ -8,7 +8,6 @@ impl OctantApp {
     pub fn inspect_active_store(&mut self) {
         self.is_loading = true;
         self.clear_active_metadata();
-        self.status_message = format!("Inspecting {:?} metadata...", self.selected.store_kind);
 
         let store_kind = self.selected.store_kind;
         self.selected.store_target = self.selected.store_target.trim().to_string();
@@ -142,7 +141,6 @@ impl OctantApp {
             Err(err) => {
                 self.layout.hero_state.loaded = false;
                 self.clear_active_metadata();
-                self.status_message = format!("Store inspect error: {}", err);
                 self.notify(Severity::Error, tr(N::CouldntOpenDataset), &err);
             }
         }
@@ -152,18 +150,14 @@ impl OctantApp {
     fn activate_inspected(&mut self, metadata: DatasetMetadata, handle: StoreHandle) {
         let is_plate = self.follow_plate(&metadata);
         if metadata.variables.is_empty() && !is_plate {
-            self.status_message = format!("No variables discovered in '{}'", metadata.name);
             self.notify(Severity::Warning, tr(N::NoVariablesFound), &metadata.name);
-        } else {
-            self.status_message = format!(
-                "Inspected '{}' (Found {} variables)",
-                metadata.name,
-                metadata.variables.len()
-            );
         }
         self.layout.hero_state.loaded = true;
         self.layout.hero_state.source_label = metadata.name.clone();
-        self.layout.show_variables_overlay = !metadata.variables.is_empty();
+        self.show_panel(
+            crate::ui::panel_layout::Panel::Variables,
+            !metadata.variables.is_empty(),
+        );
 
         let source_id = self.selected_source_id();
         let mut dataset = crate::data::Dataset::new(&source_id, handle.source().clone(), handle);

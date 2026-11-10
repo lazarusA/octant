@@ -162,7 +162,7 @@ impl crate::app::OctantApp {
                 }
                 _ => self.plate = Some(PlateState::new(&target, self.selected.store_kind, plate)),
             }
-            self.layout.show_dataset_panel = true;
+            self.show_panel(crate::ui::panel_layout::Panel::Dataset, true);
             return true;
         }
         match &mut self.plate {

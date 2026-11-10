@@ -100,7 +100,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
             });
 
             let var_name = app
-                .plotted_variable_info()
+                .effective_variable_info()
                 .map(|v| v.name.as_str())
                 .unwrap_or("plot");
             let default_name =

@@ -72,7 +72,6 @@ fn a_new_plot_replaces_playback_at_its_step() {
     let mut app = playing(PlotType::Volume);
     // A smaller box: a new block, requested for the current step.
     for dim in 1..4 {
-        app.selected.dim_ranges[dim] = (4, 19);
         app.selected.dim_config[dim].range = (4, 19);
     }
     app.plot_selection();
@@ -132,9 +131,8 @@ fn switching_plot_type_while_playing_shows_the_new_layout() {
     app.load_new_metadata(meta);
     app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
-    app.selected.dim_ranges[1] = (5, 5);
     app.selected.dim_config[1].range = (5, 5);
-    app.selected.dim_indices[1] = 5;
+    app.selected.dim_config[1].index = 5;
     app.plot_selection();
     drain(&mut app);
     app.playback.is_playing = true;
@@ -143,7 +141,6 @@ fn switching_plot_type_while_playing_shows_the_new_layout() {
     }
     // The plot type menu with the full depth: what `plot_type.rs` does.
     app.selected.plot_type = PlotType::Volume;
-    app.selected.dim_ranges[1] = (0, 31);
     app.selected.dim_config[1].range = (0, 31);
     app.load_selected_variable_block();
     for _ in 0..20 {
@@ -238,7 +235,6 @@ fn test_single_step_playback_past_cache_eviction() {
     app.block_cache = octant::data::BlockCache::new(512 * 1024);
 
     // Initial single time step selection: (0, 0)
-    app.selected.dim_ranges[0] = (0, 0);
     app.selected.dim_config[0].range = (0, 0);
     app.plot_selection();
     drain(&mut app);
@@ -257,7 +253,7 @@ fn test_single_step_playback_past_cache_eviction() {
     );
 
     // Ensure range never inverted during eviction:
-    let r = app.plotted().dim_ranges[0];
+    let r = app.plotted().dim_config[0].range;
     assert!(
         r.0 <= r.1,
         "range must never invert on eviction, got ({}, {})",

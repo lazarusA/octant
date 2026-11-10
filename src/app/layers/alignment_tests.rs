@@ -49,10 +49,6 @@ fn base_of(dataset: &VariableSelection) -> VariableSelection {
         DimConfig::new(SpatialRole::Y, AnimationRole::None, true, 0, (0, 4)),
         DimConfig::new(SpatialRole::X, AnimationRole::None, true, 0, (0, 3)),
     ];
-    base.dim_indices = vec![1, 0, 0];
-    base.dim_ranges = vec![(0, 2), (0, 4), (0, 3)];
-    base.spatial_dims = vec![2, 1];
-    base.animated_dim = Some(0);
     base
 }
 
@@ -69,9 +65,8 @@ fn an_overlay_selection_reads_the_base_window_by_dimension_name() {
     let base = base_of(&data);
     let overlay = overlay_selection(&base, &data, 1).expect("overlay");
     assert_eq!(overlay.variable_idx, 1);
-    assert_eq!(overlay.dim_ranges, base.dim_ranges);
-    assert_eq!(overlay.dim_indices, base.dim_indices);
-    assert_eq!(overlay.animated_dim, Some(0));
+    assert_eq!(overlay.dim_config, base.dim_config);
+    assert_eq!(overlay.animated_dim(), Some(0));
     assert_eq!(DimConfig::x_dim(&overlay.dim_config), Some(2));
     assert_eq!(DimConfig::y_dim(&overlay.dim_config), Some(1));
 }
@@ -126,7 +121,7 @@ fn a_different_window_or_grid_is_not_drawn() {
     let data = dataset("a", &[]);
     let base = base_of(&data);
     let mut overlay = overlay_selection(&base, &data, 1).expect("overlay");
-    overlay.dim_ranges[2] = (0, 1);
+    overlay.dim_config[2].range = (0, 1);
     assert!(!classify(&base, &overlay).is_drawn(), "another lon window");
 
     let mut other = dataset("b", &[]);

@@ -56,13 +56,9 @@ pub fn draw_end_range_inputs(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle)
     let min_resp = input(ui, min_center, &mut new_min, tr(K::RangeMinHover));
     let max_resp = input(ui, max_center, &mut new_max, tr(K::RangeMaxHover));
 
-    if min_resp.changed() || new_min != color.range_min {
-        color.range_min = new_min;
-        color.lock_bounds = true;
-    }
-    if max_resp.changed() || new_max != color.range_max {
-        color.range_max = new_max;
-        color.lock_bounds = true;
+    let changed = min_resp.changed() || max_resp.changed();
+    if changed || (new_min, new_max) != (color.range_min, color.range_max) {
+        color.set_range(new_min, new_max, true);
     }
 }
 

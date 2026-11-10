@@ -27,7 +27,7 @@ fn a_step_past_the_time_window_moves_the_window() {
         let src = "?src=https://share.test/long.zarr&var=tas&anim=time";
         apply(&mut app, &format!("{src}&time={date}"));
         assert_eq!(app.playback.current_timestep, step, "{date}");
-        let (start, end) = app.plotted().dim_ranges[0];
+        let (start, end) = app.plotted().dim_config[0].range;
         assert!((start..=end).contains(&step), "{date}: {start}..{end}");
         assert!(end < steps as usize, "{date}: {start}..{end}");
     }

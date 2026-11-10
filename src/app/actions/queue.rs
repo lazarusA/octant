@@ -214,7 +214,9 @@ impl OctantApp {
     /// answer's detail as a toast, and the Variables panel opened for what
     /// the dataset holds); link commands show only their failures; why one
     /// failed is a toast.
-    pub(crate) fn run_commands(&mut self, ctx: &egui::Context) {
+    pub(crate) fn run_commands(&mut self) {
+        // Panels the commands open or close leave focus in the command field.
+        let panels_before = self.layout.panel_focus.len();
         if self.voice.is_open() {
             for utterance in self.voice.take_utterances() {
                 self.queue_utterance(&utterance);
@@ -226,7 +228,7 @@ impl OctantApp {
         for (origin, outcome) in self.resume() {
             match (origin, outcome) {
                 (Origin::Link, Ok(_)) => {}
-                (Origin::Voice, Ok(done)) => self.show_done(ctx, &done),
+                (Origin::Voice, Ok(done)) => self.show_done(&done),
                 (Origin::Voice, Err(Failure::NotUnderstood(text))) => {
                     self.voice
                         .set_last_action(answer::not_understood_line(&text));
@@ -238,15 +240,18 @@ impl OctantApp {
                 }
             }
         }
+        if self.voice.is_open() {
+            self.layout.panel_focus.truncate(panels_before);
+        }
     }
 
-    fn show_done(&mut self, ctx: &egui::Context, done: &Done) {
+    fn show_done(&mut self, done: &Done) {
         let line = answer::done_text(done);
         if let Some(detail) = answer::done_detail(done) {
             self.notify(Severity::Info, &line, detail);
         }
         if matches!(done, Done::DatasetShown { .. } | Done::Searching { .. }) {
-            self.set_panel_open(ctx, Panel::Variables, true);
+            self.set_panel_open(Panel::Variables, true);
         }
         self.voice.set_last_action(line);
     }

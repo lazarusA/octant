@@ -50,9 +50,9 @@ fn czyx(model: &str, z_scales: [f64; 3]) -> crate::data::DatasetMetadata {
 fn an_animated_channel_axis_starts_on_its_active_channel() {
     let meta = czyx("greyscale", [1.0; 3]);
     let app = defaults_for(&meta.variables[0]);
-    assert_eq!(app.selected.animated_dim, Some(0), "no t: c animates");
-    assert_eq!(app.selected.dim_indices[0], 1);
-    assert_eq!(app.selected.dim_ranges[0], (0, 1), "the range stays");
+    assert_eq!(app.selected.animated_dim(), Some(0), "no t: c animates");
+    assert_eq!(app.selected.dim_config[0].index, 1);
+    assert_eq!(app.selected.dim_config[0].range, (0, 1), "the range stays");
 }
 
 #[test]
@@ -68,10 +68,13 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
     *app.layers.base.selection_mut() = app.selected.clone();
 
     app.switch_plot_type(PlotType::Volume);
-    assert_eq!(app.selected.dim_ranges[1], (10, 10), "z is not widened");
+    assert_eq!(
+        app.selected.dim_config[1].range,
+        (10, 10),
+        "z is not widened"
+    );
     assert_eq!(app.selection_level(&app.selected), Some(0), "fits a buffer");
     // Lines read the volume's level too.
-    app.selected.dim_ranges[1] = (0, 3);
     app.selected.dim_config[1].range = (0, 3);
     app.selected.plot_type = PlotType::Line;
     assert_eq!(
@@ -80,13 +83,11 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
         "lines as volumes"
     );
     app.selected.plot_type = PlotType::Volume;
-    app.selected.dim_ranges[1] = (10, 10);
     app.selected.dim_config[1].range = (10, 10);
 
     // The whole z stack: too big at level 0; z is downsampled with the
     // image, so the heatmap reads it at the level within one buffer.
     app.switch_plot_type(PlotType::Heatmap);
-    app.selected.dim_ranges[1] = (0, 63);
     app.selected.dim_config[1].range = (0, 63);
     app.selected.dim_config[1].active = true;
     assert_eq!(app.selection_level(&app.selected), Some(2));
@@ -109,7 +110,6 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
     assert_eq!(calculate_selected_2d_elements(&app), 512 * 512);
     // One z plane on a small canvas: surfaces, thinned to the canvas, read
     // the level of its pixels as the heatmap does.
-    app.selected.dim_ranges[1] = (10, 10);
     app.selected.dim_config[1].range = (10, 10);
     app.selected.dim_config[1].active = false;
     app.layout.canvas_px = [512, 512];
@@ -123,7 +123,6 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
     );
     app.selected.plot_type = PlotType::Heatmap;
     app.layout.canvas_px = [4096, 4096];
-    app.selected.dim_ranges[1] = (0, 63);
     app.selected.dim_config[1].range = (0, 63);
     app.selected.dim_config[1].active = true;
 

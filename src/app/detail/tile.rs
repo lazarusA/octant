@@ -34,7 +34,8 @@ impl OctantApp {
             cover[i] = axis.cover(&want.set, want.level, &cells)?;
             origin[i] = cells.start;
             end[i] = cells.end;
-            *sel.dim_ranges.get_mut(axis.dim)? = (cells.start as usize, cells.end as usize - 1);
+            let (start, end) = (cells.start as usize, cells.end as usize - 1);
+            sel.set_range(axis.dim, (start, end), start);
         }
         let (u0, u1) = want.axes[0].quad_fraction(cover[0]);
         let (v0, v1) = want.axes[1].quad_fraction(cover[1]);
@@ -64,11 +65,10 @@ impl OctantApp {
     ) -> Option<TilePlan> {
         let var = sel.variable_info()?.clone();
         let step = self.layer_step(id);
-        if let Some(a) = sel.animated_dim {
+        if let Some(a) = sel.animated_dim() {
             let last = (var.shape.get(a).copied().unwrap_or(1) as usize).saturating_sub(1);
             let step = step.min(last);
-            *sel.dim_ranges.get_mut(a)? = (step, step);
-            *sel.dim_indices.get_mut(a)? = step;
+            sel.set_index(a, step);
         }
         let slice = sel.slice_request(&var.name, &var.shape);
         let source_id = self.selection_source_id(&sel);
@@ -78,10 +78,8 @@ impl OctantApp {
             key: BlockCacheKey::new(source_id, &slice),
             tile,
             dims: var.dimension_names,
+            anim_dim: sel.animated_dim(),
             config: sel.dim_config,
-            indices: sel.dim_indices,
-            ranges: sel.dim_ranges,
-            anim_dim: sel.animated_dim,
             step,
         };
         Some((pending, slice, handle))
@@ -136,16 +134,11 @@ impl OctantApp {
         if !same_flips || block.dimension_names != pending.dims {
             return None;
         }
-        let (dims, ranges) = (&pending.dims, &pending.ranges);
+        let (dims, ranges) = (&pending.dims, &pending.config);
         let (bx, by, _) =
             Self::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, &pending.config);
-        let fixed = block_axes::fixed_indices(
-            block,
-            dims,
-            pending.anim_dim,
-            &pending.indices,
-            pending.step,
-        );
+        let fixed =
+            block_axes::fixed_indices(block, dims, pending.anim_dim, &pending.config, pending.step);
         let (_, local_x) = block_axes::dim_bounds(block, dims, bx, ranges);
         let (_, local_y) = block_axes::dim_bounds(block, dims, by, ranges);
         let window = PlaneWindow {

@@ -57,7 +57,7 @@ fn composite_toggle(
     let mut label_buf = [0u8; 160];
     let label = if enabled && !has_mc && !is_cmyk && id == LayerId::BASE {
         let meta = app.plotted().metadata.as_ref();
-        let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
+        let kind = composite_labels(app, ui.ctx(), meta, app.effective_variable_info()).kind;
         stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
     } else {
         label

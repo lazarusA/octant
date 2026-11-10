@@ -18,8 +18,8 @@ impl OctantApp {
         {
             self.switch_plot_type(crate::plots::PlotType::Heatmap);
         }
-        if let Some(anim_dim) = self.selected.animated_dim
-            && let Some(&(start, end)) = self.selected.dim_ranges.get(anim_dim)
+        if let Some(anim_dim) = self.selected.animated_dim()
+            && let Some((start, end)) = self.selected.dim_config.get(anim_dim).map(|c| c.range)
         {
             self.playback.current_timestep =
                 self.playback.current_timestep.clamp(start, end.max(start));
@@ -60,14 +60,13 @@ impl OctantApp {
             return;
         };
         if staged.metadata.is_none() {
-            self.status_message = "No dataset metadata loaded.".to_string();
             return;
         }
         let Some(layer_request) = self.staged_layer_request(id) else {
-            self.status_message = "Invalid selected variable index.".to_string();
+            log::warn!("Layer {id:?} stages no valid variable; nothing to load");
             return;
         };
-        let anim_dim = self.layer_animated_dim(id);
+        let anim_dim = layer_request.anim_dim;
         let (slice_request, step) = self.request_at_current_step(id, &layer_request, anim_dim);
         let store_handle = self.request_store(&layer_request);
         let block_request = store_handle.map(|h| BlockRequest::new(h, slice_request.clone()));
@@ -83,8 +82,11 @@ impl OctantApp {
             return;
         }
         let Some(block_request) = block_request else {
-            self.status_message =
-                format!("Dataset store not open in DatasetManager for '{source_id}'");
+            self.notify(
+                crate::ui::toast::Severity::Error,
+                crate::i18n::tr(crate::i18n::NoticesKey::CouldntLoadData),
+                source_id.as_str(),
+            );
             return;
         };
 
@@ -96,10 +98,6 @@ impl OctantApp {
             layer.load.pending_target_step = Some(step);
             layer.load.requested = requested;
         }
-        self.status_message = format!(
-            "[block cache] Downloading window for '{}'...",
-            layer_request.var.name
-        );
         self.block_prefetcher
             .request_now(block_request, &self.block_cache);
     }
@@ -161,8 +159,6 @@ impl OctantApp {
                     if let Some(id) = shown_in {
                         let moved_step =
                             requested.is_some() && self.accept_requested_block(id, &block);
-                        self.status_message =
-                            format!("[block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(id, &block);
                         // The base layer reached a new step: overlays follow it.
                         if moved_step && id == LayerId::BASE {
@@ -172,7 +168,6 @@ impl OctantApp {
                 }
                 Err(e) => {
                     self.mark_failed(&res.key, true);
-                    self.status_message = format!("Block cache fetch error: {e}");
                     self.notify(
                         crate::ui::toast::Severity::Error,
                         crate::i18n::tr(crate::i18n::NoticesKey::CouldntLoadData),
@@ -200,6 +195,5 @@ impl OctantApp {
         for layer in self.layers.iter_mut() {
             layer.load.pending_target_step = None;
         }
-        self.status_message = "Data fetch aborted by user.".to_string();
     }
 }

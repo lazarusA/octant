@@ -64,7 +64,7 @@ fn a_banded_overlay_starts_on_one_band() {
     let overlay = app.layers.get(id).expect("overlay");
     assert!(!overlay.composite.enabled, "composites start off");
     assert_eq!(overlay.composite.channel_configs.len(), 3);
-    assert_eq!(overlay.selection().dim_ranges[0], (0, 0));
+    assert_eq!(overlay.selection().dim_config[0].range, (0, 0));
     assert!(!app.layers.base.composite.enabled, "the base stays scalar");
     assert!(app.layer_has_rgb_bands(id));
     assert_eq!(app.layer_num_bands(id), 3);
@@ -82,7 +82,7 @@ fn an_overlay_composite_reads_its_ticked_bands_and_keeps_them() {
     // The base window moving leaves the overlay's bands alone.
     app.sync_overlays_to_base();
     let overlay = app.layers.get(id).expect("overlay");
-    assert_eq!(overlay.selection().dim_ranges[0], (0, 2));
+    assert_eq!(overlay.selection().dim_config[0].range, (0, 2));
 
     // Off again, it reads its one band.
     if let Some(layer) = app.layers.get_mut(id) {
@@ -118,8 +118,7 @@ fn at(cell: (usize, usize)) -> HoverAt {
 fn an_overlay_without_a_band_dimension_keeps_the_base_time_window() {
     let (mut app, meta) = memory_app();
     let mut base = selection_of(&mut app, &meta, "t2m");
-    let time = base.animated_dim.expect("time");
-    base.dim_ranges[time] = (0, 2);
+    let time = base.animated_dim().expect("time");
     base.dim_config[time].range = (0, 2);
     *app.layers.base.selection_mut() = base.clone();
     app.selected = base;
@@ -127,7 +126,7 @@ fn an_overlay_without_a_band_dimension_keeps_the_base_time_window() {
     app.load_layer_block(id);
     let overlay = app.layers.get(id).expect("overlay");
     // `time` is dimension 0, where `layer_channel_dim` falls back to.
-    assert_eq!(overlay.selection().dim_ranges[0], (0, 2));
+    assert_eq!(overlay.selection().dim_config[0].range, (0, 2));
 }
 
 #[test]
@@ -135,7 +134,6 @@ fn a_band_shared_with_the_base_follows_its_slider() {
     let (mut app, meta) = memory_app();
     make_resident(&mut app, &SliceRequest::full_range("rgb", &[3, 5, 4]));
     let mut base = selection_of(&mut app, &meta, "rgb");
-    base.dim_ranges[0] = (1, 2);
     base.dim_config[0].range = (1, 2);
     *app.layers.base.selection_mut() = base.clone();
     app.selected = base;
@@ -160,5 +158,5 @@ fn a_band_shared_with_the_base_follows_its_slider() {
     }
     app.fit_overlay_channels(id);
     let overlay = app.layers.get(id).expect("overlay");
-    assert_eq!(overlay.selection().dim_ranges[0], (1, 2));
+    assert_eq!(overlay.selection().dim_config[0].range, (1, 2));
 }

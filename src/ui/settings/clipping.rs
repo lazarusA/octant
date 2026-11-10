@@ -163,18 +163,18 @@ fn range_title_item(ui: &mut egui::Ui, item: usize, color: &mut ColorStyle, togg
 /// The Min and Max inputs; editing either locks the range.
 fn range_inputs(ui: &mut egui::Ui, color: &mut ColorStyle) {
     let speed = ((color.range_max - color.range_min).abs() / 100.0).max(1e-4);
-    for (label, value) in [
-        (K::RangeMin, &mut color.range_min),
-        (K::RangeMax, &mut color.range_max),
-    ] {
+    let mut range = [color.range_min, color.range_max];
+    let mut changed = false;
+    for (label, value) in [K::RangeMin, K::RangeMax].into_iter().zip(&mut range) {
         ui.label(tr(label));
         let input = egui::DragValue::new(value)
             .localized()
             .speed(speed)
             .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32));
-        if ui.add(input).changed() {
-            color.lock_bounds = true;
-        }
+        changed |= ui.add(input).changed();
+    }
+    if changed {
+        color.set_range(range[0], range[1], true);
     }
 }
 

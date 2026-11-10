@@ -3,7 +3,9 @@
 use crate::data::MatrixData;
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::alpha::AlphaError;
-use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
+use crate::utils::colormap::{
+    AlphaInterp, COLORMAP_RGB_COMPOSITE, ColorScale, NO_ALPHA_ROW, registry,
+};
 
 /// Text of an opacity curve as typed, its interpolation and parse error.
 #[derive(Debug, Clone, Default)]
@@ -38,7 +40,9 @@ pub struct ColorStyle {
     pub use_highclip: bool,
     /// Opacity of colormapped colors, in [0, 1].
     pub opacity: f32,
-    pub scale_type: u32,
+    /// Set through `set_scale` and `set_range`, which keep a log scale off a
+    /// range at or below zero.
+    pub scale: ColorScale,
     pub scale_param: f32,
     pub categorical: bool,
     pub custom_label: Option<String>,
@@ -70,7 +74,7 @@ impl Default for ColorStyle {
             highclip_color: shader.highclip_color,
             use_highclip: false,
             opacity: shader.opacity,
-            scale_type: shader.scale_type,
+            scale: ColorScale::Linear,
             scale_param: shader.scale_param,
             categorical: false,
             custom_label: None,
@@ -81,46 +85,6 @@ impl Default for ColorStyle {
 }
 
 impl ColorStyle {
-    /// Forgets the data extent seen so far, unless the range is locked.
-    pub fn reset_bounds(&mut self) {
-        if !self.lock_bounds {
-            self.global_min = f32::MAX;
-            self.global_max = f32::MIN;
-        }
-    }
-
-    /// Starts the data extent and range over at a new variable's `min`..`max`
-    /// (non-finite ends, as in an empty volume, keep the old ones) and unlocks
-    /// the range.
-    pub fn reset_to_extent(&mut self, min: f32, max: f32) {
-        if min.is_finite() {
-            self.global_min = min;
-            self.range_min = min;
-        }
-        if max.is_finite() {
-            self.global_max = max;
-            self.range_max = max;
-        }
-        self.lock_bounds = false;
-    }
-
-    /// Widens the data extent seen so far by another step's `min`..`max`, and
-    /// moves the range there unless it is locked. Non-finite ends are skipped.
-    pub fn follow_extent(&mut self, min: f32, max: f32) {
-        if min.is_finite() {
-            self.global_min = self.global_min.min(min);
-            if !self.lock_bounds {
-                self.range_min = min;
-            }
-        }
-        if max.is_finite() {
-            self.global_max = self.global_max.max(max);
-            if !self.lock_bounds {
-                self.range_max = max;
-            }
-        }
-    }
-
     /// Alpha of colormapped values at data position `t`: the opacity times
     /// the opacity curve, as the plots draw it.
     pub fn alpha_at(&self, t: f32) -> f32 {
@@ -194,7 +158,7 @@ impl ColorStyle {
             use_nan_color: u32::from(self.use_nan_color),
             use_lowclip: u32::from(self.use_lowclip),
             use_highclip: u32::from(self.use_highclip),
-            scale_type: self.scale_type,
+            scale_type: self.scale.code(),
             scale_param: self.scale_param,
             is_categorical: u32::from(categorical),
             num_categories: if categorical { num_categories } else { 10 },

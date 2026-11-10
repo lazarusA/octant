@@ -4,7 +4,7 @@
 use crate::app::OctantApp;
 use crate::app::layers::{Alignment, LayerId};
 use crate::app::overlays::MAX_OVERLAYS;
-use crate::app::test_support::{make_resident, memory_app, poll_until, selection_of};
+use crate::app::test_support::{make_resident, memory_app, poll_until, ranges, selection_of};
 use crate::data::{DatasetMetadata, SliceRequest};
 use crate::ui::hover::card::LayerValue;
 use crate::ui::hover::overlays::{HoverAt, overlay_values};
@@ -39,7 +39,7 @@ fn an_added_overlay_reads_the_base_window_and_draws() {
     assert_eq!(overlay.alignment, Alignment::SameGrid);
     assert!(overlay.is_drawn());
     assert!(overlay.data.matrix.is_some(), "its resident block is shown");
-    assert_eq!(overlay.selection().dim_ranges, app.plotted().dim_ranges);
+    assert_eq!(ranges(overlay.selection()), ranges(app.plotted()));
     assert!(overlay.color.opacity < 1.0, "the base shows through");
 }
 
@@ -69,7 +69,6 @@ fn overlays_follow_a_new_base_window() {
     let (mut app, meta) = plotted_app();
     let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
     let lon = 2;
-    app.selected.dim_ranges[lon] = (0, 1);
     app.selected.dim_config[lon].range = (0, 1);
     app.plot_selection();
     let width = |app: &OctantApp, id: LayerId| {
@@ -80,7 +79,7 @@ fn overlays_follow_a_new_base_window() {
     poll_until(&mut app, |app| width(app, id) == Some(2));
 
     let overlay = app.layers.get(id).expect("overlay");
-    assert_eq!(overlay.selection().dim_ranges[lon], (0, 1));
+    assert_eq!(overlay.selection().dim_config[lon].range, (0, 1));
     assert_eq!(overlay.alignment, Alignment::SameGrid);
     assert_eq!(width(&app, LayerId::BASE), Some(2));
 }

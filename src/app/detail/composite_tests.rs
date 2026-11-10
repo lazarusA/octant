@@ -15,8 +15,6 @@ fn composite() -> OctantApp {
     let mut app = plotted_with(|_, sel| {
         sel.dim_config[0].animation = AnimationRole::None;
         sel.dim_config[0].range = (0, 2);
-        sel.dim_ranges[0] = (0, 2);
-        sel.animated_dim = None;
     });
     app.layers.base.composite.enabled = true;
     app.load_layer_block(LayerId::BASE);

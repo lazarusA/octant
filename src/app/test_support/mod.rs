@@ -158,10 +158,18 @@ pub(crate) fn selection_of(
         selection.dim_config[time].spatial = SpatialRole::None;
         selection.dim_config[time].animation = AnimationRole::Animated;
         selection.dim_config[time].active = true;
-        selection.animated_dim = Some(time);
-        selection.spatial_dims.retain(|&d| d != time);
     }
     selection
+}
+
+/// `sel`'s range per dimension.
+pub(crate) fn ranges(sel: &VariableSelection) -> Vec<(usize, usize)> {
+    sel.dim_config.iter().map(|c| c.range).collect()
+}
+
+/// `sel`'s index per dimension.
+pub(crate) fn indices(sel: &VariableSelection) -> Vec<usize> {
+    sel.dim_config.iter().map(|c| c.index).collect()
 }
 
 /// Puts `request`'s block of the in-memory store into the app's block cache.

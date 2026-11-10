@@ -1,12 +1,8 @@
 use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
 use crate::ui::hover::detail::{DetailCell, detail_fields};
-use crate::ui::hover::enrich::{
-    enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
-    stored_offset,
-};
+use crate::ui::hover::enrich::enrich_entries_with_animated_and_collapsed_dims;
 use crate::ui::hover::field::HoverField;
-use crate::ui::hover::format::format_dimension_coord;
 use crate::utils::units::{COORD_DECIMALS, format_cardinal_degrees};
 use std::collections::HashSet;
 
@@ -98,61 +94,15 @@ fn resolve_2d_dim_entries(
     }
 
     if let Some(v) = var {
-        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
-
-        let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
-        let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
-
+        let (x_idx, y_idx, _) = super::entries::plane_dims(app, v);
         used_dims.insert(x_idx);
         used_dims.insert(y_idx);
-
-        // The plotted dimensions' own names, so flipped ones map back to stored rows.
-        let dim_y_name = v
-            .dimension_names
-            .get(y_idx)
-            .cloned()
-            .unwrap_or_else(|| "y".to_string());
-
-        let dim_x_name = v
-            .dimension_names
-            .get(x_idx)
-            .cloned()
-            .unwrap_or_else(|| "x".to_string());
-
-        let geo_y = geo_coords.map(|(lat, _)| lat);
-        let geo_x = geo_coords.map(|(_, lon)| lon);
-
-        let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
-        let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
-
-        let x_offset = stored_offset(app, &dim_x_name, px, orig_w);
-        let y_offset = stored_offset(app, &dim_y_name, py, orig_h);
-        let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
-        let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
-
         let tile_fields = detail.and_then(|d| detail_fields(app, meta, d));
         let (loc_y, loc_x) = tile_fields.unwrap_or_else(|| {
-            let store = Some(app.plotted().store_target.as_str());
-            (
-                format_dimension_coord(
-                    meta,
-                    Some(v),
-                    store,
-                    &dim_y_name,
-                    global_y,
-                    full_y_len,
-                    geo_y,
-                ),
-                format_dimension_coord(
-                    meta,
-                    Some(v),
-                    store,
-                    &dim_x_name,
-                    global_x,
-                    full_x_len,
-                    geo_x,
-                ),
-            )
+            let cells = (px, py, orig_w, orig_h);
+            let [y, x] =
+                super::entries::plane_fields(app, meta, v, (x_idx, y_idx), cells, geo_coords);
+            (y, x)
         });
 
         let mut list = vec![loc_y, loc_x];

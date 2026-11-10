@@ -75,8 +75,8 @@ pub(crate) fn level_matching(
 /// `selection`'s window as half-open ranges, one per dimension.
 fn window(selection: &VariableSelection, shape: &[u64]) -> Vec<Range<u64>> {
     (0..shape.len())
-        .map(|d| match selection.dim_ranges.get(d) {
-            Some(&(s, e)) => s.min(e) as u64..s.max(e) as u64 + 1,
+        .map(|d| match selection.dim_config.get(d).map(|c| c.range) {
+            Some((s, e)) => s.min(e) as u64..s.max(e) as u64 + 1,
             None => 0..shape[d],
         })
         .collect()
@@ -180,12 +180,6 @@ fn map_dims(
             range(d, r)
         }
     };
-    for (d, r) in selection.dim_ranges.iter_mut().enumerate() {
-        *r = map_range(d, *r);
-    }
-    for (d, i) in selection.dim_indices.iter_mut().enumerate() {
-        *i = index(d, *i);
-    }
     for (d, c) in selection.dim_config.iter_mut().enumerate() {
         *c = DimConfig {
             range: map_range(d, c.range),

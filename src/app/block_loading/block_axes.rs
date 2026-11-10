@@ -2,6 +2,7 @@
 //! collapsed dimensions and the window of each shown one. Pure functions of
 //! the block and the selection, so any layer can project its own blocks.
 
+use crate::app::DimConfig;
 use crate::data::octant_block::OctantBlock;
 
 /// Position of block dimension `i` in the variable's dimensions
@@ -15,12 +16,12 @@ fn variable_dim(block: &OctantBlock, orig_dim_names: &[String], i: usize) -> usi
 }
 
 /// Block-local, oriented index of every dimension: `step` along the animated
-/// dimension, the selected index (`indices`, by variable dimension) elsewhere.
+/// dimension, the selected index (`dims`, by variable dimension) elsewhere.
 pub(crate) fn fixed_indices(
     block: &OctantBlock,
     orig_dim_names: &[String],
     anim_dim: Option<usize>,
-    indices: &[usize],
+    dims: &[DimConfig],
     step: usize,
 ) -> Vec<usize> {
     (0..block.rank())
@@ -29,7 +30,7 @@ pub(crate) fn fixed_indices(
             let idx = if Some(orig_idx) == anim_dim {
                 step
             } else {
-                indices.get(orig_idx).copied().unwrap_or(0)
+                dims.get(orig_idx).map_or(0, |c| c.index)
             };
             let local = idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0));
             block.oriented_index(i, local)
@@ -37,23 +38,22 @@ pub(crate) fn fixed_indices(
         .collect()
 }
 
-/// The selected range (`ranges`, by variable dimension) along block dimension
+/// The selected range (`dims`, by variable dimension) along block dimension
 /// `dim_idx`, and its block-local `[start, end)` window (the whole block when
 /// they do not overlap).
 pub(crate) fn dim_bounds(
     block: &OctantBlock,
     orig_dim_names: &[String],
     dim_idx: usize,
-    ranges: &[(usize, usize)],
+    dims: &[DimConfig],
 ) -> ((usize, usize), (usize, usize)) {
     let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
     let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);
     let orig_idx = variable_dim(block, orig_dim_names, dim_idx);
 
-    let (req_start, req_end) = ranges
+    let (req_start, req_end) = dims
         .get(orig_idx)
-        .copied()
-        .unwrap_or((0, dim_len.saturating_sub(1)));
+        .map_or((0, dim_len.saturating_sub(1)), |c| c.range);
 
     let local = if super::view_filter::overlaps(block_orig, dim_len, (req_start, req_end)) {
         let s = req_start

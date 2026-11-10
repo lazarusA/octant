@@ -55,9 +55,7 @@ fn plot_range(app: &mut OctantApp, idx: usize, time: usize, steps: usize) {
     config.animation = AnimationRole::Animated;
     config.active = true;
     config.range = (0, steps - 1);
-    app.selected.animated_dim = Some(time);
-    app.selected.spatial_dims.retain(|&d| d != time);
-    app.selected.dim_ranges[time] = (0, steps - 1);
+    app.selected.dim_config[time].range = (0, steps - 1);
     app.playback.current_timestep = 0;
     app.plot_selection();
 }
@@ -226,7 +224,7 @@ fn play(app: &mut OctantApp, id: LayerId, buffer_secs: f32) {
         let overlay = app
             .layers
             .get(id)
-            .and_then(|l| l.selection().dim_indices.first().copied());
+            .and_then(|l| l.selection().dim_config.first().map(|c| c.index));
         lagging += u32::from(overlay != Some(step));
         frames += 1;
         std::thread::sleep(Duration::from_millis(4));
@@ -263,8 +261,9 @@ fn prefetch_network_cmip6_pr_volume_playback() {
         app.selected.plot_type = plot_type;
         crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
         eprintln!(
-            "{plot_type:?}: animated {:?} spatial {:?} ranges {:?}",
-            app.selected.animated_dim, app.selected.spatial_dims, app.selected.dim_ranges
+            "{plot_type:?}: animated {:?} ranges {:?}",
+            app.selected.animated_dim(),
+            crate::app::test_support::ranges(&app.selected)
         );
         let started = Instant::now();
         app.plot_selection();

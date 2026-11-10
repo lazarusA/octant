@@ -16,10 +16,10 @@ pub(crate) fn apply_greyscale_display(
         sel.variable_info().and_then(|v| {
             let image = &v.ome.as_ref()?.image;
             let c = image.axis_of_kind(crate::data::ome::AxisKind::Channel)?;
-            let channel = if sel.animated_dim == Some(c) {
+            let channel = if sel.animated_dim() == Some(c) {
                 step
             } else {
-                *sel.dim_indices.get(c)?
+                sel.dim_config.get(c)?.index
             };
             let display = crate::data::ome::model::greyscale_display(image, channel)?;
             Some((channel, display))
@@ -36,12 +36,8 @@ pub(crate) fn apply_greyscale_display(
     color.colormap = crate::utils::colormap::registry::find("classic:gray")
         .unwrap_or_else(crate::utils::colormap::registry::default_id);
     color.reversed = inverted;
-    if let Some(w) = window.filter(|w| w.end > w.start) {
-        color.range_min = w.start;
-        color.range_max = w.end;
-        color.lock_bounds = true;
-    } else {
-        (color.range_min, color.range_max) = data_range;
-        color.lock_bounds = false;
+    match window.filter(|w| w.end > w.start) {
+        Some(w) => color.set_range(w.start, w.end, true),
+        None => color.set_range(data_range.0, data_range.1, false),
     }
 }

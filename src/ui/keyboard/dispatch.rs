@@ -93,12 +93,12 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
             }
         }
         Action::SearchVariables => {
-            app.set_panel_open(ctx, Panel::Variables, true);
+            app.set_panel_open(Panel::Variables, true);
             crate::ui::variables_overlay::focus_search(ctx);
         }
         Action::ClosePanel => {
             if let Some(panel) = gate.panel {
-                app.set_panel_open(ctx, panel, false);
+                app.set_panel_open(panel, false);
             }
         }
         Action::PlayPause => app.toggle_playback(),
@@ -137,6 +137,6 @@ fn type_command(app: &mut OctantApp, ctx: &Context) {
 fn open_plot_picker(app: &mut OctantApp) {
     let shown = app
         .selected_variable_info()
-        .or_else(|| app.plotted_variable_info());
+        .or_else(|| app.effective_variable_info());
     app.layout.show_plot_picker = shown.is_some();
 }

@@ -18,14 +18,16 @@ pub fn clamp_2d_selection_to_gpu_limits(app: &mut OctantApp, var_info: &Variable
         return;
     };
 
-    let x_span = (app.selected.dim_ranges[x_idx]
+    let x_span = (app.selected.dim_config[x_idx]
+        .range
         .1
-        .saturating_sub(app.selected.dim_ranges[x_idx].0)
+        .saturating_sub(app.selected.dim_config[x_idx].range.0)
         + 1)
     .max(1);
-    let y_span = (app.selected.dim_ranges[y_idx]
+    let y_span = (app.selected.dim_config[y_idx]
+        .range
         .1
-        .saturating_sub(app.selected.dim_ranges[y_idx].0)
+        .saturating_sub(app.selected.dim_config[y_idx].range.0)
         + 1)
     .max(1);
     let total_2d = x_span.saturating_mul(y_span);
@@ -37,14 +39,14 @@ pub fn clamp_2d_selection_to_gpu_limits(app: &mut OctantApp, var_info: &Variable
             * 0.95;
         let new_x = ((x_span as f64) * scale).max(1.0) as usize;
         let new_y = ((y_span as f64) * scale).max(1.0) as usize;
-        let x_start = app.selected.dim_ranges[x_idx].0;
-        let y_start = app.selected.dim_ranges[y_idx].0;
+        let x_start = app.selected.dim_config[x_idx].range.0;
+        let y_start = app.selected.dim_config[y_idx].range.0;
         let max_x = var_info.shape[x_idx].saturating_sub(1) as usize;
         let max_y = var_info.shape[y_idx].saturating_sub(1) as usize;
 
-        app.selected.dim_ranges[x_idx] = (x_start, (x_start + new_x.saturating_sub(1)).min(max_x));
-        app.selected.dim_ranges[y_idx] = (y_start, (y_start + new_y.saturating_sub(1)).min(max_y));
-        app.selected.dim_config[x_idx].range = app.selected.dim_ranges[x_idx];
-        app.selected.dim_config[y_idx].range = app.selected.dim_ranges[y_idx];
+        let x_end = (x_start + new_x.saturating_sub(1)).min(max_x);
+        let y_end = (y_start + new_y.saturating_sub(1)).min(max_y);
+        app.selected.set_range(x_idx, (x_start, x_end), x_start);
+        app.selected.set_range(y_idx, (y_start, y_end), y_start);
     }
 }

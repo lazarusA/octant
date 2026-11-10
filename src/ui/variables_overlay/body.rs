@@ -8,6 +8,7 @@ use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::i18n::{DatasetKey, VariablesKey, fill, tr};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::panel_layout::Panel;
 
 /// List area under the search field: the state that applies, or the tree.
 pub(super) fn show_list(
@@ -131,7 +132,7 @@ pub(crate) fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoic
             .is_some_and(|v| v.multiscale.is_some());
     app.selected.level = level;
     if other_level {
-        app.layout.show_variable_controls = true;
+        app.show_panel(Panel::Dimensions, true);
         return;
     }
     app.selected.variable_idx = idx;
@@ -144,6 +145,6 @@ pub(crate) fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoic
         .and_then(|meta| meta.variables.get(idx).cloned());
     if let Some(var_info) = var_info {
         crate::ui::variables_panel::init_variable_dimension_defaults(app, &var_info);
-        app.layout.show_variable_controls = true;
+        app.show_panel(Panel::Dimensions, true);
     }
 }

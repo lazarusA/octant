@@ -12,7 +12,7 @@ use super::build::pair;
 use crate::app::OctantApp;
 use crate::app::VariableSelection;
 use crate::app::actions::{
-    AppAction, CURVES, ChannelSetting, ColorSetting, CompositeSetting, SCALES, hex_rgba, value_text,
+    AppAction, CURVES, ChannelSetting, ColorSetting, CompositeSetting, hex_rgba, value_text,
 };
 use crate::app::layers::LayerId;
 use crate::data::slicing::ChannelColorConfig;
@@ -68,13 +68,10 @@ impl OctantApp {
         if colormapped && s.range_min.is_finite() && s.range_max.is_finite() {
             pair(q, "range", &format!("{}..{}", s.range_min, s.range_max));
         }
-        let scale = SCALES
-            .get(s.scale_type as usize)
-            .copied()
-            .unwrap_or("linear");
-        match s.scale_type {
-            0 => {}
-            1 | 2 | 4 => pair(q, "scale", &format!("{scale}:{}", s.scale_param)),
+        let scale = s.scale.name();
+        match s.scale {
+            crate::utils::colormap::ColorScale::Linear => {}
+            k if k.has_param() => pair(q, "scale", &format!("{scale}:{}", s.scale_param)),
             _ => pair(q, "scale", scale),
         }
         if s.opacity < 1.0 {

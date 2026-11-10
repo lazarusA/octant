@@ -8,6 +8,7 @@ use super::rows::visible_row_ids;
 use super::stack::stack_state;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::layers::LevelChoice;
+use crate::app::test_support::ranges;
 use crate::data::multiscale::{Multiscale, ScaleLevel, link};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::ui::keyboard::focus as key_focus;
@@ -189,14 +190,14 @@ fn choosing_a_level_keeps_or_resets_the_dimensions() {
             .expect("variable")
     };
     app.selected = selection_of(&mut app, &meta, "0/t2m");
-    app.selected.dim_ranges[0] = (1, 1);
+    app.selected.dim_config[0].range = (1, 1);
     // Another level of the selected stack keeps its window.
     super::body::apply_selection(&mut app, index("0/t2m"), LevelChoice::Pinned(1));
     assert_eq!(app.selected.level, LevelChoice::Pinned(1));
-    assert_eq!(app.selected.dim_ranges[0], (1, 1));
+    assert_eq!(app.selected.dim_config[0].range, (1, 1));
     // A level of another stack takes that variable's defaults, keeping the level.
     super::body::apply_selection(&mut app, index("0/sst"), LevelChoice::Pinned(2));
     assert_eq!(app.selected.variable_idx, index("0/sst"));
     assert_eq!(app.selected.level, LevelChoice::Pinned(2));
-    assert_eq!(app.selected.dim_ranges[1..], [(0, 63), (0, 63)]);
+    assert_eq!(ranges(&app.selected)[1..], [(0, 63), (0, 63)]);
 }

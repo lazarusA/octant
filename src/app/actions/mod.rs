@@ -52,7 +52,7 @@ pub(crate) use coord_match::value_text;
 use outcome::resolved;
 pub use outcome::{Done, Failure, NameKind, Outcome};
 pub use queue::{CommandQueue, Origin};
-pub(crate) use style::{CURVES, SCALES, hex_rgba};
+pub(crate) use style::{CURVES, hex_rgba};
 pub use style::{ChannelSetting, ColorSetting, CompositeSetting};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]

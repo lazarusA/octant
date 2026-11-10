@@ -64,10 +64,10 @@ fn a_spoken_date_moves_the_time_step_once_the_coordinates_are_read() {
     };
     assert_eq!(dim, "time");
     let time = dim_index(&app, "time");
-    let shown = if app.selected.animated_dim == Some(time) {
+    let shown = if app.selected.animated_dim() == Some(time) {
         app.playback.current_timestep
     } else {
-        app.selected.dim_indices[time]
+        app.selected.dim_config[time].index
     };
     assert_eq!(shown, 1, "February is the second step");
 }
@@ -81,13 +81,16 @@ fn a_number_picks_the_nearest_coordinate_and_two_a_range() {
         matches!(level.as_slice(), [Ok(Done::DimSet { .. })]),
         "{level:?}"
     );
-    assert_eq!(app.selected.dim_indices[dim_index(&app, "level")], 1);
+    assert_eq!(app.selected.dim_config[dim_index(&app, "level")].index, 1);
     let lat = run(&mut app, "latitude 20 to 40");
     assert!(
         matches!(lat.as_slice(), [Ok(Done::RangeSet { .. })]),
         "{lat:?}"
     );
-    assert_eq!(app.selected.dim_ranges[dim_index(&app, "lat")], (1, 3));
+    assert_eq!(
+        app.selected.dim_config[dim_index(&app, "lat")].range,
+        (1, 3)
+    );
 }
 
 #[test]

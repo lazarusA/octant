@@ -67,9 +67,9 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
     let mut app = create_volume_app();
 
     // Set slider ranges and z-scale:
-    app.selected.dim_ranges[1] = (0, 15); // depth: 16 slices
-    app.selected.dim_ranges[2] = (0, 31); // height: 32
-    app.selected.dim_ranges[3] = (0, 31); // width: 32
+    app.selected.dim_config[1].range = (0, 15); // depth: 16 slices
+    app.selected.dim_config[2].range = (0, 31); // height: 32
+    app.selected.dim_config[3].range = (0, 31); // width: 32
     app.plot_configs.volume.z_scale = 1.5;
 
     let initial_aspect = app.get_3d_aspect_ratio();
@@ -149,7 +149,6 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
     );
 
     // Set animated range to (0, 9):
-    app.selected.dim_ranges[0] = (0, 9);
     app.selected.dim_config[0].range = (0, 9);
 
     // Switch to Volume:
