@@ -40,7 +40,7 @@ flate2 = "1.0"
 inventory = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 web-time = "1.1"
-blusc = "0.0.6"
+blusc = "0.0.7"
 ruzstd = "0.9"
 zarrs_metadata = "0.7"
 zarrs_codec = "0.2"
@@ -116,7 +116,7 @@ zarrs = { version = "0.23", default-features = false, features = ["ndarray", "cr
 web-sys = { version = "0.3", features = ["Window", "Location", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader", "EventTarget", "File", "FileList", "HtmlInputElement", "DragEvent", "DataTransfer", "DataTransferItemList", "DataTransferItem", "XmlHttpRequest", "XmlHttpRequestResponseType", "FileReaderSync"] }
 js-sys = "0.3"
 sys-locale = { version = "0.3", features = ["js"] }
-blusc = "0.0.6"
+blusc = "0.0.7"
 getrandom = { version = "0.4", features = ["wasm_js"] }
 async-tiff = { version = "0.4.0", default-features = false }
 
@@ -186,14 +186,13 @@ path = "src/bin/subset_fonts/main.rs"
 required-features = ["font-tools"]
 
 [dev-dependencies]
-blusc = "0.0.6"
+blusc = "0.0.7"
 # Checks that the bundled CJK subsets cover their translations.
 skrifa = "0.44"
 # Checks that shaders compile for wgpu's GL backend (wgpu's own naga).
 naga = { version = "30.0.1", features = ["wgsl-in", "glsl-out"] }
 
-[patch.crates-io]
-blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }
+# [patch.crates-io]
 # candle-core = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
 # candle-nn = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
 # candle-transformers = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
