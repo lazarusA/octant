@@ -28,23 +28,30 @@ impl Mesh3DRenderer {
             (&self.quad_vertex_buffer, &self.quad_index_buffer, 6)
         };
         pass.set_bind_group(0, &self.bind_group, &[]);
+        self.heights.bind(pass);
         pass.set_vertex_buffer(0, vertices.slice(..));
         pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
         pass.draw_indexed(0..count, 0, 0..self.num_instances);
     }
 
-    /// The mesh's pipeline for an OIT [`Variant`] (no culling).
+    /// The mesh's pipeline for an OIT [`Variant`].
     pub(super) fn oit_pipeline(
         &self,
         device: &wgpu::Device,
+        cubes: bool,
         variant: &Variant<'_>,
     ) -> wgpu::RenderPipeline {
+        let cull_mode = if cubes {
+            Some(wgpu::Face::Back)
+        } else {
+            self.cull_mode
+        };
         build_pipeline(
             device,
             &self.pipeline_layout,
             &self.shader,
             &[Some(MeshVertex3D::desc())],
-            None,
+            cull_mode,
             variant,
         )
     }
@@ -62,6 +69,9 @@ pub struct Mesh3DCallback {
     pub channels: Option<ChannelDraw>,
     /// How the drawn grid thins the planes' cells (`Layer::mesh_thinning`).
     pub thinning: super::Thinning,
+    /// The base layer's mesh, whose data makes this overlay's heights;
+    /// `None` for the base, which reads its own.
+    pub heights: Option<Arc<Mesh3DRenderer>>,
 }
 
 impl Mesh3DCallback {
@@ -73,7 +83,12 @@ impl Mesh3DCallback {
     fn pipeline(&self) -> &wgpu::RenderPipeline {
         let renderer = &self.renderer;
         match (self.transparency, self.cubes()) {
-            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
+            (Transparency::Oit | Transparency::NoDepthWrite, true) => {
+                &renderer.transparent_voxel_pipeline
+            }
+            (Transparency::Oit | Transparency::NoDepthWrite, false) => {
+                &renderer.transparent_pipeline
+            }
             (Transparency::Off, true) => &renderer.voxel_pipeline,
             (Transparency::Off, false) => &renderer.render_pipeline,
         }
@@ -98,16 +113,32 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
                 r.inputs.data_changed();
             }
         }
-        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
         let (renderer, cubes) = (&self.renderer, self.cubes());
-        let key = renderer.inputs.key((cubes, self.transparency as u8));
+        let base = self.heights.as_deref();
+        let own_size = (renderer.width, renderer.height);
+        renderer.heights.drape(device, own_size, base);
+        let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
+        // A draped overlay is drawn again when the base's heights change,
+        // and for a new base, whose upload count starts over.
+        let base_key = base.map(|b| (b.heights.id(), b.inputs.key(())));
+        let key = renderer
+            .inputs
+            .key((cubes, self.transparency as u8, base_key));
+        let cull_mode = if cubes {
+            Some(wgpu::Face::Back)
+        } else {
+            renderer.cull_mode
+        };
         super::frame_cache::render_frame(
             (&renderer.oit, &renderer.frame),
             device,
             encoder,
             (self.transparency, size, key),
-            super::colormap_atlas::bind_group(callback_resources),
-            (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
+            (
+                super::colormap_atlas::bind_group(callback_resources),
+                cull_mode,
+            ),
+            (self.pipeline(), |v| renderer.oit_pipeline(device, cubes, v)),
             |pass| renderer.draw_geometry(pass, cubes),
         );
         Vec::new()

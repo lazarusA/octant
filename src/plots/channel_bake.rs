@@ -38,7 +38,7 @@ pub(super) struct Baked {
 /// What a bake writes, a plot's data buffer or the raymarcher's color
 /// texture (`channel_bake_volume.rs`), named by an id never reused, so the
 /// memo holds no GPU resource and takes no new target for an old one.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BakeId(u64);
 
 impl BakeId {

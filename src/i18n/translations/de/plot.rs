@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::AlignIndexOnly => "Gleiche Gitterform, aber keine Koordinaten passen zum Plot",
         PlotKey::AlignIncompatible => "Teilt kein Gitter mit dem Plot",
         PlotKey::OverlayPlotFirst => "Zuerst eine Variable plotten",
-        PlotKey::OverlayHeatmapOnly => "Überlagerungen werden über Heatmaps gezeichnet",
+        PlotKey::OverlayPlotTypes => "Überlagerungen werden über Heatmaps, Kugeln und Oberflächen gezeichnet",
         PlotKey::OverlayStackFull => "Höchstens 4 Überlagerungen",
         PlotKey::OverlayAlreadyLayer => "Bereits eine Ebene des Plots",
         PlotKey::OverlayCantAdd => "Überlagerung kann nicht hinzugefügt werden",

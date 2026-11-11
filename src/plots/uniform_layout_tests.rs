@@ -50,10 +50,10 @@ fn mesh3d_uniform_offsets_match_wgsl() {
         ("width", offset_of!(U, width)),
         ("height", offset_of!(U, height)),
         ("coord_mode", offset_of!(U, coord_mode)),
-        ("flip_height", offset_of!(U, flip_height)),
+        ("height_flags", offset_of!(U, height_flags)),
         ("lon_bounds", offset_of!(U, lon_bounds)),
         ("lat_bounds", offset_of!(U, lat_bounds)),
-        ("_pad", offset_of!(U, _pad)),
+        ("height_range", offset_of!(U, height_range)),
         ("color", offset_of!(U, color)),
     ]
     .map(|(n, o)| (n.to_string(), o));

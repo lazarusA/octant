@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> &'static str {
         PlotKey::AlignIndexOnly => "Same grid shape, but no coordinates match the plot",
         PlotKey::AlignIncompatible => "Shares no grid with the plot",
         PlotKey::OverlayPlotFirst => "Plot a variable first",
-        PlotKey::OverlayHeatmapOnly => "Overlays draw over heatmaps",
+        PlotKey::OverlayPlotTypes => "Overlays draw over heatmaps, spheres and surfaces",
         PlotKey::OverlayStackFull => "At most 4 overlays",
         PlotKey::OverlayAlreadyLayer => "Already a layer of the plot",
         PlotKey::OverlayCantAdd => "Can't add overlay",

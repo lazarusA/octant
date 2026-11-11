@@ -53,8 +53,8 @@ pub fn overlay_values<'a>(
 }
 
 /// The overlay rows of the hover card, written into `out`: each drawn
-/// overlay's reading at `at` on the heatmap, since overlays share the
-/// heatmap's grid; none on other plots.
+/// overlay's reading at `at` on the heatmap, sphere or surface, since
+/// overlays share the base's grid; none on other plots.
 pub fn hover_rows<'a, 'o>(
     app: &'a OctantApp,
     plot_type: PlotType,
@@ -62,7 +62,7 @@ pub fn hover_rows<'a, 'o>(
     out: &'o mut [LayerValue<'a>; MAX_OVERLAYS],
 ) -> &'o [LayerValue<'a>] {
     let count = match at {
-        Some(at) if plot_type == PlotType::Heatmap => overlay_values(app, at, out),
+        Some(at) if plot_type.draws_overlays() => overlay_values(app, at, out),
         _ => 0,
     };
     out.get(..count).unwrap_or_default()

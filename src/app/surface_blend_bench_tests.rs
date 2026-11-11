@@ -64,12 +64,15 @@ pub(super) fn surface_callback(
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             flip_height: false,
+            height_range: [color.cmin, color.cmax],
+            height_composite: true,
         },
         cube_mode_idx: 2,
         rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
         transparency: Default::default(),
         channels,
         thinning: crate::plots::Thinning::NONE,
+        heights: None,
     }
 }
 

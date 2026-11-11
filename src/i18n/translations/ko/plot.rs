@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::AlignIndexOnly => "격자 형태는 같지만 플롯과 일치하는 좌표가 없음",
         PlotKey::AlignIncompatible => "플롯과 공유하는 격자가 없음",
         PlotKey::OverlayPlotFirst => "먼저 변수를 그리세요",
-        PlotKey::OverlayHeatmapOnly => "오버레이는 히트맵 위에 그려집니다",
+        PlotKey::OverlayPlotTypes => "오버레이는 히트맵, 구체, 표면 위에 그려집니다",
         PlotKey::OverlayStackFull => "오버레이는 최대 4개입니다",
         PlotKey::OverlayAlreadyLayer => "이미 플롯의 레이어입니다",
         PlotKey::OverlayCantAdd => "오버레이를 추가할 수 없음",

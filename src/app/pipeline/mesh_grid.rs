@@ -4,10 +4,13 @@
 use super::rebuild_2d::build_meshes;
 use crate::app::MeshDetail;
 use crate::app::OctantApp;
-use crate::app::layers::MeshGrid;
+use crate::app::layers::{Layer, LayerId, MeshGrid};
+use crate::data::MatrixData;
 use crate::data::render::decimate::stride_for;
-use crate::plots::PlotType;
 use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+use crate::plots::{Coastline3DRenderer, CoastlineLod, PlotType};
+use eframe::egui_wgpu::RenderState;
+use std::sync::Arc;
 
 /// Cells a mesh may always draw, however small the canvas.
 const MIN_MESH_CELLS: usize = 256 * 1024;
@@ -19,6 +22,14 @@ pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
     detail
         .budget(pixels)
         .clamp(MIN_MESH_CELLS, MAX_GPU_STORAGE_BUFFER_ELEMENTS)
+}
+
+/// `data` thinned to at most `budget` cells for the sphere and surface;
+/// `None` when they draw every cell.
+pub(super) fn mesh_grid(data: &MatrixData, budget: usize) -> Option<MeshGrid> {
+    let stride = stride_for(data.width, data.height, budget);
+    data.decimated(stride)
+        .map(|matrix| MeshGrid { matrix, stride })
 }
 
 impl OctantApp {
@@ -40,35 +51,56 @@ impl OctantApp {
         }
     }
 
-    /// Thins the base layer's sphere and surface again after the Detail
-    /// setting or the canvas size changed, when that changes their stride.
+    /// Thins every layer's sphere and surface again after the Detail
+    /// setting or the canvas size changed, when that changes their stride:
+    /// overlays keep the base's grid, which their heights are read from.
     pub fn rethin_meshes(&mut self) {
         let budget = mesh_budget(self.plot_configs.mesh.detail, self.layout.canvas_px);
-        let base = &mut self.layers.base;
-        let Some(matrix) = base.data.matrix.as_ref() else {
-            return;
-        };
-        if matrix.height < 2 || matrix.grid.is_healpix() || base.labels().is_some() {
-            return;
-        }
-        let stride = stride_for(matrix.width, matrix.height, budget);
-        // An unchanged mesh is kept: writing it again would overwrite the
-        // colors a GPU composite baked into it.
-        if base.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
-            return;
-        }
         let Some(rs) = &self.wgpu_render_state else {
             return;
         };
-        // Only the meshes change: the heatmap and its pyramid stay.
-        let Some(matrix) = base.data.matrix.take() else {
-            return;
-        };
-        let thinned = matrix.decimated(stride);
-        let coastline = Some((&mut self.coastline_3d_renderer, self.coastline_current_lod));
-        build_meshes(base, coastline, rs, thinned.as_ref().unwrap_or(&matrix));
-        base.data.matrix = Some(matrix);
-        base.data.mesh = thinned.map(|matrix| MeshGrid { matrix, stride });
-        base.data.touch_matrix();
+        let lod = self.coastline_current_lod;
+        let mut coastline = Some(&mut self.coastline_3d_renderer);
+        for layer in self.layers.iter_mut() {
+            // The 3D coastlines follow the base layer, drawn first.
+            let slot = coastline.take().filter(|_| layer.id() == LayerId::BASE);
+            rethin_layer(layer, slot.map(|slot| (slot, lod)), rs, budget);
+        }
     }
+}
+
+/// Thins `layer`'s sphere and surface to `budget` cells, when that changes
+/// their stride (and its 3D coastlines, given their slot and LOD).
+fn rethin_layer(
+    layer: &mut Layer,
+    coastline: Option<(&mut Option<Arc<Coastline3DRenderer>>, CoastlineLod)>,
+    rs: &RenderState,
+    budget: usize,
+) {
+    let Some(matrix) = layer.data.matrix.as_ref() else {
+        return;
+    };
+    if matrix.height < 2 || matrix.grid.is_healpix() || layer.labels().is_some() {
+        return;
+    }
+    // An unchanged mesh is kept: writing it again would overwrite the
+    // colors a GPU composite baked into it.
+    let stride = stride_for(matrix.width, matrix.height, budget);
+    if layer.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
+        return;
+    }
+    // Only the meshes change: the heatmap and its pyramid stay.
+    let Some(matrix) = layer.data.matrix.take() else {
+        return;
+    };
+    let grid = mesh_grid(&matrix, budget);
+    build_meshes(
+        layer,
+        coastline,
+        rs,
+        grid.as_ref().map_or(&matrix, |g| &g.matrix),
+    );
+    layer.data.matrix = Some(matrix);
+    layer.data.mesh = grid;
+    layer.data.touch_matrix();
 }

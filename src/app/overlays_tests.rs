@@ -52,6 +52,27 @@ fn no_overlay_is_added_without_a_plotted_heatmap() {
     assert!(app.layers.overlays().is_empty());
 }
 
+/// Overlays are added over the sphere and surface and stay drawn while the
+/// base switches between them; a volume hides them.
+#[test]
+fn overlays_draw_over_spheres_and_surfaces() {
+    use crate::plots::PlotType;
+    let (mut app, meta) = plotted_app();
+    let shown = |app: &mut OctantApp, plot_type| {
+        app.switch_plot_type(plot_type);
+        poll_until(app, |app| app.effective_canvas_plot_type() == plot_type);
+    };
+    shown(&mut app, PlotType::Sphere);
+    let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    let drawn = |app: &OctantApp| app.layers.get(id).is_some_and(|l| l.is_drawn());
+    assert!(drawn(&app), "over the sphere");
+    shown(&mut app, PlotType::Surface);
+    assert!(drawn(&app), "over the surface");
+    shown(&mut app, PlotType::Volume);
+    assert!(!drawn(&app), "not in the volume");
+    assert!(app.overlay_unavailable().is_some());
+}
+
 #[test]
 fn at_most_max_overlays_are_added() {
     let (mut app, meta) = plotted_app();

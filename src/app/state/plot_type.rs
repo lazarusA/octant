@@ -22,6 +22,8 @@ impl OctantApp {
 
         if was_3d != is_3d {
             self.switch_dimensionality(is_3d);
+        } else if !self.is_exploring_unplotted_variable() {
+            self.layers.base.selection_mut().plot_type = new_plot_type;
         }
         // Those switches change the base layer's plot type in place: overlays
         // follow it now, not when its block arrives.

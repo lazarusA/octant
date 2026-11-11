@@ -113,6 +113,28 @@ fn the_detail_setting_thins_again() {
     assert_eq!(bake_id(&app), kept, "the same stride keeps the mesh");
 }
 
+/// Overlays thin again with the base, so they keep its mesh grid (and
+/// drape on its heights).
+#[test]
+fn overlays_thin_again_with_the_base() {
+    let Some(mut app) = built(1024) else {
+        eprintln!("SKIPPED overlays_thin_again_with_the_base: no GPU device");
+        return;
+    };
+    let id = app.layers.push(crate::app::layers::Source::default());
+    let values = vec![1.0; 1024 * 1024];
+    let data = MatrixData::new(1024, 1024, values, 0.0, 1.0, "o".into(), 1);
+    app.rebuild_pipeline_with_matrix_data(id, data);
+    let widths = |app: &OctantApp| {
+        let width = |l: &crate::app::layers::Layer| l.renderers.surface.as_ref().map(|s| s.width);
+        (width(&app.layers.base), app.layers.get(id).and_then(width))
+    };
+    assert_eq!(widths(&app), (Some(512), Some(512)), "both thinned");
+    app.plot_configs.mesh.detail = crate::app::MeshDetail::Full;
+    app.rethin_meshes();
+    assert_eq!(widths(&app), (Some(1024), Some(1024)), "both whole");
+}
+
 #[test]
 fn a_larger_canvas_thins_less() {
     let Some(mut app) = built(1024) else {
@@ -138,9 +160,10 @@ fn a_larger_canvas_thins_less() {
     );
 }
 
-/// Overlays are never drawn as meshes, so they build none.
+/// Overlays drape on the base's sphere and surface, so they build both, on
+/// the base's thinned grid.
 #[test]
-fn overlays_build_no_meshes() {
+fn overlays_build_meshes_on_the_base_grid() {
     use crate::app::test_support::{make_resident, memory_app, poll_until, selection_of};
     use crate::data::SliceRequest;
     let Some(rs) = render_state() else {
@@ -167,5 +190,13 @@ fn overlays_build_no_meshes() {
     );
     let overlay = &app.layers.get(id).expect("overlay").renderers;
     assert!(overlay.heatmap.is_some(), "the overlay draws");
-    assert!(overlay.surface.is_none() && overlay.sphere.is_none());
+    let size = |r: &Option<std::sync::Arc<crate::plots::SurfaceRenderer>>| {
+        r.as_ref().map(|r| (r.width, r.height))
+    };
+    assert!(size(&overlay.surface).is_some() && size(&overlay.sphere).is_some());
+    assert_eq!(
+        size(&overlay.surface),
+        size(&base.surface),
+        "the base's grid"
+    );
 }

@@ -16,7 +16,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::AlignIndexOnly => "网格形状相同，但没有与图匹配的坐标",
         PlotKey::AlignIncompatible => "与图没有共同的网格",
         PlotKey::OverlayPlotFirst => "请先绘制一个变量",
-        PlotKey::OverlayHeatmapOnly => "叠加层只能绘制在热力图上",
+        PlotKey::OverlayPlotTypes => "叠加层只能绘制在热力图、球面和曲面上",
         PlotKey::OverlayStackFull => "最多 4 个叠加层",
         PlotKey::OverlayAlreadyLayer => "已是图中的图层",
         PlotKey::OverlayCantAdd => "无法添加叠加层",

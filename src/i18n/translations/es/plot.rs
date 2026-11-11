@@ -18,7 +18,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         }
         PlotKey::AlignIncompatible => "No comparte cuadrícula con el gráfico",
         PlotKey::OverlayPlotFirst => "Primero grafique una variable",
-        PlotKey::OverlayHeatmapOnly => "Las superposiciones se dibujan sobre mapas de calor",
+        PlotKey::OverlayPlotTypes => "Las superposiciones se dibujan sobre mapas de calor, esferas y superficies",
         PlotKey::OverlayStackFull => "Como máximo 4 superposiciones",
         PlotKey::OverlayAlreadyLayer => "Ya es una capa del gráfico",
         PlotKey::OverlayCantAdd => "No se puede añadir la superposición",

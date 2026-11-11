@@ -34,8 +34,8 @@ impl OctantApp {
         if self.plotted().metadata.is_none() {
             return Some(tr(PlotKey::OverlayPlotFirst));
         }
-        if self.effective_canvas_plot_type() != crate::plots::PlotType::Heatmap {
-            return Some(tr(PlotKey::OverlayHeatmapOnly));
+        if !self.effective_canvas_plot_type().draws_overlays() {
+            return Some(tr(PlotKey::OverlayPlotTypes));
         }
         if self.layers.overlays().len() >= MAX_OVERLAYS {
             return Some(tr(PlotKey::OverlayStackFull));
@@ -184,12 +184,16 @@ impl OctantApp {
             let relevelled = level != overlay.variable_idx;
             overlay.variable_idx = level;
             let moved = follow_base_window(base.selection(), overlay) || relevelled;
+            let was_drawn = layer.is_drawn();
             layer.alignment = classify(base.selection(), layer.selection());
+            let needs_load =
+                (moved || (layer.is_drawn() && !was_drawn) || layer.data.matrix.is_none())
+                    && layer.is_drawn();
             if moved {
                 layer.clear_2d();
-                if layer.is_drawn() {
-                    self.load_layer_block(id);
-                }
+            }
+            if needs_load {
+                self.load_layer_block(id);
             }
         }
     }

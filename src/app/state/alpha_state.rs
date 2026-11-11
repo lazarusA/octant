@@ -41,9 +41,11 @@ impl OctantApp {
     /// How `layer`'s 3D meshes and point clouds draw: order-independent transparency
     /// with translucent colors when the device supports it, else without depth
     /// writes; opaque colors (including RGB composites, which ignore opacity)
-    /// keep depth writes, so near parts hide far ones.
+    /// keep depth writes, so near parts hide far ones. Translucent overlays
+    /// blend even with the Transparency toggle off, so the base shows through.
     pub fn transparency_mode(&self, layer: &Layer) -> Transparency {
-        if !self.plot_configs.plot_transparency
+        let is_base = layer.id() == LayerId::BASE;
+        if (!self.plot_configs.plot_transparency && is_base)
             || layer.composite.enabled
             || !layer.color.is_translucent()
         {

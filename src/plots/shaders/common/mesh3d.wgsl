@@ -1,7 +1,8 @@
 // What the sphere and surface heightfields share: their uniforms, bindings,
 // vertex structs, shading and fragment entry points. Each plot's file adds
 // `vs_main`, `SCREEN_NORMAL_MODE` (the mode lit by screen-space normals) and
-// `LIGHT_DIR`.
+// `LIGHT_DIR`. Colors read `data_buffer`, heights `height_buffer`: the
+// layer's own data, or the base layer's under an overlay draped on it.
 
 struct Uniforms {
     camera: Camera,
@@ -12,10 +13,12 @@ struct Uniforms {
     width: u32,
     height: u32,
     coord_mode: u32,
-    flip_height: u32,
+    // Bit 0: heights flipped; bit 1: heights read packed RGB composites.
+    height_flags: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
-    _pad: vec2<u32>,
+    // The color range of the layer whose values make the heights.
+    height_range: vec2<f32>,
     color: ColorUniforms,
 };
 
@@ -24,6 +27,55 @@ var<uniform> uniforms: Uniforms;
 
 @group(0) @binding(1)
 var<storage, read> data_buffer: array<f32>;
+
+@group(2) @binding(0)
+var<storage, read> height_buffer: array<f32>;
+
+// Height of `val`, a `height_buffer` value, before displacement scaling.
+fn height_of(val: f32) -> f32 {
+    return normalized_height(
+        val,
+        uniforms.height_range.x,
+        uniforms.height_range.y,
+        (uniforms.height_flags & 2u) != 0u,
+        (uniforms.height_flags & 1u) != 0u,
+    );
+}
+
+// The value heights read at cell `i`.
+fn height_value(i: u32) -> f32 {
+    return height_buffer[min(i, arrayLength(&height_buffer) - 1u)];
+}
+
+// Cell `i` of the data (`heights` false) or of the heights.
+fn mesh_value(i: u32, heights: bool) -> f32 {
+    if (heights) {
+        return height_value(i);
+    }
+    return data_buffer[min(i, arrayLength(&data_buffer) - 1u)];
+}
+
+// Mean of the finite values around a HEALPix corner (`healpix_corner_cells`),
+// else pixel `pix`'s own, of the data or of the heights.
+fn healpix_corner_mean(pix: u32, corner_uv: vec2<f32>, nside: u32, is_nested: bool, heights: bool) -> f32 {
+    let max_idx = arrayLength(&data_buffer) - 1u;
+    let cells = healpix_corner_cells(pix, corner_uv, nside, is_nested, max_idx);
+    var sum: f32 = 0.0;
+    var count: f32 = 0.0;
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        if (cells[k] != HEALPIX_NO_CELL) {
+            let v = mesh_value(cells[k], heights);
+            if (v == v && abs(v) < 1e30) {
+                sum = sum + v;
+                count = count + 1.0;
+            }
+        }
+    }
+    if (count > 0.0) {
+        return sum / count;
+    }
+    return mesh_value(pix, heights);
+}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,

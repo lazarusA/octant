@@ -105,7 +105,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             device,
             encoder,
             (self.transparency, size, key),
-            super::colormap_atlas::bind_group(callback_resources),
+            (super::colormap_atlas::bind_group(callback_resources), None),
             (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
             |pass| renderer.draw_points(pass),
         );
