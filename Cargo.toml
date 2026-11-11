@@ -14,7 +14,7 @@ categories = ["visualization", "graphics", "science"]
 exclude = [
     ".agents/",
     ".github/",
-    "assets/octant_tas.png",
+    "assets/octant_ws10.png",
     "assets/brand/svg/",
     "assets/brand/icns/",
     "assets/brand/png/octant-app-icon-180.png",
