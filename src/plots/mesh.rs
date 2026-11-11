@@ -7,8 +7,10 @@ use super::oit::{OitSlot, Variant, build_pipeline, egui_target};
 pub struct Mesh3DRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
     pub voxel_pipeline: wgpu::RenderPipeline,
-    /// Both modes with translucent colors: no culling, no depth writes.
+    /// Translucent quads (cull_mode, no depth writes).
     pub transparent_pipeline: wgpu::RenderPipeline,
+    /// Translucent voxel cubes (backface culling, no depth writes).
+    pub transparent_voxel_pipeline: wgpu::RenderPipeline,
     pub quad_vertex_buffer: wgpu::Buffer,
     pub quad_index_buffer: wgpu::Buffer,
     pub cube_vertex_buffer: wgpu::Buffer,
@@ -33,6 +35,7 @@ pub struct Mesh3DRenderer {
     pub(crate) frame: super::frame_cache::FrameSlot,
     /// What its OIT frame depends on.
     pub(crate) inputs: super::oit::FrameInputs,
+    pub(crate) cull_mode: Option<wgpu::Face>,
 }
 
 impl Mesh3DRenderer {
@@ -166,7 +169,13 @@ impl Mesh3DRenderer {
             Some(wgpu::Face::Back),
             true,
         );
-        let transparent_pipeline = pipeline("Mesh 3D Transparent Render Pipeline", None, false);
+        let transparent_pipeline =
+            pipeline("Mesh 3D Transparent Render Pipeline", cull_mode, false);
+        let transparent_voxel_pipeline = pipeline(
+            "Mesh 3D Transparent Voxel Render Pipeline",
+            Some(wgpu::Face::Back),
+            false,
+        );
 
         let (quad_vertex_buffer, quad_index_buffer, cube_vertex_buffer, cube_index_buffer) =
             create_template_buffers(device);
@@ -175,6 +184,7 @@ impl Mesh3DRenderer {
             render_pipeline,
             voxel_pipeline,
             transparent_pipeline,
+            transparent_voxel_pipeline,
             quad_vertex_buffer,
             quad_index_buffer,
             cube_vertex_buffer,
@@ -194,6 +204,7 @@ impl Mesh3DRenderer {
             oit: OitSlot::new(target_format),
             frame: super::frame_cache::FrameSlot::new(target_format),
             inputs: Default::default(),
+            cull_mode,
         }
     }
 

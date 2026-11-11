@@ -125,7 +125,7 @@ impl OitState {
 /// renders into it, `paint` composites it.
 pub struct OitSlot {
     target_format: wgpu::TextureFormat,
-    state: Mutex<Option<OitState>>,
+    state: Mutex<Option<(Option<wgpu::Face>, OitState)>>,
 }
 
 impl OitSlot {
@@ -144,27 +144,30 @@ impl OitSlot {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         size: ([u32; 2], u64),
-        atlas: &wgpu::BindGroup,
+        (atlas, cull_mode): (&wgpu::BindGroup, Option<wgpu::Face>),
         build: impl Fn(&Variant<'_>) -> wgpu::RenderPipeline,
         draw: impl Fn(&mut wgpu::RenderPass<'_>),
     ) {
         let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        state
-            .get_or_insert_with(|| OitState::new(device, self.target_format, build))
-            .render(device, encoder, size, atlas, draw);
+        let mut s = match state.take() {
+            Some((cull, s)) if cull == cull_mode => s,
+            _ => OitState::new(device, self.target_format, build),
+        };
+        s.render(device, encoder, size, atlas, draw);
+        *state = Some((cull_mode, s));
     }
 
     /// [`OitState::paint`]; `false` when nothing was rendered yet.
     pub fn paint(&self, rpass: &mut wgpu::RenderPass<'_>) -> bool {
         let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        state.as_ref().is_some_and(|s| s.paint(rpass))
+        state.as_ref().is_some_and(|(_, s)| s.paint(rpass))
     }
 
     /// Frees the frame when the renderer draws without OIT (see
     /// [`OitState::release_frame`]).
     pub fn release(&self) {
         let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(s) = state.as_mut() {
+        if let Some((_, s)) = state.as_mut() {
             s.release_frame();
         }
     }

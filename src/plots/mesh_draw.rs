@@ -34,18 +34,24 @@ impl Mesh3DRenderer {
         pass.draw_indexed(0..count, 0, 0..self.num_instances);
     }
 
-    /// The mesh's pipeline for an OIT [`Variant`] (no culling).
+    /// The mesh's pipeline for an OIT [`Variant`].
     pub(super) fn oit_pipeline(
         &self,
         device: &wgpu::Device,
+        cubes: bool,
         variant: &Variant<'_>,
     ) -> wgpu::RenderPipeline {
+        let cull_mode = if cubes {
+            Some(wgpu::Face::Back)
+        } else {
+            self.cull_mode
+        };
         build_pipeline(
             device,
             &self.pipeline_layout,
             &self.shader,
             &[Some(MeshVertex3D::desc())],
-            None,
+            cull_mode,
             variant,
         )
     }
@@ -77,7 +83,12 @@ impl Mesh3DCallback {
     fn pipeline(&self) -> &wgpu::RenderPipeline {
         let renderer = &self.renderer;
         match (self.transparency, self.cubes()) {
-            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
+            (Transparency::Oit | Transparency::NoDepthWrite, true) => {
+                &renderer.transparent_voxel_pipeline
+            }
+            (Transparency::Oit | Transparency::NoDepthWrite, false) => {
+                &renderer.transparent_pipeline
+            }
             (Transparency::Off, true) => &renderer.voxel_pipeline,
             (Transparency::Off, false) => &renderer.render_pipeline,
         }
@@ -113,13 +124,21 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         let key = renderer
             .inputs
             .key((cubes, self.transparency as u8, base_key));
+        let cull_mode = if cubes {
+            Some(wgpu::Face::Back)
+        } else {
+            renderer.cull_mode
+        };
         super::frame_cache::render_frame(
             (&renderer.oit, &renderer.frame),
             device,
             encoder,
             (self.transparency, size, key),
-            super::colormap_atlas::bind_group(callback_resources),
-            (self.pipeline(), |v| renderer.oit_pipeline(device, v)),
+            (
+                super::colormap_atlas::bind_group(callback_resources),
+                cull_mode,
+            ),
+            (self.pipeline(), |v| renderer.oit_pipeline(device, cubes, v)),
             |pass| renderer.draw_geometry(pass, cubes),
         );
         Vec::new()

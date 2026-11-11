@@ -215,7 +215,7 @@ pub fn render_frame(
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
     (transparency, size, key): (Transparency, [u32; 2], u64),
-    atlas: Option<&wgpu::BindGroup>,
+    (atlas, cull_mode): (Option<&wgpu::BindGroup>, Option<wgpu::Face>),
     (pipeline, build): (
         &wgpu::RenderPipeline,
         impl Fn(&Variant<'_>) -> wgpu::RenderPipeline,
@@ -229,7 +229,14 @@ pub fn render_frame(
     };
     if transparency == Transparency::Oit {
         frame.release();
-        oit.render(device, encoder, (size, key), atlas, build, draw);
+        oit.render(
+            device,
+            encoder,
+            (size, key),
+            (atlas, cull_mode),
+            build,
+            draw,
+        );
     } else {
         oit.release();
         frame.render(device, encoder, (size, key), (pipeline, atlas), draw);

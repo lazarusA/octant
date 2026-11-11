@@ -20,9 +20,11 @@ fn mesh_and_point_cloud_pipelines_validate() {
     let points = super::PointCloudRenderer::new(&device, format, &data, 2, 2);
     // OIT pipelines are built on first use; build them here too.
     for mesh in [&surface, &sphere] {
-        let _oit = super::oit::OitState::new(&device, format, |variant| {
-            mesh.oit_pipeline(&device, variant)
-        });
+        for cubes in [false, true] {
+            let _oit = super::oit::OitState::new(&device, format, |variant| {
+                mesh.oit_pipeline(&device, cubes, variant)
+            });
+        }
     }
     let _oit = super::oit::OitState::new(&device, format, |variant| {
         points.oit_pipeline(&device, variant)
