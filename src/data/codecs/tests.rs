@@ -217,3 +217,96 @@ fn legacy_v2_text_fills_and_empty_filters_are_repaired() {
     let fixed = normalize_v3_array_metadata(zarray("<i4", serde_json::json!("-3")));
     assert_eq!(fixed["fill_value"], serde_json::json!(-3));
 }
+
+#[test]
+fn blosc_out_of_order_bstarts_decode() {
+    use blusc::api::*;
+    use blusc::*;
+
+    // Large enough to span multiple blocks at Blosc's automatic blocksize (256 KiB).
+    let original: Vec<f32> = (0..524_288).map(|i| (i as f32) * 0.125).collect();
+    let raw: &[u8] = bytemuck::cast_slice(&original);
+
+    let mut cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.compcode = BLOSC_LZ4;
+    cparams.typesize = 4;
+    cparams.filters[5] = BLOSC_SHUFFLE;
+    cparams.clevel = 5;
+    let cctx = blosc2_create_cctx(cparams);
+    let mut blosc2 = vec![0u8; raw.len() + BLOSC2_MAX_OVERHEAD];
+    let csize2 = blosc2_compress_ctx(&cctx, raw, &mut blosc2);
+    assert!(csize2 > 0);
+    blosc2.truncate(csize2 as usize);
+
+    let mut blosc1 = vec![0u8; raw.len() + BLOSC_MIN_HEADER_LENGTH];
+    let csize1 = blusc::internal::compress(5, BLOSC_SHUFFLE as i32, 4, raw, &mut blosc1, BLOSC_LZ4)
+        .expect("blosc1 compress");
+    blosc1.truncate(csize1);
+
+    let codec = BluscCodec::new();
+    let rep = BytesRepresentation::FixedSize(raw.len() as u64);
+    for (compressed, header_len) in [
+        (blosc2, BLOSC_EXTENDED_HEADER_LENGTH),
+        (blosc1, BLOSC_MIN_HEADER_LENGTH),
+    ] {
+        let permuted = reverse_blosc_blocks(&compressed, header_len);
+        let decoded = codec
+            .decode(permuted.into(), &rep, &CodecOptions::default())
+            .expect("out-of-order blosc blocks should decode");
+        assert_eq!(decoded.as_ref(), raw);
+    }
+}
+
+fn reverse_blosc_blocks(compressed: &[u8], header_len: usize) -> Vec<u8> {
+    let (nbytes, cbytes, blocksize) = blusc::api::blosc2_cbuffer_sizes(compressed);
+    let nblocks = nbytes.div_ceil(blocksize);
+    assert!(nblocks > 4, "expected multiple blocks, got {nblocks}");
+    let table_end = header_len + nblocks * 4;
+    let bstarts: Vec<usize> = (0..nblocks)
+        .map(|i| {
+            let off = header_len + i * 4;
+            u32::from_le_bytes(compressed[off..off + 4].try_into().unwrap()) as usize
+        })
+        .collect();
+    let mut permuted = Vec::with_capacity(cbytes);
+    permuted.extend_from_slice(&compressed[..table_end]);
+    for i in (0..nblocks).rev() {
+        let start = bstarts[i];
+        let end = if i + 1 < nblocks {
+            bstarts[i + 1]
+        } else {
+            cbytes
+        };
+        let new_start = permuted.len() as u32;
+        let off = header_len + i * 4;
+        permuted[off..off + 4].copy_from_slice(&new_start.to_le_bytes());
+        permuted.extend_from_slice(&compressed[start..end]);
+    }
+    permuted
+}
+
+#[test]
+fn blosc_malformed_header_errors_without_panicking() {
+    let codec = BluscCodec::new();
+    let rep = BytesRepresentation::FixedSize(64);
+    let opts = CodecOptions::default();
+
+    // Short buffer
+    assert!(codec.decode(vec![2, 1, 0, 4].into(), &rep, &opts).is_err());
+    // Memcpy flag claiming more bytes than present
+    let mut memcpy_trunc = vec![0u8; 32];
+    memcpy_trunc[0] = 2;
+    memcpy_trunc[2] = blusc::BLOSC_MEMCPYED;
+    memcpy_trunc[3] = 4;
+    memcpy_trunc[4..8].copy_from_slice(&64u32.to_le_bytes());
+    memcpy_trunc[12..16].copy_from_slice(&32u32.to_le_bytes());
+    assert!(codec.decode(memcpy_trunc.into(), &rep, &opts).is_err());
+    // Zero typesize with split enabled
+    let mut zero_ts = vec![0u8; 32];
+    zero_ts[0] = 2;
+    zero_ts[3] = 0;
+    zero_ts[4..8].copy_from_slice(&64u32.to_le_bytes());
+    zero_ts[8..12].copy_from_slice(&32u32.to_le_bytes());
+    zero_ts[12..16].copy_from_slice(&32u32.to_le_bytes());
+    assert!(codec.decode(zero_ts.into(), &rep, &opts).is_err());
+}
