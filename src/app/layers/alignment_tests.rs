@@ -167,3 +167,81 @@ fn coordinates_match_whatever_the_dimension_names_case() {
     let overlay = overlay_selection(&base, &upper, 1).expect("overlay");
     assert_eq!(classify(&base, &overlay), Alignment::SameGrid);
 }
+
+fn healpix_dataset(
+    target: &str,
+    var_names: &[&str],
+    cell_dim: &str,
+    npix: u64,
+) -> VariableSelection {
+    let dims = ["time", cell_dim];
+    let variables = var_names
+        .iter()
+        .map(|name| var(name, &dims, &[3, npix]))
+        .collect();
+    let metadata = DatasetMetadata {
+        variables,
+        ..Default::default()
+    };
+    VariableSelection {
+        store_target: target.to_string(),
+        metadata: Some(metadata),
+        ..Default::default()
+    }
+}
+
+fn healpix_base_of(dataset: &VariableSelection, npix: u64) -> VariableSelection {
+    let mut base = dataset.clone();
+    base.variable_idx = 0;
+    base.dim_config = vec![
+        DimConfig::new(SpatialRole::None, AnimationRole::Animated, true, 1, (0, 2)),
+        DimConfig::new(
+            SpatialRole::Grid,
+            AnimationRole::None,
+            true,
+            0,
+            (0, (npix as usize).saturating_sub(1)),
+        ),
+    ];
+    base
+}
+
+#[test]
+fn healpix_variables_of_same_dataset_share_the_grid() {
+    let data = healpix_dataset("healpix_store", &["ts", "pr"], "cell", 196_608);
+    let base = healpix_base_of(&data, 196_608);
+    let overlay = overlay_selection(&base, &data, 1).expect("overlay");
+    assert_eq!(classify(&base, &overlay), Alignment::SameGrid);
+}
+
+#[test]
+fn healpix_variables_with_different_cell_names_still_align() {
+    let base_data = healpix_dataset("store_a", &["ts"], "cell", 196_608);
+    let overlay_data = healpix_dataset("store_b", &["pr"], "cells", 196_608);
+    let base = healpix_base_of(&base_data, 196_608);
+    let overlay = overlay_selection(&base, &overlay_data, 0).expect("overlay");
+    assert_eq!(classify(&base, &overlay), Alignment::SameGrid);
+}
+
+#[test]
+fn healpix_variables_with_different_cell_counts_are_incompatible() {
+    let base_data = healpix_dataset("store_a", &["ts"], "cell", 196_608);
+    let overlay_data = healpix_dataset("store_b", &["pr"], "cell", 49_152);
+    let base = healpix_base_of(&base_data, 196_608);
+    let overlay = overlay_selection(&base, &overlay_data, 0).expect("overlay");
+    assert_eq!(classify(&base, &overlay), Alignment::Incompatible);
+}
+
+#[test]
+fn healpix_and_cartesian_grids_are_incompatible() {
+    let healpix_data = healpix_dataset("healpix", &["ts"], "cell", 196_608);
+    let cart_data = dataset("cartesian", &grid_coords());
+
+    let h_base = healpix_base_of(&healpix_data, 196_608);
+    let cart_overlay = overlay_selection(&h_base, &cart_data, 0).expect("overlay");
+    assert_eq!(classify(&h_base, &cart_overlay), Alignment::Incompatible);
+
+    let c_base = base_of(&cart_data);
+    let h_overlay = overlay_selection(&c_base, &healpix_data, 0).expect("overlay");
+    assert_eq!(classify(&c_base, &h_overlay), Alignment::Incompatible);
+}

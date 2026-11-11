@@ -52,8 +52,8 @@ enum AxisMatch {
 }
 
 /// Classifies `overlay` against the `base` selection, which must be a 2D
-/// grid (an X and a Y dimension) drawn as a heatmap, sphere or surface to
-/// place anything.
+/// grid (an X and a Y dimension, or a 1D discrete grid) drawn as a heatmap,
+/// sphere or surface to place anything.
 pub fn classify(base: &VariableSelection, overlay: &VariableSelection) -> Alignment {
     let (Some(base_var), Some(overlay_var)) = (base.variable_info(), overlay.variable_info())
     else {
@@ -65,6 +65,16 @@ pub fn classify(base: &VariableSelection, overlay: &VariableSelection) -> Alignm
     // Label images have no sphere or surface mesh.
     if base.plot_type != PlotType::Heatmap && overlay_var.label_info().is_some() {
         return Alignment::LabelsHeatmapOnly;
+    }
+    if let Some(grid) = DimConfig::grid_dim(&base.dim_config) {
+        return match axis_match(base, base_var, overlay, overlay_var, grid) {
+            AxisMatch::Same => Alignment::SameGrid,
+            AxisMatch::Unknown => Alignment::IndexOnly,
+            AxisMatch::Differs => Alignment::Incompatible,
+        };
+    }
+    if DimConfig::grid_dim(&overlay.dim_config).is_some() {
+        return Alignment::Incompatible;
     }
     let (Some(x), Some(y)) = (
         DimConfig::x_dim(&base.dim_config),
@@ -120,6 +130,7 @@ fn axis_match(
         (Some(a), Some(b)) if coords_match(a, b, len) => AxisMatch::Same,
         (Some(_), Some(_)) => AxisMatch::Differs,
         _ if same_dataset(base, overlay) => AxisMatch::Same,
+        _ if healpix_match(base_var, overlay_var, name) => AxisMatch::Same,
         _ => AxisMatch::Unknown,
     }
 }
@@ -178,13 +189,34 @@ fn same_shape(base: &VariableInfo, overlay: &VariableInfo, [x, y]: [usize; 2]) -
     base_xy == (last.1, last.0) || base_xy == last
 }
 
+fn healpix_match(base_var: &VariableInfo, overlay_var: &VariableInfo, name: &str) -> bool {
+    use crate::data::coordinates::naming::is_healpix_dim_name;
+    use crate::data::coordinates::ordering::detect_healpix_ordering_with_dggs;
+    if !is_healpix_dim_name(name) {
+        return false;
+    }
+    let base_order = detect_healpix_ordering_with_dggs(&base_var.attributes, None);
+    let overlay_order = detect_healpix_ordering_with_dggs(&overlay_var.attributes, None);
+    base_order == overlay_order
+}
+
 fn same_dataset(a: &VariableSelection, b: &VariableSelection) -> bool {
     a.store_kind == b.store_kind && a.store_target == b.store_target
 }
 
-/// The dimension of `var` named `name` (ASCII case-insensitive).
+/// The dimension of `var` named `name` (ASCII case-insensitive), or matching
+/// HEALPix discrete cell dimension naming if `name` is a HEALPix dimension.
 pub(crate) fn dim_named(var: &VariableInfo, name: &str) -> Option<usize> {
     var.dimension_names
         .iter()
         .position(|n| n.eq_ignore_ascii_case(name))
+        .or_else(|| {
+            crate::data::coordinates::naming::is_healpix_dim_name(name)
+                .then(|| {
+                    var.dimension_names
+                        .iter()
+                        .position(|n| crate::data::coordinates::naming::is_healpix_dim_name(n))
+                })
+                .flatten()
+        })
 }
