@@ -19,7 +19,7 @@ An interactive viewer for N-dimensional datasets, stored locally or in cloud obj
 
 https://github.com/user-attachments/assets/c749e1d1-9159-4928-9e05-9490fb466607
 
-![Octant screenshot](./assets/octant_ws10.png)
+![Octant screenshot](https://raw.githubusercontent.com/lazarusA/octant/refs/heads/main/assets/octant_ws10.png)
 
 **[Try it in your browser](https://lazarusa.github.io/octant/)**: nothing to install (WebGPU, with a WebGL2 fallback).
 
