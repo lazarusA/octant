@@ -51,7 +51,7 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
 pub(crate) fn copy_link_button(app: &mut OctantApp, ui: &mut egui::Ui) {
     let label = tr(K::Share);
     // The label is one word; the tooltip names the link in full.
-    let button = ToolbarButton::new(Icon::Clipboard, label)
+    let button = ToolbarButton::new(Icon::Share, label)
         .icon_size(IconSize::Sm)
         .hover(tr(K::ShareLinkHover));
     let [width] = flow_row::cached_widths(ui, "share_link", label, |ui| [button.width(ui)]);
