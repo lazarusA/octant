@@ -48,7 +48,7 @@ define_icons! {
     ],
     "Data Store & Files" => [
         Dataset, Folder, FolderOpen, VariableDoc, Icechunk, Catalog, Save, Snapshot, DropTray,
-        Search, Trash, Clipboard,
+        Search, Trash, Clipboard, Share,
     ],
     "Tools & Status Badges" => [
         Scissors, Check, Cross, Lock, Unlock, Bolt, Hourglass, Warning, Info, Bullet,

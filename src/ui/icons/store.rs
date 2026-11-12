@@ -177,3 +177,37 @@ pub fn draw_clipboard(c: &IconCanvas) {
         [(12.0, 16.0), (16.0, 13.0)],
     );
 }
+
+/// Share: three network nodes connected by branching links (18x18 keyline).
+pub fn draw_share(c: &IconCanvas) {
+    let c0 = (6.0, 12.0);
+    let c1 = (18.0, 6.0);
+    let c2 = (18.0, 18.0);
+
+    if c.compact() {
+        // Crisp 1px connecting branches so the nodes remain visually dominant.
+        let branch = c.stroke(Weight::Detail);
+        c.line(c0, c1, branch);
+        c.line(c0, c2, branch);
+
+        // Prominent solid nodes so they are immediately recognizable at 12-14 px.
+        let r = 3.2;
+        c.dot(c0, r, c.color);
+        c.dot(c1, r, c.color);
+        c.dot(c2, r, c.color);
+    } else {
+        let s = c.stroke(Weight::Base);
+        let r = 3.0;
+        // Connect from circle perimeter to circle perimeter.
+        // dx = 12.0, dy = 6.0, L = sqrt(180) ~= 13.4164.
+        // offset: r / L * (12.0, 6.0) ~= (2.68, 1.34).
+        let (ox, oy) = (2.68, 1.34);
+        c.line((c0.0 + ox, c0.1 - oy), (c1.0 - ox, c1.1 + oy), s);
+        c.line((c0.0 + ox, c0.1 + oy), (c2.0 - ox, c2.1 - oy), s);
+
+        let body = c.body();
+        c.circle(c0, r, body, s);
+        c.circle(c1, r, body, s);
+        c.circle(c2, r, body, s);
+    }
+}

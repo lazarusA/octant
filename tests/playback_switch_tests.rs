@@ -71,8 +71,8 @@ fn assert_volume(app: &OctantApp, t: usize, (lo, hi): (usize, usize), label: &st
 fn a_new_plot_replaces_playback_at_its_step() {
     let mut app = playing(PlotType::Volume);
     // A smaller box: a new block, requested for the current step.
-    for dim in 1..4 {
-        app.selected.dim_config[dim].range = (4, 19);
+    for config in &mut app.selected.dim_config[1..4] {
+        config.range = (4, 19);
     }
     app.plot_selection();
     let step = app.playback.current_timestep;

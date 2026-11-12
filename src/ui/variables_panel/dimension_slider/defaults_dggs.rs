@@ -15,7 +15,7 @@ pub fn assign_dggs_roles(app: &mut OctantApp, var_info: &VariableInfo, grid_i: u
     let mut z_assigned = false;
     let mut anim_assigned = false;
 
-    for i in 0..rank {
+    for (i, config) in app.selected.dim_config.iter_mut().enumerate().take(rank) {
         if i == grid_i {
             continue;
         }
@@ -25,19 +25,19 @@ pub fn assign_dggs_roles(app: &mut OctantApp, var_info: &VariableInfo, grid_i: u
             .map(|s| s.as_str())
             .unwrap_or("");
         if !z_assigned && crate::data::coordinates::naming::is_spatial_z_name(dim_name) {
-            app.selected.dim_config[i].spatial = SpatialRole::Z;
+            config.spatial = SpatialRole::Z;
             z_assigned = true;
         }
         if !anim_assigned && crate::data::coordinates::naming::is_animated_time_name(dim_name) {
-            app.selected.dim_config[i].animation = AnimationRole::Animated;
+            config.animation = AnimationRole::Animated;
             anim_assigned = true;
         }
     }
 
     if !anim_assigned {
-        for i in 0..rank {
-            if i != grid_i && app.selected.dim_config[i].spatial == SpatialRole::None {
-                app.selected.dim_config[i].animation = AnimationRole::Animated;
+        for (i, config) in app.selected.dim_config.iter_mut().enumerate().take(rank) {
+            if i != grid_i && config.spatial == SpatialRole::None {
+                config.animation = AnimationRole::Animated;
                 break;
             }
         }

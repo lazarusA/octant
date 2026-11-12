@@ -58,6 +58,7 @@ impl Icon {
             Icon::Search => store::draw_search(c),
             Icon::Trash => store::draw_trash(c),
             Icon::Clipboard => store::draw_clipboard(c),
+            Icon::Share => store::draw_share(c),
 
             // Status & Badges
             Icon::Scissors => status::draw_scissors(c),

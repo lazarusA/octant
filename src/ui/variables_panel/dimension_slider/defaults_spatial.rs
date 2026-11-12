@@ -12,7 +12,7 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
     let mut anim_assigned = false;
 
     // 1. Explicit naming recognition
-    for i in 0..rank {
+    for (i, config) in app.selected.dim_config.iter_mut().enumerate().take(rank) {
         let dim_name = var_info
             .dimension_names
             .get(i)
@@ -20,20 +20,20 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             .unwrap_or("");
 
         if !x_assigned && crate::data::coordinates::naming::is_spatial_x_name(dim_name) {
-            app.selected.dim_config[i].spatial = SpatialRole::X;
+            config.spatial = SpatialRole::X;
             x_assigned = true;
         } else if !y_assigned && crate::data::coordinates::naming::is_spatial_y_name(dim_name) {
-            app.selected.dim_config[i].spatial = SpatialRole::Y;
+            config.spatial = SpatialRole::Y;
             y_assigned = true;
         } else if !z_assigned && crate::data::coordinates::naming::is_spatial_z_name(dim_name) {
-            app.selected.dim_config[i].spatial = SpatialRole::Z;
+            config.spatial = SpatialRole::Z;
             z_assigned = true;
         }
         if rank >= 3
             && !anim_assigned
             && crate::data::coordinates::naming::is_animated_time_name(dim_name)
         {
-            app.selected.dim_config[i].animation = AnimationRole::Animated;
+            config.animation = AnimationRole::Animated;
             anim_assigned = true;
         }
     }
@@ -69,7 +69,7 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
 
     // 3. For 3D datasets, assign Z if still unassigned (skipping channel dimensions)
     if rank >= 3 && !z_assigned {
-        for i in 0..rank {
+        for (i, config) in app.selected.dim_config.iter_mut().enumerate().take(rank) {
             let dim_name = var_info
                 .dimension_names
                 .get(i)
@@ -78,8 +78,8 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
                 continue;
             }
-            if app.selected.dim_config[i].spatial == SpatialRole::None {
-                app.selected.dim_config[i].spatial = SpatialRole::Z;
+            if config.spatial == SpatialRole::None {
+                config.spatial = SpatialRole::Z;
                 break;
             }
         }
