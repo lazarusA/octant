@@ -96,25 +96,18 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "松开以加载数据集",
         DatasetKey::DropSupportedList => "支持：{}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "试试：",
         DatasetKey::HeroSeasFireHover => "全球野火与气候重分块数据集 (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A 真彩色 COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "合成的 4D 时空体数据",
         DatasetKey::HeroCatalogHover => "浏览数据集目录",
         DatasetKey::LoadSampleHover => "加载示例：{}",
-        DatasetKey::HeroHintLong => "URL / 本地路径 / 将文件拖放到任意位置",
-        DatasetKey::HeroHintMedium => "URL / 路径 / 拖放文件",
-        DatasetKey::HeroHintShort => "URL / 拖放文件",
         DatasetKey::HeroDropLong => "拖放数据集以加载 (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "拖放数据集 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "拖放数据集以加载",
         DatasetKey::HeroUnsupportedLong => "不支持的类型。支持：.nc, .h5, .zarr, .icechunk, .tif",
         DatasetKey::HeroUnsupportedMedium => "不支持的格式 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "不支持的格式",
-        DatasetKey::HeroInputHintLong => {
-            "https://... 或路径 (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... 或路径 (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "拖放数据集，或输入路径或 URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL 或路径...",
         DatasetKey::ClearInputHover => "清除输入",
         DatasetKey::LoadDatasetHover => "加载数据集并打开变量",

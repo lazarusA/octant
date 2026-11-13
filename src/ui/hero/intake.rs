@@ -3,7 +3,8 @@
 use super::style::{BODY_FONT, content_width, fit_text};
 use crate::app::OctantApp;
 use crate::i18n::{DatasetKey, tr};
-use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
+use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::keyboard::focus as key_focus;
 
 /// Horizontal / vertical inner padding of the intake frame.
 const MARGIN_X: i8 = 12;
@@ -18,6 +19,9 @@ const FILL_REST: f32 = 0.06;
 const FILL_HOVER: f32 = 0.09;
 const FILL_FOCUS: f32 = 0.12;
 
+/// Inner padding of the return key cap around its glyph.
+const KEY_PADDING: egui::Vec2 = egui::vec2(6.0, 2.0);
+
 pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     // Outer width follows the shared hero gutter; subtract the margins so the
     // frame itself never touches the window edge.
@@ -30,8 +34,10 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         let ui = &mut frame.content_ui;
         ui.set_width(inner_w);
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = ICON_GAP;
+            ui.icon_toned(Icon::Prompt, IconSize::Sm, IconTone::Strong);
             let has_input = !app.layout.hero_state.input.trim().is_empty();
-            let right_reserve = if has_input { 60.0 } else { 34.0 };
+            let right_reserve = if has_input { 64.0 } else { 38.0 };
             let desired_w = (ui.available_width() - right_reserve).max(30.0);
 
             // The field's own margin narrows the visible text area.
@@ -80,28 +86,51 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     frame.end(ui);
 }
 
-/// Input placeholder for `text_w`: the long one wherever the medium one would
-/// fit, so the hint fills the field as typed text does (egui cuts it at the
-/// edge with an ellipsis), else the short one.
+/// Input placeholder for `text_w`: the full hint wherever its part before the
+/// format list fits (egui cuts the list at the edge with an ellipsis), else
+/// the short one.
 fn intake_hint(ui: &egui::Ui, text_w: f32) -> &'static str {
-    let medium = tr(DatasetKey::HeroInputHintMedium);
+    let full = tr(DatasetKey::HeroInputHint);
+    let head = full.split_once(" (").map_or(full, |(head, _)| head);
     let short = tr(DatasetKey::HeroInputHintShort);
-    if fit_text(ui, &[medium, short], BODY_FONT, text_w) == medium {
-        tr(DatasetKey::HeroInputHintLong)
+    if fit_text(ui, &[head, short], BODY_FONT, text_w) == head {
+        full
     } else {
         short
     }
 }
 
-/// Frameless load button with a drop-tray glyph; returns `true` when clicked.
+/// Return key cap that loads the typed source; returns `true` when clicked.
 fn load_button(ui: &mut egui::Ui) -> bool {
-    let hover = tr(DatasetKey::LoadDatasetHover);
-    ui.add(
-        ToolbarButton::new(Icon::DropTray, hover)
-            .compact(true)
-            .icon_size(IconSize::Sm),
-    )
-    .clicked()
+    let icon = IconSize::Sm.px();
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(icon, icon) + KEY_PADDING * 2.0,
+        egui::Sense::click(),
+    );
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.visuals();
+        let active = response.hovered() || response.has_focus();
+        let (fill, tone) = if active {
+            (visuals.widgets.hovered.bg_fill, IconTone::Strong)
+        } else {
+            (egui::Color32::TRANSPARENT, IconTone::Muted)
+        };
+        let stroke = visuals.widgets.noninteractive.bg_stroke;
+        ui.painter()
+            .rect(rect, 4.0, fill, stroke, egui::StrokeKind::Inside);
+        let icon_rect = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(icon));
+        Icon::Return.paint(
+            ui.painter(),
+            icon_rect,
+            tone.color(visuals),
+            visuals.dark_mode,
+        );
+        key_focus::paint_ring(ui, &response, 4.0);
+    }
+    response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(tr(DatasetKey::LoadDatasetHover))
+        .clicked()
 }
 
 /// Load the typed source, or the current store target when the field is empty.

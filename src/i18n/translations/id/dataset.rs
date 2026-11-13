@@ -96,7 +96,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "Lepaskan untuk memuat dataset",
         DatasetKey::DropSupportedList => "Didukung: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "coba:",
         DatasetKey::HeroSeasFireHover => {
             "Dataset kebakaran hutan & iklim global yang di-rechunk (Zarr)"
         }
@@ -104,9 +103,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Volume spasiotemporal 4D sintetis",
         DatasetKey::HeroCatalogHover => "Jelajahi katalog dataset",
         DatasetKey::LoadSampleHover => "Muat contoh: {}",
-        DatasetKey::HeroHintLong => "URL / jalur lokal / seret & lepas berkas di mana saja",
-        DatasetKey::HeroHintMedium => "URL / jalur / seret & lepas berkas",
-        DatasetKey::HeroHintShort => "URL / lepas berkas",
         DatasetKey::HeroDropLong => "Lepas dataset untuk dimuat (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "Lepas dataset (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "Lepas dataset untuk dimuat",
@@ -115,10 +111,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "Format tidak didukung (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Format tidak didukung",
-        DatasetKey::HeroInputHintLong => {
-            "https://... atau jalur (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... atau jalur (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Lepas dataset, masukkan jalur atau URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL atau jalur...",
         DatasetKey::ClearInputHover => "Hapus input",
         DatasetKey::LoadDatasetHover => "Muat Dataset & Buka Variabel",

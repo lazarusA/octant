@@ -79,6 +79,8 @@ impl Icon {
             Icon::Grip => marks::draw_grip(c),
             Icon::Orientation => marks::draw_orientation(c),
             Icon::Microphone => status::draw_microphone(c),
+            Icon::Prompt => marks::draw_prompt(c),
+            Icon::Return => marks::draw_return(c),
         }
     }
 }

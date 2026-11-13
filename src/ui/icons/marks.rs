@@ -1,5 +1,5 @@
 //! Single-glyph marks: check, cross, warning, info, bullet, chevrons, eyes,
-//! the drag grip and the orientation flip.
+//! the drag grip, the orientation flip and the prompt and return keys.
 
 use super::canvas::{IconCanvas, Weight, key};
 use egui::{Color32, Stroke};
@@ -46,6 +46,21 @@ pub fn draw_chevron_right(c: &IconCanvas) {
         &[(9.0, 5.0), (16.0, 12.0), (9.0, 19.0)],
         c.stroke(Weight::Bold),
     );
+}
+
+/// Prompt: terminal prompt, a chevron and an underscore cursor on the
+/// baseline below its tip (16x15 keyline).
+pub fn draw_prompt(c: &IconCanvas) {
+    let s = c.stroke(Weight::Bold);
+    c.path_round(&[(4.0, 4.5), (9.5, 10.0), (4.0, 15.5)], s);
+    c.path_round(&[(12.5, 19.5), (20.0, 19.5)], s);
+}
+
+/// Return: the return-key arrow, down from the top right then left (16x12 keyline).
+pub fn draw_return(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.path_round(&[(19.0, 6.0), (19.0, 15.0), (5.0, 15.0)], s);
+    c.path_round(&[(9.0, 11.0), (5.0, 15.0), (9.0, 19.0)], s);
 }
 
 /// ChevronDown: bold down-pointing chevron with round caps (14x7 keyline).

@@ -87,7 +87,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropTypeNotSupported => "Typen stöds inte",
         DatasetKey::DropReleaseToLoad => "Släpp för att läsa in dataset",
         DatasetKey::DropSupportedList => "Stöds: {}",
-        DatasetKey::HeroTryPrefix => "prova:",
         DatasetKey::HeroSeasFireHover => {
             "Globalt dataset om skogsbränder och klimat, omchunkat (Zarr)"
         }
@@ -95,9 +94,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Syntetisk 4D-volym i rum och tid",
         DatasetKey::HeroCatalogHover => "Bläddra i datasetkatalogen",
         DatasetKey::LoadSampleHover => "Läs in exempel: {}",
-        DatasetKey::HeroHintLong => "URL / lokal sökväg / dra och släpp filer var som helst",
-        DatasetKey::HeroHintMedium => "URL / sökväg / dra och släpp filer",
-        DatasetKey::HeroHintShort => "URL / släpp filer",
         DatasetKey::HeroDropLong => {
             "Släpp dataset för att läsa in (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -108,10 +104,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "Formatet stöds inte (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Formatet stöds inte",
-        DatasetKey::HeroInputHintLong => {
-            "https://... eller sökväg (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... eller sökväg (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Släpp dataset, ange sökväg eller URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL eller sökväg...",
         DatasetKey::ClearInputHover => "Rensa fältet",
         DatasetKey::LoadDatasetHover => "Läs in dataset och öppna variabler",

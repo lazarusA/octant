@@ -87,7 +87,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropTypeNotSupported => "Тип не підтримується",
         DatasetKey::DropReleaseToLoad => "Відпустіть, щоб завантажити набір даних",
         DatasetKey::DropSupportedList => "Підтримуються: {}",
-        DatasetKey::HeroTryPrefix => "спробуйте:",
         DatasetKey::HeroSeasFireHover => {
             "Глобальний набір даних про пожежі та клімат із перерозбиттям на фрагменти (Zarr)"
         }
@@ -95,9 +94,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Синтетичний 4D просторово-часовий об'єм",
         DatasetKey::HeroCatalogHover => "Переглянути каталог наборів даних",
         DatasetKey::LoadSampleHover => "Завантажити зразок: {}",
-        DatasetKey::HeroHintLong => "URL / локальний шлях / перетягніть файли будь-куди",
-        DatasetKey::HeroHintMedium => "URL / шлях / перетягніть файли",
-        DatasetKey::HeroHintShort => "URL / перетягніть файли",
         DatasetKey::HeroDropLong => {
             "Відпустіть набір даних, щоб завантажити (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -108,10 +104,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "Непідтримуваний формат (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Непідтримуваний формат",
-        DatasetKey::HeroInputHintLong => {
-            "https://... або шлях (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... або шлях (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Перетягніть набір даних, введіть шлях або URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL або шлях...",
         DatasetKey::ClearInputHover => "Очистити поле",
         DatasetKey::LoadDatasetHover => "Завантажити набір даних і відкрити змінні",

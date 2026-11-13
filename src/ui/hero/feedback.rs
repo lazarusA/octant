@@ -1,6 +1,6 @@
-//! Hero status pill, idle hints, drag cues, and warning banners.
+//! Hero status pill, drag cues, and warning banners.
 
-use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text};
+use super::style::{BODY_FONT, content_width, fit_text};
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone};
 
@@ -50,26 +50,6 @@ pub fn render_status_pill(
     let text_min = egui::pos2(rect.min.x + icon_px + ICON_GAP, rect.min.y);
     let text_pos = text_min - galley.rect.min.to_vec2();
     ui.painter().galley(text_pos, galley, text_color);
-}
-
-/// Helper caption under the intake bar, centered in the hero column.
-pub fn render_idle_hint(ui: &mut egui::Ui) {
-    let text = fit_text(
-        ui,
-        &[
-            tr(DatasetKey::HeroHintLong),
-            tr(DatasetKey::HeroHintMedium),
-            tr(DatasetKey::HeroHintShort),
-        ],
-        SMALL_FONT,
-        content_width(ui.available_width()),
-    );
-    ui.label(
-        egui::RichText::new(text)
-            .monospace()
-            .size(SMALL_FONT)
-            .color(ui.visuals().weak_text_color()),
-    );
 }
 
 pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
