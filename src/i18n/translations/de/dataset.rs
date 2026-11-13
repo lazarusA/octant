@@ -96,7 +96,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "Loslassen, um den Datensatz zu laden",
         DatasetKey::DropSupportedList => "Unterstützt: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "probieren:",
         DatasetKey::HeroSeasFireHover => {
             "Globaler Waldbrand- und Klimadatensatz, neu gechunkt (Zarr)"
         }
@@ -104,9 +103,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Synthetisches raumzeitliches 4D-Volumen",
         DatasetKey::HeroCatalogHover => "Datensatzkatalog durchsuchen",
         DatasetKey::LoadSampleHover => "Beispiel laden: {}",
-        DatasetKey::HeroHintLong => "URL / lokaler Pfad / Dateien an beliebiger Stelle ablegen",
-        DatasetKey::HeroHintMedium => "URL / Pfad / Dateien ablegen",
-        DatasetKey::HeroHintShort => "URL / Dateien ablegen",
         DatasetKey::HeroDropLong => {
             "Datensatz zum Laden ablegen (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -119,10 +115,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Format nicht unterstützt (.nc, .zarr, .icechunk, .tif)"
         }
         DatasetKey::HeroUnsupportedShort => "Format nicht unterstützt",
-        DatasetKey::HeroInputHintLong => {
-            "https://... oder Pfad (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... oder Pfad (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Datensatz ablegen, Pfad oder URL eingeben (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL oder Pfad...",
         DatasetKey::ClearInputHover => "Eingabe leeren",
         DatasetKey::LoadDatasetHover => "Datensatz laden & Variablen öffnen",

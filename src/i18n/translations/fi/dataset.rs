@@ -87,7 +87,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropTypeNotSupported => "Tyyppiä ei tueta",
         DatasetKey::DropReleaseToLoad => "Vapauta ladataksesi aineiston",
         DatasetKey::DropSupportedList => "Tuetut: {}",
-        DatasetKey::HeroTryPrefix => "kokeile:",
         DatasetKey::HeroSeasFireHover => {
             "Maailman maastopalo- ja ilmastoaineisto, uudelleen lohkottu (Zarr)"
         }
@@ -95,11 +94,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Synteettinen 4D-aika-avaruustilavuus",
         DatasetKey::HeroCatalogHover => "Selaa aineistoluetteloa",
         DatasetKey::LoadSampleHover => "Lataa esimerkki: {}",
-        DatasetKey::HeroHintLong => {
-            "URL / paikallinen polku / vedä ja pudota tiedostoja mihin tahansa"
-        }
-        DatasetKey::HeroHintMedium => "URL / polku / vedä ja pudota tiedostoja",
-        DatasetKey::HeroHintShort => "URL / pudota tiedostoja",
         DatasetKey::HeroDropLong => {
             "Pudota aineisto ladataksesi (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -110,10 +104,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "Muotoa ei tueta (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Muotoa ei tueta",
-        DatasetKey::HeroInputHintLong => {
-            "https://... tai polku (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... tai polku (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Pudota aineisto, anna polku tai URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL tai polku...",
         DatasetKey::ClearInputHover => "Tyhjennä syöte",
         DatasetKey::LoadDatasetHover => "Lataa aineisto ja avaa muuttujat",

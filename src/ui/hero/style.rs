@@ -2,15 +2,13 @@
 
 /// Minimum empty space kept on each side of hero content.
 pub const GUTTER: f32 = 16.0;
-/// Widest the intake bar, banners and hints grow on large windows.
+/// Widest the intake bar and banners grow on large windows.
 const CONTENT_MAX_W: f32 = 480.0;
 /// Narrowest content width before the page simply clips.
 const CONTENT_MIN_W: f32 = 160.0;
 
-/// Font size for sample chips, banners, hints and status lines.
+/// Font size for sample chips, banners and status lines.
 pub const BODY_FONT: f32 = 13.0;
-/// Font size for secondary labels such as the chip `try:` prefix.
-pub const SMALL_FONT: f32 = 12.0;
 
 /// Outer width of a hero content block (intake bar, banners) for a column of
 /// `avail` width, leaving at least [`GUTTER`] on each side.
@@ -53,10 +51,10 @@ pub mod gap {
     pub const CUBE_TITLE: f32 = 20.0;
     /// Wordmark to intake bar.
     pub const TITLE_INTAKE: f32 = 32.0;
-    /// Intake bar to its helper caption / drag feedback banner.
-    pub const INTAKE_HINT: f32 = 8.0;
-    /// Helper caption to sample chips.
-    pub const HINT_CHIPS: f32 = 28.0;
+    /// Intake bar to the drag / warning banner shown under it.
+    pub const INTAKE_BANNER: f32 = 8.0;
+    /// Intake bar (or its banner) to sample chips.
+    pub const INTAKE_CHIPS: f32 = 16.0;
     /// Sample chips to the loading / loaded status line.
     pub const CHIPS_STATUS: f32 = 24.0;
     /// Between wrapped rows of sample chips.

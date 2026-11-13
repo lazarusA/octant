@@ -96,15 +96,11 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "離すとデータセットを読み込みます",
         DatasetKey::DropSupportedList => "対応形式: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "例:",
         DatasetKey::HeroSeasFireHover => "世界の山火事と気候の再チャンク済みデータセット (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A トゥルーカラー COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "合成された4D時空間ボリューム",
         DatasetKey::HeroCatalogHover => "データセットカタログを見る",
         DatasetKey::LoadSampleHover => "サンプルを読み込み: {}",
-        DatasetKey::HeroHintLong => "URL / ローカルパス / ファイルを任意の場所にドラッグ&ドロップ",
-        DatasetKey::HeroHintMedium => "URL / パス / ファイルをドラッグ&ドロップ",
-        DatasetKey::HeroHintShort => "URL / ファイルをドロップ",
         DatasetKey::HeroDropLong => {
             "ドロップしてデータセットを読み込み (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -115,10 +111,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "非対応の形式 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "非対応の形式",
-        DatasetKey::HeroInputHintLong => {
-            "https://... またはパス (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... またはパス (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "データセットをドロップ、またはパスかURLを入力 (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URLまたはパス...",
         DatasetKey::ClearInputHover => "入力をクリア",
         DatasetKey::LoadDatasetHover => "データセットを読み込んで変数を開く",

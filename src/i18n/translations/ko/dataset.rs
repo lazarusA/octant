@@ -96,15 +96,11 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "놓으면 데이터셋을 불러옵니다",
         DatasetKey::DropSupportedList => "지원 형식: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "예시:",
         DatasetKey::HeroSeasFireHover => "전 지구 산불 및 기후 재청크 데이터셋 (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A 트루 컬러 COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "합성 4D 시공간 볼륨",
         DatasetKey::HeroCatalogHover => "데이터셋 카탈로그 둘러보기",
         DatasetKey::LoadSampleHover => "샘플 불러오기: {}",
-        DatasetKey::HeroHintLong => "URL / 로컬 경로 / 파일을 아무 곳에나 끌어다 놓기",
-        DatasetKey::HeroHintMedium => "URL / 경로 / 파일 끌어다 놓기",
-        DatasetKey::HeroHintShort => "URL / 파일 놓기",
         DatasetKey::HeroDropLong => "데이터셋을 놓아 불러오기 (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "데이터셋 놓기 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "데이터셋을 놓아 불러오기",
@@ -113,10 +109,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "지원하지 않는 형식 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "지원하지 않는 형식",
-        DatasetKey::HeroInputHintLong => {
-            "https://... 또는 경로 (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... 또는 경로 (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "데이터셋을 놓거나 경로 또는 URL 입력 (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL 또는 경로...",
         DatasetKey::ClearInputHover => "입력 지우기",
         DatasetKey::LoadDatasetHover => "데이터셋을 불러오고 변수 열기",

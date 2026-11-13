@@ -96,17 +96,11 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "Relâchez pour charger le jeu de données",
         DatasetKey::DropSupportedList => "Pris en charge : {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "essayez :",
         DatasetKey::HeroSeasFireHover => "Jeu de données mondial feux et climat, rechunké (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A couleurs vraies COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Volume spatio-temporel 4D synthétique",
         DatasetKey::HeroCatalogHover => "Parcourir le catalogue de jeux de données",
         DatasetKey::LoadSampleHover => "Charger l'exemple : {}",
-        DatasetKey::HeroHintLong => {
-            "URL / chemin local / glissez-déposez des fichiers n'importe où"
-        }
-        DatasetKey::HeroHintMedium => "URL / chemin / glissez-déposez des fichiers",
-        DatasetKey::HeroHintShort => "URL / déposez des fichiers",
         DatasetKey::HeroDropLong => {
             "Déposez un jeu de données à charger (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -119,10 +113,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Format non pris en charge (.nc, .zarr, .icechunk, .tif)"
         }
         DatasetKey::HeroUnsupportedShort => "Format non pris en charge",
-        DatasetKey::HeroInputHintLong => {
-            "https://... ou chemin (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... ou chemin (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Déposez un jeu de données, saisissez un chemin ou une URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL ou chemin...",
         DatasetKey::ClearInputHover => "Effacer la saisie",
         DatasetKey::LoadDatasetHover => "Charger le jeu de données et ouvrir les variables",

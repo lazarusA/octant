@@ -4,9 +4,7 @@ use std::time::Duration;
 use web_time::Instant;
 
 use super::chips::sample_slash_chips_row;
-use super::feedback::{
-    render_drag_hover_cue, render_idle_hint, render_status_pill, render_warning_banner,
-};
+use super::feedback::{render_drag_hover_cue, render_status_pill, render_warning_banner};
 use super::focus;
 use super::intake::intake_row;
 use super::style::{gap, vspace, wordmark_cell};
@@ -85,18 +83,16 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(space(gap::TITLE_INTAKE));
                 intake_row(ui, app);
 
-                // Helper caption under the input; drag / warning feedback
-                // temporarily takes its place.
-                ui.add_space(gap::INTAKE_HINT);
+                // Drag / warning feedback appears under the input while active.
                 if is_warning_active {
+                    ui.add_space(gap::INTAKE_BANNER);
                     render_warning_banner(ui);
                 } else if is_drag_hovering {
+                    ui.add_space(gap::INTAKE_BANNER);
                     render_drag_hover_cue(ui);
-                } else {
-                    render_idle_hint(ui);
                 }
 
-                ui.add_space(space(gap::HINT_CHIPS));
+                ui.add_space(space(gap::INTAKE_CHIPS));
                 sample_slash_chips_row(ui, app);
 
                 let source = app.layout.hero_state.source_label.as_str();

@@ -98,7 +98,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::DropReleaseToLoad => "Rilascia per caricare il set di dati",
         DatasetKey::DropSupportedList => "Supportati: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "prova:",
         DatasetKey::HeroSeasFireHover => {
             "Set di dati globale su incendi e clima, con chunk riorganizzati (Zarr)"
         }
@@ -106,9 +105,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Volume spazio-temporale 4D sintetico",
         DatasetKey::HeroCatalogHover => "Sfoglia il catalogo dei set di dati",
         DatasetKey::LoadSampleHover => "Carica esempio: {}",
-        DatasetKey::HeroHintLong => "URL / percorso locale / trascina i file ovunque",
-        DatasetKey::HeroHintMedium => "URL / percorso / trascina i file",
-        DatasetKey::HeroHintShort => "URL / rilascia i file",
         DatasetKey::HeroDropLong => {
             "Rilascia il set di dati da caricare (.nc, .h5, .zarr, .icechunk, .tif)"
         }
@@ -119,10 +115,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroUnsupportedMedium => "Formato non supportato (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Formato non supportato",
-        DatasetKey::HeroInputHintLong => {
-            "https://... o percorso (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... o percorso (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Rilascia un set di dati, inserisci percorso o URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL o percorso...",
         DatasetKey::ClearInputHover => "Cancella il testo",
         DatasetKey::LoadDatasetHover => "Carica il set di dati e apri le variabili",

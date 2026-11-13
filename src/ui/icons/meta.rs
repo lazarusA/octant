@@ -53,5 +53,6 @@ define_icons! {
     "Tools & Status Badges" => [
         Scissors, Check, Cross, Lock, Unlock, Bolt, Hourglass, Warning, Info, Bullet,
         ChevronRight, ChevronDown, ChevronUp, Eye, EyeOff, Grip, Orientation, Microphone,
+        Prompt, Return,
     ],
 }

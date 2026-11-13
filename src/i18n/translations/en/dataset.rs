@@ -96,15 +96,11 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::DropReleaseToLoad => "Release to load dataset",
         DatasetKey::DropSupportedList => "Supported: {}",
         // Hero landing
-        DatasetKey::HeroTryPrefix => "try:",
         DatasetKey::HeroSeasFireHover => "Global wildfire & climate rechunked dataset (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A True Color COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Synthetic 4D spatiotemporal volume",
         DatasetKey::HeroCatalogHover => "Browse dataset catalog",
         DatasetKey::LoadSampleHover => "Load sample: {}",
-        DatasetKey::HeroHintLong => "URL / local path / drag & drop files anywhere",
-        DatasetKey::HeroHintMedium => "URL / path / drag & drop files",
-        DatasetKey::HeroHintShort => "URL / drop files",
         DatasetKey::HeroDropLong => "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "Drop dataset (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "Drop dataset to load",
@@ -113,10 +109,7 @@ pub fn text(key: DatasetKey) -> &'static str {
         }
         DatasetKey::HeroUnsupportedMedium => "Unsupported format (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroUnsupportedShort => "Unsupported format",
-        DatasetKey::HeroInputHintLong => {
-            "https://... or path (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-        }
-        DatasetKey::HeroInputHintMedium => "https://... or path (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHint => "Drop dataset, enter path or URL (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
         DatasetKey::HeroInputHintShort => "URL or path...",
         DatasetKey::ClearInputHover => "Clear input",
         DatasetKey::LoadDatasetHover => "Load Dataset & Open Variables",

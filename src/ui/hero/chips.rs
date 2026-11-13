@@ -1,7 +1,7 @@
 //! Sample slash chips and interactive quick-load chip buttons.
 
 use super::chip_nav::{self, chip_id};
-use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
+use super::style::{BODY_FONT, GUTTER, gap};
 use crate::app::OctantApp;
 use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::keyboard::focus as key_focus;
@@ -46,25 +46,14 @@ struct Line {
     width: f32,
 }
 
-/// Centered rows of sample chips, preceded by a `try:` prefix. Rows wrap as
-/// whole chips and every row stays centered.
+/// Centered rows of sample chips. Rows wrap as whole chips and every row
+/// stays centered.
 pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     chip_nav::handle_keys(ui.ctx(), COUNT);
 
     // Lay out every label once per frame; the same galleys size and draw.
-    let prefix = ui.painter().layout_no_wrap(
-        tr(DatasetKey::HeroTryPrefix).to_owned(),
-        egui::FontId::monospace(SMALL_FONT),
-        ui.visuals().weak_text_color(),
-    );
     let chips: [Arc<Galley>; COUNT] = std::array::from_fn(|i| chip_galley(ui, SAMPLES[i].0, false));
-    let chip_height = chips[0].size().y + CHIP_PADDING.y * 2.0;
-
-    // Item 0 is the prefix, items 1..=COUNT are the chips.
-    let mut widths = [prefix.size().x; COUNT + 1];
-    for (w, galley) in widths[1..].iter_mut().zip(&chips) {
-        *w = galley.size().x + CHIP_PADDING.x * 2.0;
-    }
+    let widths: [f32; COUNT] = std::array::from_fn(|i| chips[i].size().x + CHIP_PADDING.x * 2.0);
 
     let max_w = (ui.available_width() - 2.0 * GUTTER).max(0.0);
     let (lines, line_count) = pack_lines(&widths, max_w);
@@ -76,14 +65,10 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = CHIP_GAP;
             ui.add_space(((ui.available_width() - line.width) * 0.5).max(0.0));
-            for item in line.start..line.end {
-                if item == 0 {
-                    render_prefix(ui, &prefix, chip_height);
-                    continue;
-                }
-                let (label, uri, desc) = SAMPLES[item - 1];
-                let galley = Arc::clone(&chips[item - 1]);
-                if render_chip(ui, item - 1, label, galley, tr(desc)).clicked() {
+            for i in line.start..line.end {
+                let (label, uri, desc) = SAMPLES[i];
+                let galley = Arc::clone(&chips[i]);
+                if render_chip(ui, i, label, galley, tr(desc)).clicked() {
                     app.open_sample(uri);
                 }
             }
@@ -93,8 +78,8 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
 
 /// Greedily pack items into rows no wider than `max_w`. Every row holds at
 /// least one item, so an over-wide chip gets a row of its own.
-fn pack_lines(widths: &[f32; COUNT + 1], max_w: f32) -> ([Line; COUNT + 1], usize) {
-    let mut lines = [Line::default(); COUNT + 1];
+fn pack_lines(widths: &[f32; COUNT], max_w: f32) -> ([Line; COUNT], usize) {
+    let mut lines = [Line::default(); COUNT];
     let mut count = 0;
     let mut current = Line::default();
     for (i, &w) in widths.iter().enumerate() {
@@ -118,16 +103,6 @@ fn pack_lines(widths: &[f32; COUNT + 1], max_w: f32) -> ([Line; COUNT + 1], usiz
     }
     lines[count] = current;
     (lines, count + 1)
-}
-
-/// The `try:` prefix, vertically centered in a box as tall as a chip so it
-/// lines up with the chips beside it.
-fn render_prefix(ui: &mut egui::Ui, galley: &Arc<Galley>, height: f32) {
-    let (rect, _) =
-        ui.allocate_exact_size(egui::vec2(galley.size().x, height), egui::Sense::hover());
-    let pos = egui::pos2(rect.min.x, rect.center().y - galley.size().y * 0.5);
-    ui.painter()
-        .galley(pos, Arc::clone(galley), ui.visuals().weak_text_color());
 }
 
 /// Label galley with a dimmed leading slash.
@@ -208,14 +183,14 @@ mod tests {
 
     #[test]
     fn test_all_items_on_one_line_when_wide() {
-        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0, 100.0], 1000.0);
+        let (lines, n) = pack_lines(&[100.0, 100.0, 100.0, 100.0], 1000.0);
         assert_eq!(n, 1);
-        assert_eq!((lines[0].start, lines[0].end), (0, COUNT + 1));
+        assert_eq!((lines[0].start, lines[0].end), (0, COUNT));
     }
 
     #[test]
     fn test_wraps_whole_items_and_covers_all() {
-        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0, 100.0], 250.0);
+        let (lines, n) = pack_lines(&[100.0, 100.0, 100.0, 100.0], 250.0);
         assert!(n > 1);
         let mut next = 0;
         for line in &lines[..n] {
@@ -224,12 +199,12 @@ mod tests {
             assert!(line.width <= 250.0);
             next = line.end;
         }
-        assert_eq!(next, COUNT + 1);
+        assert_eq!(next, COUNT);
     }
 
     #[test]
     fn test_over_wide_item_gets_its_own_line() {
-        let (lines, n) = pack_lines(&[30.0, 400.0, 50.0, 50.0, 50.0], 200.0);
+        let (lines, n) = pack_lines(&[400.0, 50.0, 50.0, 50.0], 200.0);
         assert!(
             lines[..n]
                 .iter()
