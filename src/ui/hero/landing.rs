@@ -6,12 +6,16 @@ use web_time::Instant;
 use super::chips::sample_slash_chips_row;
 use super::feedback::{render_drag_hover_cue, render_status_pill, render_warning_banner};
 use super::focus;
+use super::glow::glow_shape;
 use super::intake::intake_row;
 use super::style::{gap, vspace, wordmark_cell};
 use super::widget::draw_octant_widget;
 use crate::app::OctantApp;
 use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::brand::Wordmark;
+
+/// Glow radius as a multiple of the cube size.
+const GLOW_SCALE: f32 = 2.2;
 
 /// Render the clean, centered Hero Landing page.
 pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -66,9 +70,17 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                 ui.add_space(top_spacing);
 
-                // Centered 3D Octant procedural widget (interactive click to hop)
+                // Centered 3D Octant procedural widget (interactive click to hop),
+                // over a glow whose slot is reserved first so it paints beneath.
+                let glow_slot = ui.painter().add(egui::Shape::Noop);
                 let octant_resp =
                     draw_octant_widget(ui, octant_size, filled, extra_rot, extra_scale);
+                let glow = glow_shape(
+                    ui.visuals(),
+                    octant_resp.rect.center(),
+                    octant_size * GLOW_SCALE,
+                );
+                ui.painter().set(glow_slot, glow);
                 if octant_resp
                     .on_hover_text(tr(DatasetKey::HopOctantHover))
                     .clicked()
