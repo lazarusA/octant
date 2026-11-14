@@ -42,6 +42,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "Fjärr-GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Lokal GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Lokal NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Lokal eller fjärr-GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D-volym med känt facit",
         DatasetKey::FormatMatrix2DShort => "Procedurell 2D-matris",
         DatasetKey::NoDatasetsRegistered => "Inga dataset registrerade i hanteraren.",
@@ -126,6 +128,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} variabler i den här filen är för stora för att läsas i webbläsaren: öppna den i Octants skrivbordsapp för att se dem"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "{} meddelanden i den här GRIB-filen visas inte: deras rutnät, produkt eller packning stöds inte, eller så upprepar de ett annat meddelandes tid och nivå"
         }
         DatasetKey::Plate => "Platta",
         DatasetKey::PlateAcquisition => "Bildtagning",

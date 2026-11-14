@@ -52,7 +52,10 @@ impl SourceFactory {
 
             DataSourceKind::Procedural => Arc::new(ProceduralBlockStore::open(&source.uri)?),
 
-            DataSourceKind::NetCdf => Arc::new(NetCdfBlockStore::open_local(&source.uri)?),
+            // GRIB files are read by the NetCDF store, through `grib::GribReader`.
+            DataSourceKind::NetCdf | DataSourceKind::Grib => {
+                Arc::new(NetCdfBlockStore::open_local(&source.uri)?)
+            }
 
             #[cfg(not(target_arch = "wasm32"))]
             DataSourceKind::LocalGeoTiff | DataSourceKind::RemoteGeoTiff => {

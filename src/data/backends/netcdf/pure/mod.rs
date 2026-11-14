@@ -172,15 +172,20 @@ pub(super) fn shape_of(ds: &hdf5_pure::Dataset) -> Result<Option<Vec<usize>>, hd
         .collect())
 }
 
+/// How many of the arrays or messages left out a warning names.
+const SHOWN_LEFT_OUT: usize = 10;
+
 /// One warning naming the arrays left out for the reason `title` gives (with their count).
-pub(super) fn report_left_out(title: crate::i18n::DatasetKey, paths: &[String]) {
+pub(crate) fn report_left_out(title: crate::i18n::DatasetKey, paths: &[String]) {
     if paths.is_empty() {
         return;
     }
     let title = crate::i18n::filled(crate::i18n::tr(title), &[&paths.len()]);
-    crate::ui::toast::report(
-        crate::ui::toast::Severity::Warning,
-        &title,
-        paths.join(", "),
-    );
+    // The first few: a file leaving out hundreds (a GRIB file on an unsupported grid) would
+    // fill the screen. The title gives the count.
+    let mut shown = paths[..paths.len().min(SHOWN_LEFT_OUT)].join(", ");
+    if paths.len() > SHOWN_LEFT_OUT {
+        shown.push_str(", ...");
+    }
+    crate::ui::toast::report(crate::ui::toast::Severity::Warning, &title, shown);
 }

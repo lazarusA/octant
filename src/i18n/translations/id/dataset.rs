@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "GeoTIFF / COG Jarak Jauh",
         DatasetKey::FormatLocalGeoTiffShort => "GeoTIFF Lokal",
         DatasetKey::FormatLocalNetCdfShort => "NetCDF / HDF5 Lokal",
+        DatasetKey::FormatGrib => "GRIB2 lokal atau jarak jauh (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "Volume 4D Acuan",
         DatasetKey::FormatMatrix2DShort => "Matriks Prosedural 2D",
         // Dataset manager
@@ -134,6 +136,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} variabel dalam berkas ini terlalu besar untuk dibaca di peramban: buka di aplikasi desktop Octant untuk melihatnya"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "{} pesan dari berkas GRIB ini tidak ditampilkan: grid, produk, atau pengemasannya tidak didukung, atau mengulang waktu dan level pesan lain"
         }
         DatasetKey::Plate => "Pelat",
         DatasetKey::PlateAcquisition => "Akuisisi",

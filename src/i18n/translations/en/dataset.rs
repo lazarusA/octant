@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::FormatRemoteGeoTiffShort => "Remote GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Local GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Local NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Local or remote GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D Known-Truth Volume",
         DatasetKey::FormatMatrix2DShort => "2D Procedural Matrix",
         // Dataset manager
@@ -132,6 +134,9 @@ pub fn text(key: DatasetKey) -> &'static str {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} variables of this file are too large to read in the browser: open it in the Octant desktop app to see them"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "{} messages of this GRIB file are not shown: their grid, product or packing is not supported, or they repeat another message's time and level"
         }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Acquisition",

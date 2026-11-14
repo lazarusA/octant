@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "远程 GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "本地 GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "本地 NetCDF / HDF5",
+        DatasetKey::FormatGrib => "本地或远程 GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D 已知真值体数据",
         DatasetKey::FormatMatrix2DShort => "2D 程序生成矩阵",
         // Dataset manager
@@ -130,6 +132,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "此文件中有 {} 个变量太大，无法在浏览器中读取：请在 Octant 桌面应用中打开以查看"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "此 GRIB 文件中的 {} 条消息未显示：不支持其网格、产品或打包方式，或与另一条消息的时间和层次重复"
         }
         DatasetKey::Plate => "孔板",
         DatasetKey::PlateAcquisition => "采集",

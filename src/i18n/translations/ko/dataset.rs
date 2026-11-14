@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "원격 GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "로컬 GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "로컬 NetCDF / HDF5",
+        DatasetKey::FormatGrib => "로컬 또는 원격 GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D 참값 기준 볼륨",
         DatasetKey::FormatMatrix2DShort => "2D 절차적 행렬",
         // Dataset manager
@@ -132,6 +134,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "이 파일의 변수 {}개는 브라우저에서 읽기에 너무 큽니다: 보려면 Octant 데스크톱 앱에서 여세요"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "이 GRIB 파일의 메시지 {}개는 표시되지 않습니다: 격자, 제품 또는 압축 방식이 지원되지 않거나 다른 메시지와 시간 및 레벨이 겹칩니다"
         }
         DatasetKey::Plate => "플레이트",
         DatasetKey::PlateAcquisition => "획득",

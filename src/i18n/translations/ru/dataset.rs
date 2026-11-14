@@ -42,6 +42,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "Удалённый GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Локальный GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Локальный NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Локальный или удалённый GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "Эталонный 4D-объём",
         DatasetKey::FormatMatrix2DShort => "Процедурная 2D-матрица",
         DatasetKey::NoDatasetsRegistered => "В менеджере нет зарегистрированных наборов данных.",
@@ -128,6 +130,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} переменных этого файла слишком велики для чтения в браузере: откройте его в настольном приложении Octant, чтобы увидеть их"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "Сообщения этого файла GRIB не показаны ({}): их сетка, продукт или упаковка не поддерживаются, либо они повторяют время и уровень другого сообщения"
         }
         DatasetKey::Plate => "Планшет",
         DatasetKey::PlateAcquisition => "Съёмка",

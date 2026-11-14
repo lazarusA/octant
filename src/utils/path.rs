@@ -30,8 +30,16 @@ const NETCDF_EXTS: &[&str] = &[
     ".nc", ".nc4", ".cdf", ".netcdf", ".h5", ".hdf5", ".hdf", ".he5", ".mat",
 ];
 
+const GRIB_EXTS: &[&str] = &[".grib2", ".grb2", ".grib", ".grb"];
+
 fn has_ext(s: &str, exts: &[&str]) -> bool {
     exts.iter().any(|ext| s.ends_with(ext))
+}
+
+/// Whether lowercase `s` names a GRIB file: by its extension, or as NOAA names its GRIB2
+/// products, without one (`gfs.t00z.pgrb2.0p25.f000`).
+pub(crate) fn is_grib_name(s: &str) -> bool {
+    has_ext(s, GRIB_EXTS) || s.contains(".pgrb2")
 }
 
 /// Automatically infers the supported `StoreKind` from a given target URI, file path, or directory.
@@ -83,6 +91,9 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         if has_ext(path_part, NETCDF_EXTS) {
             return Ok(StoreKind::LocalNetCdf);
         }
+        if is_grib_name(path_part) {
+            return Ok(StoreKind::Grib);
+        }
         return Ok(StoreKind::RemoteZarr);
     }
 
@@ -113,6 +124,9 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
 
     if has_ext(&lower, NETCDF_EXTS) {
         return Ok(StoreKind::LocalNetCdf);
+    }
+    if is_grib_name(&lower) {
+        return Ok(StoreKind::Grib);
     }
     if has_ext(&lower, GEOTIFF_EXTS) {
         return Ok(StoreKind::LocalGeoTiff);
@@ -323,6 +337,18 @@ mod tests {
             infer_store_kind_from_target("https://example.com/model/output.nc"),
             Ok(StoreKind::LocalNetCdf)
         );
+        for grib in [
+            "/data/hrrr.t06z.wrfsfcf01.grib2",
+            "/data/era5.grib",
+            "https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20261113/00/atmos/gfs.t00z.pgrb2.0p25.f000",
+            "s3://noaa-hrrr-bdp-pds/hrrr.20261113/conus/hrrr.t00z.wrfsfcf00.grib2",
+        ] {
+            assert_eq!(
+                infer_store_kind_from_target(grib),
+                Ok(StoreKind::Grib),
+                "{grib}"
+            );
+        }
 
         // Unsupported types
         assert_eq!(

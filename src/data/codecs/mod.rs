@@ -4,10 +4,15 @@ pub mod blusc_plugin;
 pub mod capped;
 #[cfg(test)]
 mod capped_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod grib_network_tests;
 pub mod normalize;
 #[cfg(test)]
 mod pipeline_tests;
 mod plugin;
+mod scale_offset;
+#[cfg(test)]
+mod scale_offset_tests;
 #[cfg(test)]
 mod tests;
 pub mod zstd_plugin;

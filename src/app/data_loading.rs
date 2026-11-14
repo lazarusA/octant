@@ -52,7 +52,9 @@ impl OctantApp {
                     async {
                         // NetCDF opens by URL: picked or dropped files (`local://`) and remote ones.
                         let path = match store_kind {
-                            StoreKind::LocalNetCdf => !target_clone.contains("://"),
+                            StoreKind::LocalNetCdf | StoreKind::Grib => {
+                                !target_clone.contains("://")
+                            }
                             kind => matches!(
                                 kind,
                                 StoreKind::LocalZarr

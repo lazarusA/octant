@@ -46,6 +46,8 @@ crate::i18n::keys::define_keys! {
     FormatRemoteGeoTiffShort,
     FormatLocalGeoTiffShort,
     FormatLocalNetCdfShort,
+    FormatGrib,
+    FormatGribShort,
     FormatVolume4DShort,
     FormatMatrix2DShort,
     // Dataset manager
@@ -119,6 +121,7 @@ crate::i18n::keys::define_keys! {
     NeedsDataWorkers,
     MatArraysLeftOut,
     VariablesTooLargeForBrowser,
+    GribMessagesLeftOut,
     // OME-Zarr plates
     Plate,
     PlateAcquisition,

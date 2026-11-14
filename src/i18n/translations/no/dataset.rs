@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "Ekstern GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Lokal GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Lokal NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Lokal eller ekstern GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D-volum med kjent fasit",
         DatasetKey::FormatMatrix2DShort => "Prosedyrisk 2D-matrise",
         // Dataset manager
@@ -136,6 +138,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} variabler i denne filen er for store til å leses i nettleseren: åpne den i Octant-skrivebordsappen for å se dem"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "{} meldinger i denne GRIB-filen vises ikke: rutenettet, produktet eller pakkingen deres støttes ikke, eller de gjentar tiden og nivået til en annen melding"
         }
         DatasetKey::Plate => "Plate",
         DatasetKey::PlateAcquisition => "Opptak",
