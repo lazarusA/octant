@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
+use icechunk_format::IcechunkFormatErrorKind::ChunkCoordinatesNotFound;
 use icechunk_format::manifest::{ChunkPayload, Manifest, ManifestExtents, ManifestRef};
 use icechunk_format::{ChunkIndices, NodeTag, ObjectId};
 use zarrs::array::{Array, ArraySubset};
@@ -167,32 +168,40 @@ impl WasmIcechunkBlockStore {
 }
 
 /// Where the chunk at `indices` is, from the newest manifest covering and listing it;
-/// `None` for sparse chunks.
+/// `None` for sparse chunks. A manifest failing to give a chunk it lists (an undecodable
+/// location) is an error, never a sparse chunk.
 pub(super) fn locate_chunk(
     manifests: &[(ManifestExtents, Arc<Manifest>)],
     node_id: &NodeId,
     indices: &ChunkIndices,
     base_url: &str,
-) -> Option<ChunkSource> {
+) -> Result<Option<ChunkSource>, BlockStoreError> {
     let covering = manifests
         .iter()
         .filter(|(extents, _)| extents.contains(&indices.0));
-    covering.into_iter().find_map(|(_, manifest)| {
-        match manifest.get_chunk_payload(node_id, indices) {
-            Ok(ChunkPayload::Virtual(v)) => Some(ChunkSource::Range {
+    for (_, manifest) in covering {
+        let source = match manifest.get_chunk_payload(node_id, indices) {
+            Ok(ChunkPayload::Virtual(v)) => ChunkSource::Range {
                 url: s3_to_https(v.location.url()),
                 offset: v.offset,
                 length: v.length,
-            }),
-            Ok(ChunkPayload::Ref(r)) => Some(ChunkSource::Range {
+            },
+            Ok(ChunkPayload::Ref(r)) => ChunkSource::Range {
                 url: format!("{base_url}/chunks/{}", r.id),
                 offset: r.offset,
                 length: r.length,
-            }),
-            Ok(ChunkPayload::Inline(bytes)) => Some(ChunkSource::Inline(bytes.to_vec())),
-            _ => None,
-        }
-    })
+            },
+            Ok(ChunkPayload::Inline(bytes)) => ChunkSource::Inline(bytes.to_vec()),
+            Ok(_) => continue,
+            Err(e) if matches!(e.kind(), ChunkCoordinatesNotFound { .. }) => continue,
+            Err(e) => {
+                let e = format!("Icechunk chunk {:?} unreadable: {e}", indices.0);
+                return Err(e.into());
+            }
+        };
+        return Ok(Some(source));
+    }
+    Ok(None)
 }
 
 /// The bytes of the chunk at `indices`; `None` for sparse chunks.
@@ -202,7 +211,7 @@ async fn fetch_chunk(
     indices: &ChunkIndices,
     base_url: &str,
 ) -> Result<Option<Vec<u8>>, BlockStoreError> {
-    let (url, offset, length) = match locate_chunk(manifests, node_id, indices, base_url) {
+    let (url, offset, length) = match locate_chunk(manifests, node_id, indices, base_url)? {
         None => return Ok(None),
         Some(ChunkSource::Inline(bytes)) => return Ok(Some(bytes)),
         Some(ChunkSource::Range {
