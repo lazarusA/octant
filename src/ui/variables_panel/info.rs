@@ -93,6 +93,9 @@ fn crs_line(ui: &mut Ui, var_info: &VariableInfo) {
         CrsRef::Epsg(code) => stack_str(&mut code_buf, format_args!("EPSG:{code}")),
         CrsRef::Geographic => "lon/lat",
         CrsRef::Wkt(_) => "WKT",
+        CrsRef::Proj4(proj4) => (proj4.split_whitespace())
+            .find_map(|t| t.strip_prefix("+proj="))
+            .unwrap_or("proj4"),
     };
     let mut buf = [0; 256];
     let text = match (named(var_info), crs) {

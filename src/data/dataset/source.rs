@@ -17,6 +17,9 @@ pub enum DataSourceKind {
     RemoteGeoTiff,
 
     NetCdf,
+
+    /// GRIB2 files, local or remote, read through the NetCDF backend's reader seam.
+    Grib,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

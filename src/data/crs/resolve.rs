@@ -47,6 +47,7 @@ pub fn resolve(crs: &CrsRef) -> Resolution {
         CrsRef::Geographic => from_proj4("+proj=longlat +datum=WGS84 +no_defs"),
         CrsRef::Wkt(wkt) => from_wkt(wkt),
         CrsRef::Epsg(code) => epsg(*code),
+        CrsRef::Proj4(proj4) => from_proj4(proj4),
     };
     store(crs.clone(), resolution.clone());
     resolution

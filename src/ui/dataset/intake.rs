@@ -27,7 +27,7 @@ const SAMPLE_PRESETS: [(DatasetKey, &str, Option<StoreKind>); 4] = [
     ),
 ];
 
-pub(super) const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 9] = [
+pub(super) const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 10] = [
     (StoreKind::RemoteZarr, DatasetKey::FormatRemoteZarr),
     (StoreKind::LocalZarr, DatasetKey::FormatLocalZarr),
     (StoreKind::RemoteIcechunk, DatasetKey::FormatRemoteIcechunk),
@@ -35,6 +35,7 @@ pub(super) const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 9] = [
     (StoreKind::RemoteGeoTiff, DatasetKey::FormatRemoteGeoTiff),
     (StoreKind::LocalGeoTiff, DatasetKey::FormatLocalGeoTiff),
     (StoreKind::LocalNetCdf, DatasetKey::FormatLocalNetCdf),
+    (StoreKind::Grib, DatasetKey::FormatGrib),
     (StoreKind::ProceduralVolume4D, DatasetKey::FormatVolume4D),
     (StoreKind::ProceduralRandom, DatasetKey::FormatMatrix2D),
 ];
@@ -175,6 +176,7 @@ fn format_label(kind: StoreKind) -> DatasetKey {
         StoreKind::RemoteGeoTiff => DatasetKey::FormatRemoteGeoTiffShort,
         StoreKind::LocalGeoTiff => DatasetKey::FormatLocalGeoTiffShort,
         StoreKind::LocalNetCdf => DatasetKey::FormatLocalNetCdfShort,
+        StoreKind::Grib => DatasetKey::FormatGribShort,
         StoreKind::ProceduralVolume4D => DatasetKey::FormatVolume4DShort,
         StoreKind::ProceduralRandom => DatasetKey::FormatMatrix2DShort,
     }

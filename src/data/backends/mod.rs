@@ -1,5 +1,6 @@
 pub mod coord_bounds;
 pub mod geotiff;
+pub mod grib;
 pub mod http;
 pub mod icechunk;
 pub mod local;

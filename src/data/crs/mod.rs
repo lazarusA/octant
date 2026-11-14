@@ -34,12 +34,15 @@ pub enum CrsRef {
     Epsg(u32),
     /// WKT1 or WKT2.
     Wkt(Arc<str>),
+    /// A proj string (GRIB grids' `grid_mapping`, `proj4`).
+    Proj4(Arc<str>),
 }
 
 /// The attributes naming a CRS, read in this order: EPSG codes first (canonical
 /// and short), then WKT.
 const EPSG_KEYS: [&str; 3] = ["proj:code", "proj:epsg", "epsg_code"];
 const WKT_KEYS: [&str; 3] = ["proj:wkt2", "crs_wkt", "spatial_ref"];
+const PROJ4_KEY: &str = "proj4";
 
 /// The CRS `attrs` name, else `Geographic` when `dims` hold a longitude and
 /// a latitude, else `None` (never assumed to be degrees).
@@ -53,6 +56,9 @@ pub fn discover(attrs: &HashMap<String, String>, dims: &[String]) -> Option<CrsR
         .find_map(|k| attrs.get(*k).filter(|w| is_wkt(w)));
     if let Some(wkt) = wkt {
         return Some(wkt_epsg(wkt).map_or_else(|| CrsRef::Wkt(wkt.as_str().into()), CrsRef::Epsg));
+    }
+    if let Some(proj4) = attrs.get(PROJ4_KEY).filter(|p| p.contains("+proj=")) {
+        return Some(CrsRef::Proj4(proj4.as_str().into()));
     }
     let named = |part| {
         dims.iter()
@@ -141,7 +147,7 @@ pub fn attach_grid_mappings(
 
 /// Sets each CRS key `get` gives that `attrs` lacks.
 fn fill_crs_keys(attrs: &mut HashMap<String, String>, get: impl Fn(&str) -> Option<String>) {
-    for key in WKT_KEYS.iter().chain(&EPSG_KEYS) {
+    for key in WKT_KEYS.iter().chain(&EPSG_KEYS).chain(&[PROJ4_KEY]) {
         if !attrs.contains_key(*key)
             && let Some(value) = get(key)
         {

@@ -13,6 +13,7 @@ use zarrs::metadata_ext::codec::blosc::{
 /// and v2 unicode arrays with a null fill (as zarr-python 2 writes them) get an empty one.
 pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
     repair_v2(&mut meta);
+    super::scale_offset::lift(&mut meta);
     let typesize = meta
         .get("data_type")
         .and_then(|d| MetadataV3::deserialize(d).ok())
@@ -115,6 +116,7 @@ pub fn is_array_to_bytes_codec(name: &str) -> bool {
             | "zarrs.zfp"
             | "numcodecs.zfpy"
             | "zarrs.optional"
+            | "gribberish"
     )
 }
 

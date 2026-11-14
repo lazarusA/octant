@@ -175,3 +175,25 @@ fn unknown_codes_and_text_are_unsupported() {
         );
     }
 }
+
+/// GRIB grids name their CRS by proj string through their grid mapping (`backends/grib/`).
+#[test]
+fn proj_strings_name_projected_grids() {
+    let lcc = "+proj=lcc +lon_0=262.5 +lat_0=38.5 +lat_1=38.5 +lat_2=38.5 +a=6371229 +b=6371229";
+    let mut vars = vec![VariableInfo {
+        name: "TMP".into(),
+        dimension_names: dims(&["y", "x"]),
+        attributes: attrs(&[("grid_mapping", "crs")]),
+        ..VariableInfo::default()
+    }];
+    let mapping = attrs(&[
+        ("grid_mapping_name", "lambert_conformal_conic"),
+        ("proj4", lcc),
+    ]);
+    attach_grid_mappings(&mut vars, |path| (path == "crs").then(|| mapping.clone()));
+    let found = discover(&vars[0].attributes, &vars[0].dimension_names);
+    assert_eq!(found, Some(CrsRef::Proj4(lcc.into())));
+    let crs = ready(&CrsRef::Proj4(lcc.into()));
+    assert!(!crs.geographic);
+    assert_eq!(crs.unit, "m");
+}

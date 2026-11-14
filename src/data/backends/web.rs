@@ -26,7 +26,7 @@ impl WebFormat {
             Kind::RemoteZarr => Self::Zarr,
             Kind::RemoteIcechunk => Self::Icechunk,
             Kind::RemoteGeoTiff => Self::GeoTiff,
-            Kind::NetCdf => Self::NetCdf,
+            Kind::NetCdf | Kind::Grib => Self::NetCdf,
             Kind::Procedural => Self::Procedural,
             Kind::LocalZarr | Kind::LocalIcechunk | Kind::LocalGeoTiff => Self::DesktopPath,
         }
@@ -153,6 +153,7 @@ mod tests {
             WebFormat::GeoTiff
         );
         assert_eq!(of(Kind::NetCdf, "https://x/a.nc"), WebFormat::NetCdf);
+        assert_eq!(of(Kind::Grib, "local://4/a.grib2"), WebFormat::NetCdf);
         assert_eq!(
             of(Kind::Procedural, "procedural://x"),
             WebFormat::Procedural

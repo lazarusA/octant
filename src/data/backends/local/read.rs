@@ -75,6 +75,7 @@ pub(super) async fn kind_in(source: &Source, name: &str) -> Option<DataSourceKin
         return match crate::utils::infer_store_kind_from_target(name) {
             Ok(kind) if kind.is_geotiff() => Some(DataSourceKind::RemoteGeoTiff),
             Ok(StoreKind::LocalNetCdf) => Some(DataSourceKind::NetCdf),
+            Ok(StoreKind::Grib) => Some(DataSourceKind::Grib),
             _ => None,
         };
     }

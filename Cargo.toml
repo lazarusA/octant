@@ -72,6 +72,9 @@ sha2 = "0.11"
 # NetCDF-4/HDF5 in the browser's data workers and MATLAB v7.3 `.mat` on both
 # (`data/backends/netcdf/pure/`); the desktop reads `.nc`/`.h5` through netCDF-C.
 hdf5-pure = "=0.48.0-rc.1"
+# GRIB2: messages (`data/backends/grib/`) and the `gribberish` Zarr codec of virtual
+# stores built on GRIB files (dynamical.org's HRRR). JPEG2000 (C openjpeg) only on the desktop.
+gribberish = { version = "1.10.0", default-features = false, features = ["zarrs", "png"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -99,6 +102,7 @@ crs-definitions = { version = "0.6", default-features = false, features = ["proj
 # WKT without an EPSG code to proj strings; its wasm build exports a `main`.
 proj4wkt = "0.1.1"
 cpal = "0.18"
+gribberish = { version = "1.10.0", default-features = false, features = ["zarrs", "png", "jpeg"] }
 
 # Whisper on the Apple GPU.
 [target.'cfg(target_os = "macos")'.dependencies]

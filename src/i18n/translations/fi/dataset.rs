@@ -42,6 +42,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "Etä-GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Paikallinen GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Paikallinen NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Paikallinen tai etä-GRIB2 (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D-vertailutilavuus",
         DatasetKey::FormatMatrix2DShort => "2D proseduraalinen matriisi",
         DatasetKey::NoDatasetsRegistered => "Hallinnassa ei ole rekisteröityjä aineistoja.",
@@ -126,6 +128,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} tämän tiedoston muuttujaa on liian suuria luettaviksi selaimessa: avaa tiedosto Octantin työpöytäsovelluksessa nähdäksesi ne"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "Tämän GRIB-tiedoston {} viestiä ei näytetä: niiden hilaa, tuotetta tai pakkausta ei tueta, tai ne toistavat toisen viestin ajan ja tason"
         }
         DatasetKey::Plate => "Kuoppalevy",
         DatasetKey::PlateAcquisition => "Kuvauskerta",

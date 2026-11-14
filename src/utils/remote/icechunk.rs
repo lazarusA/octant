@@ -36,6 +36,28 @@ pub fn register_standard_virtual_chunk_containers(
     virt_opts.endpoint_url = None;
     virt_opts.force_path_style = false;
 
+    for pfx in known_prefixes(primary_bucket) {
+        let mut opts = virt_opts.clone();
+        let bucket = pfx
+            .trim_start_matches("s3://")
+            .trim_start_matches("https://");
+        if let Some(region) = region_of(bucket.split(['/', '.']).next().unwrap_or(bucket)) {
+            opts.region = Some(region.to_owned());
+        }
+        if let Ok(container) = icechunk::virtual_chunks::VirtualChunkContainer::new(
+            pfx.clone(),
+            icechunk::config::ObjectStoreConfig::S3(opts),
+        ) {
+            let _ = repo_config.set_virtual_chunk_container(container);
+        }
+        auth_map.insert(pfx, None);
+    }
+}
+
+/// The prefixes of the repository's own bucket and of the open-data buckets virtual chunks
+/// commonly live in, with catch-alls.
+#[cfg(not(target_arch = "wasm32"))]
+fn known_prefixes(primary_bucket: &str) -> Vec<String> {
     let mut known_prefixes = vec![
         primary_bucket.to_string(),
         format!("{}/", primary_bucket),
@@ -76,14 +98,32 @@ pub fn register_standard_virtual_chunk_containers(
     ];
 
     known_prefixes.dedup();
+    known_prefixes
+}
 
-    for pfx in known_prefixes {
-        if let Ok(container) = icechunk::virtual_chunks::VirtualChunkContainer::new(
-            pfx.clone(),
-            icechunk::config::ObjectStoreConfig::S3(virt_opts.clone()),
-        ) {
-            let _ = repo_config.set_virtual_chunk_container(container);
-        }
-        auth_map.insert(pfx, None);
+/// The region of a public bucket virtual chunks often live in, which may not be the
+/// repository's: S3 answers a request sent to another region with a redirect, which
+/// object_store does not follow (NOAA's HRRR GRIB files, under dynamical.org's repo).
+#[cfg(not(target_arch = "wasm32"))]
+fn region_of(bucket: &str) -> Option<&'static str> {
+    match bucket {
+        "dynamical-noaa-hrrr" => Some("us-west-2"),
+        b if b.starts_with("copernicus-dem-") => Some("eu-central-1"),
+        b if b.starts_with("noaa-") => Some("us-east-1"),
+        _ => None,
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    /// Virtual chunks in another region than their repository's are read in their own
+    /// (dynamical.org's HRRR repo in us-west-2, NOAA's GRIB files in us-east-1).
+    #[test]
+    fn known_buckets_have_their_region() {
+        use super::region_of;
+        assert_eq!(region_of("noaa-hrrr-bdp-pds"), Some("us-east-1"));
+        assert_eq!(region_of("dynamical-noaa-hrrr"), Some("us-west-2"));
+        assert_eq!(region_of("copernicus-dem-30m"), Some("eu-central-1"));
+        assert_eq!(region_of("someone-elses-bucket"), None);
     }
 }

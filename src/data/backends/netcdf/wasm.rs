@@ -68,8 +68,9 @@ pub async fn open(source: &DataSource) -> Result<(), String> {
             &uri,
         )
     } else {
-        let len = crate::data::backends::http::fetch_url_size(&uri).await?;
-        let url = uri.clone();
+        // `s3://` URLs (GRIB files in NOAA's buckets) read through the bucket's https host.
+        let url = crate::utils::remote::s3_to_https(&uri);
+        let len = crate::data::backends::http::fetch_url_size(&url).await?;
         let source = ReadAhead::new(len, move |o, n| read_http(&url, len, o, n));
         open_source(source, &uri)
     };

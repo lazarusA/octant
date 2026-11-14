@@ -69,7 +69,8 @@ cargo install octant --locked
 - [Zarr](https://zarr.dev/) v2 and v3 (including sharded arrays) and [Icechunk](https://icechunk.io/) repositories, from local disk, S3, Google Cloud Storage, Azure, or HTTP. Only the chunks needed for the current view are read.
 - [OME-Zarr](https://ngff.openmicroscopy.org/) images, label images, and plates, with their OMERO channel settings.
 - GeoTIFF and Cloud-Optimized GeoTIFF (COG).
-- [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) and [HDF5](https://www.hdfgroup.org/solutions/hdf5/) (desktop).
+- [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) (classic and NetCDF-4), [HDF5](https://www.hdfgroup.org/solutions/hdf5/), and MATLAB v7.3 `.mat` files, local or remote (HTTP or S3), on desktop and in the browser.
+- GRIB2 files, local or remote (HTTP or S3), on desktop and in the browser (JPEG2000-packed fields on desktop only). On desktop, NOAA and ECMWF sidecar indexes (`.idx`, `.index`) speed up remote files. Zarr and Icechunk stores built on GRIB files, such as [dynamical.org](https://dynamical.org/)'s, read too.
 - Multiscale pyramids (OME-Zarr, GeoZarr `multiscales`, GeoTIFF overviews): Octant reads the level that fits the screen and loads finer detail as you zoom.
 - A built-in catalog of public datasets, from climate reanalysis to microscopy.
 

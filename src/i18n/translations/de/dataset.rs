@@ -46,6 +46,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::FormatRemoteGeoTiffShort => "Entferntes GeoTIFF / COG",
         DatasetKey::FormatLocalGeoTiffShort => "Lokales GeoTIFF",
         DatasetKey::FormatLocalNetCdfShort => "Lokales NetCDF / HDF5",
+        DatasetKey::FormatGrib => "Lokale oder entfernte GRIB2-Datei (.grib2/.grb2)",
+        DatasetKey::FormatGribShort => "GRIB2",
         DatasetKey::FormatVolume4DShort => "4D-Referenzvolumen",
         DatasetKey::FormatMatrix2DShort => "Prozedurale 2D-Matrix",
         // Dataset manager
@@ -138,6 +140,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::VariablesTooLargeForBrowser => {
             "{} Variablen dieser Datei sind zu groß, um sie im Browser zu lesen: Öffnen Sie sie in der Octant-Desktop-App, um sie zu sehen"
+        }
+        DatasetKey::GribMessagesLeftOut => {
+            "{} Nachrichten dieser GRIB-Datei werden nicht angezeigt: ihr Gitter, Produkt oder ihre Packung wird nicht unterstützt, oder sie wiederholen Zeit und Ebene einer anderen Nachricht"
         }
         DatasetKey::Plate => "Platte",
         DatasetKey::PlateAcquisition => "Aufnahme",

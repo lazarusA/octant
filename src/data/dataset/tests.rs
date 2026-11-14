@@ -11,6 +11,7 @@ fn test_store_kind_data_source_kind_bijective_roundtrip() {
         (StoreKind::RemoteGeoTiff, DataSourceKind::RemoteGeoTiff),
         (StoreKind::LocalGeoTiff, DataSourceKind::LocalGeoTiff),
         (StoreKind::LocalNetCdf, DataSourceKind::NetCdf),
+        (StoreKind::Grib, DataSourceKind::Grib),
         (StoreKind::ProceduralVolume4D, DataSourceKind::Procedural),
     ];
 

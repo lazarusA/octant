@@ -69,7 +69,7 @@ fn source_kind_icon(kind: &DataSourceKind) -> Icon {
         DataSourceKind::RemoteZarr => Icon::Globe,
         DataSourceKind::LocalZarr => Icon::Folder,
         DataSourceKind::RemoteIcechunk | DataSourceKind::LocalIcechunk => Icon::Icechunk,
-        DataSourceKind::NetCdf => Icon::Folder,
+        DataSourceKind::NetCdf | DataSourceKind::Grib => Icon::Folder,
         DataSourceKind::RemoteGeoTiff => Icon::Globe,
         DataSourceKind::LocalGeoTiff => Icon::Folder,
         DataSourceKind::Procedural => Icon::PlotPlane,

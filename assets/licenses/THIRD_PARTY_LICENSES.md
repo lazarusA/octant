@@ -13,14 +13,14 @@ Libraries (Boost Software License 1.0).
 
 ## Overview
 
-- MIT License (664)
-- Apache License 2.0 (62)
+- MIT License (680)
+- Apache License 2.0 (63)
 - ISC License (24)
 - BSD 3-Clause "New" or "Revised" License (19)
 - Unicode License v3 (19)
+- BSD 2-Clause "Simplified" License (6)
 - zlib License (3)
 - Boost Software License 1.0 (2)
-- BSD 2-Clause "Simplified" License (1)
 - Bitstream Vera Font License (1)
 - Creative Commons Zero v1.0 Universal (1)
 - Community Data License Agreement Permissive 2.0 (1)
@@ -944,6 +944,7 @@ Used by:
 - codespan-reporting 0.13.1 (https://github.com/brendanzab/codespan)
 - cpal 0.18.2 (https://github.com/RustAudio/cpal)
 - esaxx-rs 0.1.10 (https://github.com/Narsil/esaxx-rs)
+- mappers 0.7.2 (https://github.com/ScaleWeather/mappers)
 - safetensors 0.8.0 (https://github.com/huggingface/safetensors)
 - self_cell 1.3.0 (https://github.com/Voultapher/self_cell)
 - spm_precompiled 0.1.4 (https://github.com/huggingface/spm_precompiled)
@@ -2327,6 +2328,275 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+```
+
+## BSD 2-Clause "Simplified" License
+
+Used by:
+- openjpeg-sys 1.0.12 (https://github.com/Enet4/openjpeg-sys)
+
+```text
+/*
+ * $Id$
+ *
+ * Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium
+ * Copyright (c) 2002-2014, Professor Benoit Macq
+ * Copyright (c) 2010-2011, Kaori Hagihara
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS `AS IS'
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef     IHDRBOX_MANAGER_H_
+# define    IHDRBOX_MANAGER_H_
+
+#include "byte_manager.h"
+#include "box_manager.h"
+#include "metadata_manager.h"
+
+/** I.5.3.1 Image Header box*/
+typedef struct ihdrbox_param {
+    Byte4_t height;
+    Byte4_t width;
+    Byte2_t nc;       /**< number of components*/
+    Byte_t  bpc;      /**< bits per component*/
+} ihdrbox_param_t;
+
+/**
+ * generate ihdr box
+ *
+ * @param[in] metadatalist metadata list pointer
+ * @param[in] jpipstream   JPT/JPP stream
+ * @return    pointer to generated ihdr box
+ */
+ihdrbox_param_t * gene_ihdrbox(metadatalist_param_t *metadatalist,
+                               Byte_t *jpipstream);
+
+
+#endif      /* !IHDRBOX_MANAGER_H_ */
+
+```
+
+## BSD 2-Clause "Simplified" License
+
+Used by:
+- openjpeg-sys 1.0.12 (https://github.com/Enet4/openjpeg-sys)
+
+```text
+/*
+ * $Id$
+ *
+ * Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium
+ * Copyright (c) 2002-2014, Professor Benoit Macq
+ * Copyright (c) 2010-2011, Kaori Hagihara
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS `AS IS'
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef     JP2K_DECODER_H_
+# define    JP2K_DECODER_H_
+
+#include "byte_manager.h"
+#include "ihdrbox_manager.h"
+
+Byte_t * j2k_to_pnm(const char *fn, ihdrbox_param_t **ihdrbox);
+
+#endif      /* !JP2K_DECODER_H_ */
+
+```
+
+## BSD 2-Clause "Simplified" License
+
+Used by:
+- openjpeg-sys 1.0.12 (https://github.com/Enet4/openjpeg-sys)
+
+```text
+/*
+ * $Id$
+ *
+ * Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium
+ * Copyright (c) 2002-2014, Professor Benoit Macq
+ * Copyright (c) 2010-2011, Kaori Hagihara
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS `AS IS'
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "byte_manager.h"
+#include "msgqueue_manager.h"
+#include "ihdrbox_manager.h"
+
+Byte_t * update_JPIPstream(Byte_t *newstream, OPJ_SIZE_T newstreamlen,
+                           Byte_t *cache_stream, OPJ_SIZE_T *streamlen);
+
+void save_codestream(Byte_t *codestream, OPJ_SIZE_T streamlen, const char *fmt);
+
+Byte_t * jpipstream_to_pnm(Byte_t *jpipstream, msgqueue_param_t *msgqueue,
+                           Byte8_t csn, int fw, int fh, ihdrbox_param_t **ihdrbox);
+
+ihdrbox_param_t * get_SIZ_from_jpipstream(Byte_t *jpipstream,
+        msgqueue_param_t *msgqueue, Byte8_t csn);
+
+```
+
+## BSD 2-Clause "Simplified" License
+
+Used by:
+- openjpeg-sys 1.0.12 (https://github.com/Enet4/openjpeg-sys)
+
+```text
+/*
+ * The copyright in this software is being made available under the 2-clauses
+ * BSD License, included below. This software may be subject to other third
+ * party and contributor rights, including patent rights, and no such rights
+ * are granted under this license.
+ *
+ * Copyright (c) 2016, Even Rouault
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS `AS IS'
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef OPJ_TLS_KEYS_H
+#define OPJ_TLS_KEYS_H
+
+#define OPJ_TLS_KEY_T1  0
+
+#endif /* OPJ_TLS_KEY_H */
+
+```
+
+## BSD 2-Clause "Simplified" License
+
+Used by:
+- openjpeg-sys 1.0.12 (https://github.com/Enet4/openjpeg-sys)
+
+```text
+/*
+ * The copyright in this software is being made available under the 2-clauses
+ * BSD License, included below. This software may be subject to other third
+ * party and contributor rights, including patent rights, and no such rights
+ * are granted under this license.
+ *
+ * Copyright (c) 2017, IntoPIX SA <support@intopix.com>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS `AS IS'
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+#ifndef OPJ_COMMON_H
+#define OPJ_COMMON_H
+
+/*
+ ==========================================================
+   Common constants shared among several modules
+ ==========================================================
+*/
+#define OPJ_COMMON_CBLK_DATA_EXTRA        2    /**< Margin for a fake FFFF marker */
+
+
+#define OPJ_COMP_PARAM_DEFAULT_CBLOCKW        64
+#define OPJ_COMP_PARAM_DEFAULT_CBLOCKH        64
+#define OPJ_COMP_PARAM_DEFAULT_PROG_ORDER     OPJ_LRCP
+#define OPJ_COMP_PARAM_DEFAULT_NUMRESOLUTION  6
+
+#endif /* OPJ_COMMON_H */
 
 ```
 
@@ -4586,11 +4856,14 @@ Used by:
 - bitflags 2.13.2 (https://github.com/bitflags/bitflags)
 - log 0.4.34 (https://github.com/rust-lang/log)
 - num-bigint 0.4.8 (https://github.com/rust-num/num-bigint)
+- num-complex 0.2.4 (https://github.com/rust-num/num-complex)
 - num-complex 0.4.6 (https://github.com/rust-num/num-complex)
 - num-integer 0.1.47 (https://github.com/rust-num/num-integer)
 - num-iter 0.1.46 (https://github.com/rust-num/num-iter)
+- num-rational 0.2.4 (https://github.com/rust-num/num-rational)
 - num-rational 0.4.2 (https://github.com/rust-num/num-rational)
 - num-traits 0.2.19 (https://github.com/rust-num/num-traits)
+- num 0.2.1 (https://github.com/rust-num/num)
 - num 0.4.3 (https://github.com/rust-num/num)
 - regex-automata 0.4.18 (https://github.com/rust-lang/regex)
 - regex-lite 0.1.9 (https://github.com/rust-lang/regex)
@@ -4695,6 +4968,34 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ## MIT License
 
 Used by:
+- float-cmp 0.10.0 (https://github.com/mikedilger/float-cmp)
+
+```text
+Copyright (c) 2014-2020 Optimal Computing (NZ) Ltd
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - hyper 0.14.32 (https://github.com/hyperium/hyper)
 
 ```text
@@ -4787,6 +5088,7 @@ THE SOFTWARE.
 Used by:
 - coreaudio-rs 0.14.2 (https://github.com/RustAudio/coreaudio-rs.git)
 - either 1.18.0 (https://github.com/rayon-rs/either)
+- itertools 0.10.5 (https://github.com/rust-itertools/itertools)
 - itertools 0.14.0 (https://github.com/rust-itertools/itertools)
 - itertools 0.15.0 (https://github.com/rust-itertools/itertools)
 - petgraph 0.8.3 (https://github.com/petgraph/petgraph)
@@ -5180,6 +5482,7 @@ THE SOFTWARE.
 ## MIT License
 
 Used by:
+- png 0.17.16 (https://github.com/image-rs/image-png)
 - png 0.18.1 (https://github.com/image-rs/image-png)
 
 ```text
@@ -8520,6 +8823,40 @@ SOFTWARE.
 ## MIT License
 
 Used by:
+- const_soft_float 0.1.4 (https://github.com/823984418/const_soft_float)
+
+```text
+Copyright (c) 2023 Kirk Nickish and https://github.com/823984418
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - bit-set 0.8.0 (https://github.com/contain-rs/bit-set)
 - bit-vec 0.8.0 (https://github.com/contain-rs/bit-vec)
 - bit-vec 0.9.1 (https://github.com/contain-rs/bit-vec)
@@ -9622,6 +9959,36 @@ SOFTWARE.
 ## MIT License
 
 Used by:
+- tap 1.0.1 (https://github.com/myrrlyn/tap)
+
+```text
+MIT License
+
+Copyright (c) 2017 Elliot Linder <darfink@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - rmp-serde 1.3.1 (https://github.com/3Hren/msgpack-rust)
 - rmp 0.8.15 (https://github.com/3Hren/msgpack-rust)
 
@@ -9839,6 +10206,67 @@ SOFTWARE.
 ## MIT License
 
 Used by:
+- bitvec 1.1.1 (https://github.com/bitvecto-rs/bitvec)
+- wyz 0.5.1 (https://github.com/myrrlyn/wyz)
+
+```text
+MIT License
+
+Copyright (c) 2018 myrrlyn (Alexander Payne)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
+- geographiclib-rs 0.2.7 (https://github.com/georust/geographiclib-rs)
+
+```text
+MIT License
+
+Copyright (c) 2019 
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - bytemuck 1.25.2 (https://github.com/Lokathor/bytemuck)
 - bytemuck_derive 1.12.1 (https://github.com/Lokathor/bytemuck)
 
@@ -10011,6 +10439,36 @@ SOFTWARE.
 ## MIT License
 
 Used by:
+- radium 0.7.0 (https://github.com/bitvecto-rs/radium)
+
+```text
+MIT License
+
+Copyright (c) 2019 kneecaw (Nika Layzell)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - colorgrad 0.9.0 (https://github.com/mazznoer/colorgrad-rs)
 - csscolorparser 0.9.0 (https://github.com/mazznoer/csscolorparser-rs)
 
@@ -10048,6 +10506,36 @@ Used by:
 MIT License
 
 Copyright (c) 2020 Samuele Esposito
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
+- funty 2.0.0 (https://github.com/myrrlyn/funty)
+
+```text
+MIT License
+
+Copyright (c) 2020 myrrlyn (Alexander Payne)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -10752,6 +11240,9 @@ Used by:
 - emath 0.37.0 (https://github.com/emilk/egui/tree/main/crates/emath)
 - epaint 0.37.0 (https://github.com/emilk/egui/tree/main/crates/epaint)
 - gloo-timers 0.3.0 (https://github.com/rustwasm/gloo/tree/master/crates/timers)
+- gribberish-macros 1.10.0 (https://github.com/mpiannucci/gribberish)
+- gribberish-types 1.10.0 (https://github.com/mpiannucci/gribberish)
+- gribberish 1.10.0 (https://github.com/mpiannucci/gribberish)
 - hdf5-metno-sys 0.12.4 (https://github.com/metno/hdf5-rust)
 - libm 0.2.16 (https://github.com/rust-lang/compiler-builtins)
 - netcdf 0.12.1 (https://github.com/georust/netcdf)

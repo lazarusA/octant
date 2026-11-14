@@ -55,6 +55,7 @@ fn store_badge(kind: StoreKind) -> (Icon, &'static str, IconTone) {
             (Icon::Folder, "GeoTIFF", IconTone::Success)
         }
         StoreKind::LocalNetCdf => (Icon::Folder, "NetCDF", IconTone::Muted),
+        StoreKind::Grib => (Icon::Folder, "GRIB2", IconTone::Muted),
         StoreKind::ProceduralVolume4D => (
             Icon::PlotVolume,
             tr(DatasetKey::BadgeVolume4D),
