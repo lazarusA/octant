@@ -1,6 +1,27 @@
 //! Pure-Rust WebAssembly symbols shim for zstd C API to satisfy `icechunk-format` linking
 //! when compiling on toolchains without a C compiler for `wasm32-unknown-unknown`.
 
+/// A decoder holding the zstd dictionary `dict` (`ZSTD_DCtx_loadDictionary`): Icechunk 2
+/// manifests compress their virtual chunks' locations against one. `Ok(None)` for an empty
+/// `dict`, which as in zstd means none (`zstd::Decoder` loads one with every stream: GeoTIFF
+/// tiles); an error when `dict` is not a zstd dictionary.
+// shortcut: trained (magic-numbered) dictionaries only, as Icechunk writes, and frames
+// naming their dictionary's id (zstd's default); raw-content dictionaries or id-less
+// frames would need ruzstd support (`force_dict`). Only `ZSTD_decompressDCtx` decodes
+// with it, not the streaming `ZSTD_decompressStream`, which no dictionary user calls.
+#[cfg(any(target_arch = "wasm32", test))]
+pub(crate) fn dictionary_decoder(
+    dict: &[u8],
+) -> Result<Option<ruzstd::decoding::FrameDecoder>, String> {
+    if dict.is_empty() {
+        return Ok(None);
+    }
+    let dict = ruzstd::decoding::Dictionary::decode_dict(dict).map_err(|e| e.to_string())?;
+    let mut frames = ruzstd::decoding::FrameDecoder::new();
+    frames.add_dict(dict).map_err(|e| e.to_string())?;
+    Ok(Some(frames))
+}
+
 #[cfg(target_arch = "wasm32")]
 mod shim {
     use std::io::Read;
@@ -13,6 +34,8 @@ mod shim {
             >,
         >,
         input_accum: Vec<u8>,
+        /// The dictionary `ZSTD_DCtx_loadDictionary` loaded, for `ZSTD_decompressDCtx`.
+        dict: Option<ruzstd::decoding::FrameDecoder>,
     }
 
     #[repr(C)]
@@ -48,6 +71,7 @@ mod shim {
         Box::into_raw(Box::new(ZstdDCtx {
             decoder: None,
             input_accum: Vec::new(),
+            dict: None,
         }))
     }
 
@@ -98,11 +122,28 @@ mod shim {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn ZSTD_DCtx_loadDictionary(
-        _dctx: *mut ZstdDCtx,
-        _dict: *const core::ffi::c_void,
-        _dict_size: usize,
+        dctx: *mut ZstdDCtx,
+        dict: *const core::ffi::c_void,
+        dict_size: usize,
     ) -> usize {
-        0
+        if dctx.is_null() || (dict.is_null() && dict_size > 0) {
+            return (-(1isize)) as usize;
+        }
+        let ctx = unsafe { &mut *dctx };
+        let raw: &[u8] = match dict_size {
+            0 => &[],
+            n => unsafe { core::slice::from_raw_parts(dict as *const u8, n) },
+        };
+        match super::dictionary_decoder(raw) {
+            Ok(frames) => {
+                ctx.dict = frames;
+                0
+            }
+            Err(_) => {
+                ctx.dict = None;
+                (-(1isize)) as usize
+            }
+        }
     }
 
     #[unsafe(no_mangle)]
@@ -163,7 +204,7 @@ mod shim {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn ZSTD_decompressDCtx(
-        _dctx: *mut ZstdDCtx,
+        dctx: *mut ZstdDCtx,
         dst: *mut core::ffi::c_void,
         dst_capacity: usize,
         src: *const core::ffi::c_void,
@@ -173,6 +214,15 @@ mod shim {
             return (-(1isize)) as usize;
         }
         let src_slice = unsafe { core::slice::from_raw_parts(src as *const u8, src_size) };
+        if !dctx.is_null()
+            && let Some(frames) = unsafe { &mut *dctx }.dict.as_mut()
+        {
+            let dst_slice =
+                unsafe { core::slice::from_raw_parts_mut(dst as *mut u8, dst_capacity) };
+            return frames
+                .decode_all(src_slice, dst_slice)
+                .unwrap_or((-(1isize)) as usize);
+        }
         let mut cursor = std::io::Cursor::new(src_slice);
         let mut decoder = match ruzstd::decoding::StreamingDecoder::new(&mut cursor) {
             Ok(d) => d,

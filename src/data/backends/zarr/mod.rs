@@ -36,6 +36,8 @@ pub mod storage;
 pub mod store;
 pub mod wasm;
 pub mod zstd_shim;
+#[cfg(test)]
+mod zstd_shim_tests;
 
 pub use coords::read_coordinate;
 pub use generic::GenericZarrBlockStore;

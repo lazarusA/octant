@@ -89,7 +89,7 @@ Every backend submodule is strictly modularized into single-responsibility files
   - `block.rs`: Hyperslab extraction, coordinate orientation, and attribute inheritance.
   - `slice.rs`: Subset reading, type casting to `f32`, and fill-value masking.
   - `storage.rs`: Synchronous storage adapter construction (`object_store::http` and `FilesystemStore`).
-  - `zstd_shim.rs`: Pure-Rust `extern "C"` shims (`ZSTD_*`) backed by `ruzstd` for WASM linking.
+  - `zstd_shim.rs`: Pure-Rust `extern "C"` shims (`ZSTD_*`) backed by `ruzstd` for WASM linking; `ZSTD_DCtx_loadDictionary` keeps the dictionary (`dictionary_decoder`) that Icechunk 2 manifests compress virtual chunk locations against (`zstd_shim_tests.rs`).
   - `wasm/`: Async browser streaming (`inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`).
 - **`icechunk/`**:
   - `native.rs`: Desktop `IcechunkBlockStore` connecting to S3 / local repositories via `icechunk` crate.

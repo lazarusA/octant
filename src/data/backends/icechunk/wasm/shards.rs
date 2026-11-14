@@ -40,7 +40,7 @@ impl WasmIcechunkBlockStore {
         let mut shards = Vec::with_capacity(grid.len());
         for (shard, at) in grid.into_iter().zip(&indices) {
             let key = array.chunk_key(&shard).as_str().to_string();
-            match locate_chunk(&manifests, &node_id, at, &self.base_url) {
+            match locate_chunk(&manifests, &node_id, at, &self.base_url)? {
                 None => {}
                 Some(ChunkSource::Inline(bytes)) => {
                     if !self.inner.has_key(&key) {
