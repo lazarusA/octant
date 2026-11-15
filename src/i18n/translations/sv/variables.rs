@@ -41,7 +41,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "Storlek: {} MB",
         VariablesKey::InfoCrs => "Koordinatsystem: {}",
         VariablesKey::InfoCrsUnsupported => "Koordinatsystem: {} (stöds inte)",
-        VariablesKey::InfoAttributes => "Attribut (.zattrs)",
+        VariablesKey::InfoAttributes => "Attribut",
         VariablesKey::Download => "Nedladdning",
         VariablesKey::DownloadCells => "{} ({} celler)",
         VariablesKey::LargeSelectionPyramid => {

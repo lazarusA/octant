@@ -41,7 +41,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "サイズ: {} MB",
         VariablesKey::InfoCrs => "座標参照系: {}",
         VariablesKey::InfoCrsUnsupported => "座標参照系: {}（未対応）",
-        VariablesKey::InfoAttributes => "属性 (.zattrs)",
+        VariablesKey::InfoAttributes => "属性",
         VariablesKey::Download => "ダウンロード",
         VariablesKey::DownloadCells => "{} ({} セル)",
         VariablesKey::LargeSelectionPyramid => {
