@@ -16,7 +16,8 @@ fn detail(ui: &mut Ui, key: VariablesKey, args: &[&dyn Display]) {
     ui.small(fill(&mut buf, tr(key), args));
 }
 
-/// Renders variable data type, shape, dimensions, time range, and zattrs metadata.
+/// Renders variable data type, shape, dimensions, time range, and the button
+/// that opens its attributes.
 pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
     ui.horizontal(|ui| {
         let mut buf = [0; 64];
@@ -68,17 +69,77 @@ pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
     );
     detail(ui, VariablesKey::InfoSize, &[&size]);
     crs_line(ui, var_info);
+    attributes_button(ui, var_info);
+}
 
-    if !var_info.attributes.is_empty() {
-        egui::CollapsingHeader::new(tr(VariablesKey::InfoAttributes))
-            .id_salt("variable_info_attributes")
-            .show(ui, |ui| {
-                for (k, v) in &var_info.attributes {
-                    // Attribute values can be long: kept whole, only while open.
-                    ui.small(format!("{k}: {v}"));
-                }
-            });
+/// Tallest the attributes popup gets before it scrolls.
+const ATTRIBUTES_MAX_H: f32 = 420.0;
+
+/// "Attributes" and their count; a click opens them in a popup as wide as
+/// the panel, so long values (history, WKT) never stretch the panel.
+fn attributes_button(ui: &mut Ui, var_info: &VariableInfo) {
+    if var_info.attributes.is_empty() {
+        return;
     }
+    let width = ui.available_width();
+    let button = ui
+        .horizontal(|ui| {
+            let button = ui.outlined_icon_button(
+                Icon::Info,
+                tr(VariablesKey::InfoAttributes),
+                IconTone::Default,
+            );
+            let mut buf = [0; 24];
+            let count = stack_str(&mut buf, format_args!("{}", var_info.attributes.len()));
+            ui.label(RichText::new(count).small().weak());
+            button
+        })
+        .inner;
+    show_attributes(
+        egui::Popup::from_toggle_button_response(&button),
+        width,
+        var_info,
+    );
+}
+
+/// Shows `var_info`'s attributes in `popup`, `width` wide, scrolling past
+/// `ATTRIBUTES_MAX_H`; closes on a click outside. Shared by the Dimensions
+/// panel's info card and the colorbar's info button.
+pub fn show_attributes(popup: egui::Popup<'_>, width: f32, var_info: &VariableInfo) {
+    // No frame margin: the scroll area spans the popup, so its bar sits on the
+    // popup's right edge; the rows get their padding inside it instead.
+    let frame = egui::Frame::popup(&popup.ctx().global_style()).inner_margin(0.0);
+    popup
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .frame(frame)
+        .width(width)
+        .show(|ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("variable_info_attributes")
+                .auto_shrink([false, true])
+                .max_height(ATTRIBUTES_MAX_H)
+                .show(ui, |ui| attribute_rows(ui, var_info));
+        });
+}
+
+/// Padding around the attribute rows; the right side leaves room for the
+/// scroll bar, which floats over the content.
+const ROWS_MARGIN: egui::Margin = egui::Margin {
+    left: 12,
+    right: 18,
+    top: 10,
+    bottom: 10,
+};
+
+/// One attribute per row: its key, then its value wrapped (selectable to copy).
+fn attribute_rows(ui: &mut Ui, var_info: &VariableInfo) {
+    egui::Frame::NONE.inner_margin(ROWS_MARGIN).show(ui, |ui| {
+        for (key, value) in &var_info.attributes {
+            ui.label(RichText::new(key.as_str()).strong());
+            ui.label(RichText::new(value.as_str()));
+            ui.add_space(4.0);
+        }
+    });
 }
 
 /// The variable's CRS: its name (a WKT's or GeoTIFF citation, else its EPSG

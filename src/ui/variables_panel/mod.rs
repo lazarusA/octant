@@ -4,6 +4,8 @@ pub mod dimension_slider;
 #[cfg(test)]
 mod header_tests;
 pub mod info;
+#[cfg(test)]
+mod panel_tests;
 
 pub use dimension_slider::{
     calculate_download_sizes, calculate_max_animated_steps, calculate_selected_2d_elements,
@@ -11,7 +13,7 @@ pub use dimension_slider::{
     double_slider_with_inputs, format_byte_size, init_layer_composite_defaults,
     init_variable_dimension_defaults, is_volume_allowed, show_dimension_sliders,
 };
-pub use info::show_variable_info;
+pub use info::{show_attributes, show_variable_info};
 
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
@@ -29,6 +31,8 @@ use dimension_slider::variable_bytes;
 const PANEL_MAX_W: f32 = 340.0;
 /// Narrowest the panel gets when the canvas leaves little room.
 const PANEL_MIN_W: f32 = 220.0;
+/// Shortest the scrolled sliders get, however little canvas is left below them.
+const MIN_SLIDERS_HEIGHT: f32 = 120.0;
 
 /// Docked after the Variables and Settings panels (`panel_layout`), or where its grip dragged it.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -45,13 +49,14 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
     panel_layout::show(app, ctx, Panel::Dimensions, canvas_rect, |app, ui| {
         ui.set_width(panel_w);
-        Some(show_panel(app, ui))
+        Some(show_panel(app, ui, canvas_rect))
     });
 }
 
 /// The staged variable's header, Plot Data row and dimension sliders; what
-/// the header's buttons asked for.
-fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
+/// the header's buttons asked for. The sliders scroll rather than run past
+/// the bottom of `canvas`; the header and Plot Data stay above them.
+fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> PanelHeader {
     let Some(var_info) = app.selected.variable_info().cloned() else {
         ui.label(tr(VariablesKey::NoVariableSelected));
         return PanelHeader::default();
@@ -72,7 +77,14 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
         .id_salt("dimension_sliders")
         .default_open(true)
         .show(ui, |ui| {
-            show_dimension_sliders(app, ui, &var_info);
+            let max_height = panel_layout::room_below(ui, canvas).max(MIN_SLIDERS_HEIGHT);
+            // The area lends its last-frame size; open up to the canvas so the
+            // sliders can grow when a dimension's box expands.
+            ui.set_max_height(max_height);
+            egui::ScrollArea::vertical()
+                .id_salt("dimension_sliders_scroll")
+                .max_height(max_height)
+                .show(ui, |ui| show_dimension_sliders(app, ui, &var_info));
         });
     header
 }

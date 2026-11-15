@@ -39,7 +39,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "Størrelse: {} MB",
         VariablesKey::InfoCrs => "Koordinatsystem: {}",
         VariablesKey::InfoCrsUnsupported => "Koordinatsystem: {} (støttes ikke)",
-        VariablesKey::InfoAttributes => "Attributter (.zattrs)",
+        VariablesKey::InfoAttributes => "Attributter",
         VariablesKey::Download => "Nedlasting",
         VariablesKey::DownloadCells => "{} ({} celler)",
         VariablesKey::LargeSelectionPyramid => {

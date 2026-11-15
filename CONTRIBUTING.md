@@ -27,6 +27,6 @@ However, all AI-generated or AI-assisted contributions must adhere to the follow
 
 Octant features a decoupled component architecture designed for straightforward extensibility:
 
-- **Adding a New Visualization (e.g. Hexagonal DGGS, Vector Quiver, Custom Meshes)**: Follow the [4-Step Plug-in Pattern in ARCHITECTURE.md](ARCHITECTURE.md#62-4-step-plug-in-pattern-for-adding-any-new-plot-type).
-- **Adding a Storage Backend (e.g. HDF5, GeoParquet, Cloud Stores)**: Follow [Adding a New Storage Backend in ARCHITECTURE.md](ARCHITECTURE.md#61-adding-a-new-storage-backend-eg-hdf5-geoparquet-cloud-stores).
-- **Complex & Non-Grid Workflows (Lagrangian Trajectories, Streamlines)**: See [Non-Grid Workflows in ARCHITECTURE.md](ARCHITECTURE.md#63-supporting-complex--non-grid-workflows-lagrangian-trajectories-streamlines--particle-tracks).
+- **Adding a New Visualization (e.g. Hexagonal DGGS, Vector Quiver, Custom Meshes)**: Follow [Adding a plot type in ARCHITECTURE.md](ARCHITECTURE.md#adding-a-plot-type).
+- **Adding a Storage Backend (e.g. GeoParquet, Cloud Stores)**: Follow [Adding a format in ARCHITECTURE.md](ARCHITECTURE.md#adding-a-format).
+- **Complex & Non-Grid Workflows (Lagrangian Trajectories, Streamlines)**: Not built yet; see [Not built yet in ARCHITECTURE.md](ARCHITECTURE.md#not-built-yet) and open an issue to discuss the design first.

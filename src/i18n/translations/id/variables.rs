@@ -43,7 +43,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "Ukuran: {} MB",
         VariablesKey::InfoCrs => "SRK: {}",
         VariablesKey::InfoCrsUnsupported => "SRK: {} (tidak didukung)",
-        VariablesKey::InfoAttributes => "Atribut (.zattrs)",
+        VariablesKey::InfoAttributes => "Atribut",
         VariablesKey::Download => "Unduhan",
         VariablesKey::DownloadCells => "{} ({} sel)",
         VariablesKey::LargeSelectionPyramid => {

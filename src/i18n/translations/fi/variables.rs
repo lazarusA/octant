@@ -39,7 +39,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "Koko: {} MB",
         VariablesKey::InfoCrs => "Koordinaattijärjestelmä: {}",
         VariablesKey::InfoCrsUnsupported => "Koordinaattijärjestelmä: {} (ei tuettu)",
-        VariablesKey::InfoAttributes => "Attribuutit (.zattrs)",
+        VariablesKey::InfoAttributes => "Attribuutit",
         VariablesKey::Download => "Lataus",
         VariablesKey::DownloadCells => "{} ({} solua)",
         VariablesKey::LargeSelectionPyramid => {

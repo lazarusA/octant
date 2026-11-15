@@ -41,7 +41,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "Размер: {} MB",
         VariablesKey::InfoCrs => "СК: {}",
         VariablesKey::InfoCrsUnsupported => "СК: {} (не поддерживается)",
-        VariablesKey::InfoAttributes => "Атрибуты (.zattrs)",
+        VariablesKey::InfoAttributes => "Атрибуты",
         VariablesKey::Download => "Загрузка",
         VariablesKey::DownloadCells => "{} ({} ячеек)",
         VariablesKey::LargeSelectionPyramid => {

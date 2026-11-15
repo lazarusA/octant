@@ -39,7 +39,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoSize => "크기: {} MB",
         VariablesKey::InfoCrs => "좌표계: {}",
         VariablesKey::InfoCrsUnsupported => "좌표계: {} (지원되지 않음)",
-        VariablesKey::InfoAttributes => "속성 (.zattrs)",
+        VariablesKey::InfoAttributes => "속성",
         VariablesKey::Download => "다운로드",
         VariablesKey::DownloadCells => "{} (셀 {}개)",
         VariablesKey::LargeSelectionPyramid => {

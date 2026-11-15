@@ -15,6 +15,8 @@ mod controls;
 mod controls_tests;
 pub mod handles;
 #[cfg(test)]
+mod info_button_tests;
+#[cfg(test)]
 mod keys_tests;
 mod layout;
 #[cfg(test)]
