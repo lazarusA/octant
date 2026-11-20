@@ -1,5 +1,5 @@
 use super::layout::{BottomBarItem, COLLAPSE_ORDER, ITEM_COUNT, LEFT_ITEMS, RIGHT_ITEMS};
-use super::timeline::{Timeline, is_display_coord};
+use super::timeline::Timeline;
 use crate::app::OctantApp;
 use crate::app::VariableSelection;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
@@ -38,18 +38,6 @@ fn test_step_buttons_never_collapse() {
     ] {
         assert!(!COLLAPSE_ORDER.contains(&item));
     }
-}
-
-#[test]
-fn test_display_coord_keeps_dates_and_formats_all_numbers() {
-    assert!(is_display_coord("2020-01-01"));
-    assert!(is_display_coord("12:30"));
-    assert!(is_display_coord("2020-01-01T00:00:00"));
-    assert!(!is_display_coord("-5"));
-    assert!(!is_display_coord("1e-3"));
-    assert!(!is_display_coord("42.5"));
-    assert!(!is_display_coord("7"));
-    assert!(!is_display_coord("   "));
 }
 
 /// An app animating a 3-step `region` dimension labelled by `labels`.
@@ -145,4 +133,59 @@ fn arrows_walk_the_buttons_up_to_the_timeline() {
         rects[slider..].iter().all(|r| *r == rects[slider]),
         "{rects:?}"
     );
+}
+
+#[test]
+fn timeline_dates_match_the_hover_card() {
+    // Hourly CF time coordinate; the plotted variable's own units are "K".
+    let time = VariableInfo {
+        name: "time".into(),
+        shape: vec![3],
+        dimension_names: vec!["time".into()],
+        units: Some("hours since 2020-01-01".into()),
+        ..Default::default()
+    };
+    let var = VariableInfo {
+        name: "t2m".into(),
+        shape: vec![3],
+        dimension_names: vec!["time".into()],
+        units: Some("K".into()),
+        ..Default::default()
+    };
+    let meta = DatasetMetadata {
+        variables: vec![var, time],
+        dimension_coordinates: std::collections::HashMap::from([(
+            "time".to_string(),
+            CoordValues::Values(vec![0.0, 6.0, 12.0].into()),
+        )]),
+        ..Default::default()
+    };
+    let hover = |i| {
+        crate::ui::hover::format::format_dimension_coord(
+            Some(&meta),
+            meta.variables.first(),
+            Some(""),
+            "time",
+            i,
+            3,
+            None,
+        )
+        .value
+    };
+    let (start, end) = (hover(0), hover(2));
+    let mut app = OctantApp::default();
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(meta),
+        dim_config: vec![crate::app::DimConfig {
+            animation: crate::app::AnimationRole::Animated,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let tl = Timeline::cached(&app, &egui::Context::default());
+    assert_eq!(
+        (tl.start.as_str(), tl.end.as_str()),
+        (start.as_str(), end.as_str())
+    );
+    assert_ne!(tl.start, tl.end, "6-hourly steps are told apart");
 }
