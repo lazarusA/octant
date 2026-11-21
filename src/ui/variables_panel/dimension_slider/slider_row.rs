@@ -1,6 +1,6 @@
 //! Dimension row controls and metric banners.
 
-use crate::app::{AnimationRole, OctantApp};
+use crate::app::{AnimationRole, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
 use crate::i18n::{VariablesKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
@@ -97,6 +97,11 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             };
             let active = &mut app.selected.dim_config[i].active;
             role_row(ui, i, name, active, &mut spatial, &mut anim);
+            // Unticking clears the roles, which would otherwise tick it again.
+            if !*active {
+                spatial = SpatialRole::None;
+                anim = AnimationRole::None;
+            }
             apply_role_change(i, spatial, anim, app);
 
             ui.add_space(4.0);
