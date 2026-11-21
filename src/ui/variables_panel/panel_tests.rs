@@ -1,6 +1,6 @@
 //! The Dimensions panel stays inside the canvas: its sliders scroll on a
 //! short canvas, and a variable's attributes open in a popup instead of
-//! stretching the panel.
+//! stretching the panel. Unticking a dimension clears its roles.
 
 use super::{show_variable_controls, show_variable_info};
 use crate::app::test_support::{memory_app, selection_of};
@@ -20,12 +20,7 @@ const SLACK: f32 = 1.0;
 
 /// The center of the painted text `label` in `shapes`, if any.
 fn text_center(shapes: &[ClippedShape], label: &str) -> Option<Pos2> {
-    shapes.iter().find_map(|clipped| match &clipped.shape {
-        egui::Shape::Text(text) if text.galley.text() == label => {
-            Some(text.pos + text.galley.size() * 0.5)
-        }
-        _ => None,
-    })
+    text_rect(shapes, label).map(|r| r.center())
 }
 
 #[test]
@@ -84,4 +79,44 @@ fn attributes_open_in_a_popup_and_leave_the_card_height() {
         "the value is shown"
     );
     assert_eq!(height.get(), closed, "the card keeps its height");
+}
+
+#[test]
+fn unticking_a_dimension_clears_its_roles() {
+    use crate::app::{AnimationRole, SpatialRole};
+    let (mut app, meta) = memory_app();
+    app.selected = selection_of(&mut app, &meta, "t2m");
+    app.layout.show_variable_controls = true;
+    let lon = 2;
+    assert_ne!(app.selected.dim_config[lon].spatial, SpatialRole::None);
+    let mut run = |ui: &mut Ui| show_variable_controls(&mut app, ui.ctx(), SCREEN);
+
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run);
+    // The checkbox sits one item spacing left of the dimension's name.
+    let name = text_rect(&shapes, "lon").expect("the lon row is shown");
+    let spacing = egui::Style::default().spacing;
+    let checkbox = pos2(
+        name.left() - spacing.item_spacing.x - spacing.interact_size.y * 0.5,
+        name.center().y,
+    );
+    h.click(checkbox, &mut run);
+    h.settle(3, &mut run);
+
+    let c = app.selected.dim_config[lon];
+    assert!(!c.active, "stays unticked");
+    assert_eq!(
+        (c.spatial, c.animation),
+        (SpatialRole::None, AnimationRole::None)
+    );
+}
+
+/// The painted rect of the text `label` in `shapes`, if any.
+fn text_rect(shapes: &[ClippedShape], label: &str) -> Option<Rect> {
+    shapes.iter().find_map(|clipped| match &clipped.shape {
+        egui::Shape::Text(text) if text.galley.text() == label => {
+            Some(Rect::from_min_size(text.pos, text.galley.size()))
+        }
+        _ => None,
+    })
 }
