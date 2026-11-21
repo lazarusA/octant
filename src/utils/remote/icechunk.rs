@@ -52,7 +52,23 @@ pub fn register_standard_virtual_chunk_containers(
         }
         auth_map.insert(pfx, None);
     }
+    // Public GCS buckets, read anonymously (`None` credentials); GCS needs one prefix per bucket.
+    for bucket in PUBLIC_GCS_BUCKETS {
+        let pfx = format!("gs://{bucket}/");
+        let store = icechunk::config::ObjectStoreConfig::Gcs(HashMap::new());
+        if let Ok(container) =
+            icechunk::virtual_chunks::VirtualChunkContainer::new(pfx.clone(), store)
+        {
+            let _ = repo_config.set_virtual_chunk_container(container);
+        }
+        auth_map.insert(pfx, None);
+    }
 }
+
+/// Public Google Cloud Storage buckets virtual chunks commonly live in (ECMWF open data,
+/// under dynamical.org's IFS ENS repo).
+#[cfg(not(target_arch = "wasm32"))]
+const PUBLIC_GCS_BUCKETS: &[&str] = &["ecmwf-open-data"];
 
 /// The prefixes of the repository's own bucket and of the open-data buckets virtual chunks
 /// commonly live in, with catch-alls.
@@ -125,5 +141,22 @@ mod tests {
         assert_eq!(region_of("dynamical-noaa-hrrr"), Some("us-west-2"));
         assert_eq!(region_of("copernicus-dem-30m"), Some("eu-central-1"));
         assert_eq!(region_of("someone-elses-bucket"), None);
+    }
+
+    /// ECMWF's GRIB files in Google Cloud Storage are readable anonymously
+    /// (dynamical.org's IFS ENS repo); icechunk rejects a container silently skipped here.
+    #[test]
+    fn public_gcs_buckets_are_registered() {
+        let mut config = icechunk::config::RepositoryConfig::default();
+        let mut auth = std::collections::HashMap::new();
+        let s3 = icechunk::config::S3Options::default();
+        super::register_standard_virtual_chunk_containers(&mut config, &mut auth, &s3, "repo");
+        let pfx = "gs://ecmwf-open-data/";
+        assert!(
+            config
+                .virtual_chunk_containers()
+                .any(|c| c.url_prefix() == pfx)
+        );
+        assert!(matches!(auth.get(pfx), Some(None)));
     }
 }

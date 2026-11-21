@@ -26,6 +26,8 @@ pub fn s3_to_https(location: &str) -> String {
         } else {
             format!("https://{rest}.s3.amazonaws.com")
         }
+    } else if let Some(rest) = clean.strip_prefix("gs://") {
+        format!("https://storage.googleapis.com/{rest}")
     } else if let Some(rest) = clean.strip_prefix("vcc://") {
         if let Some((container, key)) = rest.split_once('/') {
             format!("https://{container}.s3.amazonaws.com/{key}")
