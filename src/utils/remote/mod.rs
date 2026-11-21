@@ -37,6 +37,10 @@ mod tests {
             s3_to_https("icechunk+s3://icechunk-bucket/repo"),
             "https://icechunk-bucket.s3.amazonaws.com/repo"
         );
+        assert_eq!(
+            s3_to_https("gs://ecmwf-open-data/20261021/00z/a.grib2"),
+            "https://storage.googleapis.com/ecmwf-open-data/20261021/00z/a.grib2"
+        );
     }
 
     #[test]
