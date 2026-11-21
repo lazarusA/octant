@@ -5648,7 +5648,7 @@ dependencies = [
 
 [[package]]
 name = "octant"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "allsorts",
  "arboard",

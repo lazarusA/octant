@@ -11115,7 +11115,7 @@ SOFTWARE.
 ## MIT License
 
 Used by:
-- octant 0.5.0 (https://github.com/lazarusA/octant)
+- octant 0.5.1 (https://github.com/lazarusA/octant)
 
 ```text
 MIT License
