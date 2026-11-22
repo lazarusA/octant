@@ -52,6 +52,17 @@ pub const SHADER_MANUAL_FILTER: &str = volume_shader!(
     include_str!("../shaders/volume/sample_dense.wgsl"),
     include_str!("../shaders/volume/walk.wgsl")
 );
+/// Shader of a bricked volume: an `R16Float` atlas, filterable on every
+/// device (`bricks.rs`).
+pub const SHADER_BRICKED: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_hardware.wgsl"),
+    concat!(
+        include_str!("../shaders/volume/sample_bricked.wgsl"),
+        "\n",
+        include_str!("../shaders/volume/sample_bricked_steps.wgsl")
+    ),
+    include_str!("../shaders/volume/walk_bricked.wgsl")
+);
 
 /// Whether the device filters `R32Float` textures (`FLOAT32_FILTERABLE`).
 pub fn hardware_filtering(device: &wgpu::Device) -> bool {

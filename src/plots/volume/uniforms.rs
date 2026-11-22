@@ -13,7 +13,9 @@ pub struct VolumeUniforms {
     pub camera: CameraUniform,
     pub slice: SliceUniform,
     pub light_color: [f32; 3],
-    pub _pad0: u32,
+    /// Non-zero in a resting (banded) bricked frame: rays mark the table
+    /// cells they reach (`mark_seen`); moving frames would only add noise.
+    pub record_seen: u32,
     pub ambient: [f32; 3],
     pub shininess: f32,
     pub light_direction: [f32; 3],
@@ -86,7 +88,7 @@ impl VolumeUniformParams {
             camera: self.camera,
             slice: self.slice,
             light_color: [1.0, 1.0, 1.0],
-            _pad0: 0,
+            record_seen: 0,
             ambient: [0.2, 0.2, 0.2],
             shininess: 32.0,
             light_direction: [1.0, 1.0, 1.0],

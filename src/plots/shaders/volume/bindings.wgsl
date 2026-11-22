@@ -20,7 +20,8 @@ struct Uniforms {
     // The slicer's cut in unit-box axes (`common/slice.wgsl`).
     slice: Slice,
     light_color: vec3<f32>,
-    _pad0: u32,
+    // Non-zero while a resting bricked frame records ray feedback.
+    record_seen: u32,
     ambient: vec3<f32>,
     shininess: f32,
     light_direction: vec3<f32>,

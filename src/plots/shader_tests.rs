@@ -35,7 +35,7 @@ fn mesh_and_point_cloud_pipelines_validate() {
 }
 
 /// Every plot shader, by name.
-pub(super) const SHADERS: [(&str, &str); 16] = [
+pub(super) const SHADERS: [(&str, &str); 17] = [
     ("sphere", super::mesh_draw::SPHERE_WGSL),
     ("surface", super::mesh_draw::SURFACE_WGSL),
     ("heatmap", super::heatmap::HEATMAP_WGSL),
@@ -48,6 +48,10 @@ pub(super) const SHADERS: [(&str, &str); 16] = [
     (
         "volume_manual_filter",
         crate::plots::volume::pipeline::SHADER_MANUAL_FILTER,
+    ),
+    (
+        "volume_bricked",
+        crate::plots::volume::pipeline::SHADER_BRICKED,
     ),
     (
         "volume_blit",

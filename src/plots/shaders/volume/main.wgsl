@@ -7,7 +7,8 @@ override ALGORITHM: u32 = 0u;
 
 // Upper bound on samples per ray: large volumes sample coarser than one per
 // voxel (opacity stays step-corrected) instead of costing thousands of taps.
-const MAX_SAMPLES: i32 = 384;
+// Bricked volumes, drawn finer than one texture holds, allow more.
+override MAX_SAMPLES: i32 = 384;
 
 // Interleaved gradient noise in [0, 1): a per-pixel start offset that turns
 // wood-grain banding into fine, unstructured grain.
