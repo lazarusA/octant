@@ -31,6 +31,16 @@ mod banded_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod bench_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_border_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_byte_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_missing_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_walk_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod gpu_render;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_tests;
