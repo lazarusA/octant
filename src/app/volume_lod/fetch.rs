@@ -88,6 +88,9 @@ impl OctantApp {
         };
         match result {
             Ok(block) => {
+                // Composites recolor from the plotted block: keep it newer
+                // than the bricks, which would otherwise evict it first.
+                self.keep_plotted_block();
                 self.block_cache.put(key.clone(), block.clone());
                 if let Some(lod) = self.layers.base.data.volume_lod.lod.as_mut() {
                     lod.arrived.push_back((brick, read, block.clone()));

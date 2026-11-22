@@ -20,8 +20,12 @@
 //! bricks cannot draw the plot (`setup.rs` `Off`, with a notice).
 
 mod apron;
+mod apron_color;
+#[cfg(test)]
+mod apron_color_tests;
 #[cfg(test)]
 mod apron_tests;
+mod composite;
 mod draw;
 mod encode;
 mod feedback;

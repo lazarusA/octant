@@ -35,6 +35,8 @@ mod bricked_border_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod bricked_byte_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_composite_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod bricked_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod bricked_missing_gpu_tests;
