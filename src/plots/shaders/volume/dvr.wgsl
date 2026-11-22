@@ -115,16 +115,16 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
             continue;
         }
         let pos = sample_pos(ray, i);
-        let d = sample_scalar(pos);
+        let d = blocks_scalar(&blocks, pos);
         if (uniforms.transparency == 0u && inside_scalar(d, surface)) {
-            return opaque_surface(ray, previous_pos(ray, i), pos, surface, i == 0);
+            return opaque_surface(ray, previous_taken(&blocks, ray, i), pos, surface, i == 0);
         }
         // Outside the color range only clip and NaN colors show; below a
         // value surface nothing does, so the surface alone is drawn.
         if (uniforms.transparency == 0u && surface == SURFACE_VALUE) {
             continue;
         }
-        let s = dvr_sample(d, ray.step_refs);
+        let s = dvr_sample(d, ray.step_refs * sample_span(&blocks));
         let a = s.a;
         if (a > 0.0) {
             // Only samples that still show through pay for the gradient.
@@ -141,19 +141,26 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
     return vec4<f32>(accum, alpha_acc);
 }
 
-// DVR of RGB composite colors: opacity follows brightness.
+// DVR of RGB composite colors: opacity follows brightness. Bricks are
+// sampled on their own step (composite blocks are always open).
 fn dvr_composite(ray: Ray) -> vec4<f32> {
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
+        let next = next_open_sample(&blocks, i, OPEN_DRAWN);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
         let pos = sample_pos(ray, i);
-        let s = sample_composite(pos);
+        let s = blocks_composite(&blocks, pos);
         if (s.a > 0.001) {
             if (uniforms.transparency == 0u) {
-                return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_BRIGHT, i == 0);
+                return opaque_surface(ray, previous_taken(&blocks, ray, i), pos, SURFACE_BRIGHT, i == 0);
             }
-            let a = corrected_alpha(dvr_opacity(s.a), ray.step_refs);
+            let a = corrected_alpha(dvr_opacity(s.a), ray.step_refs * sample_span(&blocks));
             let lit = uniforms.lighting != 0u && a * (1.0 - alpha_acc) > LIT_ALPHA_MIN;
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, 1.0), lit);
             accum += (1.0 - alpha_acc) * a * rgb;
