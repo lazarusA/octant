@@ -24,6 +24,9 @@ mod apron;
 mod apron_tests;
 mod draw;
 mod encode;
+mod feedback;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod feedback_tests;
 mod fetch;
 mod occlusion;
 #[cfg(test)]
