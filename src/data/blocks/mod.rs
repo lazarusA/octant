@@ -6,6 +6,8 @@ pub mod key;
 pub mod loader;
 pub mod memory_budget;
 pub mod prefetch;
+#[cfg(test)]
+mod prefetch_cancel_tests;
 mod prefetch_task;
 #[cfg(test)]
 mod prefetch_tests;

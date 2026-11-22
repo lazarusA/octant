@@ -14,9 +14,8 @@ use web_time::Instant;
 use super::cache::{BlockCache, BlockCacheKey};
 #[cfg(not(target_arch = "wasm32"))]
 use super::loader::BlockLoader;
-use super::prefetch_task::Task;
 use super::request::BlockRequest;
-use crate::data::{octant_block::OctantBlock, slice_request::DimensionSelection};
+use crate::data::octant_block::OctantBlock;
 
 /// How long the lookahead leaves a failed block: asked every few seconds,
 /// never in a loop, so playback recovers once the network does.
@@ -25,12 +24,23 @@ const RETRY_AFTER: Duration = Duration::from_secs(5);
 pub struct PrefetchResult {
     pub key: BlockCacheKey,
     pub result: Result<OctantBlock, String>,
+    /// Cancelled (`BlockPrefetcher::cancel`) while it ran: nobody waits on
+    /// it, and the key may be asked again by a newer request it must not
+    /// clear.
+    pub unrequested: bool,
+    /// The request it answers (`BlockPrefetcher::track`): a result sent
+    /// before its cancel must not answer a newer request for its key.
+    pub(super) request: u64,
 }
 
 pub struct BlockPrefetcher {
     tx: Sender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
     pending: HashSet<BlockCacheKey>,
+    /// Each pending request's id and cancel flag (`cancel`).
+    cancels: HashMap<BlockCacheKey, (u64, Arc<AtomicBool>)>,
+    /// The last request id handed out (`track`).
+    last_request: u64,
     /// Blocks whose last fetch failed, and when: the lookahead skips them
     /// for `retry_after` (`failed_recently`), or until Play, Plot, Abort.
     failed: HashMap<BlockCacheKey, Instant>,
@@ -66,6 +76,8 @@ impl BlockPrefetcher {
             tx,
             rx,
             pending: HashSet::new(),
+            cancels: HashMap::new(),
+            last_request: 0,
             failed: HashMap::new(),
             retry_after: RETRY_AFTER,
             active_worker_threads: Arc::new(AtomicUsize::new(0)),
@@ -115,16 +127,7 @@ impl BlockPrefetcher {
             // With nothing pending, any worker still busy is an aborted fetch.
             self.strays = self.active_worker_threads() > 0;
         }
-        self.pending.insert(key.clone());
-        self.active_worker_threads.fetch_add(1, Ordering::Relaxed);
-
-        let task = Task {
-            key,
-            tx: self.tx.clone(),
-            aborted: self.aborted.clone(),
-            active: self.active_worker_threads.clone(),
-            freed: self.freed.clone(),
-        };
+        let task = self.track(key);
 
         #[cfg(not(target_arch = "wasm32"))]
         crate::utils::executor::TaskExecutor::spawn_background(move || {
@@ -155,6 +158,16 @@ impl BlockPrefetcher {
     pub fn poll(&mut self) -> Vec<PrefetchResult> {
         let mut results = Vec::new();
         while let Ok(result) = self.rx.try_recv() {
+            // Not the pending request of its key: cancelled after it sent,
+            // perhaps asked again since (`abort` drops the old channel).
+            let current = self.cancels.get(&result.key).map(|(id, _)| *id);
+            if result.unrequested || current != Some(result.request) {
+                results.push(PrefetchResult {
+                    unrequested: true,
+                    ..result
+                });
+                continue;
+            }
             if result.result.is_err() {
                 let retry_after = self.retry_after;
                 self.failed.retain(|_, at| at.elapsed() < retry_after);
@@ -163,6 +176,7 @@ impl BlockPrefetcher {
                 self.failed.remove(&result.key);
             }
             self.pending.remove(&result.key);
+            self.cancels.remove(&result.key);
             results.push(result);
         }
 
@@ -210,36 +224,6 @@ impl BlockPrefetcher {
         self.pending.contains(key)
     }
 
-    /// Checks if any pending in-flight request already covers the given timestep and matching spatial selections.
-    pub fn is_pending_timestep(
-        &self,
-        source_id: &str,
-        variable_name: &str,
-        selections: &[DimensionSelection],
-        anim_dim: Option<usize>,
-        timestep: usize,
-    ) -> bool {
-        self.pending.iter().any(|key| {
-            if key.source_id != source_id || key.variable_name != variable_name {
-                return false;
-            }
-            let non_anim_matches = selections
-                .iter()
-                .enumerate()
-                .filter(|&(d, _)| Some(d) != anim_dim)
-                .all(|(d, sel)| key.selections.get(d) == Some(sel));
-            if !non_anim_matches {
-                return false;
-            }
-            anim_dim
-                .and_then(|d| key.selections.get(d))
-                .is_none_or(|sel| {
-                    let (start, end) = sel.bounds();
-                    timestep >= start && timestep < end
-                })
-        })
-    }
-
     /// Drops every pending request: queued ones never start, running ones
     /// finish unread, holding their worker slots until then.
     pub fn abort(&mut self) {
@@ -248,10 +232,14 @@ impl BlockPrefetcher {
         let (tx, rx) = channel();
         (self.tx, self.rx) = (tx, rx);
         self.pending.clear();
+        self.cancels.clear();
         super::progress::reset();
         self.failed.clear();
     }
 }
+
+#[path = "prefetch_pending.rs"]
+mod pending;
 
 #[cfg(test)]
 #[path = "prefetch_channel_tests.rs"]

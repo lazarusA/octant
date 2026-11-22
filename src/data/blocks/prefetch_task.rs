@@ -11,17 +11,22 @@ use crate::data::octant_block::OctantBlock;
 
 pub(super) struct Task {
     pub(super) key: BlockCacheKey,
+    /// Its request id (`BlockPrefetcher::track`).
+    pub(super) request: u64,
     pub(super) tx: Sender<PrefetchResult>,
     pub(super) aborted: Arc<AtomicBool>,
+    /// Set by `BlockPrefetcher::cancel`.
+    pub(super) cancel: Arc<AtomicBool>,
     pub(super) active: Arc<AtomicUsize>,
     pub(super) freed: Arc<AtomicBool>,
 }
 
 impl Task {
-    /// Whether the prefetcher aborted while this task was queued: nobody
-    /// reads its result, so it releases its worker slot and does nothing.
+    /// Whether the prefetcher aborted or cancelled it while it was queued:
+    /// nobody reads its result, so it releases its worker slot and does
+    /// nothing.
     pub(super) fn cancelled(&self) -> bool {
-        let aborted = self.aborted.load(Ordering::Relaxed);
+        let aborted = self.aborted.load(Ordering::Relaxed) || self.cancel.load(Ordering::Relaxed);
         if aborted {
             self.active.fetch_sub(1, Ordering::Relaxed);
             self.freed.store(true, Ordering::Release);
@@ -44,6 +49,8 @@ impl Task {
         let sent = self.tx.send(PrefetchResult {
             key: self.key,
             result,
+            unrequested: self.cancel.load(Ordering::Relaxed),
+            request: self.request,
         });
         if sent.is_err() {
             self.freed.store(true, Ordering::Release);
