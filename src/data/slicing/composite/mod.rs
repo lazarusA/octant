@@ -19,6 +19,8 @@ mod display_tests;
 mod stretch_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod volume_stretch_tests;
 
 pub use cmyk::slice_cmyk_composite;
 pub use multichannel::slice_multichannel_composite_nd;
@@ -31,5 +33,7 @@ pub use utils::{
     compute_channel_normalization, compute_normalization_scale, drawn_channels, linear_to_srgb,
     normalize_channel_value, pack_rgb, unpack_rgb,
 };
-pub use volume_multichannel::slice_multichannel_volume_composite_nd;
-pub use volume_rgb::slice_rgb_volume_composite_nd;
+pub use volume_multichannel::{
+    slice_multichannel_volume_composite_nd, slice_multichannel_volume_stretched,
+};
+pub use volume_rgb::{slice_rgb_volume_composite_nd, slice_rgb_volume_stretched};
