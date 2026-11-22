@@ -19,8 +19,7 @@ impl OctantApp {
             let w = vdata.width as f32 * scale_x;
             let h = vdata.height as f32 * scale_y;
             let d = vdata.depth as f32 * scale_z * z_mult;
-            let max_dim = w.max(h).max(d).max(1.0);
-            return (w / max_dim, h / max_dim, d / max_dim);
+            return unit_box(w, h, d);
         }
 
         let sel_dims = &self.selected.dim_config;
@@ -37,12 +36,10 @@ impl OctantApp {
             }
         };
 
-        let w = (get_extent(x_idx) as f32 * scale_x).max(1.0);
-        let h = (get_extent(y_idx) as f32 * scale_y).max(1.0);
-        let d = (get_extent(z_idx) as f32 * scale_z * z_mult).max(1.0);
-        let max_dim = w.max(h).max(d).max(1.0);
-
-        (w / max_dim, h / max_dim, d / max_dim)
+        let w = get_extent(x_idx) as f32 * scale_x;
+        let h = get_extent(y_idx) as f32 * scale_y;
+        let d = get_extent(z_idx) as f32 * scale_z * z_mult;
+        unit_box(w, h, d)
     }
 
     /// Computes circular shift offsets (shift_x, shift_y, shift_z) along the animated spatial dimension.
@@ -158,5 +155,33 @@ impl OctantApp {
         } else {
             [1.0, 1.0]
         }
+    }
+}
+
+/// Sizes `w`, `h`, `d` scaled so the longest side is 1, whatever their
+/// unit: OME-Zarr scales in metres make a volume a few hundredths across,
+/// which flooring at 1 left that small (the camera could not come close).
+fn unit_box(w: f32, h: f32, d: f32) -> (f32, f32, f32) {
+    let size = |v: f32| {
+        if v.is_finite() && v > 0.0 {
+            v
+        } else {
+            f32::MIN_POSITIVE
+        }
+    };
+    let (w, h, d) = (size(w), size(h), size(d));
+    let max_dim = w.max(h).max(d);
+    (w / max_dim, h / max_dim, d / max_dim)
+}
+
+#[cfg(test)]
+mod unit_box_tests {
+    #[test]
+    fn the_longest_side_is_one_in_any_unit() {
+        let metres = super::unit_box(1024.0 * 2e-5, 1024.0 * 2e-5, 1546.0 * 2e-5);
+        let voxels = super::unit_box(1024.0, 1024.0, 1546.0);
+        assert!((metres.2 - 1.0).abs() < 1e-6 && (metres.0 - 1024.0 / 1546.0).abs() < 1e-6);
+        assert!((metres.0 - voxels.0).abs() < 1e-6);
+        assert_eq!(super::unit_box(0.0, 2.0, 2.0).1, 1.0);
     }
 }
