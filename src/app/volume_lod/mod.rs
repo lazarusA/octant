@@ -20,6 +20,8 @@
 //! bricks cannot draw the plot (`setup.rs` `Off`, with a notice).
 
 mod encode;
+mod fetch;
+mod place;
 mod placement;
 mod reset;
 mod residency;

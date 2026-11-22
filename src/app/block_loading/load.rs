@@ -2,7 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
-use crate::data::BlockRequest;
+use crate::data::{BlockCacheKey, BlockRequest, OctantBlock};
 
 impl OctantApp {
     /// Plots the current slider selection (the Plot button): aborts pending
@@ -142,30 +142,17 @@ impl OctantApp {
         let had_completed = !completed.is_empty();
 
         for res in completed {
+            let Some(res) = self.cache_unrequested(res) else {
+                continue;
+            };
             // A detail tile and a layer may wait on one fetch: both take it.
-            if self.take_detail_result(&res.key, &res.result)
-                && self.layers.find_by_key(&res.key).is_none()
-            {
+            let detail = self.take_detail_result(&res.key, &res.result)
+                | self.take_brick_result(&res.key, &res.result);
+            if detail && self.layers.find_by_key(&res.key).is_none() {
                 continue;
             }
             match res.result {
-                Ok(block) => {
-                    self.mark_failed(&res.key, false);
-                    let requested = self.layers.find_by_key(&res.key);
-                    let shown_in = requested.or_else(|| self.layer_showing_block(&res.key, &block));
-
-                    self.block_cache.put(res.key, block.clone());
-
-                    if let Some(id) = shown_in {
-                        let moved_step =
-                            requested.is_some() && self.accept_requested_block(id, &block);
-                        self.apply_block_projection(id, &block);
-                        // The base layer reached a new step: overlays follow it.
-                        if moved_step && id == LayerId::BASE {
-                            self.load_animated_overlay_blocks();
-                        }
-                    }
-                }
+                Ok(block) => self.accept_fetched(res.key, block),
                 Err(e) => {
                     self.mark_failed(&res.key, true);
                     self.notify(
@@ -184,6 +171,41 @@ impl OctantApp {
         if had_completed || freed {
             self.prefetch_animated_ranges();
         }
+    }
+
+    /// Caches fetched `block` (of `key`) and shows it in the layer that
+    /// asked for it or shows it.
+    fn accept_fetched(&mut self, key: BlockCacheKey, block: OctantBlock) {
+        self.mark_failed(&key, false);
+        let requested = self.layers.find_by_key(&key);
+        let shown_in = requested.or_else(|| self.layer_showing_block(&key, &block));
+
+        self.block_cache.put(key, block.clone());
+
+        if let Some(id) = shown_in {
+            let moved_step = requested.is_some() && self.accept_requested_block(id, &block);
+            self.apply_block_projection(id, &block);
+            // The base layer reached a new step: overlays follow it.
+            if moved_step && id == LayerId::BASE {
+                self.load_animated_overlay_blocks();
+            }
+        }
+    }
+
+    /// Caches a cancelled read's block (nobody waits on it; its failure is
+    /// no one's, no toast); `res` back when someone asked for it.
+    fn cache_unrequested(
+        &mut self,
+        res: crate::data::blocks::PrefetchResult,
+    ) -> Option<crate::data::blocks::PrefetchResult> {
+        if !res.unrequested {
+            return Some(res);
+        }
+        match res.result {
+            Ok(block) => self.block_cache.put(res.key, block),
+            Err(e) => log::debug!("Cancelled read of {:?} failed: {e}", res.key),
+        }
+        None
     }
 
     /// Aborts all ongoing data transfers and prefetch worker threads.
