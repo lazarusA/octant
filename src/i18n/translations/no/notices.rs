@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Kystlinjer utilgjengelige",
         NoticesKey::VolumeTooLargeForGpu => "Volumet er for stort for GPU-en",
+        NoticesKey::VolumeLodOff => "Detalj etter visning er av for dette volumet",
+        NoticesKey::VolumeLodOffDetail => {
+            "Det viste nivået trenger {} blokker; atlaset rommer {} og holder halvparten fri til finere. Volumet tegnes med ett helt nivå."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Nivåene er ikke hele multipler av hverandre med justerte celler, slik blokker krever. Volumet tegnes med ett helt nivå."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Heltallsverdiene (som etikett-ID-er) spenner over et for stort område til at blokker kan holde dem atskilt. Volumet tegnes med ett helt nivå."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Denne GPU-en kan ikke skrive fra volumets shader, slik blokker krever. Volumet tegnes med ett helt nivå."
+        }
+        NoticesKey::VolumeLodBrickFailed => "En del av volumet kunne ikke leses på et finere nivå",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Størrelsen på volumbufferen ({} elementer / {} byte) overskrider GPU-ens maksimale lagringsbuffer ({})"
         }

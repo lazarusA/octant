@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> &'static str {
         }
         NoticesKey::CoastlinesUnavailable => "Coastlines unavailable",
         NoticesKey::VolumeTooLargeForGpu => "Volume too large for the GPU",
+        NoticesKey::VolumeLodOff => "Detail by view is off for this volume",
+        NoticesKey::VolumeLodOffDetail => {
+            "Its plotted level needs {} bricks; the atlas holds {} and keeps half free for finer ones. The volume draws one level whole."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Its levels are not whole multiples of one another with aligned cells, which bricks need. The volume draws one level whole."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Its integer values (such as label ids) span too wide a range for bricks to keep them apart. The volume draws one level whole."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "This GPU cannot write from the volume's shader, which bricks need. The volume draws one level whole."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Part of the volume could not be read at a finer level",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Volume data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})"
         }

@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Береговые линии недоступны",
         NoticesKey::VolumeTooLargeForGpu => "Объём слишком велик для GPU",
+        NoticesKey::VolumeLodOff => "Детализация по виду выключена для этого объёма",
+        NoticesKey::VolumeLodOffDetail => {
+            "Отображаемому уровню нужно {} блоков; атлас вмещает {} и оставляет половину для более детальных. Объём рисуется одним целым уровнем."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Его уровни не кратны друг другу целым числом с выровненными ячейками, как требуют блоки. Объём рисуется одним целым уровнем."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Его целые значения (например, идентификаторы меток) охватывают слишком широкий диапазон, чтобы блоки их различали. Объём рисуется одним целым уровнем."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Этот GPU не может записывать из шейдера объёма, как требуют блоки. Объём рисуется одним целым уровнем."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Часть объёма не удалось прочитать на более детальном уровне",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Размер буфера объёма ({} элементов / {} байт) превышает максимальный лимит буфера хранения GPU ({})"
         }

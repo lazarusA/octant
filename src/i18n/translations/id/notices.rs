@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Garis pantai tidak tersedia",
         NoticesKey::VolumeTooLargeForGpu => "Volume terlalu besar untuk GPU",
+        NoticesKey::VolumeLodOff => "Detail sesuai tampilan nonaktif untuk volume ini",
+        NoticesKey::VolumeLodOffDetail => {
+            "Level yang diplot memerlukan {} brick; atlas memuat {} dan menyisakan setengahnya untuk yang lebih halus. Volume digambar dengan satu level utuh."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Level-levelnya bukan kelipatan bulat satu sama lain dengan sel yang sejajar, seperti yang dibutuhkan brick. Volume digambar dengan satu level utuh."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Nilai bilangan bulatnya (seperti id label) mencakup rentang terlalu lebar untuk dibedakan oleh brick. Volume digambar dengan satu level utuh."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "GPU ini tidak dapat menulis dari shader volume, yang dibutuhkan brick. Volume digambar dengan satu level utuh."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Sebagian volume tidak dapat dibaca pada level yang lebih halus",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Ukuran buffer data volume ({} elemen / {} byte) melebihi batas maksimum buffer penyimpanan GPU ({})"
         }

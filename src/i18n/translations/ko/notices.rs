@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "해안선을 사용할 수 없음",
         NoticesKey::VolumeTooLargeForGpu => "볼륨이 GPU에 비해 너무 큼",
+        NoticesKey::VolumeLodOff => "이 볼륨에서는 보기에 따른 세부가 꺼져 있습니다",
+        NoticesKey::VolumeLodOffDetail => {
+            "표시된 레벨에 브릭 {}개가 필요하지만 아틀라스는 {}개를 담고 절반을 더 세밀한 레벨용으로 비워 둡니다. 볼륨은 한 레벨 전체로 그려집니다."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "레벨들이 셀이 정렬된 정수 배수 관계가 아니어서 브릭에 필요한 조건을 충족하지 않습니다. 볼륨은 한 레벨 전체로 그려집니다."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "정수 값(레이블 ID 등)의 범위가 너무 넓어 브릭에서 값을 구분할 수 없습니다. 볼륨은 한 레벨 전체로 그려집니다."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "이 GPU는 볼륨 셰이더에서 쓸 수 없어 브릭에 필요한 조건을 충족하지 않습니다. 볼륨은 한 레벨 전체로 그려집니다."
+        }
+        NoticesKey::VolumeLodBrickFailed => "볼륨 일부를 더 세밀한 레벨로 읽지 못했습니다",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "볼륨 데이터 버퍼 크기 (요소 {}개 / {} 바이트)가 GPU 저장 버퍼 최대 한도 ({})를 넘습니다"
         }

@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "海岸線を利用できません",
         NoticesKey::VolumeTooLargeForGpu => "ボリュームが GPU には大きすぎます",
+        NoticesKey::VolumeLodOff => "このボリュームでは表示に応じた詳細はオフです",
+        NoticesKey::VolumeLodOffDetail => {
+            "表示中のレベルには {} 個のブリックが必要ですが、アトラスは {} 個で、半分を細かいレベル用に空けています。ボリュームは一つのレベルで描画されます。"
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "レベル同士がセルの揃った整数倍になっておらず、ブリックに必要な条件を満たしません。ボリュームは1つのレベル全体で描画されます。"
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "整数値（ラベルIDなど）の範囲が広すぎて、ブリックでは値を区別できません。ボリュームは1つのレベル全体で描画されます。"
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "このGPUはボリュームのシェーダーから書き込めず、ブリックに必要な条件を満たしません。ボリュームは1つのレベル全体で描画されます。"
+        }
+        NoticesKey::VolumeLodBrickFailed => "ボリュームの一部を細かいレベルで読み込めませんでした",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "ボリュームデータのバッファサイズ ({} 要素 / {} バイト) が GPU ストレージバッファの上限 ({}) を超えています"
         }

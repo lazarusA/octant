@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Côtes indisponibles",
         NoticesKey::VolumeTooLargeForGpu => "Volume trop grand pour le GPU",
+        NoticesKey::VolumeLodOff => "Le détail selon la vue est désactivé pour ce volume",
+        NoticesKey::VolumeLodOffDetail => {
+            "Son niveau affiché demande {} briques ; l'atlas en contient {} et en garde la moitié pour les plus fines. Le volume est dessiné sur un seul niveau entier."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Ses niveaux ne sont pas des multiples entiers les uns des autres avec des cellules alignées, comme l'exigent les briques. Le volume est dessiné d'un seul niveau entier."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Ses valeurs entières (comme des identifiants d'étiquettes) couvrent une plage trop large pour que les briques les distinguent. Le volume est dessiné d'un seul niveau entier."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Ce GPU ne peut pas écrire depuis le shader du volume, ce que les briques exigent. Le volume est dessiné d'un seul niveau entier."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Une partie du volume n'a pas pu être lue plus finement",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "La taille du tampon de données du volume ({} éléments / {} octets) dépasse la limite maximale du tampon de stockage GPU ({})"
         }

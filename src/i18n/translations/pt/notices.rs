@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Litorais indisponíveis",
         NoticesKey::VolumeTooLargeForGpu => "Volume grande demais para a GPU",
+        NoticesKey::VolumeLodOff => "Detalhe conforme a vista está desligado para este volume",
+        NoticesKey::VolumeLodOffDetail => {
+            "O nível representado precisa de {} blocos; o atlas comporta {} e reserva metade para os mais finos. O volume é desenhado com um único nível inteiro."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Os seus níveis não são múltiplos inteiros uns dos outros com células alinhadas, como os blocos exigem. O volume é desenhado com um nível inteiro."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Os seus valores inteiros (como ids de rótulos) abrangem um intervalo amplo demais para os blocos os distinguirem. O volume é desenhado com um nível inteiro."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Esta GPU não consegue escrever a partir do shader do volume, como os blocos exigem. O volume é desenhado com um nível inteiro."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Parte do volume não pôde ser lida num nível mais fino",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "O tamanho do buffer de dados do volume ({} elementos / {} bytes) excede o limite máximo do buffer de armazenamento da GPU ({})"
         }

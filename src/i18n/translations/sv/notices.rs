@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Kustlinjer saknas",
         NoticesKey::VolumeTooLargeForGpu => "Volymen är för stor för GPU:n",
+        NoticesKey::VolumeLodOff => "Detalj efter vy är av för den här volymen",
+        NoticesKey::VolumeLodOffDetail => {
+            "Den visade nivån behöver {} block; atlasen rymmer {} och håller hälften fri för finare. Volymen ritas med en hel nivå."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Dess nivåer är inte hela multipler av varandra med justerade celler, som block kräver. Volymen ritas med en hel nivå."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Dess heltalsvärden (som etikett-id:n) spänner över ett för stort intervall för att block ska hålla isär dem. Volymen ritas med en hel nivå."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Denna GPU kan inte skriva från volymens shader, som block kräver. Volymen ritas med en hel nivå."
+        }
+        NoticesKey::VolumeLodBrickFailed => "En del av volymen kunde inte läsas på en finare nivå",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Volymdatabuffertens storlek ({} element / {} byte) överskrider GPU:ns maxgräns för lagringsbuffertar ({})"
         }
