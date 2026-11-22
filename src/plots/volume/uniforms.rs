@@ -73,6 +73,26 @@ pub struct VolumeUniformParams {
     pub lighting: bool,
 }
 
+/// Equal when every parameter is (colors compared by their bytes): the
+/// frame a ray feedback readback came from (`feedback.rs`).
+impl PartialEq for VolumeUniformParams {
+    fn eq(&self, o: &Self) -> bool {
+        bytemuck::bytes_of(&self.color) == bytemuck::bytes_of(&o.color)
+            && self.camera == o.camera
+            && self.slice == o.slice
+            && [self.aspect_x, self.aspect_y, self.aspect_z] == [o.aspect_x, o.aspect_y, o.aspect_z]
+            && [
+                self.opacity_scale,
+                self.quality,
+                self.isovalue,
+                self.attenuation,
+            ] == [o.opacity_scale, o.quality, o.isovalue, o.attenuation]
+            && [self.algorithm, self.surface] == [o.algorithm, o.surface]
+            && [self.shift_x, self.shift_y, self.shift_z] == [o.shift_x, o.shift_y, o.shift_z]
+            && [self.transparency, self.lighting] == [o.transparency, o.lighting]
+    }
+}
+
 /// Texture state the uniforms report alongside the frame parameters.
 #[derive(Copy, Clone, Debug)]
 pub struct VolumeState {

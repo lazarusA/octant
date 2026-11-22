@@ -18,6 +18,7 @@ mod bricked;
 pub mod bricks;
 mod callback;
 pub mod encode;
+pub mod feedback;
 mod frame;
 pub mod pipeline;
 mod render;
