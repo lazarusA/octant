@@ -3,7 +3,7 @@
 /// Assembles the volume shader around `$filter`, the file defining `fetch_trilinear`.
 /// Colors come from the shared colormap atlas at `@group(1)`.
 macro_rules! volume_shader {
-    ($filter:expr) => {
+    ($filter:expr, $sample:expr, $walk:expr) => {
         concat!(
             include_str!("../shaders/colormaps/mod.wgsl"),
             "\n",
@@ -17,7 +17,9 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
-            include_str!("../shaders/volume/walk.wgsl"),
+            $sample,
+            "\n",
+            $walk,
             "\n",
             include_str!("../shaders/volume/blocks.wgsl"),
             "\n",
@@ -39,11 +41,17 @@ macro_rules! volume_shader {
 }
 
 /// Shader for devices that filter `R32Float` in hardware.
-pub const SHADER_HARDWARE_FILTER: &str =
-    volume_shader!(include_str!("../shaders/volume/filter_hardware.wgsl"));
+pub const SHADER_HARDWARE_FILTER: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_hardware.wgsl"),
+    include_str!("../shaders/volume/sample_dense.wgsl"),
+    include_str!("../shaders/volume/walk.wgsl")
+);
 /// Shader blending eight texel loads where `R32Float` is not filterable.
-pub const SHADER_MANUAL_FILTER: &str =
-    volume_shader!(include_str!("../shaders/volume/filter_manual.wgsl"));
+pub const SHADER_MANUAL_FILTER: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_manual.wgsl"),
+    include_str!("../shaders/volume/sample_dense.wgsl"),
+    include_str!("../shaders/volume/walk.wgsl")
+);
 
 /// Whether the device filters `R32Float` textures (`FLOAT32_FILTERABLE`).
 pub fn hardware_filtering(device: &wgpu::Device) -> bool {

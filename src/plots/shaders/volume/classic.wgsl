@@ -8,7 +8,7 @@ fn exact_rgba(p: vec3<f32>) -> vec4<f32> {
     if (texel_missing(t)) {
         return select(vec4<f32>(0.0), uniforms.color.nan_color, uniforms.color.use_nan_color == 1u);
     }
-    let v = textureLoad(volume_values, t, 0);
+    let v = texel_value(t);
     if (is_composite()) {
         return v;
     }
@@ -21,7 +21,7 @@ fn exact_intensity(p: vec3<f32>) -> f32 {
     if (texel_missing(t)) {
         return 0.0;
     }
-    let v = textureLoad(volume_values, t, 0);
+    let v = texel_value(t);
     return select(v.r, v.a, is_composite());
 }
 
