@@ -12,6 +12,10 @@
 //! - `callback.rs`: egui paint callback.
 
 mod blocks;
+mod brick_types;
+mod brick_writes;
+mod bricked;
+pub mod bricks;
 mod callback;
 pub mod encode;
 mod frame;
@@ -24,7 +28,7 @@ mod uniforms;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod bench_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
-mod gpu_render;
+pub(crate) mod gpu_render;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -58,6 +62,9 @@ pub struct VolumeRenderer {
     textures: VolumeTextures,
     blit: Blit,
     cache: Mutex<RenderCache>,
+    /// A bricked volume's atlas and table (`new_bricked`); its `textures`
+    /// are then a one-voxel stand-in for the bindings it does not use.
+    bricks: Option<bricks::BrickTextures>,
 }
 
 impl VolumeRenderer {
@@ -133,6 +140,7 @@ impl VolumeRenderer {
             textures,
             blit: Blit::new(device, target_format),
             cache: Mutex::new(RenderCache::default()),
+            bricks: None,
         };
         renderer.update_data(queue, data);
         Some(renderer)
@@ -176,6 +184,13 @@ impl VolumeRenderer {
     }
 
     fn state(&self) -> VolumeState {
+        if let Some(bricks) = &self.bricks {
+            return VolumeState {
+                dims: bricks.dims(),
+                has_invalid: false,
+                composite: bricks.color(),
+            };
+        }
         let Dims { w, h, d } = self.textures.dims;
         VolumeState {
             dims: [w as u32, h as u32, d as u32],

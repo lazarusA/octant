@@ -75,7 +75,7 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
 }
 
 /// Premultiplied RGBA8 pixels of one `size`² frame of `renderer` with `p`.
-pub(super) fn render_sized(
+pub(crate) fn render_sized(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     renderer: &VolumeRenderer,
