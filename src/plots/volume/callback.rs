@@ -13,6 +13,9 @@ pub struct VolumeCallback {
     /// A multi-channel composite the GPU blends, baked into the textures
     /// (`VolumeRenderer::bake_channels`).
     pub channels: Option<crate::plots::ChannelDraw>,
+    /// Bands of rows the frame is built in, one per egui frame
+    /// (`VolumeRenderer::render_frame_banded`); 1 renders it whole.
+    pub bands: u32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
@@ -33,12 +36,11 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         let pixels = self.rect.size() * screen_descriptor.pixels_per_point;
         let scale = self.scale.clamp(0.1, 1.0);
         let size = [pixels.x, pixels.y].map(|p| (p.round() * scale).round().max(1.0) as u32);
-        self.renderer.render_frame(
+        self.renderer.render_frame_banded(
             device,
             queue,
             encoder,
-            &self.params,
-            size,
+            (&self.params, size, self.bands),
             callback_resources,
         );
         Vec::new()
