@@ -25,6 +25,8 @@ mod apron_color;
 mod apron_color_tests;
 #[cfg(test)]
 mod apron_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod bench_tests;
 mod composite;
 mod draw;
 mod encode;
@@ -32,6 +34,8 @@ mod feedback;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod feedback_tests;
 mod fetch;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod fetch_bench_tests;
 #[cfg(test)]
 mod mode_tests;
 mod occlusion;
