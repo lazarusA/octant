@@ -39,6 +39,8 @@ mod bricked_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod bricked_missing_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
+mod bricked_skip_gpu_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod bricked_walk_gpu_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod gpu_render;

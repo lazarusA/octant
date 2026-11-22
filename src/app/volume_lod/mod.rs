@@ -41,6 +41,7 @@ mod select;
 #[cfg(test)]
 mod select_tests;
 mod setup;
+mod subblocks;
 mod want;
 
 use std::collections::{HashMap, HashSet, VecDeque};
