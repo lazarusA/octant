@@ -140,6 +140,22 @@ impl BlockCache {
             .collect()
     }
 
+    /// A cached block, leaving its recency and the hit counts alone: for
+    /// reads that must not count as uses (the hover, every frame).
+    pub fn peek(&self, key: &BlockCacheKey) -> Option<&OctantBlock> {
+        self.entries.get(key)
+    }
+
+    /// Marks `key` recently used without counting a hit: a block others are
+    /// built from (a bricked composite's plotted block) stays while the
+    /// blocks built from it pour in.
+    pub fn touch(&mut self, key: &BlockCacheKey) {
+        if let Some(pos) = self.access_order.iter().position(|k| k == key) {
+            self.access_order.remove(pos);
+            self.access_order.push_back(key.clone());
+        }
+    }
+
     /// Gets a block and marks it as recently used. Counts as a real cache
     /// access (updates hits/misses).
     pub fn get(&mut self, key: &BlockCacheKey) -> Option<OctantBlock> {
