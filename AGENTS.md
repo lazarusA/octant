@@ -47,7 +47,7 @@ When developing and reviewing code in this repository:
 
 5. **Skills** (`.agents/skills/`, each with its reference files):
    - `octant-data-engine`: `src/data/`; `data.md` (blocks, prefetch, data workers, backends, OME-Zarr, CRS, multiscale, codecs, coordinates, slicing, orientation), `catalog.md` (`src/catalog/`).
-   - `octant-rendering-wgpu`: `src/plots/`; `plots.md` (renderers, volume raymarcher, OIT, camera, slicer shaders, buffer limits), `colormaps.md` (`src/utils/colormap/`), `export.md` (`src/export/`).
+   - `octant-rendering-wgpu`: `src/plots/`; `plots.md` (renderers, volume raymarcher, OIT, camera, slicer shaders, buffer limits), `colormaps.md` (`src/utils/colormap/`), `export.md` (`src/export/`), `volume_lod.md` (bricked multiresolution volumes, `src/app/volume_lod/`).
    - `octant-ui-egui`: `src/ui/` and `src/app/`; `ui.md`, `app.md` (state, actions, share links, controllers, canvas, pipeline, layers, block loading), `i18n.md` (translations and fonts).
    - `rust-workflows`: build, test, lint, clippy and WASM commands; `build.md` (release profile, size budgets, licensing).
    - `rust-skills`: 265 detailed Rust best practices across 26 categories (install locally via `git clone --depth 1 https://github.com/leonardomso/rust-skills.git .agents/skills/rust-skills && rm -rf .agents/skills/rust-skills/.git`).

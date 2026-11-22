@@ -138,8 +138,13 @@ pub fn detail_fields(
 /// The level row of a multiscale plot's hover: the tile's level under the
 /// pointer (`cell`), else the plotted one, of the stack's level count.
 pub fn level_field(app: &OctantApp, cell: Option<&DetailCell>) -> Option<HoverField> {
+    level_field_of(app, cell.map(|c| c.level))
+}
+
+/// The level row reading `level` (a brick's or tile's), else the plotted one.
+pub fn level_field_of(app: &OctantApp, level: Option<usize>) -> Option<HoverField> {
     let shown = app.plotted().variable_info()?.multiscale.as_ref()?;
-    let level = cell.map_or(shown.level, |c| c.level);
+    let level = level.unwrap_or(shown.level);
     let mut buf = [0; 64];
     let value = fill(
         &mut buf,

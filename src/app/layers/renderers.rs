@@ -24,6 +24,8 @@ pub struct LayerRenderers {
     pub sphere: Option<Arc<SphereRenderer>>,
     pub surface: Option<Arc<SurfaceRenderer>>,
     pub volume: Option<Arc<VolumeRenderer>>,
+    /// A multiscale volume's bricked renderer (`app::volume_lod`).
+    pub volume_bricked: Option<Arc<VolumeRenderer>>,
     pub point_cloud: Option<Arc<PointCloudRenderer>>,
     /// Z planes of the layer's volume not yet uploaded to the volume renderer.
     pub volume_dirty: Option<Range<usize>>,

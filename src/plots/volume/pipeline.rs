@@ -3,7 +3,7 @@
 /// Assembles the volume shader around `$filter`, the file defining `fetch_trilinear`.
 /// Colors come from the shared colormap atlas at `@group(1)`.
 macro_rules! volume_shader {
-    ($filter:expr) => {
+    ($filter:expr, $sample:expr, $walk:expr) => {
         concat!(
             include_str!("../shaders/colormaps/mod.wgsl"),
             "\n",
@@ -17,7 +17,9 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
-            include_str!("../shaders/volume/walk.wgsl"),
+            $sample,
+            "\n",
+            $walk,
             "\n",
             include_str!("../shaders/volume/blocks.wgsl"),
             "\n",
@@ -39,11 +41,28 @@ macro_rules! volume_shader {
 }
 
 /// Shader for devices that filter `R32Float` in hardware.
-pub const SHADER_HARDWARE_FILTER: &str =
-    volume_shader!(include_str!("../shaders/volume/filter_hardware.wgsl"));
+pub const SHADER_HARDWARE_FILTER: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_hardware.wgsl"),
+    include_str!("../shaders/volume/sample_dense.wgsl"),
+    include_str!("../shaders/volume/walk.wgsl")
+);
 /// Shader blending eight texel loads where `R32Float` is not filterable.
-pub const SHADER_MANUAL_FILTER: &str =
-    volume_shader!(include_str!("../shaders/volume/filter_manual.wgsl"));
+pub const SHADER_MANUAL_FILTER: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_manual.wgsl"),
+    include_str!("../shaders/volume/sample_dense.wgsl"),
+    include_str!("../shaders/volume/walk.wgsl")
+);
+/// Shader of a bricked volume: an `R16Float` atlas, filterable on every
+/// device (`bricks.rs`).
+pub const SHADER_BRICKED: &str = volume_shader!(
+    include_str!("../shaders/volume/filter_hardware.wgsl"),
+    concat!(
+        include_str!("../shaders/volume/sample_bricked.wgsl"),
+        "\n",
+        include_str!("../shaders/volume/sample_bricked_steps.wgsl")
+    ),
+    include_str!("../shaders/volume/walk_bricked.wgsl")
+);
 
 /// Whether the device filters `R32Float` textures (`FLOAT32_FILTERABLE`).
 pub fn hardware_filtering(device: &wgpu::Device) -> bool {
@@ -52,7 +71,7 @@ pub fn hardware_filtering(device: &wgpu::Device) -> bool {
         .contains(wgpu::Features::FLOAT32_FILTERABLE)
 }
 
-fn texture_entry(
+pub(super) fn texture_entry(
     binding: u32,
     filterable: bool,
     dim: wgpu::TextureViewDimension,
@@ -75,16 +94,7 @@ pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Volume Bind Group Layout"),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
             texture_entry(1, hardware_filter, D3),
             texture_entry(2, true, D3),
             wgpu::BindGroupLayoutEntry {
@@ -96,6 +106,22 @@ pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::
             texture_entry(4, false, D3),
         ],
     })
+}
+
+pub(super) fn uniform_entry(
+    binding: u32,
+    visibility: wgpu::ShaderStages,
+) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
 }
 
 /// Linear sampler repeating on every axis: the shader clamps logical
@@ -121,6 +147,14 @@ pub fn create_module(device: &wgpu::Device, hardware_filter: bool) -> wgpu::Shad
     } else {
         SHADER_MANUAL_FILTER
     };
+    shader_module(device, source)
+}
+
+pub fn create_bricked_module(device: &wgpu::Device) -> wgpu::ShaderModule {
+    shader_module(device, SHADER_BRICKED)
+}
+
+fn shader_module(device: &wgpu::Device, source: &'static str) -> wgpu::ShaderModule {
     device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Volume Raymarching Shader"),
         source: wgpu::ShaderSource::Wgsl(source.into()),
@@ -147,8 +181,15 @@ pub fn create_raymarch_pipeline(
     module: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
     algorithm: u32,
+    bricked: bool,
 ) -> wgpu::RenderPipeline {
-    let constants = [("ALGORITHM", f64::from(algorithm))];
+    // Bricked: a lattice of the finest level drawn, which no single
+    // texture could hold, long enough for any ray through 8k voxels; each
+    // brick samples it on its own step (coarse and empty ones are skipped
+    // through, so a ray costs the samples it takes, not the lattice).
+    let dense = [("ALGORITHM", f64::from(algorithm))];
+    let bricked_constants = [("ALGORITHM", f64::from(algorithm)), ("MAX_SAMPLES", 8192.0)];
+    let constants: &[(&str, f64)] = if bricked { &bricked_constants } else { &dense };
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Volume Raymarch Pipeline"),
         layout: Some(layout),
@@ -167,7 +208,7 @@ pub fn create_raymarch_pipeline(
                 write_mask: wgpu::ColorWrites::ALL,
             })],
             compilation_options: wgpu::PipelineCompilationOptions {
-                constants: &constants,
+                constants,
                 ..Default::default()
             },
         }),

@@ -34,6 +34,8 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .logarithmic(true),
     )
     .on_hover_text(tr(K::QualityHover));
+    ui.checkbox(&mut app.plot_configs.volume.lod, tr(K::ViewDetail))
+        .on_hover_text(tr(K::ViewDetailHover));
 
     if app.plot_configs.volume.algorithm == 0 || app.plot_configs.volume.algorithm >= 5 {
         labeled_slider(

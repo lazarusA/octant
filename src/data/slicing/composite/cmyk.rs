@@ -101,7 +101,7 @@ fn ink_stretch(inks: [&[f32]; 4]) -> Stretch {
 
 /// [`blend_cmyk`] with the inks stretched as `stretch` records (else over their values,
 /// recorded).
-fn blend_cmyk_stretched(
+pub(super) fn blend_cmyk_stretched(
     [c, m, y, k]: [&[f32]; 4],
     len: usize,
     stretch: &mut CompositeStretch,

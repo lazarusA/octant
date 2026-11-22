@@ -68,13 +68,20 @@ fn label_iso(ray: Ray) -> vec4<f32> {
     return vec4<f32>(accum / alpha, alpha);
 }
 
-// 5. Optical Absorption RGBA
+// 5. Optical Absorption RGBA. Coarse bricks are sampled on their own step
+// (`next_strided_sample`), a sample standing for the steps it spans.
 fn absorptionrgba(ray: Ray) -> vec4<f32> {
     var transmittance: f32 = 1.0;
     var color_sum = vec3<f32>(0.0);
     let step_size = length(ray.step);
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
+        let next = next_strided_sample(&blocks, i);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
         let pos = sample_pos(ray, i);
         let color_sample = exact_rgba(pos);
         if (uniforms.transparency == 0u) {
@@ -84,7 +91,9 @@ fn absorptionrgba(ray: Ray) -> vec4<f32> {
                 return vec4<f32>(shaded, 1.0);
             }
         } else {
-            let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
+            // A coarse sample stands for `sample_span` steps of this one.
+            let step_opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
+            let opacity = corrected_alpha(step_opacity, sample_span(&blocks));
             color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
             transmittance = transmittance * (1.0 - opacity);
             if (transmittance <= 0.01) {
@@ -98,30 +107,48 @@ fn absorptionrgba(ray: Ray) -> vec4<f32> {
     return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
 }
 
-// 6. Additive RGBA (Volume Emission)
+// 6. Additive RGBA (Volume Emission), strided as absorption.
 fn additivergba(ray: Ray) -> vec4<f32> {
     var integrated_color = vec4<f32>(0.0);
     let step_size = length(ray.step);
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
-        let density = uniforms.absorption * step_size * exact_rgba(sample_pos(ray, i));
+        let next = next_strided_sample(&blocks, i);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
+        // A coarse sample stands for `sample_span` steps: its step's
+        // density compounded over them, as `corrected_alpha` does.
+        let c = uniforms.absorption * step_size * exact_rgba(sample_pos(ray, i));
+        let step_density = clamp(c, vec4<f32>(0.0), vec4<f32>(0.9999));
+        let density = 1.0 - pow(1.0 - step_density, vec4<f32>(sample_span(&blocks)));
         integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - density);
     }
     return integrated_color;
 }
 
-// 7. Volume Indexed RGBA (Palette-indexed materials; missing voxels skipped)
+// 7. Volume Indexed RGBA (Palette-indexed materials; missing voxels
+// skipped), strided as absorption.
 fn volumeindexedrgba(ray: Ray) -> vec4<f32> {
     var transmittance: f32 = 1.0;
     var color_sum = vec3<f32>(0.0);
     let step_size = length(ray.step);
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
-        let raw = sample_exact(sample_pos(ray, i));
+        let next = next_strided_sample(&blocks, i);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
+        let raw = blocks_exact(&blocks, sample_pos(ray, i));
         if (!is_missing(raw)) {
             let norm = clamp(f32(max(i32(raw) - 1, 0)) / 255.0, 0.0, 1.0);
             let rgb = sample_plot_colormap(uniforms.color, norm);
-            let opacity = clamp(step_size * uniforms.absorption, 0.0, 1.0);
+            let step_opacity = clamp(step_size * uniforms.absorption, 0.0, 1.0);
+            let opacity = corrected_alpha(step_opacity, sample_span(&blocks));
             color_sum = color_sum + (transmittance * opacity) * rgb;
             transmittance = transmittance * (1.0 - opacity);
             if (transmittance <= 0.01) {

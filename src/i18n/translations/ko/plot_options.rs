@@ -31,6 +31,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "인덱스 RGBA",
         PlotOptionsKey::Quality => "품질",
         PlotOptionsKey::QualityHover => "광선마다 복셀당 샘플 수",
+        PlotOptionsKey::ViewDetail => "보기에 따른 세부",
+        PlotOptionsKey::ViewDetailHover => "보기가 멈추면 다중 스케일 볼륨에서 보이는 부분을 더 세밀한 레벨로 읽습니다",
         PlotOptionsKey::Density => "밀도",
         PlotOptionsKey::Attenuation => "감쇠",
         PlotOptionsKey::ZScale => "Z 배율",

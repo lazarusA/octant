@@ -12,10 +12,10 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 /// Counts fetches; fails them, or waits for a release first.
-struct Store {
-    fetches: Arc<AtomicUsize>,
-    fail: bool,
-    hold: Option<Mutex<mpsc::Receiver<()>>>,
+pub(super) struct Store {
+    pub(super) fetches: Arc<AtomicUsize>,
+    pub(super) fail: bool,
+    pub(super) hold: Option<Mutex<mpsc::Receiver<()>>>,
 }
 
 impl BlockStore for Store {
@@ -37,7 +37,7 @@ impl BlockStore for Store {
     }
 }
 
-fn request(store: Store) -> (impl Fn() -> BlockRequest, Arc<AtomicUsize>) {
+pub(super) fn request(store: Store) -> (impl Fn() -> BlockRequest, Arc<AtomicUsize>) {
     let fetches = store.fetches.clone();
     let source = DataSource::new("test", DataSourceKind::Procedural, "test", "test");
     let handle = StoreHandle::new(source, Arc::new(store));
@@ -48,7 +48,7 @@ fn request(store: Store) -> (impl Fn() -> BlockRequest, Arc<AtomicUsize>) {
     )
 }
 
-fn until(mut done: impl FnMut() -> bool) {
+pub(super) fn until(mut done: impl FnMut() -> bool) {
     let start = Instant::now();
     while !done() {
         assert!(start.elapsed() < Duration::from_secs(10), "timed out");

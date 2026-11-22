@@ -1,7 +1,10 @@
 //! Bioimaging OME-Zarr datasets: images, labels, plates and containers of
 //! every OME-Zarr version, from public archives (IDR, the BioImage Archive's
 //! EMPIAR and NGFF challenge conversions, JAX, Janelia OpenOrganelle). The
-//! archives publish them under CC-BY 4.0.
+//! archives publish them under CC-BY 4.0. Also large multiscale volumes for
+//! testing volume LOD: CT and micro-CT from the OpenSciVis collection's
+//! OME-Zarr conversions, cryo-ET and fluorescence stacks on public object
+//! stores; linked only, under each store's own terms.
 
 use super::types::CatalogEntry;
 use crate::app::StoreKind;
@@ -136,6 +139,83 @@ pub static MICROSCOPY_CATALOG: &[CatalogEntry] = &[
         label: "HeLa Cell FIB-SEM (jrc_hela-2)",
         subtitle: "Janelia OpenOrganelle electron microscopy in nanometers, 6 levels",
         store: "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-2/jrc_hela-2.zarr/recon-1/em/fibsem-uint8",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "scivis-woodbranch",
+        label: "Woodbranch (Micro-CT)",
+        subtitle: "2048^3 uint16 wood micro-CT, 16 GB in a multiscale pyramid (OpenSciVis)",
+        store: "https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2/woodbranch.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "microct-beechnut",
+        label: "Beechnut (Micro-CT)",
+        subtitle: "1546 x 1024 x 1024 uint16 micro-CT in 5 levels, Gaussian scale space",
+        store: "https://d39zu0xtgv0613.cloudfront.net/beechnut.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "scivis-kingsnake",
+        label: "Kingsnake (CT)",
+        subtitle: "1024 x 1024 x 795 uint8 CT of a kingsnake egg (OpenSciVis)",
+        store: "https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2/kingsnake.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "scivis-pawpawsaurus",
+        label: "Pawpawsaurus Skull (CT)",
+        subtitle: "958 x 646 x 1088 uint16 CT of a fossil skull (OpenSciVis)",
+        store: "https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2/pawpawsaurus.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "scivis-pancreas",
+        label: "Pancreas (CT)",
+        subtitle: "240 x 512 x 512 int16 CT in Hounsfield units (OpenSciVis)",
+        store: "https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2/pancreas.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "scivis-backpack",
+        label: "Backpack (CT)",
+        subtitle: "512 x 512 x 373 uint16 baggage CT scan (OpenSciVis)",
+        store: "https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2/backpack.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cryoet-vibrio",
+        label: "Vibrio cholerae (Cryo-ET)",
+        subtitle: "1023 x 1440 x 400 float32 cryo-electron tomogram",
+        store: "https://d39zu0xtgv0613.cloudfront.net/sma2022-07-13-10.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "bia-zebrafish-im4",
+        label: "Zebrafish Embryo IM4",
+        subtitle: "4 channels, 103 planes of 512 x 512 uint16 fluorescence (BioImage Archive S-BSST410)",
+        store: "https://uk1s3.embassy.ebi.ac.uk/bia-integrator-data/S-BSST410/IM4/IM4.zarr/0",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "bia-arabidopsis-im500",
+        label: "Arabidopsis FLC smFISH IM500",
+        subtitle: "2 channels, 46 planes of 1024 x 512 uint8 smFISH (BioImage Archive S-BIAD425)",
+        store: "https://uk1s3.embassy.ebi.ac.uk/bia-integrator-data/S-BIAD425/IM500/IM500.zarr/0",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "idr0047-yeast",
+        label: "Yeast smFISH (IDR0047)",
+        subtitle: "4 channels, 25 planes of 2048 x 2048 uint16 fluorescence",
+        store: "https://d39zu0xtgv0613.cloudfront.net/multichannel/4496763.zarr/4496763.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "efish-drosophila",
+        label: "Drosophila Brain (Fly-eFISH)",
+        subtitle: "4 channels, 752 planes of 1920 x 1920 uint16 expansion FISH",
+        store: "https://d39zu0xtgv0613.cloudfront.net/Fly-eFISH/NP01_1_1_SS00790_AstA546_CCHa1_647_1x_LOL.chunked.zarr",
         store_kind: StoreKind::RemoteZarr,
     },
 ];

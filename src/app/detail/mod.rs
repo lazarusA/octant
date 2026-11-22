@@ -43,6 +43,8 @@ mod geometry_tests;
 mod tests;
 mod tile;
 mod want;
+pub(crate) use tile::LevelRead;
+pub(crate) use want::plot_hash;
 #[cfg(test)]
 mod zoom_tests;
 
@@ -59,7 +61,7 @@ const MARGIN: f64 = 0.25;
 
 /// Seconds a view stays unchanged before it counts as resting: longer than
 /// the frames between mouse wheel ticks.
-const SETTLE: f64 = 0.15;
+pub(crate) const SETTLE: f64 = 0.15;
 
 /// The base layer's detail tile, the one being fetched, and the view the
 /// last decision was made for.

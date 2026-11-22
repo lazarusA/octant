@@ -188,7 +188,16 @@ pub(crate) fn make_resident(app: &mut OctantApp, request: &SliceRequest) {
 
 /// Polls finished fetches until `done` holds.
 pub(crate) fn poll_until(app: &mut OctantApp, done: impl Fn(&OctantApp) -> bool) {
-    let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
+    poll_until_for(app, std::time::Duration::from_secs(10), done);
+}
+
+/// [`poll_until`] waiting up to `limit` (network tests).
+pub(crate) fn poll_until_for(
+    app: &mut OctantApp,
+    limit: std::time::Duration,
+    done: impl Fn(&OctantApp) -> bool,
+) {
+    let deadline = web_time::Instant::now() + limit;
     while !done(app) {
         assert!(
             web_time::Instant::now() < deadline,

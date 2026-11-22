@@ -30,6 +30,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "索引 RGBA",
         PlotOptionsKey::Quality => "质量",
         PlotOptionsKey::QualityHover => "每条光线在每个体素内的采样数",
+        PlotOptionsKey::ViewDetail => "按视图细化",
+        PlotOptionsKey::ViewDetailHover => "视图静止后，为多尺度体数据的可见部分读取更精细的层级",
         PlotOptionsKey::Density => "密度",
         PlotOptionsKey::Attenuation => "衰减",
         PlotOptionsKey::ZScale => "Z 缩放",

@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Rantaviivoja ei saatavilla",
         NoticesKey::VolumeTooLargeForGpu => "Tilavuus on liian suuri GPU:lle",
+        NoticesKey::VolumeLodOff => "Tarkkuus näkymän mukaan ei ole käytössä tälle tilavuudelle",
+        NoticesKey::VolumeLodOffDetail => {
+            "Sen piirretty taso tarvitsee {} lohkoa; atlas mahtuu {} ja varaa puolet tarkemmille. Tilavuus piirretään yhtenä kokonaisena tasona."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Sen tasot eivät ole toistensa kokonaislukumonikertoja tasattuine soluineen, kuten lohkot vaativat. Tilavuus piirretään yhtenä kokonaisena tasona."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Sen kokonaislukuarvot (kuten nimiötunnisteet) kattavat liian laajan alueen, jotta lohkot pitäisivät ne erillään. Tilavuus piirretään yhtenä kokonaisena tasona."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Tämä GPU ei voi kirjoittaa tilavuuden varjostimesta, mitä lohkot vaativat. Tilavuus piirretään yhtenä kokonaisena tasona."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Osaa tilavuudesta ei voitu lukea tarkemmalla tasolla",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Tilavuusdatan puskurin koko ({} alkiota / {} tavua) ylittää GPU:n tallennuspuskurin enimmäiskoon ({})"
         }

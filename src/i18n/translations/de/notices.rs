@@ -16,6 +16,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::CoastlinesUnavailable => "Küstenlinien nicht verfügbar",
         NoticesKey::VolumeTooLargeForGpu => "Volumen zu groß für die GPU",
+        NoticesKey::VolumeLodOff => "Detail nach Ansicht ist für dieses Volumen aus",
+        NoticesKey::VolumeLodOffDetail => {
+            "Seine dargestellte Stufe braucht {} Bricks; der Atlas fasst {} und hält die Hälfte für feinere frei. Das Volumen wird als eine ganze Stufe gezeichnet."
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "Seine Stufen sind keine ganzzahligen Vielfachen voneinander mit ausgerichteten Zellen, wie Bricks sie brauchen. Das Volumen wird als eine ganze Stufe gezeichnet."
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "Seine ganzzahligen Werte (etwa Label-IDs) umfassen einen zu großen Bereich, als dass Bricks sie auseinanderhalten könnten. Das Volumen wird als eine ganze Stufe gezeichnet."
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "Diese GPU kann aus dem Shader des Volumens nicht schreiben, was Bricks brauchen. Das Volumen wird als eine ganze Stufe gezeichnet."
+        }
+        NoticesKey::VolumeLodBrickFailed => "Ein Teil des Volumens konnte nicht feiner gelesen werden",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "Größe des Volumendatenpuffers ({} Elemente / {} Bytes) überschreitet das maximale GPU-Speicherpufferlimit ({})"
         }

@@ -15,6 +15,17 @@ use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
 use crate::plots::{ChannelRenderer, HeatmapRenderer};
 
+/// A read of a finer level's window: its request, store, cache key, the
+/// level's dimension names and selection, and the step it reads.
+pub(crate) struct LevelRead {
+    pub key: BlockCacheKey,
+    pub dims: Vec<String>,
+    pub sel: crate::app::layers::VariableSelection,
+    pub slice: crate::data::SliceRequest,
+    pub handle: crate::data::StoreHandle,
+    pub step: usize,
+}
+
 /// A tile's matrix, its composite window and, where the GPU blends it, its
 /// channel planes.
 type TileSlice = (MatrixData, Option<CompositeProbe>, Option<Vec<MatrixData>>);
@@ -60,29 +71,46 @@ impl OctantApp {
     pub(super) fn plan_tile(
         &self,
         id: LayerId,
-        mut sel: crate::app::layers::VariableSelection,
+        sel: crate::app::layers::VariableSelection,
         tile: DetailTile,
     ) -> Option<TilePlan> {
+        let r = self.level_read(id, sel)?;
+        let pending = PendingDetail {
+            layer: id,
+            key: r.key,
+            tile,
+            dims: r.dims,
+            anim_dim: r.sel.animated_dim(),
+            config: r.sel.dim_config,
+            step: r.step,
+        };
+        Some((pending, r.slice, r.handle))
+    }
+
+    /// The read of `sel` (a finer level's window) for layer `id`, at the
+    /// layer's current step of an animated dimension.
+    pub(crate) fn level_read(
+        &self,
+        id: LayerId,
+        mut sel: crate::app::layers::VariableSelection,
+    ) -> Option<LevelRead> {
         let var = sel.variable_info()?.clone();
         let step = self.layer_step(id);
         if let Some(a) = sel.animated_dim() {
             let last = (var.shape.get(a).copied().unwrap_or(1) as usize).saturating_sub(1);
-            let step = step.min(last);
-            sel.set_index(a, step);
+            sel.set_index(a, step.min(last));
         }
         let slice = sel.slice_request(&var.name, &var.shape);
         let source_id = self.selection_source_id(&sel);
         let handle = self.resolve_store_handle(&source_id, &sel.store_target, sel.store_kind)?;
-        let pending = PendingDetail {
-            layer: id,
+        Some(LevelRead {
             key: BlockCacheKey::new(source_id, &slice),
-            tile,
             dims: var.dimension_names,
-            anim_dim: sel.animated_dim(),
-            config: sel.dim_config,
+            sel,
+            slice,
+            handle,
             step,
-        };
-        Some((pending, slice, handle))
+        })
     }
 
     /// Slices `block` into `pending`'s tile and draws it; nothing when the

@@ -123,3 +123,108 @@ fn timed(
     times.sort();
     times[RUNS / 2]
 }
+
+/// `data` (`N`^3) as one level of `N / 64` bricks a side, in slots of its
+/// own, drawn bricked.
+fn bricked_of(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    data: &[f32],
+    spread: bool,
+) -> super::VolumeRenderer {
+    use super::bricks::{BrickLevelGpu, BrickUniforms, MAX_LEVELS};
+    use crate::data::multiscale::bricks::{APRON, BRICK, STORED};
+    let b = (N as u64 / BRICK) as u32;
+    let format = wgpu::TextureFormat::Rgba8Unorm;
+    let slots = if spread { [8, 8, 6] } else { [b; 3] };
+    let renderer = super::VolumeRenderer::new_bricked(
+        device,
+        queue,
+        format,
+        (slots, [b; 3], super::bricks::AtlasTexel::Half),
+    )
+    .expect("fits");
+    // Spread: each brick two slots apart in a 384-slot atlas, as the app's.
+    let at = |c: u32| if spread { c * 2 } else { c };
+    let bricks = renderer.bricks().expect("bricked");
+    let stored = STORED as usize;
+    let mut table = Vec::new();
+    for bz in 0..b {
+        for by in 0..b {
+            for bx in 0..b {
+                let cell = |c: u32, s: usize| {
+                    (c as usize * BRICK as usize + s)
+                        .saturating_sub(APRON as usize)
+                        .min(N - 1)
+                };
+                let mut cube = Vec::with_capacity(stored * stored * stored);
+                for sz in 0..stored {
+                    for sy in 0..stored {
+                        for sx in 0..stored {
+                            let at = (cell(bz, sz) * N + cell(by, sy)) * N + cell(bx, sx);
+                            cube.push(half::f16::from_f32(data[at]).to_bits());
+                        }
+                    }
+                }
+                let slot = [at(bx), at(by), bz];
+                bricks.upload_brick(queue, slot, &cube);
+                let (lo, hi) = cube
+                    .iter()
+                    .map(|&h| half::f16::from_bits(h).to_f32())
+                    .fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
+                bricks.write_range(queue, slot, [lo, hi], false);
+                // Spread: neighbours alternate between two identical levels.
+                let level = if spread { 1 + (bx + by + bz) % 2 } else { 1 };
+                table.push([slot[0] as u8, slot[1] as u8, slot[2] as u8, level as u8]);
+            }
+        }
+    }
+    bricks.write_table(queue, &[0..b, 0..b, 0..b], &table);
+    let mut levels = [BrickLevelGpu::default(); MAX_LEVELS];
+    levels[0] = BrickLevelGpu {
+        factor: [1.0; 4],
+        offset: [0.0; 4],
+        count: [b, b, b, 0],
+    };
+    levels[1] = levels[0];
+    let n = N as f32;
+    bricks.set_uniforms(
+        queue,
+        &BrickUniforms {
+            lo: [0.0; 4],
+            span: [n, n, n, 0.0],
+            flip: [0; 4],
+            grid: [b, b, b, 0],
+            value: [0.0, 1.0, 0.0, 0.0],
+            slots: [slots[0], slots[1], slots[2], 0],
+            levels,
+        },
+    );
+    bricks.set_dims([N as u32; 3]);
+    renderer
+}
+
+#[test]
+#[ignore = "benchmark"]
+fn volume_bricked_timed() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, filterable)) = gpu() else {
+        eprintln!("SKIPPED volume_bricked_timed: no GPU adapter");
+        return;
+    };
+    let resources = atlas(&device, &queue);
+    eprintln!("{N}^3 volume, {SIZE}^2 frame, dense vs one level of bricks, DVR");
+    for (name, data) in [("dense", dense()), ("sparse", sparse())] {
+        let flat = renderer_n(&device, &queue, &data, N, filterable);
+        let bricked = bricked_of(&device, &queue, &data, false);
+        let spread = bricked_of(&device, &queue, &data, true);
+        let mut p = params(0, 1.0, 0);
+        p.color.cmin = if name == "sparse" { 0.1 } else { 0.0 };
+        let t = timed(&device, &queue, &flat, p, &resources);
+        let b = timed(&device, &queue, &bricked, p, &resources);
+        let s = timed(&device, &queue, &spread, p, &resources);
+        eprintln!(
+            "{name:<8} dense {t:>10.2?}  bricked {b:>10.2?}  in a 384-slot atlas, two levels {s:>10.2?}"
+        );
+    }
+}

@@ -88,14 +88,28 @@ fn mip(ray: Ray) -> vec4<f32> {
     return projection_output(evaluate_plot_color(max_raw, uniforms.color));
 }
 
-// 2. Minimum Intensity Projection (MinIP)
+// 2. Minimum Intensity Projection (MinIP). Samples each brick on its own
+// step and, unless values below the range can be the minimum shown (a
+// visible low clip color), skips blocks wholly below cmin
+// (`next_open_sample`; values above cmax still draw, in the top color).
 fn minip(ray: Ray) -> vec4<f32> {
     var minimum: f32 = 1e30;
     var any_hit = false;
     let lowclip_visible = uniforms.color.lowclip_color.a > 0.0;
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
-        let density = sample_exact(sample_pos(ray, i));
+        var next = i;
+        if (lowclip_visible) {
+            next = next_strided_sample(&blocks, i);
+        } else {
+            next = next_open_sample(&blocks, i, OPEN_AT_LEAST);
+        }
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
+        let density = blocks_exact(&blocks, sample_pos(ray, i));
         if (!is_missing(density)) {
             let consider_sample = (density >= uniforms.color.cmin) || lowclip_visible;
             if (consider_sample && (density < minimum)) {
@@ -110,16 +124,25 @@ fn minip(ray: Ray) -> vec4<f32> {
     return projection_output(evaluate_plot_color(minimum, uniforms.color));
 }
 
-// 3. Average / Mean Intensity Projection (Radiographic Column Transmission)
+// 3. Average / Mean Intensity Projection (Radiographic Column Transmission).
+// Skips blocks drawing nothing (no value in the range counts) and samples
+// each brick on its own step, a sample weighing the steps it stands for.
 fn average_projection(ray: Ray) -> vec4<f32> {
     var sum_val: f32 = 0.0;
     var valid_count: f32 = 0.0;
+    var blocks = sample_blocks(ray);
 
     for (var i = 0; i < ray.count; i = i + 1) {
-        let density = sample_exact(sample_pos(ray, i));
+        let next = next_open_sample(&blocks, i, OPEN_DRAWN);
+        if (next != i) {
+            i = next - 1;
+            continue;
+        }
+        let density = blocks_exact(&blocks, sample_pos(ray, i));
         if (!is_missing(density) && density >= uniforms.color.cmin && density <= uniforms.color.cmax) {
-            sum_val += density;
-            valid_count += 1.0;
+            let span = sample_span(&blocks);
+            sum_val += density * span;
+            valid_count += span;
         }
     }
     if (valid_count <= 0.0) {

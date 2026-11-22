@@ -9,7 +9,7 @@ description: >-
 
 This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management, and integration with `egui` inside `src/plots/`.
 
-**Reference**: `plots.md` (every renderer, the volume raymarcher, OIT, frame caches, the camera, the slicer's shaders, buffer limits), `colormaps.md` (the colormap atlas, registry and `fetch_colormaps`), `export.md`. Update them with the code they describe.
+**Reference**: `plots.md` (every renderer, the volume raymarcher, OIT, frame caches, the camera, the slicer's shaders, buffer limits), `colormaps.md` (the colormap atlas, registry and `fetch_colormaps`), `export.md`, `volume_lod.md` (bricked multiresolution volumes: "Detail by view", `app/volume_lod/` and the bricked shaders). Update them with the code they describe.
 
 ## Renderers
 

@@ -47,6 +47,8 @@ pub struct LayerData {
     pub volume_version: u64,
     /// The finer level's tile drawn over a multiscale heatmap (base layer).
     pub detail: crate::app::detail::DetailState,
+    /// A multiscale volume's bricks by view (base layer; `app::volume_lod`).
+    pub volume_lod: crate::app::volume_lod::VolumeLodState,
 }
 
 /// A 2D matrix with one cell in `stride` along each axis

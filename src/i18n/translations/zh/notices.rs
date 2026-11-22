@@ -14,6 +14,20 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::CoordinatesFailedDetail => "'{}' 的坐标加载失败（{}）；坐标轴显示索引",
         NoticesKey::CoastlinesUnavailable => "海岸线不可用",
         NoticesKey::VolumeTooLargeForGpu => "体数据过大，GPU 无法处理",
+        NoticesKey::VolumeLodOff => "此体数据的按视图细化已关闭",
+        NoticesKey::VolumeLodOffDetail => {
+            "其显示层级需要 {} 个砖块；图集可容纳 {} 个，并为更精细的层级保留一半。体数据以单一完整层级绘制。"
+        }
+        NoticesKey::VolumeLodUnevenDetail => {
+            "其各级之间不是单元对齐的整数倍，不满足分块的要求。体积将以单一完整级别绘制。"
+        }
+        NoticesKey::VolumeLodWideIntegersDetail => {
+            "其整数值（如标签 ID）范围过宽，分块无法区分。体积将以单一完整级别绘制。"
+        }
+        NoticesKey::VolumeLodUnsupportedDetail => {
+            "此 GPU 无法从体积着色器写入，不满足分块的要求。体积将以单一完整级别绘制。"
+        }
+        NoticesKey::VolumeLodBrickFailed => "部分体数据无法以更精细的层级读取",
         NoticesKey::VolumeBufferTooLargeDetail => {
             "体数据缓冲区大小（{} 个元素 / {} 字节）超出 GPU 存储缓冲区上限（{}）"
         }

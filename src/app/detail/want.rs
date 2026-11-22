@@ -55,22 +55,27 @@ impl OctantApp {
         let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(&plotted.dim_config) else {
             return None;
         };
+        Some([self.plotted_axis(x)?, self.plotted_axis(y)?])
+    }
+
+    /// The base layer's plotted dimension `d` on level 0's index grid (its
+    /// own grid for a variable without levels), flipped as drawn.
+    pub(crate) fn plotted_axis(&self, d: usize) -> Option<Axis> {
+        let plotted = self.plotted();
+        let var = plotted.variable_info()?;
         let flips = &self.layers.base.data.flipped_dims;
-        let axis = |d: usize| {
-            let name = var.dimension_names.get(d);
-            let flipped = name.is_some_and(|n| flips.iter().any(|f| f.eq_ignore_ascii_case(n)));
-            let (start, end) = plotted.dim_config.get(d)?.range;
-            match &var.multiscale {
-                Some(r) => Axis::plotted(&r.set, r.level, d, (start, end), flipped),
-                None => Some(Axis {
-                    dim: d,
-                    lo: start.min(end) as f64,
-                    hi: start.max(end) as f64 + 1.0,
-                    flipped,
-                }),
-            }
-        };
-        Some([axis(x)?, axis(y)?])
+        let name = var.dimension_names.get(d);
+        let flipped = name.is_some_and(|n| flips.iter().any(|f| f.eq_ignore_ascii_case(n)));
+        let (start, end) = plotted.dim_config.get(d)?.range;
+        match &var.multiscale {
+            Some(r) => Axis::plotted(&r.set, r.level, d, (start, end), flipped),
+            None => Some(Axis {
+                dim: d,
+                lo: start.min(end) as f64,
+                hi: start.max(end) as f64 + 1.0,
+                flipped,
+            }),
+        }
     }
 
     /// How far the heatmap may zoom in: over a level of a multiscale variable
@@ -190,7 +195,7 @@ pub(super) fn styled(
     (!layer.blends_on_gpu()).then_some(&layer.composite)
 }
 
-pub(super) fn plot_hash(
+pub(crate) fn plot_hash(
     sel: &crate::app::layers::VariableSelection,
     step: usize,
     flips: &[String],

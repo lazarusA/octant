@@ -31,6 +31,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "Indeksoitu RGBA",
         PlotOptionsKey::Quality => "Laatu",
         PlotOptionsKey::QualityHover => "Näytteitä vokselia kohden kunkin säteen suunnassa",
+        PlotOptionsKey::ViewDetail => "Tarkkuus näkymän mukaan",
+        PlotOptionsKey::ViewDetailHover => "Lukee monitasoisen tilavuuden tarkempia tasoja näkyvälle osalle, kun näkymä pysähtyy",
         PlotOptionsKey::Density => "Tiheys",
         PlotOptionsKey::Attenuation => "Vaimennus",
         PlotOptionsKey::ZScale => "Z-skaala",

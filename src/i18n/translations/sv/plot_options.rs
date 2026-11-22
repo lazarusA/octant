@@ -33,6 +33,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "Indexerad RGBA",
         PlotOptionsKey::Quality => "Kvalitet",
         PlotOptionsKey::QualityHover => "Sampel per voxel längs varje stråle",
+        PlotOptionsKey::ViewDetail => "Detalj efter vy",
+        PlotOptionsKey::ViewDetailHover => "Läser finare nivåer av en flerskalig volym för den synliga delen när vyn står stilla",
         PlotOptionsKey::Density => "Densitet",
         PlotOptionsKey::Attenuation => "Dämpning",
         PlotOptionsKey::ZScale => "Z-skala",

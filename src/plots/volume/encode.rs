@@ -58,6 +58,12 @@ pub fn encode_rgba(values: &[f32], dims: Dims, z: Range<usize>) -> Encoded<[u8; 
     })
 }
 
+/// One packed RGB composite color as RGBA8 (alpha the brightest channel),
+/// transparent where missing: a bricked composite's atlas texel.
+pub fn packed_rgba(v: f32) -> [u8; 4] {
+    unpack_rgb(v).map_or([0; 4], |c| c.map(|x| x.round().clamp(0.0, 255.0) as u8))
+}
+
 fn unpack_rgb(v: f32) -> Option<[f32; 4]> {
     if !is_valid(v) {
         return None;

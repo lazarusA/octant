@@ -17,6 +17,12 @@ crate::i18n::keys::define_keys! {
     CoastlinesUnavailable,
     // GPU limits
     VolumeTooLargeForGpu,
+    VolumeLodOff,
+    VolumeLodOffDetail,
+    VolumeLodUnevenDetail,
+    VolumeLodWideIntegersDetail,
+    VolumeLodUnsupportedDetail,
+    VolumeLodBrickFailed,
     VolumeBufferTooLargeDetail,
     VolumeTextureTooLargeDetail,
     VolumeUploadSkipped,

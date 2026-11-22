@@ -81,3 +81,22 @@ fn uniform_layout_matches_wgsl() {
         std::mem::size_of::<VolumeUniforms>()
     );
 }
+
+#[test]
+fn bricked_uniform_layouts_match_wgsl() {
+    use super::bricks::BrickUniforms;
+    use super::pipeline::SHADER_BRICKED;
+    let module = naga::front::wgsl::parse_str(SHADER_BRICKED).expect("bricked shader parses");
+    let mut layouter = naga::proc::Layouter::default();
+    layouter.update(module.to_ctx()).expect("layout");
+    let size = |name: &str| {
+        let (handle, _) = module
+            .types
+            .iter()
+            .find(|(_, ty)| ty.name.as_deref() == Some(name))
+            .expect("struct");
+        layouter[handle].size as usize
+    };
+    assert_eq!(size("Uniforms"), std::mem::size_of::<VolumeUniforms>());
+    assert_eq!(size("Bricked"), std::mem::size_of::<BrickUniforms>());
+}

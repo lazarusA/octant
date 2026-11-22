@@ -21,6 +21,32 @@ pub fn slice_multichannel_volume_composite_nd(
     channel_configs: &[ChannelColorConfig],
     dataset_name: &str,
 ) -> Option<VolumeData> {
+    let stretch = &mut super::stretch::CompositeStretch::default();
+    slice_multichannel_volume_stretched(
+        block,
+        (c_dim, x_dim, y_dim, z_dim),
+        (x_range, y_range, z_range),
+        fixed_indices,
+        channel_configs,
+        stretch,
+    )
+    .map(|v| VolumeData {
+        dataset_name: dataset_name.to_string(),
+        ..v
+    })
+}
+
+/// [`slice_multichannel_volume_composite_nd`] with channels stretched by
+/// `stretch` (recorded from the values when it holds none for a channel),
+/// so bricks of one plot share their plot's colors (`app::volume_lod`).
+pub fn slice_multichannel_volume_stretched(
+    block: &OctantBlock,
+    (c_dim, x_dim, y_dim, z_dim): (usize, usize, usize, usize),
+    (x_range, y_range, z_range): ((usize, usize), (usize, usize), (usize, usize)),
+    fixed_indices: &[usize],
+    channel_configs: &[ChannelColorConfig],
+    stretch: &mut super::stretch::CompositeStretch,
+) -> Option<VolumeData> {
     if block.shape.len() < 3 || c_dim >= block.shape.len() {
         return None;
     }
@@ -36,7 +62,7 @@ pub fn slice_multichannel_volume_composite_nd(
         fixed_indices,
         channel_configs,
         len,
-        &mut super::stretch::CompositeStretch::default(),
+        stretch,
         |fixed, cfg| {
             let (x, y, z) = (x_range, y_range, z_range);
             let data =
@@ -51,6 +77,6 @@ pub fn slice_multichannel_volume_composite_nd(
         values,
         0.0,
         16777215.0,
-        dataset_name.to_string(),
+        String::new(),
     ))
 }

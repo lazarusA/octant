@@ -33,6 +33,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "Индексированный RGBA",
         PlotOptionsKey::Quality => "Качество",
         PlotOptionsKey::QualityHover => "Число выборок на воксель вдоль каждого луча",
+        PlotOptionsKey::ViewDetail => "Детализация по виду",
+        PlotOptionsKey::ViewDetailHover => "Читает более детальные уровни многомасштабного объёма для видимой части, когда вид неподвижен",
         PlotOptionsKey::Density => "Плотность",
         PlotOptionsKey::Attenuation => "Затухание",
         PlotOptionsKey::ZScale => "Масштаб Z",
