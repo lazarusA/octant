@@ -2,7 +2,7 @@
 //! and apron, a slot, its ranges, the upload and the table cells it changed,
 //! then its neighbours' aprons and its ancestors' ranges.
 
-use super::encode::{Cube, brick_values, value_range};
+use super::encode::{Cube, brick_values, has_missing, value_range};
 use super::fetch::Gpu;
 use super::residency::CellBox;
 use super::subblocks::{SubRanges, open_subs, sub_ranges};
@@ -28,6 +28,8 @@ impl Lod {
             return false;
         };
         self.stitch_own(key, &mut cube, cache, Some(read));
+        // Neighbours' aprons may bring missing voxels the brick lacks.
+        let missing = missing || has_missing(&cube);
         let (range, subs) = self.cube_ranges(&cube);
         // Not `self.bricks()`: the residency is borrowed apart from the set.
         let bricks = Bricks {

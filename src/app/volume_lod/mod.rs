@@ -19,6 +19,9 @@
 //! the plotted volume draws until every root brick has arrived, and where
 //! bricks cannot draw the plot (`setup.rs` `Off`, with a notice).
 
+mod apron;
+#[cfg(test)]
+mod apron_tests;
 mod draw;
 mod encode;
 mod fetch;

@@ -73,6 +73,15 @@ pub(super) enum Cube {
     Colors(Vec<[u8; 4]>),
 }
 
+/// Whether a scalar cube holds a missing voxel (stored as NaN); a
+/// composite's missing voxels are transparent colors, never flagged.
+pub(super) fn has_missing(cube: &Cube) -> bool {
+    match cube {
+        Cube::Values(values) => values.iter().any(|&h| half::f16::from_bits(h).is_nan()),
+        Cube::Colors(_) => false,
+    }
+}
+
 /// `key`'s stored cube from its block (oriented as plotted, put back in
 /// storage order), edge cells repeated past the level's ends, and whether
 /// any voxel is missing.
