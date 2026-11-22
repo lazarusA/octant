@@ -30,6 +30,9 @@ mod occlusion;
 mod occlusion_tests;
 mod place;
 mod placement;
+mod ranges;
+#[cfg(test)]
+mod ranges_tests;
 mod reset;
 mod residency;
 #[cfg(test)]
