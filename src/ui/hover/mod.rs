@@ -124,16 +124,15 @@ fn show_sample(
         resolve_cell_value_and_dim_entries(app, matrix, meta, var, sampler, hit);
     let point = hit.point_3d;
     let plot_type = app.effective_canvas_plot_type();
+    let brick = brick_reading(app, ctx, point, sampler, plot_type);
+    let raw_val = brick.map_or(raw_val, |(_, value)| value);
     let pixel = (point.is_none() && plot_type != PlotType::Line).then_some((px, py));
     // A label image reads its id, color and properties instead of a value.
     let base = &app.layers.base;
-    let composite = match base.labels() {
-        Some(_) => None,
-        None => {
-            let tile = detail::tile_probe(app, hit.norm_x, hit.norm_y);
-            composite::composite_rows(app, ctx, meta, var, units, pixel, tile, &mut fields)
-        }
-    };
+    let tile = || detail::tile_probe(app, hit.norm_x, hit.norm_y);
+    let composite = (base.labels().is_none())
+        .then(|| composite::composite_rows(app, ctx, meta, var, units, pixel, tile(), &mut fields))
+        .flatten();
     if plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }
@@ -143,14 +142,13 @@ fn show_sample(
         resolve_target_screen_pos(app, matrix, camera, sampler, &transform, px, py, point);
     if plot_type == PlotType::Heatmap && point.is_none() {
         target = detail_overrides(app, hit, &transform, target, &mut fields);
-    } else if let Some(level) = detail::level_field(app, None) {
+    } else if let Some(level) = detail::level_field_of(app, brick.map(|(l, _)| l)) {
         fields.push(level);
     }
     let swatch = || resolve_hover_color(app, raw_val, py);
     let (value, swatch, units) = labels::layer_reading(base, raw_val, composite, units, swatch);
-    let long_name = var.and_then(|v| v.long_name.as_deref());
     let card = HoverCard {
-        title: HoverCard::title_for(var_name, long_name),
+        title: HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref())),
         value,
         units,
         swatch,
@@ -160,6 +158,38 @@ fn show_sample(
     let norm = (hit.norm_x, hit.norm_y);
     let at = pixel.map(|cell| overlays::HoverAt { cell, norm });
     paint_hover_card(app, ctx, rect, (hover_pos, target), plot_type, at, card);
+}
+
+/// A bricked volume's level and value under the hit voxel `point`: the
+/// finest brick drawn there (`app::volume_lod`). Kept until the voxel, the
+/// mode, the plot or the bricks change: in MIP and MinIP one hit voxel can
+/// span a whole finer brick's cells.
+fn brick_reading(
+    app: &OctantApp,
+    ctx: &egui::Context,
+    point: Option<(usize, usize, usize, f32)>,
+    sampler: Option<&VolumeSampler>,
+    plot_type: PlotType,
+) -> Option<(usize, f32)> {
+    let ((x, y, z, _), s) = point.zip(sampler)?;
+    if plot_type != PlotType::Volume {
+        return None;
+    }
+    let dims = [s.width, s.height, s.depth];
+    let base = &app.layers.base;
+    let bricks = base.renderers.volume_bricked.as_ref();
+    let version = bricks.and_then(|r| r.bricks()).map(|b| b.version());
+    let algorithm = app.plot_configs.volume.algorithm;
+    let key = (
+        [x, y, z],
+        dims,
+        algorithm,
+        version,
+        base.data.volume_lod.context,
+    );
+    crate::ui::temp_cache::cached(ctx, egui::Id::unique("brick_reading"), key, || {
+        app.brick_reading([x, y, z], dims)
+    })
 }
 
 /// Over a multiscale heatmap: the level row read under the pointer, and the

@@ -19,6 +19,7 @@
 //! the plotted volume draws until every root brick has arrived, and where
 //! bricks cannot draw the plot (`setup.rs` `Off`, with a notice).
 
+mod draw;
 mod encode;
 mod fetch;
 mod place;

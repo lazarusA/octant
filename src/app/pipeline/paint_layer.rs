@@ -4,6 +4,9 @@ use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::plots::PlotType;
 
+/// Bands a bricked volume's resting frame is built in (`paint_volume`).
+const RESTING_BANDS: u32 = 16;
+
 /// Where the canvas draws this frame.
 #[derive(Clone, Copy)]
 pub struct CanvasView {
@@ -99,15 +102,31 @@ impl OctantApp {
     }
 
     fn paint_volume(&self, ui: &egui::Ui, layer: &Layer, view: &CanvasView) {
-        let Some(volume_renderer) = &layer.renderers.volume else {
+        let screen_aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
+        // A dragged slider changes the frame every frame, as the camera
+        // does: drawn whole and coarse, not in bands that never finish.
+        let moving = self.nav.view_interacting || ui.ctx().dragged_id().is_some();
+        // The plotted volume, or its bricks (`app::volume_lod`).
+        let Some((renderer, params)) = self.volume_draw(layer, screen_aspect, moving) else {
             return;
         };
-        let screen_aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_volume_uniform_params(layer, screen_aspect);
+        // A bricked frame at rest can take most of a second: built in bands
+        // over the next frames, which this asks for until it shows. An
+        // export draws its frame whole, never a moving frame still shown.
+        let resting = !moving && self.pending_export.is_none();
+        let bands = match renderer.bricks().is_some() && resting {
+            true => RESTING_BANDS,
+            false => 1,
+        };
+        // egui skips callbacks over no area: nothing would ever show.
+        let drawn = view.plot_rect.width() >= 1.0 && view.plot_rect.height() >= 1.0;
+        if bands > 1 && drawn && !renderer.shows(&params, bands) {
+            ui.ctx().request_repaint();
+        }
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::VolumeCallback {
-                renderer: volume_renderer.clone(),
+                renderer,
                 params,
                 rect: view.plot_rect,
                 // Half resolution while rotating or zooming; the
@@ -119,6 +138,7 @@ impl OctantApp {
                     layer.data.channel_volume.as_ref().map(|cv| cv.c_start),
                     None,
                 ),
+                bands,
             },
         );
         ui.painter().add(callback);

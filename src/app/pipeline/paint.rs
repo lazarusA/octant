@@ -234,7 +234,9 @@ impl OctantApp {
         };
         self.refresh_resampled_tiles(canvas_plot_type, &view);
         let now = ui.input(|i| i.time);
-        if let Some(wait) = self.refresh_detail(canvas_plot_type, &view, now) {
+        let wait = self.refresh_detail(canvas_plot_type, &view, now);
+        let volume_wait = self.refresh_volume_lod(canvas_plot_type, &view, now);
+        if let Some(wait) = wait.into_iter().chain(volume_wait).reduce(f64::min) {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs_f64(wait.max(0.0)));
         }
