@@ -22,6 +22,9 @@
 mod draw;
 mod encode;
 mod fetch;
+mod occlusion;
+#[cfg(test)]
+mod occlusion_tests;
 mod place;
 mod placement;
 mod reset;
@@ -32,6 +35,7 @@ mod select;
 #[cfg(test)]
 mod select_tests;
 mod setup;
+mod want;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Range;
