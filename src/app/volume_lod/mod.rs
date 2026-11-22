@@ -32,6 +32,8 @@ mod feedback;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod feedback_tests;
 mod fetch;
+#[cfg(test)]
+mod mode_tests;
 mod occlusion;
 #[cfg(test)]
 mod occlusion_tests;
@@ -49,6 +51,8 @@ mod select;
 mod select_tests;
 mod setup;
 mod subblocks;
+#[cfg(test)]
+mod tests;
 mod want;
 
 use std::collections::{HashMap, HashSet, VecDeque};
