@@ -16,6 +16,9 @@
 //! Every level stays a variable of its own, with its own coordinates; a
 //! stack only groups them.
 
+pub mod bricks;
+#[cfg(test)]
+mod bricks_tests;
 pub mod geotiff;
 pub mod geozarr;
 pub mod geozarr_layout;
