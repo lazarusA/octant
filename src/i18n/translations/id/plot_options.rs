@@ -32,6 +32,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "RGBA Terindeks",
         PlotOptionsKey::Quality => "Kualitas",
         PlotOptionsKey::QualityHover => "Sampel per voxel di sepanjang setiap sinar",
+        PlotOptionsKey::ViewDetail => "Detail sesuai tampilan",
+        PlotOptionsKey::ViewDetailHover => "Membaca level lebih halus dari volume multiskala untuk bagian yang terlihat setelah tampilan diam",
         PlotOptionsKey::Density => "Kepadatan",
         PlotOptionsKey::Attenuation => "Atenuasi",
         PlotOptionsKey::ZScale => "Skala Z",

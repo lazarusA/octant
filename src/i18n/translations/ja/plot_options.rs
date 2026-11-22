@@ -30,6 +30,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "インデックス RGBA",
         PlotOptionsKey::Quality => "品質",
         PlotOptionsKey::QualityHover => "各レイに沿ったボクセルあたりのサンプル数",
+        PlotOptionsKey::ViewDetail => "表示に応じた詳細",
+        PlotOptionsKey::ViewDetailHover => "表示が止まると、マルチスケールボリュームの見えている部分をより細かいレベルで読み込みます",
         PlotOptionsKey::Density => "密度",
         PlotOptionsKey::Attenuation => "減衰",
         PlotOptionsKey::ZScale => "Zスケール",

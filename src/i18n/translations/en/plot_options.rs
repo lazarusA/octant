@@ -33,6 +33,8 @@ pub fn text(key: PlotOptionsKey) -> &'static str {
         PlotOptionsKey::AlgoIndexed => "Indexed RGBA",
         PlotOptionsKey::Quality => "Quality",
         PlotOptionsKey::QualityHover => "Samples per voxel along each ray",
+        PlotOptionsKey::ViewDetail => "Detail by view",
+        PlotOptionsKey::ViewDetailHover => "Reads finer levels of a multiscale volume for the part in view once the view rests",
         PlotOptionsKey::Density => "Density",
         PlotOptionsKey::Attenuation => "Attenuation",
         PlotOptionsKey::ZScale => "Z-Scale",

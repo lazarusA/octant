@@ -35,6 +35,8 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoIndexed => "RGBA indexado",
         PlotOptionsKey::Quality => "Calidad",
         PlotOptionsKey::QualityHover => "Muestras por vóxel a lo largo de cada rayo",
+        PlotOptionsKey::ViewDetail => "Detalle según la vista",
+        PlotOptionsKey::ViewDetailHover => "Lee niveles más finos de un volumen multiescala para la parte visible cuando la vista se detiene",
         PlotOptionsKey::Density => "Densidad",
         PlotOptionsKey::Attenuation => "Atenuación",
         PlotOptionsKey::ZScale => "Escala Z",

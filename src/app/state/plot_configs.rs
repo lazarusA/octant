@@ -44,6 +44,9 @@ pub struct VolumePlotConfig {
     /// it from the data.
     pub isovalue: f32,
     pub z_scale: f32,
+    /// Reads finer levels of a multiscale volume for the part in view once
+    /// the view rests (`app::volume_lod`); off draws one level whole.
+    pub lod: bool,
 }
 
 impl VolumePlotConfig {
@@ -90,6 +93,7 @@ impl Default for VolumePlotConfig {
             surface: VolumeSurface::Range,
             isovalue: f32::NAN,
             z_scale: 1.0,
+            lod: false,
         }
     }
 }

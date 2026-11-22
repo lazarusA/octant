@@ -31,6 +31,8 @@ crate::i18n::keys::define_keys! {
     AlgoIndexed,
     Quality,
     QualityHover,
+    ViewDetail,
+    ViewDetailHover,
     Density,
     Attenuation,
     ZScale,
