@@ -12,6 +12,9 @@ const BLOCK_EDGE: i32 = 8;
 const OPEN_DRAWN: u32 = 0u;
 const OPEN_VALUE: u32 = 1u;
 const OPEN_ABOVE: u32 = 2u;
+// A value at or above the color range's low end (MinIP: lower values are
+// never its minimum without a visible low clip color; higher ones draw).
+const OPEN_AT_LEAST: u32 = 3u;
 
 fn block_open(b: vec4<f32>, kind: u32, maximum: f32) -> bool {
     if (kind == OPEN_VALUE) {
@@ -19,6 +22,9 @@ fn block_open(b: vec4<f32>, kind: u32, maximum: f32) -> bool {
     }
     if (kind == OPEN_ABOVE) {
         return b.y > maximum;
+    }
+    if (kind == OPEN_AT_LEAST) {
+        return b.y >= uniforms.color.cmin;
     }
     let c = uniforms.color;
     let lo = select(c.cmin, -3.4e38, c.use_lowclip == 1u);
