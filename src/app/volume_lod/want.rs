@@ -40,7 +40,7 @@ impl Lod {
         self.wanted = wanted.iter().copied().collect();
         self.refresh_finest();
         // Read already: running, or arrived and waiting to be placed.
-        let asked: Vec<BrickKey> = (self.pending.values().map(|(k, _)| *k))
+        let asked: std::collections::HashSet<BrickKey> = (self.pending.values().map(|(k, _)| *k))
             .chain(self.arrived.iter().map(|(k, _, _)| *k))
             .collect();
         self.queue = wanted

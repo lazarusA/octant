@@ -2,13 +2,10 @@
 //! `(value - offset) / scale` in storage order, NaN where missing.
 
 use super::Lod;
-use crate::app::OctantApp;
-use crate::app::block_loading::block_axes;
 use crate::app::detail::LevelRead;
 use crate::data::OctantBlock;
-use crate::data::multiscale::bricks::{APRON, BRICK, BrickKey, STORED};
+use crate::data::multiscale::bricks::{BrickKey, STORED};
 use crate::plots::volume::bricks::{AtlasTexel, BrickTextures};
-use crate::plots::volume::encode::packed_rgba;
 
 /// f16 bits of `(v - offset) / scale`, NaN where `v` is missing; values
 /// past f16's range saturate (an infinity would read as no value, and
@@ -54,18 +51,6 @@ impl Lod {
     }
 }
 
-/// The range of the valid values a stored cube encodes (apron included:
-/// rays near its faces read it).
-pub(super) fn value_range(values: &[u16], encoding: Encoding) -> (f32, f32) {
-    values
-        .iter()
-        .map(|&h| encoding.decode(h))
-        .filter(|v| v.is_finite())
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-            (lo.min(v), hi.max(v))
-        })
-}
-
 /// A brick's stored cube: f16 bits of `(value - offset) / scale` (NaN
 /// where missing), or a composite's RGBA8 colors (transparent where missing).
 pub(super) enum Cube {
@@ -75,6 +60,7 @@ pub(super) enum Cube {
 
 /// Whether a scalar cube holds a missing voxel (stored as NaN); a
 /// composite's missing voxels are transparent colors, never flagged.
+#[cfg(test)]
 pub(super) fn has_missing(cube: &Cube) -> bool {
     match cube {
         Cube::Values(values) => values.iter().any(|&h| half::f16::from_bits(h).is_nan()),
@@ -83,81 +69,23 @@ pub(super) fn has_missing(cube: &Cube) -> bool {
 }
 
 /// `key`'s stored cube from its block (oriented as plotted, put back in
-/// storage order), edge cells repeated past the level's ends, and whether
-/// any voxel is missing.
+/// storage order), edge cells repeated past the level's ends.
 pub(super) fn brick_values(
     lod: &Lod,
     key: BrickKey,
     read: &LevelRead,
     block: &OctantBlock,
-) -> Option<(Cube, bool)> {
-    let window = lod.bricks().window(key)?;
-    let (dims, config) = (&read.dims, &read.sel.dim_config);
-    if block.dimension_names != *dims {
-        return None;
+) -> Option<Cube> {
+    let n = STORED as usize;
+    let whole = [0..n, 0..n, 0..n];
+    match lod.composite {
+        Some(_) => lod
+            .region_colors(key, &whole, block, read)
+            .map(Cube::Colors),
+        None => lod
+            .region_values(key, &whole, block, Some(read))
+            .map(Cube::Values),
     }
-    let (bx, by, bz) =
-        OctantApp::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, config);
-    let fixed = block_axes::fixed_indices(block, dims, read.sel.animated_dim(), config, read.step);
-    let range =
-        |d: usize| block.oriented_range(d, block_axes::dim_bounds(block, dims, d, config).1);
-    let ranges = (range(bx), range(by), range(bz));
-    let volume = match &lod.composite {
-        Some(c) => c.slice(block, (bx, by, bz), ranges, &fixed)?,
-        None => {
-            let (x, y, z) = ranges;
-            block.volume_with_ranges(bx, by, bz, x, y, z, &fixed, "", false)?
-        }
-    };
-    let n = [volume.width, volume.height, volume.depth];
-    let axes = [bx, by, bz];
-    // The volume's (oriented) index of the brick's stored cell `s` along
-    // axis `i`: the volume spans the whole block, so the block's.
-    let read_cell = |i: usize, s: usize| {
-        let cell = (u64::from(key.b[i]) * BRICK + s as u64).saturating_sub(APRON);
-        let local = cell.clamp(window[i].start, window[i].end.saturating_sub(1)) - window[i].start;
-        let local = (local as usize).min(n[i].saturating_sub(1));
-        block.oriented_index(axes[i], local)
-    };
-    let (offset, scale) = (lod.offset, lod.scale);
-    Some(match lod.composite {
-        Some(_) => {
-            let (cube, missing) = encode_cube(&volume.values, n, read_cell, packed_rgba);
-            (Cube::Colors(cube), missing)
-        }
-        None => {
-            let encode = |v| encode_value(v, offset, scale);
-            let (cube, missing) = encode_cube(&volume.values, n, read_cell, encode);
-            (Cube::Values(cube), missing)
-        }
-    })
-}
-
-/// The stored cube read from `values` (`n` x, y, z, x fastest) at
-/// `read_cell(axis, stored index)`, each value `encode`d, and whether any
-/// is missing.
-fn encode_cube<T>(
-    values: &[f32],
-    n: [usize; 3],
-    read_cell: impl Fn(usize, usize) -> usize,
-    encode: impl Fn(f32) -> T,
-) -> (Vec<T>, bool) {
-    let stored = STORED as usize;
-    let columns: Vec<usize> = (0..stored).map(|s| read_cell(0, s)).collect();
-    let mut out = Vec::with_capacity(stored * stored * stored);
-    let mut missing = false;
-    for sz in 0..stored {
-        let z = read_cell(2, sz);
-        for sy in 0..stored {
-            let row = (z * n[1] + read_cell(1, sy)) * n[0];
-            out.extend(columns.iter().map(|&x| {
-                let v = values.get(row + x).copied().unwrap_or(f32::NAN);
-                missing |= !v.is_finite();
-                encode(v)
-            }));
-        }
-    }
-    (out, missing)
 }
 
 impl Lod {

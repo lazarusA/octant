@@ -46,7 +46,6 @@ fn bricked(device: &wgpu::Device, queue: &wgpu::Queue) -> VolumeRenderer {
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let renderer = VolumeRenderer::new_bricked(
         device,
-        queue,
         format,
         ([2, 2, 2], [2, 2, 2], super::bricks::AtlasTexel::Color),
     )

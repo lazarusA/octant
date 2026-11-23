@@ -138,11 +138,16 @@ impl BrickTextures {
         self.version.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Linear slot index (`x` fastest).
+    fn slot_index(&self, slot: [u32; 3]) -> u64 {
+        let [sx, sy, _] = self.slots;
+        u64::from(slot[0] + sx * (slot[1] + sy * slot[2]))
+    }
+
     /// Records `slot`'s value range (`min`, `max`) and whether it has
     /// missing voxels, which rays skip it by.
     pub fn write_range(&self, queue: &wgpu::Queue, slot: [u32; 3], range: [f32; 2], missing: bool) {
-        let [sx, sy, _] = self.slots;
-        let index = u64::from(slot[0] + sx * (slot[1] + sy * slot[2]));
+        let index = self.slot_index(slot);
         let texel = [range[0], range[1], f32::from(u8::from(missing)), 0.0];
         queue.write_buffer(&self.ranges, index * 16, bytemuck::bytes_of(&texel));
         self.version.fetch_add(1, Ordering::Relaxed);
@@ -151,9 +156,7 @@ impl BrickTextures {
     /// Records `slot`'s sub-block ranges (`SUBS_PER_BRICK` of
     /// `[min, max, missing, 0]`, x fastest).
     pub fn write_subs(&self, queue: &wgpu::Queue, slot: [u32; 3], subs: &[[f32; 4]]) {
-        let [sx, sy, _] = self.slots;
-        let index = u64::from(slot[0] + sx * (slot[1] + sy * slot[2]));
-        let offset = index * SUBS_PER_BRICK * 16;
+        let offset = self.slot_index(slot) * SUBS_PER_BRICK * 16;
         queue.write_buffer(&self.subs, offset, bytemuck::cast_slice(subs));
         self.version.fetch_add(1, Ordering::Relaxed);
     }

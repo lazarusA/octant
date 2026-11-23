@@ -119,11 +119,15 @@ pub(super) fn value_encoding(lo: f32, hi: f32) -> (f32, f32) {
     (lo, if tiny { lo.abs().max(1.0) } else { span })
 }
 
+/// `data_type` stripped of whitespace and numpy endianness prefixes.
+fn bare_type(data_type: &str) -> &str {
+    data_type.trim().trim_start_matches(['<', '>', '|'])
+}
+
 /// The offset that makes 8-bit integer data of `data_type` start at 0 in a
 /// byte atlas (`uint8` 0, `int8` -128), `None` for other types.
 pub(super) fn byte_offset(data_type: &str) -> Option<f32> {
-    let t = data_type.trim().trim_start_matches(['<', '>', '|']);
-    match t.to_ascii_lowercase().as_str() {
+    match bare_type(data_type).to_ascii_lowercase().as_str() {
         "uint8" | "u8" | "u1" => Some(0.0),
         "int8" | "i8" | "i1" => Some(-128.0),
         _ => None,
@@ -147,8 +151,7 @@ pub(super) const F16_WHOLE_SPAN: f32 = 2048.0;
 
 /// Whether `data_type` is an integer type wider than a byte.
 fn wide_integer_type(data_type: &str) -> bool {
-    let t = data_type.trim().trim_start_matches(['<', '>', '|']);
-    let t = t.to_ascii_lowercase();
+    let t = bare_type(data_type).to_ascii_lowercase();
     let bits = t
         .strip_prefix("uint")
         .or_else(|| t.strip_prefix("int"))

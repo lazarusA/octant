@@ -79,7 +79,9 @@ fn volume_mode_timed() {
         let renderer = renderer_n(&device, &queue, &data, N, filterable);
         // The same volume with every block open: what skipping saves.
         let open = renderer_n(&device, &queue, &data, N, filterable);
-        open.textures.blocks.open_all(&queue);
+        if let Some(t) = &open.textures {
+            t.blocks.open_all(&queue);
+        }
         for (mode, algorithm, transparency) in [
             ("dvr", 0, true),
             ("dvr opaque", 0, false),
@@ -139,7 +141,6 @@ fn bricked_of(
     let slots = if spread { [8, 8, 6] } else { [b; 3] };
     let renderer = super::VolumeRenderer::new_bricked(
         device,
-        queue,
         format,
         (slots, [b; 3], super::bricks::AtlasTexel::Half),
     )

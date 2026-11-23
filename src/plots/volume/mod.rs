@@ -76,11 +76,10 @@ pub struct VolumeRenderer {
     pipeline_layout: wgpu::PipelineLayout,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    textures: VolumeTextures,
+    textures: Option<VolumeTextures>,
     blit: Blit,
     cache: Mutex<RenderCache>,
-    /// A bricked volume's atlas and table (`new_bricked`); its `textures`
-    /// are then a one-voxel stand-in for the bindings it does not use.
+    /// A bricked volume's atlas and table (`new_bricked`).
     bricks: Option<bricks::BrickTextures>,
 }
 
@@ -154,7 +153,7 @@ impl VolumeRenderer {
             pipeline_layout: pipeline::create_pipeline_layout(device, &layout),
             uniform_buffer,
             bind_group,
-            textures,
+            textures: Some(textures),
             blit: Blit::new(device, target_format),
             cache: Mutex::new(RenderCache::default()),
             bricks: None,
@@ -164,18 +163,23 @@ impl VolumeRenderer {
     }
 
     pub fn encoding(&self) -> VolumeEncoding {
-        self.textures.encoding
+        self.textures
+            .as_ref()
+            .map_or(VolumeEncoding::Scalar, |t| t.encoding)
     }
 
     /// Uploads the whole volume; `data` must match the texture's voxel count.
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
-        self.textures
-            .upload_planes(queue, data, 0..self.textures.dims.d);
+        if let Some(t) = &self.textures {
+            t.upload_planes(queue, data, 0..t.dims.d);
+        }
     }
 
     /// Uploads Z planes `z` of the full volume `data` (and the planes next to them).
     pub fn update_planes(&self, queue: &wgpu::Queue, data: &[f32], z: std::ops::Range<usize>) {
-        self.textures.upload_planes(queue, data, z);
+        if let Some(t) = &self.textures {
+            t.upload_planes(queue, data, z);
+        }
     }
 
     /// Blends `channels` into the textures of a composite volume, unless
@@ -187,16 +191,20 @@ impl VolumeRenderer {
         encoder: &mut wgpu::CommandEncoder,
         channels: &crate::plots::ChannelDraw,
     ) {
-        if self.textures.encoding != VolumeEncoding::PackedRgb {
+        let Some(textures) = self
+            .textures
+            .as_ref()
+            .filter(|t| t.encoding == VolumeEncoding::PackedRgb)
+        else {
             return;
-        }
+        };
         channels.renderer.update_params(queue, &channels.params);
-        let targets = self.textures.bake_targets();
+        let targets = textures.bake_targets();
         if channels
             .renderer
             .bake_volume(device, encoder, &channels.params, &targets)
         {
-            self.textures.mark_baked();
+            textures.mark_baked();
         }
     }
 
@@ -208,11 +216,18 @@ impl VolumeRenderer {
                 composite: bricks.color(),
             };
         }
-        let Dims { w, h, d } = self.textures.dims;
+        let Some(textures) = &self.textures else {
+            return VolumeState {
+                dims: [1, 1, 1],
+                has_invalid: false,
+                composite: false,
+            };
+        };
+        let Dims { w, h, d } = textures.dims;
         VolumeState {
             dims: [w as u32, h as u32, d as u32],
-            has_invalid: self.textures.has_invalid(),
-            composite: self.textures.encoding == VolumeEncoding::PackedRgb,
+            has_invalid: textures.has_invalid(),
+            composite: textures.encoding == VolumeEncoding::PackedRgb,
         }
     }
 }

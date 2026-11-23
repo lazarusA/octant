@@ -21,7 +21,7 @@ const PER_PIXEL: u8 = 2;
 fn uniform(device: &wgpu::Device, queue: &wgpu::Queue, mixed: bool) -> VolumeRenderer {
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let texels = ([3, 3, 1], [2, 2, 2], AtlasTexel::Half);
-    let renderer = VolumeRenderer::new_bricked(device, queue, format, texels).expect("fits");
+    let renderer = VolumeRenderer::new_bricked(device, format, texels).expect("fits");
     let bricks = renderer.bricks().expect("bricked");
     let cube = vec![half::f16::from_f32(0.5).to_bits(); (STORED * STORED * STORED) as usize];
     let open = [[f32::MIN, f32::MAX, 0.0, 0.0]; 512];

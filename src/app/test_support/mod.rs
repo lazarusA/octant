@@ -15,7 +15,7 @@ use crate::data::{BlockCacheKey, DataSource, Dataset, DatasetMetadata, SliceRequ
 
 mod pyramid;
 
-pub(crate) use pyramid::{big_pyramid_app, iso_pyramid_app, pyramid_app};
+pub(crate) use pyramid::{big_pyramid_app, iso_pyramid_app, pyramid_app, time_depth_pyramid_app};
 
 pub(crate) const TARGET: &str = "memory://overlay";
 

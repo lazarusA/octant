@@ -34,23 +34,32 @@ fn subs_of(c: usize) -> Range<usize> {
 }
 
 /// Widens `subs` with the f16 `values` (x fastest, decoded by `encoding`)
-/// over the stored box `region`.
+/// over the stored box `region`, returning the decoded `(min, max)` range
+/// and whether any voxel in `values` was missing.
 pub(super) fn widen_subs(
     subs: &mut [[f32; 4]],
     region: &[Range<usize>; 3],
     values: &[u16],
     encoding: Encoding,
-) {
+) -> ((f32, f32), bool) {
     let mut values = values.iter();
+    let (mut lo, mut hi) = (f32::INFINITY, f32::NEG_INFINITY);
+    let mut missing = false;
     for z in region[2].clone() {
         let sz = subs_of(z);
         for y in region[1].clone() {
             let sy = subs_of(y);
             for x in region[0].clone() {
                 let Some(&h) = values.next() else {
-                    return;
+                    return ((lo, hi), missing);
                 };
                 let v = encoding.decode(h);
+                if v.is_finite() {
+                    lo = lo.min(v);
+                    hi = hi.max(v);
+                } else {
+                    missing = true;
+                }
                 for k in sz.clone() {
                     for j in sy.clone() {
                         for i in subs_of(x) {
@@ -63,6 +72,7 @@ pub(super) fn widen_subs(
             }
         }
     }
+    ((lo, hi), missing)
 }
 
 fn widen(s: &mut [f32; 4], v: f32) {
@@ -74,12 +84,13 @@ fn widen(s: &mut [f32; 4], v: f32) {
     }
 }
 
-/// The sub-block ranges of a whole stored cube of f16 `values`.
-pub(super) fn sub_ranges(values: &[u16], encoding: Encoding) -> SubRanges {
+/// Single-pass valid range, missing flag, and sub-block ranges of a whole
+/// stored cube of f16 `values` (apron included: rays near its faces read it).
+pub(super) fn sub_ranges(values: &[u16], encoding: Encoding) -> ((f32, f32), bool, SubRanges) {
     let mut subs = vec![[f32::INFINITY, f32::NEG_INFINITY, 0.0, 0.0]; SUBS];
     let n = STORED as usize;
-    widen_subs(&mut subs, &[0..n, 0..n, 0..n], values, encoding);
-    subs
+    let (range, missing) = widen_subs(&mut subs, &[0..n, 0..n, 0..n], values, encoding);
+    (range, missing, subs)
 }
 
 #[cfg(test)]
@@ -110,7 +121,9 @@ mod tests {
             scale: 100.0,
             byte: false,
         };
-        let subs = sub_ranges(&values, encoding);
+        let (range, missing, subs) = sub_ranges(&values, encoding);
+        assert_eq!(range, (0.0, 100.0));
+        assert!(!missing);
         let at = |i: usize, j: usize, k: usize| subs[(k * SUB + j) * SUB + i];
         assert_eq!(at(2, 2, 2)[1], 100.0);
         assert_eq!(at(3, 2, 2)[1], 0.0, "a sub-block away stays dark");

@@ -83,14 +83,8 @@ impl VolumeRenderer {
             b.feedback.clear(encoder);
         }
         let rows = (size[1] * band / bands)..(size[1] * (band + 1) / bands);
-        if let (Some(pipeline), Some(frame)) = (&cache.pipelines[algorithm], &cache.next) {
-            self.raymarch(
-                encoder,
-                pipeline,
-                atlas,
-                &frame.view,
-                (rows, size[0], band == 0),
-            );
+        if let (Some(p), Some(f)) = (&cache.pipelines[algorithm], &cache.next) {
+            self.raymarch(encoder, p, atlas, &f.view, (rows, size[0], band == 0));
         }
         self.finish_band(&mut cache, encoder, (params, bands));
         true
@@ -143,14 +137,8 @@ impl VolumeRenderer {
         let shown = cache.frame.take().filter(|f| f.size == size);
         cache.frame = Some(shown.unwrap_or_else(|| self.blit.create_frame(device, size)));
         cache.next_key = None;
-        if let (Some(pipeline), Some(frame)) = (&cache.pipelines[algorithm], &cache.frame) {
-            self.raymarch(
-                encoder,
-                pipeline,
-                atlas,
-                &frame.view,
-                (0..size[1], size[0], true),
-            );
+        if let (Some(p), Some(f)) = (&cache.pipelines[algorithm], &cache.frame) {
+            self.raymarch(encoder, p, atlas, &f.view, (0..size[1], size[0], true));
         }
         cache.key = Some(key);
     }
@@ -183,7 +171,8 @@ impl VolumeRenderer {
         uniforms.record_seen = u32::from(banded && self.bricks.is_some());
         FrameKey {
             uniforms,
-            data_version: self.textures.version() + self.bricks.as_ref().map_or(0, |b| b.version()),
+            data_version: self.textures.as_ref().map_or(0, |t| t.version())
+                + self.bricks.as_ref().map_or(0, |b| b.version()),
             generation: registry::generation(),
             size,
         }

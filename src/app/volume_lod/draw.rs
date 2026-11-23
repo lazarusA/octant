@@ -7,9 +7,10 @@ use std::sync::Arc;
 
 use super::Lod;
 use crate::app::OctantApp;
+use crate::app::detail::LevelRead;
 use crate::app::layers::{Layer, LayerId};
 use crate::data::OctantBlock;
-use crate::data::multiscale::bricks::BRICK;
+use crate::data::multiscale::bricks::{APRON, BRICK, BrickKey};
 use crate::plots::{VolumeRenderer, VolumeUniformParams};
 
 impl OctantApp {
@@ -111,16 +112,13 @@ impl Lod {
         pick: fn(f32, f32) -> f32,
     ) -> Option<f32> {
         let center = std::array::from_fn(|i| (lo[i] + hi[i]) / 2.0);
-        let lvl = self.set.level(level)?;
+        self.set.level(level)?;
         let axes = self.block_axes(block)?;
-        // The box's cells inside the block: the hover runs every frame.
         let cells: [std::ops::Range<usize>; 3] = std::array::from_fn(|i| {
-            let d = self.dims[i];
-            let f = lvl.factor.get(d).copied().unwrap_or(1.0);
-            let off = lvl.offset.get(d).copied().unwrap_or(0.0);
+            let (f, off) = self.level_scale(level, i);
             let first = ((lo[i] - off) / f - 0.5).ceil().max(0.0) as usize;
             let end = ((hi[i] - off) / f - 0.5).ceil().max(0.0) as usize;
-            let (_, origin, len) = axes[i];
+            let (_, origin, len, _) = axes.axes[i];
             first.max(origin)..end.min(origin + len)
         });
         let mut best: Option<f32> = None;
@@ -140,16 +138,24 @@ impl Lod {
 
     /// `block`'s value (a brick of `level`) at level-0 position `q`.
     fn block_value(&self, block: &OctantBlock, level: usize, q: [f64; 3]) -> Option<f32> {
-        let level = self.set.level(level)?;
+        self.set.level(level)?;
         let cell: [u64; 3] = std::array::from_fn(|i| {
-            let d = self.dims[i];
-            let (f, off) = (
-                level.factor.get(d).copied().unwrap_or(1.0),
-                level.offset.get(d).copied().unwrap_or(0.0),
-            );
+            let (f, off) = self.level_scale(level, i);
             ((q[i] - off) / f).floor().max(0.0) as u64
         });
         self.cell_value(block, cell)
+    }
+
+    /// Factor and offset of `level` along spatial axis `i` (`0..3`).
+    fn level_scale(&self, level: usize, i: usize) -> (f64, f64) {
+        let Some(lvl) = self.set.level(level) else {
+            return (1.0, 0.0);
+        };
+        let d = self.dims[i];
+        (
+            lvl.factor.get(d).copied().unwrap_or(1.0),
+            lvl.offset.get(d).copied().unwrap_or(0.0),
+        )
     }
 
     /// `block`'s value at its level's cell `cell` (x, y, z), clamped into
@@ -158,34 +164,81 @@ impl Lod {
         value_at(block, &self.block_axes(block)?, cell.map(|c| c as usize))
     }
 
-    /// `block`'s x, y and z: its dimension, where it starts on the level
-    /// and its length (resolved once for a loop over its cells).
+    /// `block`'s x, y and z: its dimension, where it starts on the level,
+    /// its length and stride (resolved once for a loop over its cells).
     pub(super) fn block_axes(&self, block: &OctantBlock) -> Option<BlockAxes> {
-        let mut axes = [(0, 0, 0); 3];
-        for (i, axis) in axes.iter_mut().enumerate() {
-            let name = self.set.dims.get(self.dims[i])?;
-            let k = block.dimension_names.iter().position(|n| n == name)?;
-            *axis = (k, *block.origin.get(k)?, *block.shape.get(k)?);
+        self.block_axes_for(block, None)
+    }
+
+    /// [`Self::block_axes`] with non-spatial dimensions fixed at `read`'s step.
+    pub(super) fn block_axes_for(
+        &self,
+        block: &OctantBlock,
+        read: Option<&LevelRead>,
+    ) -> Option<BlockAxes> {
+        let (spatial, fixed) = match read {
+            Some(r) => {
+                let (s, f) = r.block_axes(block)?;
+                (s, Some(f))
+            }
+            None => {
+                let mut s = [0; 3];
+                for (i, slot) in s.iter_mut().enumerate() {
+                    let name = self.set.dims.get(self.dims[i])?;
+                    *slot = block.dimension_names.iter().position(|n| n == name)?;
+                }
+                (s, None)
+            }
+        };
+        let mut axes = [(0, 0, 0, 0); 3];
+        for (i, &k) in spatial.iter().enumerate() {
+            let len = *block.shape.get(k)?;
+            if len == 0 {
+                return None;
+            }
+            axes[i] = (k, *block.origin.get(k)?, len, *block.strides.get(k)?);
         }
-        Some(axes)
+        let base = fixed.map_or(0, |f| {
+            (0..block.rank())
+                .filter(|d| !spatial.contains(d))
+                .map(|d| {
+                    f.get(d).copied().unwrap_or(0) * block.strides.get(d).copied().unwrap_or(0)
+                })
+                .sum()
+        });
+        Some(BlockAxes { axes, base })
     }
 }
 
-/// Per x, y, z: a block's dimension, its start on the level and its length.
-pub(super) type BlockAxes = [(usize, usize, usize); 3];
+/// Per x, y, z: a block's dimension, its start on the level, its length and
+/// stride, plus the flat offset of any fixed non-spatial dimensions.
+pub(super) struct BlockAxes {
+    pub axes: [(usize, usize, usize, usize); 3],
+    pub base: usize,
+}
+
+impl BlockAxes {
+    /// Flat offset along spatial axis `i` for level cell `cell`, clamped
+    /// into the block.
+    pub fn cell_offset(&self, block: &OctantBlock, i: usize, cell: usize) -> usize {
+        let (k, origin, len, stride) = self.axes[i];
+        let local = cell.saturating_sub(origin).min(len.saturating_sub(1));
+        block.oriented_index(k, local) * stride
+    }
+
+    /// Flat offset along spatial axis `i` for stored cube index `s` of brick `key`.
+    pub fn stored_offset(&self, block: &OctantBlock, key: BrickKey, i: usize, s: usize) -> usize {
+        let cell = (key.b[i] as usize * BRICK as usize + s).saturating_sub(APRON as usize);
+        self.cell_offset(block, i, cell)
+    }
+}
 
 /// `block`'s value at its level's cell `cell` (x, y, z) along `axes`,
-/// clamped into the block; other dimensions at their first index.
+/// clamped into the block.
 pub(super) fn value_at(block: &OctantBlock, axes: &BlockAxes, cell: [usize; 3]) -> Option<f32> {
-    // On the stack: the hover and aprons read many.
-    let mut index = [0usize; 8];
-    let rank = block.rank();
-    if rank > index.len() {
-        return None;
-    }
-    for (i, &(k, origin, len)) in axes.iter().enumerate() {
-        let local = cell[i].saturating_sub(origin).min(len.saturating_sub(1));
-        index[k] = block.oriented_index(k, local);
-    }
-    block.get(&index[..rank])
+    let offset = axes.base
+        + axes.cell_offset(block, 0, cell[0])
+        + axes.cell_offset(block, 1, cell[1])
+        + axes.cell_offset(block, 2, cell[2]);
+    block.values.get(offset).copied()
 }

@@ -151,7 +151,7 @@ fn gpu_volume_rendering() {
 
     // A volume with no data draws nothing.
     let empty = renderer(&device, &queue, &vec![f32::NAN; data.len()], false);
-    assert!(empty.textures.has_invalid());
+    assert!(empty.textures.as_ref().is_some_and(|t| t.has_invalid()));
     assert_eq!(
         mean_alpha(&render(&device, &queue, &empty, &params(0, 1.0, 0))),
         0.0

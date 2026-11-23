@@ -7,12 +7,10 @@ use bytemuck::Zeroable;
 use wgpu::util::DeviceExt;
 
 use super::bricks::{AtlasTexel, BrickTextures};
-use super::encode::Dims;
 use super::frame::Blit;
 use super::render::RenderCache;
-use super::textures::VolumeTextures;
 use super::uniforms::VolumeUniforms;
-use super::{VolumeEncoding, VolumeRenderer, pipeline, view_entry};
+use super::{VolumeRenderer, pipeline, view_entry};
 
 impl VolumeRenderer {
     /// A bricked volume: an atlas of `slots` per axis and a table of `grid`
@@ -20,26 +18,23 @@ impl VolumeRenderer {
     /// the device's 3D texture size.
     pub fn new_bricked(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
         target_format: wgpu::TextureFormat,
         (slots, grid, texel): ([u32; 3], [u32; 3], AtlasTexel),
     ) -> Option<Self> {
         let bricks = BrickTextures::new(device, slots, grid, texel)?;
-        let one = Dims { w: 1, h: 1, d: 1 };
-        let textures = VolumeTextures::new(device, queue, one, VolumeEncoding::Scalar)?;
         let layout = bricked_layout(device);
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Bricked Volume Uniform Buffer"),
             contents: bytemuck::bytes_of(&VolumeUniforms::zeroed()),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let bind_group = bricked_bind_group(device, &layout, &uniform_buffer, (&bricks, &textures));
+        let bind_group = bricked_bind_group(device, &layout, &uniform_buffer, &bricks);
         Some(Self {
             module: pipeline::create_bricked_module(device),
             pipeline_layout: pipeline::create_pipeline_layout(device, &layout),
             uniform_buffer,
             bind_group,
-            textures,
+            textures: None,
             blit: Blit::new(device, target_format),
             cache: Mutex::new(RenderCache::default()),
             bricks: Some(bricks),
@@ -52,9 +47,10 @@ impl VolumeRenderer {
     }
 }
 
-/// `@group(0)` of a bricked volume: the dense layout (the atlas at 1, always
-/// filterable), the bricks' uniforms at 5, their table at 6 and the slots'
-/// value ranges at 7.
+/// `@group(0)` of a bricked volume: the frame uniforms at 0, the brick atlas
+/// at 1 (always filterable), the sampler at 3, the bricks' uniforms at 5,
+/// their table at 6, slot ranges at 7, ray feedback at 8 and sub-block ranges
+/// at 9.
 pub(super) fn bricked_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::D3;
     let stage = wgpu::ShaderStages::VERTEX_FRAGMENT;
@@ -63,14 +59,12 @@ pub(super) fn bricked_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         entries: &[
             pipeline::uniform_entry(0, stage),
             pipeline::texture_entry(1, true, D3),
-            pipeline::texture_entry(2, true, D3),
             wgpu::BindGroupLayoutEntry {
                 binding: 3,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },
-            pipeline::texture_entry(4, false, D3),
             pipeline::uniform_entry(5, wgpu::ShaderStages::FRAGMENT),
             storage_entry(7, true),
             storage_entry(9, true),
@@ -104,14 +98,13 @@ fn storage_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// `@group(0)` of a bricked volume over `layout`: the frame's `uniforms`,
-/// the bricks' atlas, table and buffers, and the dense textures' unused
-/// validity and blocks.
+/// `@group(0)` of a bricked volume over `layout`: the frame's `uniforms` and
+/// the bricks' atlas, table and buffers.
 fn bricked_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     uniforms: &wgpu::Buffer,
-    (bricks, textures): (&BrickTextures, &VolumeTextures),
+    bricks: &BrickTextures,
 ) -> wgpu::BindGroup {
     let sampler = pipeline::create_sampler(device);
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -123,12 +116,10 @@ fn bricked_bind_group(
                 resource: uniforms.as_entire_binding(),
             },
             view_entry(1, &bricks.atlas_view),
-            view_entry(2, &textures.validity_view),
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Sampler(&sampler),
             },
-            view_entry(4, &textures.blocks.view),
             wgpu::BindGroupEntry {
                 binding: 5,
                 resource: bricks.uniforms.as_entire_binding(),

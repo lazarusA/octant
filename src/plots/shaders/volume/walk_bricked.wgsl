@@ -211,8 +211,7 @@ fn walk_block_open(
     if (any(w.cell != *last)) {
         *last = w.cell;
         let e = w.entry;
-        let slot = e.x + bricked.slots.x * (e.y + bricked.slots.y * e.z);
-        *open = e.w != 0u && block_open(brick_ranges[slot], kind, maximum);
+        *open = e.w != 0u && block_open(brick_ranges[slot_index(e.xyz)], kind, maximum);
     }
     return *open;
 }

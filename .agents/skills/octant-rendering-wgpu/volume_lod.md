@@ -124,18 +124,23 @@ bricks no longer wanted are cancelled (`fetch.rs` `drop_unwanted_reads`).
   neighbour's channels over just the apron's box (`apron_color.rs`).
 - Each slot's valid range and missing flag go to a storage buffer
   (`write_range`), and per 8^3 sub-block of its brick (and one cell around)
-  to another (`subblocks.rs`, `write_subs`), for skipping; composites are
-  always open. Filling a neighbour's apron widens its ranges (`ranges.rs`
-  `widen_apron`), and its missing flag when the apron brings NaN; a brick
-  placed beside residents takes their missing cells the same way
-  (`has_missing` after `stitch_own`). Placement: `place.rs`.
+  to another (`subblocks.rs` `sub_ranges`, `write_subs`, scanned in one pass
+  with the brick's range and missing flag), for skipping; composites are
+  always open. Scalar bricks and aprons read straight from the block with
+  column stride offsets (`apron.rs` `region_values`, `draw.rs`
+  `block_axes_for`). Filling a neighbour's apron widens its ranges (`ranges.rs`
+  `widen_apron`) and its missing flag when the apron brings NaN; finer
+  bricks widen their ancestors' ranges and missing flags (`widen_ancestors`,
+  `absorb_descendants`). Placement: `place.rs`.
 
 ## GPU (`plots/volume/bricks.rs`, `bricked.rs`, `feedback.rs`)
 
-`VolumeRenderer::new_bricked` builds the dense renderer's pipeline over:
-binding 1 the atlas, 5 the `Bricked` uniforms (window, flips, grid, value
-encoding, slots, per level factor, offset and brick count), 6 the table
-(`Rgba8Uint`), 7 the slots' ranges, 8 the ray feedback bits, 9 the
+`VolumeRenderer::new_bricked` builds the bricked pipeline without allocating
+dense textures (`textures: None`; `volume_validity` and `volume_blocks` live
+in `sample_dense.wgsl` only), over:
+binding 1 the atlas, 3 the sampler, 5 the `Bricked` uniforms (window, flips,
+grid, value encoding, slots, per level factor, offset and brick count), 6 the
+table (`Rgba8Uint`), 7 the slots' ranges, 8 the ray feedback bits, 9 the
 sub-block ranges (layout in `bricked.rs`, types in `brick_types.rs`). The shader is
 the dense one with `sample_bricked.wgsl` and `walk_bricked.wgsl` in place of
 `sample_dense.wgsl` and `walk.wgsl` (same function names); `MAX_SAMPLES` is

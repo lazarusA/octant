@@ -65,7 +65,7 @@ impl OctantApp {
     }
 
     /// The block request reading `key`'s cells and apron.
-    fn brick_read(&self, key: BrickKey) -> Option<LevelRead> {
+    pub(super) fn brick_read(&self, key: BrickKey) -> Option<LevelRead> {
         let lod = self.layers.base.data.volume_lod.lod.as_ref()?;
         let window = lod.bricks().window(key)?;
         let mut sel = to_level(self.plotted(), usize::from(key.level))?;

@@ -73,7 +73,6 @@ pub(super) fn bricked_of(
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let renderer = VolumeRenderer::new_bricked(
         device,
-        queue,
         format,
         ([2, 2, 2], [2, 2, 2], super::bricks::AtlasTexel::Half),
     )
@@ -122,7 +121,6 @@ fn coarse_only(device: &wgpu::Device, queue: &wgpu::Queue) -> VolumeRenderer {
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let renderer = VolumeRenderer::new_bricked(
         device,
-        queue,
         format,
         ([1, 1, 1], [2, 2, 2], super::bricks::AtlasTexel::Half),
     )
