@@ -104,10 +104,52 @@ pub(super) fn deflate(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
     read_capped(flate2::read::ZlibDecoder::new(input), cap, UP_FRONT_BYTES).map_err(tile_error)
 }
 
+/// C zstd on the desktop: 2-5x faster than `ruzstd`, and linked there anyway (async-tiff,
+/// icechunk). It reads every frame of a tile and passes over skippable ones.
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn zstd(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
     // The input is already in memory: no BufReader of its own.
     let decoder = zstd::Decoder::with_buffer(input).map_err(tile_error)?;
     read_capped(decoder, cap, UP_FRONT_BYTES).map_err(tile_error)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) use zstd_pure as zstd;
+
+/// Pure Rust (`ruzstd`) in the browser, which has no C zstd of its own (only
+/// `zstd_shim.rs`, which reads one frame). A tile may hold several frames, as C zstd
+/// reads them; skippable frames are passed over.
+#[cfg(any(target_arch = "wasm32", test))]
+pub(super) fn zstd_pure(mut input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
+    use ruzstd::decoding::StreamingDecoder;
+    use ruzstd::decoding::errors::{FrameDecoderError, ReadFrameHeaderError};
+    use std::io::Read;
+
+    let mut out = Vec::with_capacity(UP_FRONT_BYTES.min(cap));
+    while !input.is_empty() {
+        let frame = match StreamingDecoder::new(&mut input) {
+            Ok(frame) => frame,
+            Err(FrameDecoderError::ReadFrameHeaderError(ReadFrameHeaderError::SkipFrame {
+                length,
+                ..
+            })) => {
+                input = input
+                    .get(length as usize..)
+                    .ok_or_else(|| tile_error("zstd skippable frame past the tile's end"))?;
+                continue;
+            }
+            Err(e) => return Err(tile_error(e)),
+        };
+        let left = cap.saturating_sub(out.len());
+        frame
+            .take(u64::try_from(left).unwrap_or(u64::MAX).saturating_add(1))
+            .read_to_end(&mut out)
+            .map_err(tile_error)?;
+        if out.len() > cap {
+            return Err(tile_error(exceeded(cap)));
+        }
+    }
+    Ok(out)
 }
 
 #[derive(Debug, Clone)]

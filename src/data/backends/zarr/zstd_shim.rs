@@ -3,8 +3,8 @@
 
 /// A decoder holding the zstd dictionary `dict` (`ZSTD_DCtx_loadDictionary`): Icechunk 2
 /// manifests compress their virtual chunks' locations against one. `Ok(None)` for an empty
-/// `dict`, which as in zstd means none (`zstd::Decoder` loads one with every stream: GeoTIFF
-/// tiles); an error when `dict` is not a zstd dictionary.
+/// `dict`, which as in zstd means none (`zstd::Decoder` loads one with every stream: async-tiff's
+/// zstd decoder); an error when `dict` is not a zstd dictionary.
 // shortcut: trained (magic-numbered) dictionaries only, as Icechunk writes, and frames
 // naming their dictionary's id (zstd's default); raw-content dictionaries or id-less
 // frames would need ruzstd support (`force_dict`). Only `ZSTD_decompressDCtx` decodes
