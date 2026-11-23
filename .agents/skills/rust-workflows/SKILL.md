@@ -70,6 +70,23 @@ cargo run --release
 
 Octant supports browser execution via WASM and WebGPU/WebGL2:
 
+The wasm build compiles C zstd (`zstd-sys`, through `async-tiff`, `icechunk-format` and
+`zstd`) and needs a C compiler that targets `wasm32-unknown-unknown`. Linux clang does
+(CI); Apple clang does not (since Command Line Tools 26.6: "No available targets are
+compatible with triple"). On macOS, unpack LLVM's own clang (native arm64, no Homebrew or
+Rosetta) and point the wasm build at it; desktop builds keep Apple clang:
+
+```bash
+V=23.1.5; N=LLVM-$V-macOS-ARM64
+curl -fLO https://github.com/llvm/llvm-project/releases/download/llvmorg-$V/$N.tar.xz
+mkdir -p ~/.local/llvm-wasm
+tar -xJf $N.tar.xz -C ~/.local/llvm-wasm --strip-components=1 \
+  $N/bin/clang $N/bin/clang-${V%%.*} $N/bin/llvm-ar $N/lib/clang/${V%%.*}/include
+# In ~/.zshrc:
+export CC_wasm32_unknown_unknown="$HOME/.local/llvm-wasm/bin/clang"
+export AR_wasm32_unknown_unknown="$HOME/.local/llvm-wasm/bin/llvm-ar"
+```
+
 ```bash
 # Check WASM32 compilation
 cargo check --target wasm32-unknown-unknown

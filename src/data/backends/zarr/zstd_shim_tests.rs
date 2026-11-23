@@ -37,8 +37,8 @@ fn bytes_that_are_no_dictionary_are_refused() {
     assert!(dictionary_decoder(b"not a zstd dictionary").is_err());
 }
 
-/// `zstd::Decoder` loads an empty dictionary with every stream (GeoTIFF zstd tiles in the
-/// browser): it means none, as in zstd, never a failure.
+/// `zstd::Decoder` loads an empty dictionary with every stream (async-tiff's own zstd
+/// decoder): it means none, as in zstd, never a failure.
 #[test]
 fn an_empty_dictionary_is_none() {
     assert!(matches!(dictionary_decoder(&[]), Ok(None)));
