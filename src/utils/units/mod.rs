@@ -3,6 +3,9 @@
 pub mod bytes;
 pub mod calendar;
 pub mod cf;
+pub mod coverage;
+#[cfg(test)]
+mod coverage_tests;
 pub mod dates;
 pub mod decimals;
 pub mod format;

@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> &'static str {
             "Coordinates of '{}' failed to load ({}); axes show indices"
         }
         NoticesKey::CoastlinesUnavailable => "Coastlines unavailable",
+        NoticesKey::NoDataAtStep => "No data at this step",
+        NoticesKey::NoDataAtStepDetail => "'{}' has no values at this step: the store holds no data here. Try another step.",
+        NoticesKey::LargeChunks => "Large chunks",
+        NoticesKey::LargeChunksDetail => "'{}' is stored in chunks of {}: every step downloads at least one whole chunk, so steps load slowly.",
         NoticesKey::VolumeTooLargeForGpu => "Volume too large for the GPU",
         NoticesKey::VolumeLodOff => "Detail by view is off for this volume",
         NoticesKey::VolumeLodOffDetail => {

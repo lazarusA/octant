@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Не удалось загрузить координаты '{}' ({}); на осях показаны индексы"
         }
         NoticesKey::CoastlinesUnavailable => "Береговые линии недоступны",
+        NoticesKey::NoDataAtStep => "Нет данных на этом шаге",
+        NoticesKey::NoDataAtStepDetail => "У '{}' нет значений на этом шаге: в хранилище здесь нет данных. Попробуйте другой шаг.",
+        NoticesKey::LargeChunks => "Крупные фрагменты",
+        NoticesKey::LargeChunksDetail => "'{}' хранится фрагментами по {}: каждый шаг загружает как минимум один фрагмент целиком, поэтому шаги загружаются медленно.",
         NoticesKey::VolumeTooLargeForGpu => "Объём слишком велик для GPU",
         NoticesKey::VolumeLodOff => "Детализация по виду выключена для этого объёма",
         NoticesKey::VolumeLodOffDetail => {

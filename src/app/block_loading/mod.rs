@@ -1,6 +1,7 @@
 //! Loading path through `DatasetManager`/`BlockCache`/`BlockPrefetcher`.
 
 mod arrival;
+mod arrival_notices;
 #[cfg(test)]
 mod arrival_tests;
 pub(crate) mod block_axes;
@@ -21,6 +22,7 @@ mod pacing_tests;
 pub mod prefetch;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod prefetch_network_tests;
+mod prefetch_pacing;
 #[cfg(test)]
 mod prefetch_tests;
 pub mod projection;
@@ -33,6 +35,11 @@ pub mod projection_hash;
 mod slow_store;
 pub mod staging;
 pub mod step_nav;
+mod time_coverage;
+#[cfg(test)]
+mod time_coverage_late_tests;
+#[cfg(test)]
+mod time_coverage_tests;
 pub mod view_filter;
 mod volume_ring;
 pub mod volume_slab;

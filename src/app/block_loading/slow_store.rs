@@ -54,8 +54,26 @@ pub(super) fn slow_app(delay: Duration) -> OctantApp {
 
 /// [`slow_app`] over a store that may fail (`SlowStore::failed`).
 pub(super) fn store_app(delay: Duration, failed: Option<Arc<Mutex<Vec<usize>>>>) -> OctantApp {
+    let mut app = unplotted_app(delay, failed, |_| {});
+    app.plot_selection();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while app.layers.base.data.matrix.is_none() {
+        assert!(Instant::now() < deadline, "the first block never arrived");
+        app.poll_block_prefetch_results();
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    app
+}
+
+/// The slow store's app before its first Plot, its metadata changed by `edit`.
+pub(super) fn unplotted_app(
+    delay: Duration,
+    failed: Option<Arc<Mutex<Vec<usize>>>>,
+    edit: impl FnOnce(&mut crate::data::DatasetMetadata),
+) -> OctantApp {
     let inner = ProceduralBlockStore::open(TARGET).expect("open procedural store");
-    let meta = inner.inspect().expect("inspect");
+    let mut meta = inner.inspect().expect("inspect");
+    edit(&mut meta);
     let kind = StoreKind::ProceduralVolume4D;
     let source_id = StoreKind::make_source_id(kind, TARGET);
     let source = DataSource::new(&source_id, kind.to_data_source_kind(), TARGET, "Store");
@@ -76,12 +94,5 @@ pub(super) fn store_app(delay: Duration, failed: Option<Arc<Mutex<Vec<usize>>>>)
     app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
     app.prefetch_threads = 1;
-    app.plot_selection();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while app.layers.base.data.matrix.is_none() {
-        assert!(Instant::now() < deadline, "the first block never arrived");
-        app.poll_block_prefetch_results();
-        std::thread::sleep(Duration::from_millis(1));
-    }
     app
 }

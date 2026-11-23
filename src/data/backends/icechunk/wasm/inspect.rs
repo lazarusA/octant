@@ -29,13 +29,13 @@ use crate::utils::units::calculate_variable_size_bytes;
 #[cfg(target_arch = "wasm32")]
 #[allow(clippy::single_range_in_vec_init)]
 pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, String> {
-    let clean_url = url.trim_start_matches("icechunk+").trim_end_matches('/');
+    let clean_url = super::store::repo_url(url);
     if clean_url.is_empty() {
         return Err("URL is empty".to_string());
     }
 
-    let store = WasmIcechunkBlockStore::get_or_create(clean_url);
-    let (snap_id, spec_version) = resolve_snapshot_id(clean_url).await?;
+    let store = WasmIcechunkBlockStore::get_or_create(&clean_url);
+    let (snap_id, spec_version) = resolve_snapshot_id(&clean_url).await?;
 
     log::info!("[WASM Icechunk] Resolved snapshot ID: {snap_id} (spec: {spec_version:?})");
 
@@ -170,7 +170,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
     let dataset_name = clean_url
         .split('/')
         .next_back()
-        .unwrap_or(clean_url)
+        .unwrap_or(&clean_url)
         .to_string();
 
     let dataset_metadata = DatasetMetadata {

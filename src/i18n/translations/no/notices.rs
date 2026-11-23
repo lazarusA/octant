@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Koordinatene til '{}' kunne ikke lastes inn ({}); aksene viser indekser"
         }
         NoticesKey::CoastlinesUnavailable => "Kystlinjer utilgjengelige",
+        NoticesKey::NoDataAtStep => "Ingen data i dette trinnet",
+        NoticesKey::NoDataAtStepDetail => "'{}' har ingen verdier i dette trinnet: lageret har ingen data her. Prøv et annet trinn.",
+        NoticesKey::LargeChunks => "Store blokker",
+        NoticesKey::LargeChunksDetail => "'{}' er lagret i blokker på {}: hvert trinn laster ned minst én hel blokk, så trinnene lastes sakte.",
         NoticesKey::VolumeTooLargeForGpu => "Volumet er for stort for GPU-en",
         NoticesKey::VolumeLodOff => "Detalj etter visning er av for dette volumet",
         NoticesKey::VolumeLodOffDetail => {

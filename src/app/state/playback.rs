@@ -15,6 +15,13 @@ pub struct PlaybackState {
     pub buffering: bool,
     /// Steps ready ahead and steps wanted while buffering (the indicator).
     pub buffer_progress: (usize, usize),
+    /// The plotted store and variable whose empty step outside its stated
+    /// span was reported, until a step inside it shows: one warning per run.
+    pub empty_step_warned: Option<(String, Option<String>)>,
+    /// A selected variable whose time axis had not loaded (its source id and
+    /// variable, and the staged step), moved into the stated span when the
+    /// axis arrives if still selected there (`block_loading::time_coverage`).
+    pub coverage_unchecked: Option<((String, usize), usize)>,
 }
 
 impl Default for PlaybackState {
@@ -29,6 +36,8 @@ impl Default for PlaybackState {
             buffer_secs: 3.0,
             buffering: false,
             buffer_progress: (0, 0),
+            empty_step_warned: None,
+            coverage_unchecked: None,
         }
     }
 }

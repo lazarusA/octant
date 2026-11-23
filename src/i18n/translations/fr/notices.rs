@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Les coordonnées de '{}' n'ont pas pu être chargées ({}) ; les axes affichent des indices"
         }
         NoticesKey::CoastlinesUnavailable => "Côtes indisponibles",
+        NoticesKey::NoDataAtStep => "Aucune donnée à cette étape",
+        NoticesKey::NoDataAtStepDetail => "'{}' n'a aucune valeur à cette étape : le magasin ne contient pas de données ici. Essayez une autre étape.",
+        NoticesKey::LargeChunks => "Chunks volumineux",
+        NoticesKey::LargeChunksDetail => "'{}' est stocké en chunks de {} : chaque étape télécharge au moins un chunk entier, les étapes se chargent donc lentement.",
         NoticesKey::VolumeTooLargeForGpu => "Volume trop grand pour le GPU",
         NoticesKey::VolumeLodOff => "Le détail selon la vue est désactivé pour ce volume",
         NoticesKey::VolumeLodOffDetail => {

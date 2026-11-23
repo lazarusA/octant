@@ -9,7 +9,7 @@ pub mod url;
 pub use icechunk::{build_icechunk_s3_options, register_standard_virtual_chunk_containers};
 #[cfg(not(target_arch = "wasm32"))]
 pub use s3::{discover_bucket_region, s3_as_https};
-pub use url::{ParsedStorageUrl, parse_remote_storage_url, s3_to_https};
+pub use url::{ParsedStorageUrl, gs_as_https, parse_remote_storage_url, s3_to_https, strip_scheme};
 
 #[cfg(test)]
 mod tests {
@@ -40,6 +40,56 @@ mod tests {
         assert_eq!(
             s3_to_https("gs://ecmwf-open-data/20261021/00z/a.grib2"),
             "https://storage.googleapis.com/ecmwf-open-data/20261021/00z/a.grib2"
+        );
+    }
+
+    #[test]
+    fn browser_readers_take_gs_urls_at_the_gcs_https_host() {
+        assert_eq!(
+            gs_as_https("gs://gcp-public-data-arco-era5/ar/x.zarr"),
+            "https://storage.googleapis.com/gcp-public-data-arco-era5/ar/x.zarr"
+        );
+        // The scheme in any case, as `utils/path.rs` detects it.
+        assert_eq!(
+            gs_as_https("GS://bucket/x.zarr"),
+            "https://storage.googleapis.com/bucket/x.zarr"
+        );
+        // The browser's NetCDF and Icechunk readers take any case too.
+        assert_eq!(
+            s3_to_https("GS://bucket/x.nc"),
+            "https://storage.googleapis.com/bucket/x.nc"
+        );
+        assert_eq!(
+            s3_to_https("ICECHUNK+S3://b/r"),
+            "https://b.s3.amazonaws.com/r"
+        );
+        assert_eq!(
+            strip_scheme("Icechunk+gs://b/r", "icechunk+"),
+            Some("gs://b/r")
+        );
+        assert_eq!(strip_scheme("gs:", "gs://"), None);
+        // Icechunk and S3 addresses keep their own readers.
+        assert_eq!(gs_as_https("icechunk+s3://b/r"), "icechunk+s3://b/r");
+        assert_eq!(gs_as_https("s3://b/k"), "s3://b/k");
+        // `parse_remote_storage_url` strips schemes in any case and maps `gs://`
+        // to `https://storage.googleapis.com`.
+        let parsed = parse_remote_storage_url("ICECHUNK+GS://my-bucket/path/to/repo")
+            .expect("parse icechunk+gs url");
+        assert_eq!(parsed.bucket, "my-bucket");
+        assert_eq!(parsed.prefix.as_deref(), Some("path/to/repo"));
+        assert_eq!(
+            parsed.endpoint_url.as_deref(),
+            Some("https://storage.googleapis.com")
+        );
+        assert!(parsed.force_path_style);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn gs_urls_read_through_the_gcs_https_host() {
+        assert_eq!(
+            s3_as_https("gs://gcp-public-data-arco-era5/ar/model-level-1h-0p25deg.zarr-v1"),
+            "https://storage.googleapis.com/gcp-public-data-arco-era5/ar/model-level-1h-0p25deg.zarr-v1"
         );
     }
 

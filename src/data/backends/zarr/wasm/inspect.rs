@@ -10,7 +10,7 @@ use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
 
 /// Asynchronously inspects a remote Zarr URL in the browser and returns `DatasetMetadata`.
 pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, String> {
-    let clean_url = url.trim_end_matches('/');
+    let clean_url = &crate::utils::remote::gs_as_https(url.trim_end_matches('/'));
     if clean_url.is_empty() {
         return Err("URL is empty".to_string());
     }

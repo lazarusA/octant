@@ -15,6 +15,10 @@ crate::i18n::keys::define_keys! {
     CoordinatesUnavailable,
     CoordinatesFailedDetail,
     CoastlinesUnavailable,
+    NoDataAtStep,
+    NoDataAtStepDetail,
+    LargeChunks,
+    LargeChunksDetail,
     // GPU limits
     VolumeTooLargeForGpu,
     VolumeLodOff,

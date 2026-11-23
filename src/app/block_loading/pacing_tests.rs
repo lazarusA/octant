@@ -68,3 +68,61 @@ fn paused_outside_the_range_queues_the_steps_after_the_current_one() {
     assert_eq!(paused_chunks(10, (0, 3), 99, 100), vec![10, 11, 12]);
     assert_eq!(paused_chunks(98, (0, 3), 99, 100), vec![98, 99]);
 }
+
+#[test]
+fn only_chunked_remote_sources_count_their_stored_chunks() {
+    use super::arrival_notices::stored_chunk_bytes;
+    use crate::data::{DataSourceKind as Kind, VariableInfo};
+    // ARCO-ERA5's pressure-level temperature: 37 levels per chunk.
+    let era5 = VariableInfo {
+        data_type: "float32".into(),
+        shape: vec![1_323_648, 37, 721, 1440],
+        chunk_shape: vec![1, 37, 721, 1440],
+        ..VariableInfo::default()
+    };
+    assert_eq!(
+        stored_chunk_bytes(&era5, &Kind::RemoteZarr, "https://h/s"),
+        37 * 721 * 1440 * 4
+    );
+    assert_eq!(stored_chunk_bytes(&era5, &Kind::NetCdf, "https://h/s"), 0);
+    assert_eq!(
+        stored_chunk_bytes(&era5, &Kind::Procedural, "https://h/s"),
+        0
+    );
+    // One chunk holding the whole array is the worst case for Zarr; NetCDF
+    // and GRIB report that shape for any array, and so does Icechunk's
+    // browser inspection when it cannot read an array's metadata.
+    let one_chunk = VariableInfo {
+        shape: vec![8760, 721, 1440],
+        chunk_shape: vec![8760, 721, 1440],
+        ..era5.clone()
+    };
+    assert_eq!(
+        stored_chunk_bytes(&one_chunk, &Kind::RemoteZarr, "https://h/s"),
+        8760 * 721 * 1440 * 4
+    );
+    assert_eq!(
+        stored_chunk_bytes(&one_chunk, &Kind::RemoteIcechunk, "https://h/s"),
+        0
+    );
+    assert_eq!(
+        stored_chunk_bytes(&one_chunk, &Kind::NetCdf, "https://h/s"),
+        0
+    );
+    // An `icechunk+` address opened as Zarr reads as Icechunk.
+    let repo = "icechunk+s3://b/r";
+    assert_eq!(stored_chunk_bytes(&one_chunk, &Kind::RemoteZarr, repo), 0);
+    // The browser's local folders register as remote Zarr but read from disk.
+    let local = "local://folder/era5.zarr";
+    assert_eq!(stored_chunk_bytes(&era5, &Kind::RemoteZarr, local), 0);
+    // A chunk running past a small array's edge counts only the array's part.
+    let edge = VariableInfo {
+        shape: vec![10, 4],
+        chunk_shape: vec![100, 4],
+        ..era5.clone()
+    };
+    assert_eq!(
+        stored_chunk_bytes(&edge, &Kind::RemoteZarr, "https://h/s"),
+        10 * 4 * 4
+    );
+}

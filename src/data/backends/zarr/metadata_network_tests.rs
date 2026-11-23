@@ -168,3 +168,20 @@ fn metadata_reads_counted() {
         }
     }
 }
+
+/// ARCO-ERA5's `gs://` address lists the same variables as its HTTPS one:
+/// its variables come from the HTTP `.zmetadata` fallback, which reads the
+/// store's URL as typed.
+/// `cargo test --lib arco_era5_gs_lists_its_variables -- --ignored`
+#[test]
+#[ignore]
+fn arco_era5_gs_lists_its_variables() {
+    let path = "gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3";
+    let count = |url: &str| {
+        let store = ZarrBlockStore::open_remote(url).expect("open");
+        store.inspect().expect("inspect").variables.len()
+    };
+    let https = count(&format!("https://storage.googleapis.com/{path}"));
+    assert!(https > 0);
+    assert_eq!(count(&format!("gs://{path}")), https);
+}

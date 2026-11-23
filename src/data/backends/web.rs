@@ -22,7 +22,11 @@ impl WebFormat {
     /// (`local::kind_of`), so only typed desktop paths are `Local*`.
     pub fn of(source: &DataSource) -> Self {
         match source.kind {
-            Kind::RemoteZarr if source.uri.starts_with("icechunk+") => Self::Icechunk,
+            Kind::RemoteZarr
+                if crate::utils::remote::strip_scheme(&source.uri, "icechunk+").is_some() =>
+            {
+                Self::Icechunk
+            }
             Kind::RemoteZarr => Self::Zarr,
             Kind::RemoteIcechunk => Self::Icechunk,
             Kind::RemoteGeoTiff => Self::GeoTiff,
