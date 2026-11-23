@@ -97,7 +97,9 @@ fn gpu_skipping_blocks_changes_nothing() {
     let data = balls();
     let skipping: VolumeRenderer = renderer_wh(&device, &queue, &data, [M, M], false);
     let full = renderer_wh(&device, &queue, &data, [M, M], false);
-    full.textures.blocks.open_all(&queue);
+    if let Some(t) = &full.textures {
+        t.blocks.open_all(&queue);
+    }
     for p in skipping_cases() {
         let a = render(&device, &queue, &skipping, &p);
         let b = render(&device, &queue, &full, &p);

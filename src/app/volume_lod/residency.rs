@@ -179,17 +179,15 @@ impl<T> Residency<T> {
         ];
         let cells = bricks.cells(key);
         let (levels, by_key) = (self.levels, &self.by_key);
-        let slots = self.slots;
-        let mut table = std::mem::take(&mut self.table);
-        let grid = self.grid;
+        let (slots, grid) = (self.slots, self.grid);
         for z in cells[2].clone() {
             for y in cells[1].clone() {
                 for x in cells[0].clone() {
                     let i = cell_index(grid, [x, y, z]);
-                    if table[i] != mine {
+                    if self.table[i] != mine {
                         continue;
                     }
-                    table[i] = (usize::from(key.level) + 1..levels)
+                    self.table[i] = (usize::from(key.level) + 1..levels)
                         .find_map(|l| {
                             let s = *by_key.get(&bricks.cell_brick(l, [x, y, z]))?;
                             let c = coords_of(slots, s);
@@ -199,7 +197,6 @@ impl<T> Residency<T> {
                 }
             }
         }
-        self.table = table;
         cells
     }
 

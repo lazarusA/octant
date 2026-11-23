@@ -54,6 +54,8 @@ mod select;
 #[cfg(test)]
 mod select_tests;
 mod setup;
+#[cfg(test)]
+mod step_tests;
 mod subblocks;
 #[cfg(test)]
 mod tests;
@@ -164,8 +166,7 @@ impl Lod {
         self.finest = resident
             .map(|k| usize::from(k.level))
             .min()
-            .unwrap_or(self.root_level)
-            .min(self.root_level);
+            .unwrap_or(self.root_level);
     }
 }
 

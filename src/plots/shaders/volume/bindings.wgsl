@@ -54,23 +54,14 @@ struct Uniforms {
 var<uniform> uniforms: Uniforms;
 
 // Voxel values: R32Float scalars, or Rgba8Unorm colors (alpha = brightest
-// channel) in RGB composite mode. Missing voxels hold their neighbors' average.
+// channel) in RGB composite mode; the brick atlas (`R16Float`, `R8Unorm` or
+// `Rgba8Unorm`) in the bricked variant.
 @group(0) @binding(1)
 var volume_values: texture_3d<f32>;
-
-// 1 where the voxel holds data, 0 where it is missing. Filtered, its 0.5 level
-// is a smooth missing-data boundary.
-@group(0) @binding(2)
-var volume_validity: texture_3d<f32>;
 
 // Linear, Repeat on every axis (see `texture_coord`).
 @group(0) @binding(3)
 var volume_sampler: sampler;
-
-// Per block of 8^3 stored voxels (and its neighbors): min and max of the
-// valid values, 1 where any is missing (`blocks.rs`); read with textureLoad.
-@group(0) @binding(4)
-var volume_blocks: texture_3d<f32>;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,

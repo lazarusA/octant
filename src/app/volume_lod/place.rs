@@ -2,7 +2,7 @@
 //! and apron, a slot, its ranges, the upload and the table cells it changed,
 //! then its neighbours' aprons and its ancestors' ranges.
 
-use super::encode::{Cube, brick_values, has_missing, value_range};
+use super::encode::{Cube, brick_values};
 use super::fetch::Gpu;
 use super::residency::CellBox;
 use super::subblocks::{SubRanges, open_subs, sub_ranges};
@@ -24,13 +24,11 @@ impl Lod {
         generation: u64,
         (gpu, cache): (Gpu, &crate::data::blocks::BlockCache),
     ) -> bool {
-        let Some((mut cube, missing)) = brick_values(self, key, read, &block) else {
+        let Some(mut cube) = brick_values(self, key, read, &block) else {
             return false;
         };
         self.stitch_own(key, &mut cube, cache, Some(read));
-        // Neighbours' aprons may bring missing voxels the brick lacks.
-        let missing = missing || has_missing(&cube);
-        let (range, subs) = self.cube_ranges(&cube);
+        let (range, missing, subs) = self.cube_ranges(&cube);
         // Not `self.bricks()`: the residency is borrowed apart from the set.
         let bricks = Bricks {
             set: &self.set,
@@ -58,20 +56,18 @@ impl Lod {
         self.upload_placed(key, (slot, &changed), &cube, (gpu, queue));
         self.stitch_neighbours(key, (&block, read), gpu, queue);
         if let Cube::Values(_) = cube {
-            self.widen_ancestors(key, range, Some((gpu, queue)));
+            self.widen_ancestors(key, range, missing, Some((gpu, queue)));
         }
         true
     }
 
-    /// The range of `cube`'s valid values and its sub-blocks' ranges.
-    fn cube_ranges(&self, cube: &Cube) -> ((f32, f32), SubRanges) {
+    /// The range of `cube`'s valid values, whether any voxel is missing, and
+    /// its sub-blocks' ranges (computed in a single pass).
+    fn cube_ranges(&self, cube: &Cube) -> ((f32, f32), bool, SubRanges) {
         match cube {
-            Cube::Values(values) => (
-                value_range(values, self.encoding()),
-                sub_ranges(values, self.encoding()),
-            ),
+            Cube::Values(values) => sub_ranges(values, self.encoding()),
             // Never skipped as drawing nothing (composites are always open).
-            Cube::Colors(_) => ((f32::MIN, f32::MAX), open_subs()),
+            Cube::Colors(_) => ((f32::MIN, f32::MAX), false, open_subs()),
         }
     }
 

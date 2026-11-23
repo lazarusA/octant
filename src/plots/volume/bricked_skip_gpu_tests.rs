@@ -66,7 +66,7 @@ fn bricked(
 ) -> (VolumeRenderer, usize) {
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let texels = ([2, 2, 2], [2, 2, 2], AtlasTexel::Half);
-    let renderer = VolumeRenderer::new_bricked(device, queue, format, texels).expect("fits");
+    let renderer = VolumeRenderer::new_bricked(device, format, texels).expect("fits");
     let bricks = renderer.bricks().expect("bricked");
     let (mut table, mut closed) = (Vec::new(), 0);
     for b in (0..8u32).map(|i| [i % 2, i / 2 % 2, i / 4]) {

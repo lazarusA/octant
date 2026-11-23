@@ -125,8 +125,7 @@ impl OctantApp {
             }
             None => {
                 let target = (lod.slots, grid, lod.texel);
-                let new =
-                    VolumeRenderer::new_bricked(&rs.device, &rs.queue, rs.target_format, target);
+                let new = VolumeRenderer::new_bricked(&rs.device, rs.target_format, target);
                 let max = rs.device.limits().max_texture_dimension_3d;
                 Arc::new(new.ok_or(Off::TooLarge(grid, max))?)
             }

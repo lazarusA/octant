@@ -11,13 +11,12 @@
 use std::ops::Range;
 
 use super::Lod;
-use super::draw::value_at;
 use super::encode::Cube;
 use super::encode::encode_value;
 use crate::app::detail::LevelRead;
 use crate::data::OctantBlock;
 use crate::data::blocks::BlockCache;
-use crate::data::multiscale::bricks::{APRON, BRICK, BrickKey, STORED};
+use crate::data::multiscale::bricks::{BrickKey, STORED};
 use crate::plots::volume::bricks::BrickTextures;
 
 /// The 26 neighbour offsets.
@@ -74,31 +73,35 @@ impl Lod {
     }
 
     /// The f16 values of `block` over the stored box `region` of brick
-    /// `key`'s cube (x fastest).
-    fn region_values(
+    /// `key`'s cube (x fastest), reading directly from `block` with column
+    /// offsets precomputed.
+    pub(super) fn region_values(
         &self,
         key: BrickKey,
         region: &[Range<usize>; 3],
         block: &OctantBlock,
-    ) -> Vec<u16> {
-        let mut out = Vec::new();
-        let axes = self.block_axes(block);
+        read: Option<&LevelRead>,
+    ) -> Option<Vec<u16>> {
+        self.bricks().window(key)?;
+        let axes = self.block_axes_for(block, read)?;
+        let len = region[0].len() * region[1].len() * region[2].len();
+        let mut out = Vec::with_capacity(len);
+        let cols: Vec<usize> = region[0]
+            .clone()
+            .map(|x| axes.stored_offset(block, key, 0, x))
+            .collect();
+        let (offset, scale) = (self.offset, self.scale);
         for z in region[2].clone() {
+            let oz = axes.base + axes.stored_offset(block, key, 2, z);
             for y in region[1].clone() {
-                for x in region[0].clone() {
-                    // Stored cell `s` is the level's cell `b * BRICK + s - APRON`
-                    // as `encode.rs` reads it; `value_at` clamps into the block.
-                    let s = [x, y, z];
-                    let cell = std::array::from_fn(|i| {
-                        (key.b[i] as usize * BRICK as usize + s[i]).saturating_sub(APRON as usize)
-                    });
-                    let v = axes.as_ref().and_then(|a| value_at(block, a, cell));
-                    let v = v.unwrap_or(f32::NAN);
-                    out.push(encode_value(v, self.offset, self.scale));
-                }
+                let row = oz + axes.stored_offset(block, key, 1, y);
+                out.extend(cols.iter().map(|&ox| {
+                    let v = block.values.get(row + ox).copied().unwrap_or(f32::NAN);
+                    encode_value(v, offset, scale)
+                }));
             }
         }
-        out
+        Some(out)
     }
 
     /// Fills `cube` (`key`'s stored cube) where its apron faces a resident
@@ -125,7 +128,9 @@ impl Lod {
             let region = self.facing(key, d);
             match cube {
                 Cube::Values(values) => {
-                    fill(values, &region, self.region_values(key, &region, block));
+                    if let Some(found) = self.region_values(key, &region, block, read) {
+                        fill(values, &region, found);
+                    }
                 }
                 Cube::Colors(colors) => {
                     let found = read.and_then(|r| self.region_colors(key, &region, block, r));
@@ -162,8 +167,7 @@ impl Lod {
                 if let Some(colors) = self.region_colors(other, &region, block, read) {
                     gpu.upload_region(queue, slot, at, size, &colors);
                 }
-            } else {
-                let values = self.region_values(other, &region, block);
+            } else if let Some(values) = self.region_values(other, &region, block, Some(read)) {
                 self.upload_values((gpu, queue), slot, (at, size), &values);
                 self.widen_apron(other, &region, &values, (gpu, queue, slot));
             }

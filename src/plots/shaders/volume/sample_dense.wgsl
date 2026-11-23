@@ -3,6 +3,16 @@
 // validity. The bricked variant (`sample_bricked.wgsl`) defines the same
 // functions over the brick atlas.
 
+// 1 where the voxel holds data, 0 where it is missing. Filtered, its 0.5 level
+// is a smooth missing-data boundary.
+@group(0) @binding(2)
+var volume_validity: texture_3d<f32>;
+
+// Per block of 8^3 stored voxels (and its neighbors): min and max of the
+// valid values, 1 where any is missing (`blocks.rs`); read with textureLoad.
+@group(0) @binding(4)
+var volume_blocks: texture_3d<f32>;
+
 fn volume_dims() -> vec3<f32> {
     return vec3<f32>(textureDimensions(volume_values));
 }

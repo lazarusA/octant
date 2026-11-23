@@ -26,6 +26,21 @@ pub(crate) struct LevelRead {
     pub step: usize,
 }
 
+impl LevelRead {
+    /// `block`'s `(x, y, z)` dimensions and the oriented indices of its
+    /// fixed dimensions at this read's step.
+    pub(crate) fn block_axes(&self, block: &OctantBlock) -> Option<([usize; 3], Vec<usize>)> {
+        let (dims, config) = (&self.dims, &self.sel.dim_config);
+        (block.dimension_names == *dims).then(|| {
+            let (x, y, z) =
+                OctantApp::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, config);
+            let fixed =
+                block_axes::fixed_indices(block, dims, self.sel.animated_dim(), config, self.step);
+            ([x, y, z], fixed)
+        })
+    }
+}
+
 /// A tile's matrix, its composite window and, where the GPU blends it, its
 /// channel planes.
 type TileSlice = (MatrixData, Option<CompositeProbe>, Option<Vec<MatrixData>>);
@@ -145,8 +160,7 @@ impl OctantApp {
             renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
             layer.renderers.detail = Some(renderer);
         }
-        tile.matrix = Some(Arc::new(matrix));
-        tile.probe = probe;
+        (tile.matrix, tile.probe) = (Some(Arc::new(matrix)), probe);
         layer.data.detail.tile = Some(tile);
     }
 
@@ -167,13 +181,15 @@ impl OctantApp {
             Self::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, &pending.config);
         let fixed =
             block_axes::fixed_indices(block, dims, pending.anim_dim, &pending.config, pending.step);
-        let (_, local_x) = block_axes::dim_bounds(block, dims, bx, ranges);
-        let (_, local_y) = block_axes::dim_bounds(block, dims, by, ranges);
+        let [x_range, y_range] = [bx, by].map(|d| {
+            let (_, local) = block_axes::dim_bounds(block, dims, d, ranges);
+            block.oriented_range(d, local)
+        });
         let window = PlaneWindow {
             x_dim: bx,
             y_dim: by,
-            x_range: block.oriented_range(bx, local_x),
-            y_range: block.oriented_range(by, local_y),
+            x_range,
+            y_range,
             fixed: &fixed,
         };
         if layer.composite.enabled
@@ -181,17 +197,11 @@ impl OctantApp {
         {
             return Some(tile);
         }
-        let matrix = block.slice_2d_with_ranges(
-            window.x_dim,
-            window.y_dim,
-            window.x_range,
-            window.y_range,
-            window.fixed,
-            self.layer_animated_dim_extent(pending.layer),
-            &block.variable_name,
-            false,
-        )?;
-        Some((matrix, None, None))
+        let anim_len = self.layer_animated_dim_extent(pending.layer);
+        let name = &block.variable_name;
+        let m =
+            block.slice_2d_with_ranges(bx, by, x_range, y_range, &fixed, anim_len, name, false)?;
+        Some((m, None, None))
     }
 
     /// `window` of `block` as layer `id`'s composite tile: every channel's

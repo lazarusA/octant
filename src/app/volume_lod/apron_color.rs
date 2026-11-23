@@ -6,8 +6,6 @@
 use std::ops::Range;
 
 use super::Lod;
-use crate::app::OctantApp;
-use crate::app::block_loading::block_axes;
 use crate::app::detail::LevelRead;
 use crate::data::OctantBlock;
 use crate::data::multiscale::bricks::{APRON, BRICK, BrickKey};
@@ -24,15 +22,9 @@ impl Lod {
         block: &OctantBlock,
         read: &LevelRead,
     ) -> Option<Vec<[u8; 4]>> {
-        let (dims, config) = (&read.dims, &read.sel.dim_config);
-        if block.dimension_names != *dims {
-            return None;
-        }
-        let (bx, by, bz) =
-            OctantApp::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, config);
-        let fixed =
-            block_axes::fixed_indices(block, dims, read.sel.animated_dim(), config, read.step);
-        self.colors_over(key, region, block, ([bx, by, bz], &fixed))
+        self.bricks().window(key)?;
+        let (axes, fixed) = read.block_axes(block)?;
+        self.colors_over(key, region, block, (axes, &fixed))
     }
 
     /// [`Self::region_colors`] with the block's x, y, z dimensions `axes`
@@ -68,18 +60,17 @@ impl Lod {
                 .saturating_sub(span[i].0);
             o.min(n[i].saturating_sub(1))
         };
-        let mut out = Vec::new();
+        let cols: Vec<usize> = region[0].clone().map(|x| at(0, x)).collect();
+        let len = region[0].len() * region[1].len() * region[2].len();
+        let mut out = Vec::with_capacity(len);
         for z in region[2].clone() {
+            let oz = at(2, z) * n[1];
             for y in region[1].clone() {
-                let row = (at(2, z) * n[1] + at(1, y)) * n[0];
-                for x in region[0].clone() {
-                    let v = volume
-                        .values
-                        .get(row + at(0, x))
-                        .copied()
-                        .unwrap_or(f32::NAN);
-                    out.push(packed_rgba(v));
-                }
+                let row = (oz + at(1, y)) * n[0];
+                out.extend(cols.iter().map(|&x| {
+                    let v = volume.values.get(row + x).copied().unwrap_or(f32::NAN);
+                    packed_rgba(v)
+                }));
             }
         }
         Some(out)

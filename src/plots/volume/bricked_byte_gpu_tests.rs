@@ -21,7 +21,7 @@ fn value(x: usize, y: usize, z: usize) -> u8 {
 fn bricked(device: &wgpu::Device, queue: &wgpu::Queue) -> VolumeRenderer {
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let texels = ([2, 2, 2], [2, 2, 2], AtlasTexel::Byte);
-    let renderer = VolumeRenderer::new_bricked(device, queue, format, texels).expect("fits");
+    let renderer = VolumeRenderer::new_bricked(device, format, texels).expect("fits");
     let bricks = renderer.bricks().expect("bricked");
     let stored = STORED as usize;
     let mut table = Vec::new();

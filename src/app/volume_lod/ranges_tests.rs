@@ -67,7 +67,7 @@ fn a_finer_brick_widens_its_ancestors_range() {
         lod.draws_nothing(root, shown),
         "the mean level is background"
     );
-    lod.widen_ancestors(child, (5.0, 80.0), None);
+    lod.widen_ancestors(child, (5.0, 80.0), false, None);
     let range = lod.residency.get(&root).map(|p| p.range);
     assert_eq!(range, Some((0.0, 80.0)));
     assert!(!lod.draws_nothing(root, shown), "refined once seen");
@@ -112,10 +112,10 @@ fn every_parent_of_a_brick_is_widened() {
         lod.residency
             .insert(&bricks, p, placed((0.0, 10.0)), 0, true);
     }
-    lod.widen_ancestors(child, (5.0, 80.0), None);
+    lod.widen_ancestors(child, (5.0, 80.0), true, None);
     for p in parents {
-        let range = lod.residency.get(&p).map(|r| r.range);
-        assert_eq!(range, Some((0.0, 80.0)), "{p:?}");
+        let got = lod.residency.get(&p).map(|r| (r.range, r.missing));
+        assert_eq!(got, Some(((0.0, 80.0), true)), "{p:?}");
     }
 }
 
