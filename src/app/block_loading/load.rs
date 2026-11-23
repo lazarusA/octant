@@ -133,6 +133,9 @@ impl OctantApp {
         };
         let selections = request.selections.clone();
         self.show_cached_block(id, source_id, &block, &selections, anim_dim);
+        if id == LayerId::BASE {
+            self.notice_empty_block(&block);
+        }
         true
     }
 
@@ -182,13 +185,18 @@ impl OctantApp {
 
         self.block_cache.put(key, block.clone());
 
+        let mut moved_step = false;
         if let Some(id) = shown_in {
-            let moved_step = requested.is_some() && self.accept_requested_block(id, &block);
+            moved_step = requested.is_some() && self.accept_requested_block(id, &block);
             self.apply_block_projection(id, &block);
             // The base layer reached a new step: overlays follow it.
             if moved_step && id == LayerId::BASE {
                 self.load_animated_overlay_blocks();
             }
+        }
+        // Only once the view moved to the block's step: the step it checks.
+        if requested == Some(LayerId::BASE) && moved_step {
+            self.notice_empty_block(&block);
         }
     }
 

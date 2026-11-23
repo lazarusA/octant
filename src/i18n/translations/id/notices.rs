@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Koordinat '{}' gagal dimuat ({}); sumbu menampilkan indeks"
         }
         NoticesKey::CoastlinesUnavailable => "Garis pantai tidak tersedia",
+        NoticesKey::NoDataAtStep => "Tidak ada data pada langkah ini",
+        NoticesKey::NoDataAtStepDetail => "'{}' tidak memiliki nilai pada langkah ini: penyimpanan tidak berisi data di sini. Coba langkah lain.",
+        NoticesKey::LargeChunks => "Chunk besar",
+        NoticesKey::LargeChunksDetail => "'{}' disimpan dalam chunk berukuran {}: setiap langkah mengunduh setidaknya satu chunk utuh, sehingga langkah dimuat lambat.",
         NoticesKey::VolumeTooLargeForGpu => "Volume terlalu besar untuk GPU",
         NoticesKey::VolumeLodOff => "Detail sesuai tampilan nonaktif untuk volume ini",
         NoticesKey::VolumeLodOffDetail => {

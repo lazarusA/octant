@@ -96,7 +96,7 @@ impl WasmGeoTiffBlockStore {
     }
 
     pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url.trim().to_string();
+        let clean_url = crate::utils::remote::gs_as_https(url.trim());
         WASM_GEOTIFF_STORES.with(|stores| {
             let mut map = stores.borrow_mut();
             if let Some(store) = map.get(&clean_url) {
@@ -111,8 +111,9 @@ impl WasmGeoTiffBlockStore {
 
     /// Drops the store of `url` from the registry (its dataset closed).
     pub fn release(url: &str) {
-        let clean_url = url.trim();
-        let _released = WASM_GEOTIFF_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
+        // Keyed as `get_or_create` keys it.
+        let clean_url = crate::utils::remote::gs_as_https(url.trim());
+        let _released = WASM_GEOTIFF_STORES.with(|stores| stores.borrow_mut().remove(&clean_url));
     }
 }
 

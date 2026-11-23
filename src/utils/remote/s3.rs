@@ -18,9 +18,13 @@ pub async fn discover_bucket_region(bucket: &str) -> Option<String> {
 
 /// `s3://bucket/key` as `https://s3.{region}.amazonaws.com/bucket/key`: S3
 /// answers a wrong region with a redirect, and a virtual-hosted name with
-/// dots fails TLS. Other URLs are returned unchanged.
+/// dots fails TLS. `gs://bucket/key` reads through `storage.googleapis.com`.
+/// Other URLs are returned unchanged.
 pub fn s3_as_https(url: &str) -> String {
-    let Some(rest) = url.strip_prefix("s3://") else {
+    if super::strip_scheme(url, "gs://").is_some() {
+        return super::gs_as_https(url);
+    }
+    let Some(rest) = super::strip_scheme(url, "s3://") else {
         return url.to_string();
     };
     let (bucket, key) = rest.split_once('/').unwrap_or((rest, ""));

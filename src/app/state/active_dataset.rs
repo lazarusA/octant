@@ -17,12 +17,17 @@ impl OctantApp {
     /// apply the first variable's dimension defaults and select it.
     pub fn load_new_metadata(&mut self, meta: DatasetMetadata) {
         self.layout.variable_search.clear();
-        if let Some(var_info) = meta.variables.first().cloned() {
-            crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
+        let first = meta.variables.first().cloned();
+        if let Some(var_info) = &first {
+            crate::ui::variables_panel::init_variable_dimension_defaults(self, var_info);
         }
         self.set_active_metadata(meta);
         self.selected.variable_idx = 0;
         self.selected.level = crate::app::layers::LevelChoice::Auto;
+        // The defaults above ran before the metadata was active.
+        if let Some(var_info) = &first {
+            self.select_inside_time_coverage(var_info);
+        }
     }
 
     /// Drop the active dataset (loading, failed, removed or cleared).

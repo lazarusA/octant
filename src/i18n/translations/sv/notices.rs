@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Koordinaterna för '{}' kunde inte läsas in ({}); axlarna visar index"
         }
         NoticesKey::CoastlinesUnavailable => "Kustlinjer saknas",
+        NoticesKey::NoDataAtStep => "Inga data i detta steg",
+        NoticesKey::NoDataAtStepDetail => "'{}' har inga värden i detta steg: lagret innehåller inga data här. Prova ett annat steg.",
+        NoticesKey::LargeChunks => "Stora chunkar",
+        NoticesKey::LargeChunksDetail => "'{}' lagras i chunkar på {}: varje steg laddar ner minst en hel chunk, så stegen laddas långsamt.",
         NoticesKey::VolumeTooLargeForGpu => "Volymen är för stor för GPU:n",
         NoticesKey::VolumeLodOff => "Detalj efter vy är av för den här volymen",
         NoticesKey::VolumeLodOffDetail => {

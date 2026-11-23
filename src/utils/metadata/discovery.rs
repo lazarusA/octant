@@ -119,7 +119,9 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
     {
         let mut variables = Vec::new();
 
-        let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
+        // The store's URL as typed: `gs://` and `s3://` fetch over HTTPS.
+        let base_url = &crate::utils::remote::s3_as_https(base_url.trim_end_matches('/'));
+        let zmetadata_url = format!("{base_url}/.zmetadata");
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .connect_timeout(std::time::Duration::from_secs(10))

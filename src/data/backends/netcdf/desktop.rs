@@ -39,8 +39,11 @@ impl NetCdfBlockStore {
     /// Opens a NetCDF, HDF5 or MATLAB v7.3 dataset from a local filesystem path, or a
     /// NetCDF-4/HDF5 one from an `http(s)` URL.
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
-        let remote = ["s3://", "https://", "http://"];
-        if remote.iter().any(|scheme| path.starts_with(scheme)) {
+        let remote = ["s3://", "gs://", "https://", "http://"];
+        if remote
+            .iter()
+            .any(|s| crate::utils::remote::strip_scheme(path, s).is_some())
+        {
             let reader = open_remote(&crate::utils::remote::s3_as_https(path), path)?;
             return Ok(Self {
                 file_path: path.to_owned(),

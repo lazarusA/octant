@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "'{}' の座標を読み込めませんでした ({})。軸にはインデックスを表示します"
         }
         NoticesKey::CoastlinesUnavailable => "海岸線を利用できません",
+        NoticesKey::NoDataAtStep => "このステップにはデータがありません",
+        NoticesKey::NoDataAtStepDetail => "'{}' はこのステップに値がありません。ストアにはここのデータがありません。別のステップを試してください。",
+        NoticesKey::LargeChunks => "大きなチャンク",
+        NoticesKey::LargeChunksDetail => "'{}' は {} のチャンクで保存されています。各ステップでチャンク全体をダウンロードするため、読み込みが遅くなります。",
         NoticesKey::VolumeTooLargeForGpu => "ボリュームが GPU には大きすぎます",
         NoticesKey::VolumeLodOff => "このボリュームでは表示に応じた詳細はオフです",
         NoticesKey::VolumeLodOffDetail => {

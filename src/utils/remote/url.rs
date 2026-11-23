@@ -17,18 +17,25 @@ pub struct ParsedStorageUrl {
     pub force_path_style: bool,
 }
 
+/// `url` after `scheme`, matched in any case (`utils/path.rs` detects
+/// schemes lowercased); `None` without it.
+pub fn strip_scheme<'a>(url: &'a str, scheme: &str) -> Option<&'a str> {
+    let (head, rest) = url.get(..scheme.len()).zip(url.get(scheme.len()..))?;
+    head.eq_ignore_ascii_case(scheme).then_some(rest)
+}
+
 /// Converts an S3 or Virtual Chunk Container URI into an HTTPS URL for browser fetching.
 pub fn s3_to_https(location: &str) -> String {
-    let clean = location.trim_start_matches("icechunk+");
-    if let Some(rest) = clean.strip_prefix("s3://") {
+    let clean = strip_scheme(location, "icechunk+").unwrap_or(location);
+    if let Some(rest) = strip_scheme(clean, "s3://") {
         if let Some((bucket, key)) = rest.split_once('/') {
             format!("https://{bucket}.s3.amazonaws.com/{key}")
         } else {
             format!("https://{rest}.s3.amazonaws.com")
         }
-    } else if let Some(rest) = clean.strip_prefix("gs://") {
-        format!("https://storage.googleapis.com/{rest}")
-    } else if let Some(rest) = clean.strip_prefix("vcc://") {
+    } else if strip_scheme(clean, "gs://").is_some() {
+        gs_as_https(clean)
+    } else if let Some(rest) = strip_scheme(clean, "vcc://") {
         if let Some((container, key)) = rest.split_once('/') {
             format!("https://{container}.s3.amazonaws.com/{key}")
         } else {
@@ -39,26 +46,38 @@ pub fn s3_to_https(location: &str) -> String {
     }
 }
 
+/// `gs://bucket/key` (the scheme in any case, as `utils/path.rs` detects
+/// it) at GCS's public HTTPS host, for readers that fetch over HTTPS; other
+/// URLs (`icechunk+s3://` among them) unchanged.
+pub fn gs_as_https(url: &str) -> String {
+    match strip_scheme(url, "gs://") {
+        Some(rest) => format!("https://storage.googleapis.com/{rest}"),
+        None => url.to_string(),
+    }
+}
+
 /// Parses any S3 URL, virtual-hosted S3 endpoint, Source Cooperative endpoint,
 /// or custom S3/HTTP object store address into structured components.
 pub fn parse_remote_storage_url(
     url: &str,
 ) -> Result<ParsedStorageUrl, Box<dyn Error + Send + Sync>> {
-    let trimmed = url.trim().trim_start_matches("icechunk+");
+    let trimmed = url.trim();
+    let trimmed = strip_scheme(trimmed, "icechunk+").unwrap_or(trimmed);
     if trimmed.is_empty() {
         return Err("Storage URL is empty".into());
     }
 
-    if let Some(s3_path) = trimmed
-        .strip_prefix("s3://")
-        .or_else(|| trimmed.strip_prefix("vcc://"))
+    if let Some(s3_path) =
+        strip_scheme(trimmed, "s3://").or_else(|| strip_scheme(trimmed, "vcc://"))
     {
         return parse_s3_or_vcc_scheme(s3_path);
     }
 
-    let clean = trimmed
-        .trim_start_matches("https://")
-        .trim_start_matches("http://");
+    let gs = gs_as_https(trimmed);
+    let trimmed = gs.as_str();
+    let clean = strip_scheme(trimmed, "https://")
+        .or_else(|| strip_scheme(trimmed, "http://"))
+        .unwrap_or(trimmed);
 
     let parts: Vec<&str> = clean.split('/').filter(|s| !s.is_empty()).collect();
     if parts.is_empty() {
@@ -157,7 +176,7 @@ fn parse_generic_http_endpoint(
     } else {
         None
     };
-    let scheme = if trimmed.starts_with("http://") {
+    let scheme = if strip_scheme(trimmed, "http://").is_some() {
         "http"
     } else {
         "https"

@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "As coordenadas de '{}' não puderam ser carregadas ({}); os eixos mostram índices"
         }
         NoticesKey::CoastlinesUnavailable => "Litorais indisponíveis",
+        NoticesKey::NoDataAtStep => "Sem dados nesta etapa",
+        NoticesKey::NoDataAtStepDetail => "'{}' não tem valores nesta etapa: o armazenamento não contém dados aqui. Experimente outra etapa.",
+        NoticesKey::LargeChunks => "Chunks grandes",
+        NoticesKey::LargeChunksDetail => "'{}' está armazenado em chunks de {}: cada etapa transfere pelo menos um chunk inteiro, por isso as etapas carregam devagar.",
         NoticesKey::VolumeTooLargeForGpu => "Volume grande demais para a GPU",
         NoticesKey::VolumeLodOff => "Detalhe conforme a vista está desligado para este volume",
         NoticesKey::VolumeLodOffDetail => {

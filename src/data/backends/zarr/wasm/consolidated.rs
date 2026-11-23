@@ -26,6 +26,11 @@ fn consolidated_variable(
 ) -> Option<VariableInfo> {
     let var_name = variable_name(key);
     let (shape, data_type, chunk_shape) = array_layout(meta)?;
+    // A sharded array reads by its inner chunks, as `VariableInfo` documents.
+    let (chunk_shape, shard_shape) = match crate::utils::metadata::sharding::sharding_shapes(meta) {
+        Some((inner, shard)) => (inner, Some(shard)),
+        None => (chunk_shape, None),
+    };
     let attrs_key = if key == ".zarray" {
         ".zattrs".to_string()
     } else {
@@ -56,7 +61,7 @@ fn consolidated_variable(
         multiscale: None,
         crs: None,
         affine: None,
-        shard_shape: None,
+        shard_shape,
     })
 }
 
@@ -114,5 +119,31 @@ fn inherit_ancestor_attributes(
                 &p_cf.attributes,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    /// A sharded v3 array listed in a v2 `.zmetadata` reads by its inner
+    /// chunks, as the desktop and v3 consolidated paths report it.
+    #[test]
+    fn a_sharded_array_reports_its_inner_chunks() {
+        let metadata = json!({
+            "t/zarr.json": {
+                "zarr_format": 3, "node_type": "array", "data_type": "float32",
+                "shape": [512, 721, 1440],
+                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 721, 1440]}},
+                "codecs": [{"name": "sharding_indexed", "configuration": {"chunk_shape": [1, 721, 1440]}}]
+            }
+        });
+        let Some(metadata) = metadata.as_object() else {
+            panic!("an object");
+        };
+        let vars = super::variables_from_consolidated_v2(metadata);
+        assert_eq!(vars.len(), 1);
+        assert_eq!(vars[0].chunk_shape, vec![1, 721, 1440]);
+        assert_eq!(vars[0].shard_shape, Some(vec![512, 721, 1440]));
     }
 }

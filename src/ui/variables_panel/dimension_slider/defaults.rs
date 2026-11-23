@@ -49,6 +49,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
         clamp_2d_selection_to_gpu_limits(app, var_info);
     }
     app.stage_current_step();
+    app.select_inside_time_coverage(var_info);
 }
 
 /// A multiscale variable shows its whole x and y extent: the plot reads it

@@ -93,6 +93,14 @@ impl OctantApp {
     /// The staged animated dimension shows the current step, as its slider
     /// does, whether or not the Dimensions panel is drawn.
     pub(crate) fn stage_current_step(&mut self) {
+        // A step of the plotted view inside the stated span ends a run of
+        // empty steps; browsing an unplotted variable moves another's step.
+        if self.playback.empty_step_warned.is_some()
+            && !self.is_exploring_unplotted_variable()
+            && !self.plotted_step_outside_coverage()
+        {
+            self.playback.empty_step_warned = None;
+        }
         let sel = &mut self.selected;
         let Some(a) = sel.animated_dim() else {
             return;

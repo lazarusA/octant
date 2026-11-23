@@ -176,6 +176,8 @@ impl OctantApp {
                     self, &var_info,
                 );
             }
+            // Fetched or from the cache, once per plotted variable.
+            self.notice_large_chunks();
         }
 
         if !self.has_rgb_bands() {

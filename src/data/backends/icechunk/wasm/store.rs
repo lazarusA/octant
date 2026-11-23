@@ -34,10 +34,7 @@ pub struct WasmIcechunkBlockStore {
 
 impl WasmIcechunkBlockStore {
     pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url
-            .trim_start_matches("icechunk+")
-            .trim_end_matches('/')
-            .to_string();
+        let clean_url = repo_url(url);
         WASM_ICECHUNK_STORES.with(|stores| {
             let mut map = stores.borrow_mut();
             if let Some(store) = map.get(&clean_url) {
@@ -59,10 +56,18 @@ impl WasmIcechunkBlockStore {
     /// Drops the store of `url`, and the Zarr store it reads through, from
     /// their registries (its dataset closed).
     pub fn release(url: &str) {
-        let clean_url = url.trim_start_matches("icechunk+").trim_end_matches('/');
-        let _released = WASM_ICECHUNK_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
-        WasmZarrBlockStore::release(clean_url);
+        let clean_url = repo_url(url);
+        let _released = WASM_ICECHUNK_STORES.with(|stores| stores.borrow_mut().remove(&clean_url));
+        WasmZarrBlockStore::release(&clean_url);
     }
+}
+
+/// The repository's HTTPS address its manifests and chunks are fetched
+/// under: without `icechunk+`, and `gs://` at GCS's host. Keys the registry,
+/// so `get_or_create` and `release` agree.
+pub(super) fn repo_url(url: &str) -> String {
+    let repo = crate::utils::remote::strip_scheme(url.trim(), "icechunk+").unwrap_or(url.trim());
+    crate::utils::remote::gs_as_https(repo.trim_end_matches('/'))
 }
 
 impl BlockStore for WasmIcechunkBlockStore {

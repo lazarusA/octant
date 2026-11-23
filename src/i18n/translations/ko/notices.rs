@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "'{}' 좌표를 불러오지 못했습니다 ({}). 축에 인덱스를 표시합니다"
         }
         NoticesKey::CoastlinesUnavailable => "해안선을 사용할 수 없음",
+        NoticesKey::NoDataAtStep => "이 단계에 데이터 없음",
+        NoticesKey::NoDataAtStepDetail => "'{}' 는 이 단계에 값이 없습니다. 저장소에 여기 데이터가 없습니다. 다른 단계를 시도하세요.",
+        NoticesKey::LargeChunks => "큰 청크",
+        NoticesKey::LargeChunksDetail => "'{}' 는 {} 크기의 청크로 저장되어 있습니다. 각 단계마다 청크 하나 전체를 내려받으므로 단계가 느리게 로드됩니다.",
         NoticesKey::VolumeTooLargeForGpu => "볼륨이 GPU에 비해 너무 큼",
         NoticesKey::VolumeLodOff => "이 볼륨에서는 보기에 따른 세부가 꺼져 있습니다",
         NoticesKey::VolumeLodOffDetail => {

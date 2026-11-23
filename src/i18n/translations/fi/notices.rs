@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Muuttujan '{}' koordinaattien lataus epäonnistui ({}); akseleilla näytetään indeksit"
         }
         NoticesKey::CoastlinesUnavailable => "Rantaviivoja ei saatavilla",
+        NoticesKey::NoDataAtStep => "Ei dataa tässä vaiheessa",
+        NoticesKey::NoDataAtStepDetail => "Muuttujalla '{}' ei ole arvoja tässä vaiheessa: tallennus ei sisällä dataa tässä. Kokeile toista vaihetta.",
+        NoticesKey::LargeChunks => "Suuret lohkot",
+        NoticesKey::LargeChunksDetail => "'{}' on tallennettu {} kokoisiin lohkoihin: jokainen vaihe lataa vähintään yhden kokonaisen lohkon, joten vaiheet latautuvat hitaasti.",
         NoticesKey::VolumeTooLargeForGpu => "Tilavuus on liian suuri GPU:lle",
         NoticesKey::VolumeLodOff => "Tarkkuus näkymän mukaan ei ole käytössä tälle tilavuudelle",
         NoticesKey::VolumeLodOffDetail => {

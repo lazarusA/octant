@@ -100,6 +100,8 @@ pub async fn create_async_reader(
     let clean = uri.trim();
     #[cfg(not(target_arch = "wasm32"))]
     {
+        let https = crate::utils::remote::gs_as_https(clean);
+        let clean = https.as_str();
         if clean.starts_with("http://") || clean.starts_with("https://") {
             let parsed =
                 reqwest::Url::parse(clean).map_err(|e| format!("Invalid URL '{clean}': {e}"))?;
@@ -117,6 +119,8 @@ pub async fn create_async_reader(
     }
     #[cfg(target_arch = "wasm32")]
     {
+        let https = crate::utils::remote::gs_as_https(clean);
+        let clean = https.as_str();
         let local = clean.starts_with(crate::data::backends::local::SCHEME);
         if clean.starts_with("http://") || clean.starts_with("https://") || local {
             Ok(Arc::new(WasmHttpTiffReader::new(clean)))

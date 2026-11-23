@@ -13,6 +13,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::CoordinatesUnavailable => "坐标不可用",
         NoticesKey::CoordinatesFailedDetail => "'{}' 的坐标加载失败（{}）；坐标轴显示索引",
         NoticesKey::CoastlinesUnavailable => "海岸线不可用",
+        NoticesKey::NoDataAtStep => "此时间步没有数据",
+        NoticesKey::NoDataAtStepDetail => "'{}' 在此时间步没有数值：存储中此处没有数据。请选择其他时间步。",
+        NoticesKey::LargeChunks => "分块过大",
+        NoticesKey::LargeChunksDetail => "'{}' 以 {} 的分块存储：每个时间步都要下载完整分块，因此加载较慢。",
         NoticesKey::VolumeTooLargeForGpu => "体数据过大，GPU 无法处理",
         NoticesKey::VolumeLodOff => "此体数据的按视图细化已关闭",
         NoticesKey::VolumeLodOffDetail => {

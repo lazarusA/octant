@@ -106,5 +106,6 @@ impl OctantApp {
         }
         self.coordinates_revision = self.coordinates_revision.wrapping_add(1);
         self.refresh_alignments();
+        self.check_selection_against_time_coverage(source_id);
     }
 }

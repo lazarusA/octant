@@ -62,7 +62,7 @@ pub struct WasmZarrBlockStore {
 impl WasmZarrBlockStore {
     #[cfg(target_arch = "wasm32")]
     pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url.trim_end_matches('/').to_string();
+        let clean_url = crate::utils::remote::gs_as_https(url.trim_end_matches('/'));
         WASM_STORES.with(|stores| {
             let mut map = stores.borrow_mut();
             if let Some(store) = map.get(&clean_url) {
@@ -92,7 +92,7 @@ impl WasmZarrBlockStore {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_or_create(url: &str) -> Arc<Self> {
-        let clean_url = url.trim_end_matches('/').to_string();
+        let clean_url = crate::utils::remote::gs_as_https(url.trim_end_matches('/'));
         let stores = WASM_STORES_DESKTOP.get_or_init(|| Mutex::new(HashMap::new()));
         let mut guard = stores.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(store) = guard.get(&clean_url) {
@@ -123,15 +123,16 @@ impl WasmZarrBlockStore {
     /// its metadata and downloaded chunks go once the loads still running
     /// on it finish.
     pub fn release(url: &str) {
-        let clean_url = url.trim_end_matches('/');
+        // Keyed as `get_or_create` keys it.
+        let key = crate::utils::remote::gs_as_https(url.trim_end_matches('/'));
         #[cfg(target_arch = "wasm32")]
-        let _released = WASM_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
+        let _released = WASM_STORES.with(|stores| stores.borrow_mut().remove(&key));
         #[cfg(not(target_arch = "wasm32"))]
         let _released = WASM_STORES_DESKTOP.get().and_then(|stores| {
             stores
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())
-                .remove(clean_url)
+                .remove(&key)
         });
     }
 

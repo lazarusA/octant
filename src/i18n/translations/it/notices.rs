@@ -15,6 +15,10 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Le coordinate di '{}' non sono state caricate ({}); gli assi mostrano gli indici"
         }
         NoticesKey::CoastlinesUnavailable => "Linee di costa non disponibili",
+        NoticesKey::NoDataAtStep => "Nessun dato in questo passo",
+        NoticesKey::NoDataAtStepDetail => "'{}' non ha valori in questo passo: l'archivio non contiene dati qui. Prova un altro passo.",
+        NoticesKey::LargeChunks => "Chunk grandi",
+        NoticesKey::LargeChunksDetail => "'{}' è memorizzato in chunk da {}: ogni passo scarica almeno un chunk intero, quindi i passi si caricano lentamente.",
         NoticesKey::VolumeTooLargeForGpu => "Volume troppo grande per la GPU",
         NoticesKey::VolumeLodOff => "Il dettaglio secondo la vista è disattivato per questo volume",
         NoticesKey::VolumeLodOffDetail => {
