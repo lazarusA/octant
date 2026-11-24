@@ -73,6 +73,7 @@ impl OctantApp {
             end,
             matrix: None,
             probe: None,
+            thinning: crate::plots::Thinning::NONE,
             context: want.context,
             cover,
             uv: [u0, v0, u1, v1],
@@ -139,11 +140,28 @@ impl OctantApp {
         if pending.layer == LayerId::BASE {
             self.request_detail_coordinates(pending.tile.var_idx);
         }
+        let budget = crate::app::pipeline::mesh_grid::mesh_budget(
+            self.plot_configs.mesh.detail,
+            self.layout.canvas_px,
+        );
+        let mesh = crate::app::pipeline::mesh_grid::mesh_grid(&matrix, budget);
+        let size = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        let thinning = match &mesh {
+            Some(g) => crate::plots::Thinning {
+                stride: size(g.stride),
+                width: size(g.matrix.width),
+                height: size(g.matrix.height),
+                full_width: size(matrix.width),
+                full_height: size(matrix.height),
+            },
+            None => crate::plots::Thinning::NONE,
+        };
         let rs = self.wgpu_render_state.clone();
         let Some(layer) = self.layers.get_mut(pending.layer) else {
             return;
         };
         let mut tile = pending.tile;
+        tile.thinning = thinning;
         // Headless, the tile is decided and nothing draws it.
         if let Some(rs) = rs {
             let (w, h) = (matrix.width, matrix.height);
@@ -159,6 +177,27 @@ impl OctantApp {
             };
             renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
             layer.renderers.detail = Some(renderer);
+
+            if layer.labels().is_none() {
+                let sphere_mat = mesh.as_ref().map_or(&matrix, |g| &g.matrix);
+                let (sw, sh) = (sphere_mat.width, sphere_mat.height);
+                let sphere = match &layer.renderers.detail_sphere {
+                    Some(r) if (r.width, r.height) == (sw, sh) => {
+                        r.update_data(&rs.queue, &sphere_mat.values);
+                        r.clone()
+                    }
+                    _ => Arc::new(crate::plots::SphereRenderer::new_sphere_with_coords(
+                        &rs.device,
+                        rs.target_format,
+                        &sphere_mat.values,
+                        sw,
+                        sh,
+                        None,
+                        None,
+                    )),
+                };
+                layer.renderers.detail_sphere = Some(sphere);
+            }
         }
         (tile.matrix, tile.probe) = (Some(Arc::new(matrix)), probe);
         layer.data.detail.tile = Some(tile);

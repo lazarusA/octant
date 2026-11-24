@@ -123,8 +123,41 @@ fn moving_views_and_other_plots_ask_for_nothing() {
     frame_at(&mut app, PlotType::Surface, 4.0, 1.0);
     assert!(
         app.layers.base.data.detail.pending.is_none(),
-        "heatmaps only"
+        "heatmaps and spheres only"
     );
+}
+
+#[test]
+fn sphere_zooming_in_reads_the_visible_cap_finer() {
+    let mut app = plotted_with(|_, sel| {
+        sel.plot_type = PlotType::Sphere;
+    });
+    let rest_sphere = |app: &mut OctantApp, distance: f32| {
+        app.nav.sphere_rotation_x = 0.0;
+        app.nav.sphere_rotation_y = 0.0;
+        app.nav.sphere_zoom = distance;
+        frame_at(app, PlotType::Sphere, 1.0, 1.0);
+        frame_at(app, PlotType::Sphere, 1.0, 1.0);
+        if app.layers.base.data.detail.pending.is_some() {
+            poll_until(app, |app| app.layers.base.data.detail.pending.is_none());
+        }
+    };
+
+    rest_sphere(&mut app, crate::plots::camera::DEFAULT_DISTANCE);
+    assert_eq!(tile_level(&app), None, "default distance fits the globe");
+
+    // 4x closer to the surface (`1.0 + 1.5 / 4.0 = 1.375`): reads level 0.
+    rest_sphere(&mut app, 1.375);
+    assert_eq!(tile_level(&app), Some(0));
+
+    // 2x closer to the surface (`1.0 + 1.5 / 2.0 = 1.75`): reads level 1.
+    rest_sphere(&mut app, 1.75);
+    assert_eq!(tile_level(&app), Some(1));
+
+    // Auto-rotating sphere drops the detail tile.
+    app.nav.sphere_auto_rotate = true;
+    rest_sphere(&mut app, 1.375);
+    assert_eq!(tile_level(&app), None);
 }
 
 #[test]

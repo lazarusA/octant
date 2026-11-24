@@ -18,6 +18,8 @@ pub struct LayerRenderers {
     pub channels: Option<Arc<ChannelRenderer>>,
     /// A multiscale heatmap's detail tile (`app::detail`).
     pub detail: Option<Arc<HeatmapRenderer>>,
+    /// A multiscale sphere's detail tile (`app::detail`).
+    pub detail_sphere: Option<Arc<SphereRenderer>>,
     /// The detail tile's composite planes, as `channels`.
     pub detail_channels: Option<Arc<ChannelRenderer>>,
     pub line: Option<Arc<LineRenderer>>,
@@ -51,6 +53,7 @@ impl LayerRenderers {
     pub fn release_idle_oit_frames(&self, active: PlotType) {
         let meshes = [
             (PlotType::Sphere, &self.sphere),
+            (PlotType::Sphere, &self.detail_sphere),
             (PlotType::Surface, &self.surface),
         ];
         for (kind, renderer) in meshes {

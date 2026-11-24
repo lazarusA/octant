@@ -17,7 +17,7 @@ const MIN_MESH_CELLS: usize = 256 * 1024;
 
 /// The most cells the sphere and surface draw at `detail` on a canvas of
 /// `canvas_px`, within one storage buffer.
-pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
+pub(crate) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
     let pixels = (w as usize).saturating_mul(h as usize);
     detail
         .budget(pixels)
@@ -26,7 +26,7 @@ pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
 
 /// `data` thinned to at most `budget` cells for the sphere and surface;
 /// `None` when they draw every cell.
-pub(super) fn mesh_grid(data: &MatrixData, budget: usize) -> Option<MeshGrid> {
+pub(crate) fn mesh_grid(data: &MatrixData, budget: usize) -> Option<MeshGrid> {
     let stride = stride_for(data.width, data.height, budget);
     data.decimated(stride)
         .map(|matrix| MeshGrid { matrix, stride })

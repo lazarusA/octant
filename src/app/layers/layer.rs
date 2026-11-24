@@ -95,6 +95,7 @@ impl Layer {
         self.renderers.labels = None;
         self.renderers.channels = None;
         self.renderers.detail = None;
+        self.renderers.detail_sphere = None;
         self.renderers.detail_channels = None;
         self.data.detail.clear();
         self.renderers.sphere = None;

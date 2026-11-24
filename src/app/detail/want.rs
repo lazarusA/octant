@@ -17,22 +17,34 @@ use crate::plots::PlotType;
 impl OctantApp {
     /// The finer level the view asks for over the visible window; `None`
     /// when the plotted level already fits the screen.
-    pub(super) fn detail_want(&self, view: &CanvasView, context: u64) -> Option<Want> {
+    pub(super) fn detail_want(
+        &self,
+        plot_type: PlotType,
+        view: &CanvasView,
+        context: u64,
+    ) -> Option<Want> {
         let plotted = self.plotted();
         let var = plotted.variable_info()?;
         let r = var.multiscale.as_ref()?;
         let axes = self.plotted_axes()?;
         let (x, y, set) = (axes[0].dim, axes[1].dim, &r.set);
-        let (u, v) = crate::data::ViewportResampler::compute_visible_data_bounds(
-            view.pan,
-            view.zoom,
-            view.aspect_scale,
-        );
+        let (u, v) = if plot_type == PlotType::Sphere {
+            let aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
+            let camera = self.nav.orbit_camera(PlotType::Sphere, aspect);
+            let grid = &self.layers.base.data.matrix.as_ref()?.grid;
+            super::sphere_view::visible_uv(&camera, grid)?
+        } else {
+            crate::data::ViewportResampler::compute_visible_data_bounds(
+                view.pan,
+                view.zoom,
+                view.aspect_scale,
+            )
+        };
         let visible = [axes[0].visible(u), axes[1].visible(v)];
         let [px_w, px_h] = self.layout.canvas_px;
         let px = [pixels_over(px_w, u), pixels_over(px_h, v)];
         let window = level0_window(plotted, set, r.level, [x, y], visible);
-        let demand = crate::app::controllers::controller_for(PlotType::Heatmap).resolution_demand(
+        let demand = crate::app::controllers::controller_for(plot_type).resolution_demand(
             var,
             &plotted.dim_config,
             px,
@@ -109,17 +121,24 @@ impl OctantApp {
     }
 
     /// The plot a tile belongs to, when the base layer can have one: a
-    /// heatmap at rest reading a level of a multiscale variable chosen by
-    /// Auto, on a regular grid.
+    /// heatmap or sphere at rest reading a level of a multiscale variable
+    /// chosen by Auto, on a regular grid.
     pub(super) fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
         let base = &self.layers.base;
         let plotted = base.selection();
         // Global (0) and regional (1) regular grids draw cells evenly over
-        // the quad, as tiles do; coordinate lookups (2) and HEALPix don't.
-        let regular = matches!(base.data.matrix.as_ref()?.grid.render_coord_mode(), 0 | 1);
-        let readable = plot_type == PlotType::Heatmap
+        // the quad or globe, as tiles do; coordinate lookups (2) and HEALPix don't.
+        let grid = &base.data.matrix.as_ref()?.grid;
+        let regular = match plot_type {
+            PlotType::Heatmap => matches!(grid.render_coord_mode(), 0 | 1),
+            PlotType::Sphere => matches!(grid.sphere_coord_mode(), 0 | 1),
+            _ => false,
+        };
+        let spinning = plot_type == PlotType::Sphere && self.nav.sphere_auto_rotate;
+        let readable = matches!(plot_type, PlotType::Heatmap | PlotType::Sphere)
             && regular
             && !self.playback.is_playing
+            && !spinning
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;

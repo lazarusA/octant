@@ -39,6 +39,7 @@ mod geometry;
 pub(crate) use geometry::Axis;
 #[cfg(test)]
 mod geometry_tests;
+mod sphere_view;
 #[cfg(test)]
 mod tests;
 mod tile;
@@ -119,6 +120,8 @@ pub struct DetailTile {
     pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
     /// A composite tile's block window, for the hover's channel values.
     pub probe: Option<crate::data::slicing::CompositeProbe>,
+    /// How the detail sphere thins the tile's cells for GPU channel bakes.
+    pub thinning: crate::plots::Thinning,
     /// The plot it belongs to (`OctantApp::detail_context`).
     pub context: u64,
     /// Level-0 positions it covers along x and y.
@@ -197,9 +200,17 @@ impl OctantApp {
         if self.nav.view_interacting {
             return None;
         }
+        let (pan, zoom) = if plot_type == PlotType::Sphere {
+            (
+                [self.nav.sphere_rotation_x, self.nav.sphere_rotation_y],
+                self.nav.sphere_zoom,
+            )
+        } else {
+            (view.pan, view.zoom)
+        };
         let key = ViewKey {
-            pan: view.pan,
-            zoom: view.zoom,
+            pan,
+            zoom,
             aspect: view.aspect_scale,
             px: self.layout.canvas_px,
             context,
@@ -218,15 +229,15 @@ impl OctantApp {
             return None;
         }
         state.view = Some(key);
-        self.decide_detail(view, context);
+        self.decide_detail(plot_type, view, context);
         None
     }
 
     /// Asks for the tile the resting `view` wants, unless the tile shown or
     /// pending already covers it at that level; drops both when the plotted
     /// level fits the view.
-    fn decide_detail(&mut self, view: &CanvasView, context: u64) {
-        let Some(want) = self.detail_want(view, context) else {
+    fn decide_detail(&mut self, plot_type: PlotType, view: &CanvasView, context: u64) {
+        let Some(want) = self.detail_want(plot_type, view, context) else {
             let state = &mut self.layers.base.data.detail;
             state.tile = None;
             state.drop_request();
