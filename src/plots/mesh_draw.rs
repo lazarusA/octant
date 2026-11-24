@@ -67,6 +67,32 @@ pub struct MeshDetailDraw {
     pub heights: Option<Arc<Mesh3DRenderer>>,
 }
 
+impl MeshDetailDraw {
+    fn prepare(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> (super::BakeId, u64) {
+        self.renderer.update_uniforms(queue, &self.params);
+        if let Some(channels) = &self.channels {
+            let r = &self.renderer;
+            let target = (r.bake_id.id(), &r.data_buffer, self.thinning);
+            if channels.bake_into(device, queue, encoder, target) {
+                r.inputs.data_changed();
+            }
+        }
+        let base = self.heights.as_deref();
+        let size = (self.renderer.width, self.renderer.height);
+        self.renderer.heights.drape(device, size, base);
+        let base_key = base.map(|b| (b.heights.id(), b.inputs.key(())));
+        (
+            self.renderer.heights.id(),
+            self.renderer.inputs.key(base_key),
+        )
+    }
+}
+
 pub struct Mesh3DCallback {
     pub renderer: Arc<Mesh3DRenderer>,
     pub params: Mesh3DUniformParams,
@@ -129,21 +155,10 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         let base = self.heights.as_deref();
         let own_size = (renderer.width, renderer.height);
         renderer.heights.drape(device, own_size, base);
-        let detail_key = self.detail.as_ref().map(|d| {
-            d.renderer.update_uniforms(queue, &d.params);
-            if let Some(channels) = &d.channels {
-                let r = &d.renderer;
-                let target = (r.bake_id.id(), &r.data_buffer, d.thinning);
-                if channels.bake_into(device, queue, encoder, target) {
-                    r.inputs.data_changed();
-                }
-            }
-            let d_base = d.heights.as_deref();
-            let d_size = (d.renderer.width, d.renderer.height);
-            d.renderer.heights.drape(device, d_size, d_base);
-            let d_base_key = d_base.map(|b| (b.heights.id(), b.inputs.key(())));
-            (d.renderer.heights.id(), d.renderer.inputs.key(d_base_key))
-        });
+        let detail_key = self
+            .detail
+            .as_ref()
+            .map(|d| d.prepare(device, queue, encoder));
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
         // A draped overlay is drawn again when the base's heights change,
         // and for a new base, whose upload count starts over.

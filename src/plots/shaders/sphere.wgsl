@@ -23,13 +23,25 @@ fn sphere_lon_lat(
     grid_h: u32,
 ) -> vec2<f32> {
     if (is_subtile()) {
-        let local_uv = (vec2<f32>(f32(cell_x), f32(cell_y)) + model_xy) / vec2<f32>(f32(grid_w), f32(grid_h));
-        let uv = mix(uniforms.tile_bounds.xy, uniforms.tile_bounds.zw, local_uv);
+        let tb = uniforms.tile_bounds;
         if (uniforms.coord_mode == 1u) {
+            let u = select(
+                (f32(cell_x) + model_xy.x - 0.5) / max(f32(grid_w) - 1.0, 1.0),
+                model_xy.x,
+                grid_w <= 1u,
+            );
+            let v = select(
+                (f32(cell_y) + model_xy.y - 0.5) / max(f32(grid_h) - 1.0, 1.0),
+                model_xy.y,
+                grid_h <= 1u,
+            );
+            let uv = mix(tb.xy, tb.zw, vec2<f32>(u, v));
             let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, uv.x);
             let lat = clamp(mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, uv.y), -1.5707963, 1.5707963);
             return vec2<f32>(lon, lat);
         }
+        let local_uv = (vec2<f32>(f32(cell_x), f32(cell_y)) + model_xy) / vec2<f32>(f32(grid_w), f32(grid_h));
+        let uv = mix(tb.xy, tb.zw, local_uv);
         let lon = (uv.x - 0.5) * 2.0 * 3.14159265;
         let lat = (0.5 - uv.y) * 3.14159265;
         return vec2<f32>(lon, lat);
@@ -67,6 +79,16 @@ fn vs_main(
     if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
         // HEALPix pixels have no rows: fractions of the globe.
         slice_xy = vec2<f32>(lon / 6.2831853 + 0.5, 0.5 - lat / 3.14159265);
+    } else {
+        // Fast vertex-stage culling for coarse cells strictly inside `hole_bounds`.
+        let hb = uniforms.hole_bounds;
+        let pad = vec2<f32>(1.5) / grid;
+        if (hb.z > hb.x
+            && slice_xy.x - pad.x >= hb.x && slice_xy.x + pad.x <= hb.z
+            && slice_xy.y - pad.y >= hb.y && slice_xy.y + pad.y <= hb.w) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
     }
 
     var pos_3d: vec3<f32>;
