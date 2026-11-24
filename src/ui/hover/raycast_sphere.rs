@@ -44,10 +44,21 @@ impl<'a> SphereField<'a> {
     /// `[k, k + 1]`) on grids `get_lon_lat` places linearly (global and
     /// regional regular), and whether longitudes wrap around.
     fn cell_coords(&self, lon: f32, lat: f32) -> Option<(f32, f32, bool)> {
-        let grid = &self.matrix.grid;
+        let (u, v) = self.uv(lon, lat)?;
         let (w, h) = (self.matrix.width as f32, self.matrix.height as f32);
+        match self.matrix.grid.sphere_coord_mode() {
+            0 => Some((u * w, v * h, true)),
+            1 => Some((u * (w - 1.0) + 0.5, v * (h - 1.0) + 0.5, false)),
+            _ => None,
+        }
+    }
+
+    /// Normalized `[0..1, 0..1]` quad fractions `(u, v)` of `(lon, lat)` on
+    /// a global or regional regular sphere.
+    fn uv(&self, lon: f32, lat: f32) -> Option<(f32, f32)> {
+        let grid = &self.matrix.grid;
         match grid.sphere_coord_mode() {
-            0 => Some(((lon + PI) / (2.0 * PI) * w, (0.5 - lat / PI) * h, true)),
+            0 => Some(((lon + PI) / (2.0 * PI), 0.5 - lat / PI)),
             1 => {
                 let [lon_min, lon_max] = grid.lon_bounds_rad();
                 let [lat_min, lat_max] = grid.lat_bounds_rad();
@@ -58,9 +69,23 @@ impl<'a> SphereField<'a> {
                 };
                 let u = (lon - lon_min) / (lon_max - lon_min).abs().max(1e-6);
                 let v = (lat_max - lat) / (lat_max - lat_min).abs().max(1e-6);
-                Some((u * (w - 1.0) + 0.5, v * (h - 1.0) + 0.5, false))
+                Some((u, v))
             }
             _ => None,
+        }
+    }
+
+    /// Longitude and latitude (radians) at quad fractions `(u, v)`.
+    pub(super) fn lon_lat_of_uv(&self, u: f32, v: f32) -> (f32, f32) {
+        let grid = &self.matrix.grid;
+        if grid.sphere_coord_mode() == 1 {
+            let [lon_min, lon_max] = grid.lon_bounds_rad();
+            let [lat_min, lat_max] = grid.lat_bounds_rad();
+            let lon = lon_min + u * (lon_max - lon_min);
+            let lat = (lat_max - v * (lat_max - lat_min)).clamp(-PI * 0.5, PI * 0.5);
+            (lon, lat)
+        } else {
+            ((u - 0.5) * 2.0 * PI, (0.5 - v) * PI)
         }
     }
 
@@ -171,6 +196,12 @@ impl<'a> SphereField<'a> {
     /// The cell where `ray` first meets the drawn globe, or crosses the unit
     /// sphere when it meets nothing.
     pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
+        self.hit_with_lon_lat(ray).map(|(cell, _)| cell)
+    }
+
+    /// [`Self::hit`] together with the `(lon, lat)` radians where `ray` met
+    /// the globe.
+    fn hit_with_lon_lat(&self, ray: &Ray3D) -> Option<((usize, usize), (f32, f32))> {
         let marched = (self.mode != 0).then(|| {
             // Between the outermost and innermost drawn radii; below the
             // innermost the ray only sees the inside of the globe.
@@ -185,7 +216,7 @@ impl<'a> SphereField<'a> {
         });
         let unit = || sphere_span(ray, 1.0).map(|(t_in, _)| t_in);
         let (lon, lat, _) = point(ray, marched.flatten().or_else(unit)?);
-        self.cell(lon, lat)
+        Some((self.cell(lon, lat)?, (lon, lat)))
     }
 }
 
@@ -220,7 +251,15 @@ pub fn raycast_sphere(
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
     let world_ray = camera.cast_ray(hover_pos);
-    let (px, py) = SphereField::new(app, matrix).hit(&world_ray)?;
+    let field = SphereField::new(app, matrix);
+    let ((px, py), (lon, lat)) = field.hit_with_lon_lat(&world_ray)?;
+    if let Some((u, v)) = field.uv(lon, lat)
+        && let Some(tile_cell) = crate::ui::hover::detail::detail_cell(app, u, v)
+    {
+        let (nx, ny) = tile_cell.center;
+        let (lon_c, lat_c) = field.lon_lat_of_uv(nx, ny);
+        return Some((nx, ny, Some((lat_c.to_degrees(), lon_c.to_degrees()))));
+    }
     let (w, h) = (matrix.width, matrix.height);
     let (nx, ny) = matrix.grid.cell_center_norm(px, py, w, h);
     let (cell_lon_rad, cell_lat_rad) = matrix.grid.cell_center_lon_lat_rad(px, py, w, h);
@@ -230,6 +269,32 @@ pub fn raycast_sphere(
         ny,
         Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees())),
     ))
+}
+
+/// Forward projects a hovered detail tile cell's center on the drawn globe to
+/// screen space.
+pub fn sphere_detail_target_pos(
+    app: &OctantApp,
+    matrix: Option<&MatrixData>,
+    camera: &Camera3D,
+    cell: crate::ui::hover::detail::DetailCell,
+) -> Option<Pos2> {
+    let matrix = matrix?;
+    let field = SphereField::new(app, matrix);
+    let (lon_c, lat_c) = field.lon_lat_of_uv(cell.center.0, cell.center.1);
+    let dr = if cell.value.is_finite() {
+        field.scale.normalized(cell.value) * height_factor(true, field.mode) * field.disp
+    } else {
+        0.0
+    };
+    let r = match field.mode {
+        3 => 1.0 + dr.max(0.0),
+        _ => 1.0 + dr,
+    };
+    let world_x = r * lat_c.cos() * lon_c.sin();
+    let world_y = r * lat_c.sin();
+    let world_z = r * lat_c.cos() * lon_c.cos();
+    camera.project_point([world_x, world_y, world_z])
 }
 
 /// Forward projects the hovered cell's center, on the drawn globe, to screen
