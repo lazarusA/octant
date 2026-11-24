@@ -147,8 +147,23 @@ fn sphere_zooming_in_reads_the_visible_cap_finer() {
     assert_eq!(tile_level(&app), None, "default distance fits the globe");
 
     // 4x closer to the surface (`1.0 + 1.5 / 4.0 = 1.375`): reads level 0.
+    let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(20.0, 20.0));
+    let center = rect.center();
+    app.nav.sphere_zoom = 1.375;
+    let key_before = crate::ui::hover::hit_cache::mesh_hit_key(&app, rect, center);
     rest_sphere(&mut app, 1.375);
     assert_eq!(tile_level(&app), Some(0));
+    let key_after = crate::ui::hover::hit_cache::mesh_hit_key(&app, rect, center);
+    assert_ne!(
+        key_before, key_after,
+        "hit cache invalidates on tile arrival"
+    );
+
+    let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
+    let camera = crate::ui::hover::Camera3D::from_app(&app, rect);
+    let (nx, ny, _) = crate::ui::hover::raycast_sphere(&app, matrix, &camera, center).expect("hit");
+    let cell = crate::ui::hover::detail::detail_cell(&app, nx, ny).expect("detail cell");
+    assert_eq!(cell.level, 0);
 
     // 2x closer to the surface (`1.0 + 1.5 / 2.0 = 1.75`): reads level 1.
     rest_sphere(&mut app, 1.75);

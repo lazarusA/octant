@@ -14,7 +14,7 @@ pub mod entries_3d;
 pub mod field;
 pub mod format;
 pub mod hit;
-mod hit_cache;
+pub(crate) mod hit_cache;
 pub mod labels;
 mod march;
 pub mod overlays;

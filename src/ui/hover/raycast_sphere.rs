@@ -10,6 +10,8 @@ use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
+use crate::ui::hover::sphere_slice::project_lon_lat;
+pub use crate::ui::hover::sphere_slice::sphere_detail_target_pos;
 use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
 
@@ -18,8 +20,8 @@ pub struct SphereField<'a> {
     pub(super) layer: &'a Layer,
     pub(super) matrix: &'a MatrixData,
     pub(super) scale: HeightScale,
-    mode: u32,
-    disp: f32,
+    pub(super) mode: u32,
+    pub(super) disp: f32,
     /// The slicer: cells its box cuts away are not drawn.
     pub(super) slice: crate::app::Slicer,
     /// Whether the globe draws relief (`slice::has_relief`), for the cut.
@@ -50,42 +52,6 @@ impl<'a> SphereField<'a> {
             0 => Some((u * w, v * h, true)),
             1 => Some((u * (w - 1.0) + 0.5, v * (h - 1.0) + 0.5, false)),
             _ => None,
-        }
-    }
-
-    /// Normalized `[0..1, 0..1]` quad fractions `(u, v)` of `(lon, lat)` on
-    /// a global or regional regular sphere.
-    fn uv(&self, lon: f32, lat: f32) -> Option<(f32, f32)> {
-        let grid = &self.matrix.grid;
-        match grid.sphere_coord_mode() {
-            0 => Some(((lon + PI) / (2.0 * PI), 0.5 - lat / PI)),
-            1 => {
-                let [lon_min, lon_max] = grid.lon_bounds_rad();
-                let [lat_min, lat_max] = grid.lat_bounds_rad();
-                let lon = if lon_max > PI && lon < 0.0 {
-                    lon + 2.0 * PI
-                } else {
-                    lon
-                };
-                let u = (lon - lon_min) / (lon_max - lon_min).abs().max(1e-6);
-                let v = (lat_max - lat) / (lat_max - lat_min).abs().max(1e-6);
-                Some((u, v))
-            }
-            _ => None,
-        }
-    }
-
-    /// Longitude and latitude (radians) at quad fractions `(u, v)`.
-    pub(super) fn lon_lat_of_uv(&self, u: f32, v: f32) -> (f32, f32) {
-        let grid = &self.matrix.grid;
-        if grid.sphere_coord_mode() == 1 {
-            let [lon_min, lon_max] = grid.lon_bounds_rad();
-            let [lat_min, lat_max] = grid.lat_bounds_rad();
-            let lon = lon_min + u * (lon_max - lon_min);
-            let lat = (lat_max - v * (lat_max - lat_min)).clamp(-PI * 0.5, PI * 0.5);
-            (lon, lat)
-        } else {
-            ((u - 0.5) * 2.0 * PI, (0.5 - v) * PI)
         }
     }
 
@@ -137,6 +103,12 @@ impl<'a> SphereField<'a> {
     /// Radii the drawn geometry spans toward `(lon, lat)` in cell `(px, py)`:
     /// a voxel's column from the unit sphere, else the surface's one radius.
     fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
+        if let Some(dr) = self.detail_dr(lon, lat) {
+            return match self.mode {
+                3 => (1.0 + dr.min(0.0), 1.0 + dr.max(0.0)),
+                _ => (1.0 + dr, 1.0 + dr),
+            };
+        }
         let dr = self.dr_at(px, py);
         match self.mode {
             1 => {
@@ -146,6 +118,12 @@ impl<'a> SphereField<'a> {
             3 => (1.0 + dr.min(0.0), 1.0 + dr.max(0.0)),
             _ => (1.0 + dr, 1.0 + dr),
         }
+    }
+
+    /// [`Self::span`] at `(lon, lat)`.
+    pub(super) fn span_at(&self, lon: f32, lat: f32) -> (f32, f32) {
+        let (px, py) = self.grid_cell(lon, lat).unwrap_or((0, 0));
+        self.span(px, py, lon, lat)
     }
 
     fn shape(&self) -> Shape {
@@ -163,7 +141,7 @@ impl<'a> SphereField<'a> {
             self.matrix.width.max(1) as f32,
             self.matrix.height.max(1) as f32,
         );
-        if grid.sphere_coord_mode() == 1 {
+        let base = if grid.sphere_coord_mode() == 1 {
             let [lon_min, lon_max] = grid.lon_bounds_rad();
             let [lat_min, lat_max] = grid.lat_bounds_rad();
             let dx = (lon_max - lon_min).abs() / (w - 1.0).max(1.0);
@@ -171,7 +149,8 @@ impl<'a> SphereField<'a> {
             dx.min(dy).max(1e-5)
         } else {
             (2.0 * PI / w).min(PI / h)
-        }
+        };
+        self.detail_cell_angle(base)
     }
 
     fn probe(&self, ray: &Ray3D, t: f32) -> Probe {
@@ -203,8 +182,6 @@ impl<'a> SphereField<'a> {
     /// the globe.
     fn hit_with_lon_lat(&self, ray: &Ray3D) -> Option<((usize, usize), (f32, f32))> {
         let marched = (self.mode != 0).then(|| {
-            // Between the outermost and innermost drawn radii; below the
-            // innermost the ray only sees the inside of the globe.
             let (r_in, r_out) = self.radius_span();
             let (r_in, r_out) = (r_in - 1e-3, r_out + 1e-3);
             let (t_in, t_out) = sphere_span(ray, r_out)?;
@@ -271,32 +248,6 @@ pub fn raycast_sphere(
     ))
 }
 
-/// Forward projects a hovered detail tile cell's center on the drawn globe to
-/// screen space.
-pub fn sphere_detail_target_pos(
-    app: &OctantApp,
-    matrix: Option<&MatrixData>,
-    camera: &Camera3D,
-    cell: crate::ui::hover::detail::DetailCell,
-) -> Option<Pos2> {
-    let matrix = matrix?;
-    let field = SphereField::new(app, matrix);
-    let (lon_c, lat_c) = field.lon_lat_of_uv(cell.center.0, cell.center.1);
-    let dr = if cell.value.is_finite() {
-        field.scale.normalized(cell.value) * height_factor(true, field.mode) * field.disp
-    } else {
-        0.0
-    };
-    let r = match field.mode {
-        3 => 1.0 + dr.max(0.0),
-        _ => 1.0 + dr,
-    };
-    let world_x = r * lat_c.cos() * lon_c.sin();
-    let world_y = r * lat_c.sin();
-    let world_z = r * lat_c.cos() * lon_c.cos();
-    camera.project_point([world_x, world_y, world_z])
-}
-
 /// Forward projects the hovered cell's center, on the drawn globe, to screen
 /// space.
 pub fn sphere_target_pos(
@@ -310,10 +261,5 @@ pub fn sphere_target_pos(
         .grid
         .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
     let r = SphereField::new(app, matrix).span(px, py, lon_c, lat_c).1;
-
-    let world_x = r * lat_c.cos() * lon_c.sin();
-    let world_y = r * lat_c.sin();
-    let world_z = r * lat_c.cos() * lon_c.cos();
-
-    camera.project_point([world_x, world_y, world_z])
+    project_lon_lat(camera, lon_c, lat_c, r)
 }
