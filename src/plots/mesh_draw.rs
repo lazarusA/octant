@@ -57,6 +57,16 @@ impl Mesh3DRenderer {
     }
 }
 
+/// A multiscale sphere's finer detail tile drawn in the same pass as its
+/// coarse mesh (which discards its covered cells via `hole_bounds`).
+pub struct MeshDetailDraw {
+    pub renderer: Arc<Mesh3DRenderer>,
+    pub params: Mesh3DUniformParams,
+    pub channels: Option<ChannelDraw>,
+    pub thinning: super::Thinning,
+    pub heights: Option<Arc<Mesh3DRenderer>>,
+}
+
 pub struct Mesh3DCallback {
     pub renderer: Arc<Mesh3DRenderer>,
     pub params: Mesh3DUniformParams,
@@ -72,6 +82,8 @@ pub struct Mesh3DCallback {
     /// The base layer's mesh, whose data makes this overlay's heights;
     /// `None` for the base, which reads its own.
     pub heights: Option<Arc<Mesh3DRenderer>>,
+    /// A multiscale sphere's finer detail tile drawn in the same pass.
+    pub detail: Option<MeshDetailDraw>,
 }
 
 impl Mesh3DCallback {
@@ -117,13 +129,28 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         let base = self.heights.as_deref();
         let own_size = (renderer.width, renderer.height);
         renderer.heights.drape(device, own_size, base);
+        let detail_key = self.detail.as_ref().map(|d| {
+            d.renderer.update_uniforms(queue, &d.params);
+            if let Some(channels) = &d.channels {
+                let r = &d.renderer;
+                let target = (r.bake_id.id(), &r.data_buffer, d.thinning);
+                if channels.bake_into(device, queue, encoder, target) {
+                    r.inputs.data_changed();
+                }
+            }
+            let d_base = d.heights.as_deref();
+            let d_size = (d.renderer.width, d.renderer.height);
+            d.renderer.heights.drape(device, d_size, d_base);
+            let d_base_key = d_base.map(|b| (b.heights.id(), b.inputs.key(())));
+            (d.renderer.heights.id(), d.renderer.inputs.key(d_base_key))
+        });
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
         // A draped overlay is drawn again when the base's heights change,
         // and for a new base, whose upload count starts over.
         let base_key = base.map(|b| (b.heights.id(), b.inputs.key(())));
         let key = renderer
             .inputs
-            .key((cubes, self.transparency as u8, base_key));
+            .key((cubes, self.transparency as u8, base_key, detail_key));
         let cull_mode = if cubes {
             Some(wgpu::Face::Back)
         } else {
@@ -139,7 +166,12 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
                 cull_mode,
             ),
             (self.pipeline(), |v| renderer.oit_pipeline(device, cubes, v)),
-            |pass| renderer.draw_geometry(pass, cubes),
+            |pass| {
+                renderer.draw_geometry(pass, cubes);
+                if let Some(d) = &self.detail {
+                    d.renderer.draw_geometry(pass, cubes);
+                }
+            },
         );
         Vec::new()
     }
@@ -154,12 +186,18 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             return;
         }
         let renderer = &self.renderer;
+        let cubes = self.cubes();
         super::frame_cache::paint_frame(
             (&renderer.oit, &renderer.frame),
             (self.transparency, self.pipeline()),
             rpass,
             callback_resources,
-            |rpass| renderer.draw_geometry(rpass, self.cubes()),
+            |rpass| {
+                renderer.draw_geometry(rpass, cubes);
+                if let Some(d) = &self.detail {
+                    d.renderer.draw_geometry(rpass, cubes);
+                }
+            },
         );
     }
 }

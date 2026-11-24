@@ -19,6 +19,10 @@ struct Uniforms {
     lat_bounds: vec2<f32>,
     // The color range of the layer whose values make the heights.
     height_range: vec2<f32>,
+    // Sub-region [u0, v0, u1, v1] of the plotted domain this mesh covers.
+    tile_bounds: vec4<f32>,
+    // Sub-region [u0, v0, u1, v1] discarded from this mesh for a finer detail tile.
+    hole_bounds: vec4<f32>,
     color: ColorUniforms,
 };
 
@@ -97,6 +101,12 @@ struct VertexOutput {
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
+    let hb = uniforms.hole_bounds;
+    if (hb.z > hb.x
+        && in.slice_at.x >= hb.x && in.slice_at.x <= hb.z
+        && in.slice_at.y >= hb.y && in.slice_at.y <= hb.w) {
+        discard;
+    }
     if (!slice_box_keeps(uniforms.slice, in.slice_at)) {
         discard;
     }

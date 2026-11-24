@@ -54,6 +54,8 @@ fn mesh3d_uniform_offsets_match_wgsl() {
         ("lon_bounds", offset_of!(U, lon_bounds)),
         ("lat_bounds", offset_of!(U, lat_bounds)),
         ("height_range", offset_of!(U, height_range)),
+        ("tile_bounds", offset_of!(U, tile_bounds)),
+        ("hole_bounds", offset_of!(U, hole_bounds)),
         ("color", offset_of!(U, color)),
     ]
     .map(|(n, o)| (n.to_string(), o));
