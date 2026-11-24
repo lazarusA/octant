@@ -32,17 +32,40 @@ mod global {
     }
 }
 
-/// Sends `init` to `url` and waits for the answer, giving up after
-/// [`ANSWER_TIMEOUT_MS`]: `fetch` has no limit of its own, and a server that
-/// never answers would hold its prefetch worker for good. Only the wait for
-/// the answer is limited, so a slow but steady body still arrives.
-/// (`AbortController` and `setTimeout`, unlike `AbortSignal.timeout`, exist
-/// in every browser the WebGL build runs in.)
+/// Sends `init` to `url` ([`send_once`]), retrying a GCS bucket the browser
+/// blocks (no CORS) at `super::gcs`'s endpoint.
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn send(
     url: &str,
     init: &web_sys::RequestInit,
 ) -> Result<web_sys::Response, String> {
+    let first = super::gcs::known(url);
+    let rejected = match send_once(&first, init).await? {
+        Ok(resp) => return Ok(resp),
+        Err(rejected) => rejected,
+    };
+    let blocked = matches!(first, std::borrow::Cow::Borrowed(_))
+        && wasm_bindgen::JsCast::is_instance_of::<js_sys::TypeError>(&rejected);
+    if let Some(json) = blocked.then(|| super::gcs::cors_url(url)).flatten()
+        && let Ok(Ok(resp)) = send_once(&json, init).await
+    {
+        super::gcs::remember(url);
+        return Ok(resp);
+    }
+    Err(format!("Network fetch failed for '{url}': {rejected:?}"))
+}
+
+/// One request to `url`: `Err` when it cannot be built, `Ok(Err)` with what
+/// `fetch` rejected with. Gives up after [`ANSWER_TIMEOUT_MS`]: `fetch` has no
+/// limit of its own, and a server that never answers would hold its prefetch
+/// worker for good. Only the wait for the answer is limited, so a slow but
+/// steady body still arrives. (`AbortController` and `setTimeout`, unlike
+/// `AbortSignal.timeout`, exist in every browser the WebGL build runs in.)
+#[cfg(target_arch = "wasm32")]
+async fn send_once(
+    url: &str,
+    init: &web_sys::RequestInit,
+) -> Result<Result<web_sys::Response, wasm_bindgen::JsValue>, String> {
     use wasm_bindgen::JsCast;
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen_futures::JsFuture;
@@ -71,11 +94,12 @@ pub(crate) async fn send(
         handle,
         _abort: abort,
     };
-    JsFuture::from(fetched)
-        .await
-        .map_err(|e| format!("Network fetch failed for '{url}': {e:?}"))?
-        .dyn_into()
-        .map_err(|_| "Failed to cast fetch response".to_string())
+    match JsFuture::from(fetched).await {
+        Ok(resp) => Ok(Ok(resp
+            .dyn_into()
+            .map_err(|_| "Failed to cast fetch response".to_string())?)),
+        Err(rejected) => Ok(Err(rejected)),
+    }
 }
 
 /// The bytes of `resp`'s body.
