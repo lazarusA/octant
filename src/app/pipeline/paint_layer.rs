@@ -80,38 +80,9 @@ impl OctantApp {
         let heights = (layer.id() != base.id()).then(|| mesh(base)).flatten();
         let aspect_ratio = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
         let mut params = self.get_mesh_3d_uniform_params(layer, sphere, aspect_ratio);
-        let detail = if sphere {
-            if let (Some(tile), Some(detail_renderer)) =
-                (&layer.data.detail.tile, &layer.renderers.detail_sphere)
-            {
-                params.hole_bounds = tile.uv;
-                let detail_params = crate::plots::Mesh3DUniformParams {
-                    tile_bounds: tile.uv,
-                    hole_bounds: [0.0; 4],
-                    ..params
-                };
-                let detail_heights = (layer.id() != base.id())
-                    .then(|| base.renderers.detail_sphere.clone())
-                    .flatten();
-                let detail_channels = channel_draw(
-                    layer,
-                    &layer.renderers.detail_channels,
-                    probe_start(tile.probe.as_ref()),
-                    None,
-                );
-                Some(crate::plots::MeshDetailDraw {
-                    renderer: detail_renderer.clone(),
-                    params: detail_params,
-                    channels: detail_channels,
-                    thinning: tile.thinning,
-                    heights: detail_heights,
-                })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let detail = sphere
+            .then(|| self.sphere_detail_draw(layer, &mut params))
+            .flatten();
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::Mesh3DCallback {
@@ -132,6 +103,41 @@ impl OctantApp {
             },
         );
         ui.painter().add(callback);
+    }
+
+    /// `layer`'s detail sphere draw call and coarse `hole_bounds`, when a
+    /// detail tile is shown on the sphere.
+    fn sphere_detail_draw(
+        &self,
+        layer: &Layer,
+        params: &mut crate::plots::Mesh3DUniformParams,
+    ) -> Option<crate::plots::MeshDetailDraw> {
+        let (tile, detail_renderer) = (
+            layer.data.detail.tile.as_ref()?,
+            layer.renderers.detail_sphere.as_ref()?,
+        );
+        params.hole_bounds = tile.uv;
+        let base = &self.layers.base;
+        let heights = (layer.id() != base.id())
+            .then(|| base.renderers.detail_sphere.clone())
+            .flatten();
+        let channels = channel_draw(
+            layer,
+            &layer.renderers.detail_channels,
+            probe_start(tile.probe.as_ref()),
+            None,
+        );
+        Some(crate::plots::MeshDetailDraw {
+            renderer: detail_renderer.clone(),
+            params: crate::plots::Mesh3DUniformParams {
+                tile_bounds: tile.uv,
+                hole_bounds: [0.0; 4],
+                ..*params
+            },
+            channels,
+            thinning: tile.thinning,
+            heights,
+        })
     }
 
     fn paint_volume(&self, ui: &egui::Ui, layer: &Layer, view: &CanvasView) {

@@ -46,9 +46,8 @@ pub(super) fn visible_uv(
         1 => {
             let [lon_min, lon_max] = grid.lon_bounds_rad().map(f64::from);
             let [lat_min, lat_max] = grid.lat_bounds_rad().map(f64::from);
-            if lon_max > PI && center_lon < 0.0 {
-                center_lon += 2.0 * PI;
-            }
+            let lon_mid = 0.5 * (lon_min + lon_max);
+            center_lon = lon_mid + ((center_lon - lon_mid + PI).rem_euclid(2.0 * PI) - PI);
             let lon_lo = center_lon - dlon;
             let lon_hi = center_lon + dlon;
             let lon_span = (lon_max - lon_min).abs().max(1e-6);
