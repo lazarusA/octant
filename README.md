@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <b>Download the desktop app</b> · or <a href="https://lazarusa.github.io/octant/">try it in your browser.</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-macOS-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/macOS-Apple%20silicon-3a3f44?style=for-the-badge&labelColor=121416"></a>
   <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Windows-x64-setup.exe"><img alt="Download for Windows (x64)" src="https://img.shields.io/badge/Windows-x64-3a3f44?style=for-the-badge&labelColor=121416"></a>
   <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Linux-x86_64.AppImage"><img alt="Download for Linux (x86_64 AppImage)" src="https://img.shields.io/badge/Linux-AppImage-3a3f44?style=for-the-badge&labelColor=121416"></a>
@@ -20,8 +24,6 @@ An interactive viewer for N-dimensional datasets, stored locally or in cloud obj
 https://github.com/user-attachments/assets/c749e1d1-9159-4928-9e05-9490fb466607
 
 ![Octant screenshot](https://raw.githubusercontent.com/lazarusA/octant/refs/heads/main/assets/octant_ws10.png)
-
-**[Try it in your browser](https://lazarusa.github.io/octant/)**: nothing to install (WebGPU, with a WebGL2 fallback).
 
 ## Install
 
@@ -86,6 +88,52 @@ cargo install octant --locked
 - An interface in 15 languages.
 
 Rendering is powered by [`wgpu`](https://wgpu.rs/) (Vulkan, Metal, DirectX, WebGPU, and WebGL2) with an [`egui`](https://github.com/emilk/egui) interface.
+
+## Related tools
+
+Many good viewers exist for scientific arrays, and most specialize in one domain, one format family, or one platform. **Octant** aims to be one viewer for N-dimensional data from climate to microscopy, read straight from cloud storage.
+
+**Octant** is built first for the desktop, where it has your GPU, memory, and files to itself. The browser version runs the same code and is there for a quick look or a shared link.
+
+What Octant brings together:
+
+- **Earth-science and bioimaging data in one app**: from GRIB forecasts and NetCDF model output to OME-Zarr plates ([formats](#data)).
+- **A native desktop app that streams from the cloud**: S3, Google Cloud Storage, Azure, or HTTP, with no download, server, Java, Julia, or Python.
+- **Heatmaps, globes, and GPU volume rendering in the same window**, switched with a click on the same data.
+- **One codebase for desktop and browser**: the web version is the same Rust compiled to WebAssembly, so a shared link opens the same view in a browser, or in the desktop app when pasted into its input field (for publicly reachable data).
+
+The tools below each do their job well, and you may prefer one of them for its own strengths.
+
+**Web**
+
+| Tool | Runs on | Focus |
+|---|---|---|
+| [Browzarr](https://github.com/EarthyScience/Browzarr) | Browser | Zarr and NetCDF exploration in the browser, no backend |
+| [gridlook](https://github.com/d70-t/gridlook) | Browser | Zarr, Icechunk, and NetCDF model output on native grids, on a 3D globe |
+| [LexCube](https://www.lexcube.org/) | Browser, Jupyter | Interactive 3D space-time data cubes |
+| [xcube Viewer](https://github.com/xcube-dev/xcube-viewer) | Browser, with an xcube server | Data cubes on a map |
+| [Neuroglancer](https://github.com/google/neuroglancer) | Browser | Multiscale volumes, meshes, and skeletons (precomputed, N5, Zarr, OME-Zarr) |
+| [Vizarr](https://github.com/hms-dbmi/vizarr) | Browser, Jupyter | 2D multichannel views of OME-Zarr and OME-TIFF |
+| [Avivator](https://github.com/hms-dbmi/viv) | Browser | OME-TIFF and OME-Zarr viewer built on Viv |
+| [Find Nuclei](https://find-nuclei.github.io) | Browser | Many microscopy formats in 2D and 3D; closed source, free to use |
+
+**Desktop**
+
+| Tool | Runs on | Focus |
+|---|---|---|
+| [Panoply](https://www.giss.nasa.gov/tools/panoply/) | Java | NetCDF, HDF, and GRIB maps and plots; remote files and THREDDS/OPeNDAP catalogs |
+| [ncview](https://cirrus.ucsd.edu/ncview/) | X11 | Quick NetCDF slice browsing and movies |
+| [VAPOR](https://www.vapor.ucar.edu/) | Native app | 3D visualization of atmosphere and ocean model output |
+| [IDV](https://www.unidata.ucar.edu/software/idv/) | Java | 2D and 3D displays of models, satellite, radar, and observations |
+| [QGIS](https://qgis.org/) | Native app | Geographic information system for raster and vector maps |
+| [napari](https://github.com/napari/napari) | Python | N-dimensional images in 2D and 3D, with a plugin ecosystem |
+| [BigDataViewer](https://imagej.net/plugins/bdv/) | Fiji plugin | Re-slicing very large multi-view volumes |
+| [BigWarp](https://imagej.net/plugins/bigwarp) | Fiji plugin | Landmark-based image registration, streaming N5, Zarr, and HDF5 |
+| [ParaView](https://www.paraview.org/) | Native app, also HPC and browser | General-purpose 3D scientific visualization |
+
+Libraries for building your own viewer: [Kiln](https://github.com/kilnrender/kiln-render) (WebGPU volume rendering of OME-Zarr), [Viv](https://github.com/hms-dbmi/viv) (OME-Zarr and OME-TIFF layers for deck.gl), [zarr-layer](https://github.com/carbonplan/zarr-layer) (Zarr on MapLibre and Mapbox maps), and [deck.gl-raster](https://github.com/developmentseed/deck.gl-raster) (COG and Zarr layers for deck.gl).
+
+Know a tool we missed? [Open an issue or a pull request](https://github.com/lazarusA/octant/issues).
 
 ## License
 
