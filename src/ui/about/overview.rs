@@ -111,10 +111,7 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
 
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Catalog, IconSize::Sm);
-        ui.hyperlink_to(
-            "github.com/lazarusA/octant",
-            "https://github.com/lazarusA/octant",
-        );
+        ui.hyperlink_to("github.com/ndvis/octant", "https://github.com/ndvis/octant");
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::VariableDoc, IconSize::Sm);
@@ -132,8 +129,8 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
             .weak(),
     );
     ui.hyperlink_to(
-        egui::RichText::new("github.com/lazarusA/octant/issues").small(),
-        "https://github.com/lazarusA/octant/issues",
+        egui::RichText::new("github.com/ndvis/octant/issues").small(),
+        "https://github.com/ndvis/octant/issues",
     );
     super::credits::show_colormap_credits(ui);
     super::licenses::show_third_party_licenses(ui);
