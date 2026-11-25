@@ -80,12 +80,15 @@ fn vs_main(
         // HEALPix pixels have no rows: fractions of the globe.
         slice_xy = vec2<f32>(lon / 6.2831853 + 0.5, 0.5 - lat / 3.14159265);
     } else {
-        // Fast vertex-stage culling for coarse cells strictly inside `hole_bounds`.
+        // Fast per-instance vertex culling for coarse cells strictly inside
+        // `hole_bounds` (depends only on `cell_x`/`cell_y`, never `model.position`,
+        // so every vertex of an instance is culled or kept together).
         let hb = uniforms.hole_bounds;
-        let pad = vec2<f32>(1.5) / grid;
+        let cell_center = mix(tb.xy, tb.zw, (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid);
+        let cell_pad = (tb.zw - tb.xy) * (1.5 / grid);
         if (hb.z > hb.x
-            && slice_xy.x - pad.x >= hb.x && slice_xy.x + pad.x <= hb.z
-            && slice_xy.y - pad.y >= hb.y && slice_xy.y + pad.y <= hb.w) {
+            && cell_center.x - cell_pad.x >= hb.x && cell_center.x + cell_pad.x <= hb.z
+            && cell_center.y - cell_pad.y >= hb.y && cell_center.y + cell_pad.y <= hb.w) {
             out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
             return out;
         }
