@@ -96,3 +96,28 @@ fn regional_tile(
         drawn(v1, h, ch),
     ];
 }
+
+#[cfg(test)]
+mod tests {
+    use super::regional_tile;
+    use crate::app::test_support::pyramid_app;
+
+    #[test]
+    fn a_regional_tile_draws_between_its_own_edges() {
+        let (app, _) = pyramid_app();
+        let mut params = app.get_mesh_3d_uniform_params(&app.layers.base, true, 1.0);
+        // 10 x 10 cells centered from 0 to 0.9 rad: edges half a cell out.
+        (params.lon_bounds, params.lat_bounds) = ([0.0, 0.9], [0.0, 0.9]);
+        let mut own = params;
+        own.tile_bounds = [0.0, 0.0, 1.0, 0.5];
+        regional_tile(&mut params, &mut own, (10, 10), (10, 10));
+        let near = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).abs() + (a[1] - b[1]).abs() < 1e-5;
+        assert!(near(own.lon_bounds, [-0.05, 0.95]), "{:?}", own.lon_bounds);
+        // The tile's top half is the northern half, south edge first.
+        assert!(near(own.lat_bounds, [0.45, 0.95]), "{:?}", own.lat_bounds);
+        assert_eq!(params.hole_bounds, own.tile_bounds, "an unthinned mesh");
+
+        regional_tile(&mut params, &mut own, (10, 10), (5, 5));
+        assert!(params.hole_bounds[0] > 0.0, "thinned: its own fractions");
+    }
+}

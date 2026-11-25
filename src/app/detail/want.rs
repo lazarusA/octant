@@ -28,21 +28,25 @@ impl OctantApp {
         let r = var.multiscale.as_ref()?;
         let axes = self.plotted_axes()?;
         let (x, y, set) = (axes[0].dim, axes[1].dim, &r.set);
-        let (u, v) = if plot_type == PlotType::Sphere {
+        // The sphere reads more longitudes than the screen spans (poles,
+        // seams), at the screen's density (`SphereWindow`).
+        let (u, v, read_u) = if plot_type == PlotType::Sphere {
             let aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
             let camera = self.nav.orbit_camera(PlotType::Sphere, aspect);
             let m = self.layers.base.data.matrix.as_ref()?;
-            super::sphere_view::visible_uv(&camera, &m.grid, (m.width, m.height))?
+            let w = super::sphere_view::visible_uv(&camera, &m.grid, (m.width, m.height))?;
+            (w.u, w.v, w.read_u)
         } else {
-            crate::data::ViewportResampler::compute_visible_data_bounds(
+            let (u, v) = crate::data::ViewportResampler::compute_visible_data_bounds(
                 view.pan,
                 view.zoom,
                 view.aspect_scale,
-            )
+            );
+            (u, v, u)
         };
-        let visible = [axes[0].visible(u), axes[1].visible(v)];
+        let visible = [axes[0].visible(read_u), axes[1].visible(v)];
         let [px_w, px_h] = self.layout.canvas_px;
-        let px = [pixels_over(px_w, u), pixels_over(px_h, v)];
+        let px = [pixels_over(px_w, u, read_u), pixels_over(px_h, v, v)];
         let window = level0_window(plotted, set, r.level, [x, y], visible);
         let demand = crate::app::controllers::controller_for(plot_type).resolution_demand(
             var,

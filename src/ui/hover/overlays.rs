@@ -31,10 +31,13 @@ pub fn overlay_values<'a>(
     out: &mut [LayerValue<'a>; MAX_OVERLAYS],
 ) -> usize {
     let drawn = app.layers.overlays().iter().rev().filter(|l| l.is_drawn());
+    let tiles = crate::ui::hover::detail::reads_tiles(app, at.norm.0, at.norm.1);
     let mut count = 0;
     for (slot, layer) in out.iter_mut().zip(drawn) {
-        let raw = tile_reading(layer, at.norm.0, at.norm.1)
-            .map_or_else(|| cell_value(layer, at.cell), |r| r.value);
+        let raw = (tiles
+            .then(|| tile_reading(layer, at.norm.0, at.norm.1))
+            .flatten())
+        .map_or_else(|| cell_value(layer, at.cell), |r| r.value);
         let var = layer.selection().variable_info();
         let name = var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name());
         let units = resolve_variable_units(var);

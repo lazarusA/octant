@@ -73,6 +73,13 @@ pub fn hovered_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailC
     (cell.center == (norm_x, norm_y)).then_some(cell)
 }
 
+/// Whether the hover at `(norm_x, norm_y)` reads layers' tiles: always on
+/// the heatmap, on the sphere only where [`hovered_cell`] finds one.
+pub fn reads_tiles(app: &OctantApp, norm_x: f32, norm_y: f32) -> bool {
+    app.effective_canvas_plot_type() != crate::plots::PlotType::Sphere
+        || hovered_cell(app, norm_x, norm_y).is_some()
+}
+
 /// The base layer's composite tile window under `(norm_x, norm_y)` on the
 /// plotted quad, and the tile cell there, for the channels' raw values.
 pub fn tile_probe(
@@ -80,6 +87,7 @@ pub fn tile_probe(
     norm_x: f32,
     norm_y: f32,
 ) -> Option<(&crate::data::slicing::CompositeProbe, (usize, usize))> {
+    reads_tiles(app, norm_x, norm_y).then_some(())?;
     let tile = app.layers.base.data.detail.tile.as_ref()?;
     let probe = tile.probe.as_ref()?;
     Some((probe, tile_reading(&app.layers.base, norm_x, norm_y)?.cell))
