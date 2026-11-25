@@ -83,13 +83,16 @@ fn rethin_layer(
     if matrix.height < 2 || matrix.grid.is_healpix() || layer.labels().is_some() {
         return;
     }
+    rethin_detail_sphere(layer, rs, budget);
+    let Some(matrix) = layer.data.matrix.as_ref() else {
+        return;
+    };
     // An unchanged mesh is kept: writing it again would overwrite the
     // colors a GPU composite baked into it.
     let stride = stride_for(matrix.width, matrix.height, budget);
     if layer.data.mesh.as_ref().map_or(1, |m| m.stride) == stride {
         return;
     }
-    rethin_detail_sphere(layer, rs, budget);
     // Only the meshes change: the heatmap and its pyramid stay.
     let Some(matrix) = layer.data.matrix.take() else {
         return;
@@ -106,7 +109,8 @@ fn rethin_layer(
     layer.data.touch_matrix();
 }
 
-/// Thins `layer`'s detail sphere to `budget` cells when one is resident.
+/// Thins `layer`'s detail sphere to `budget` cells when one is resident
+/// and its stride changes.
 fn rethin_detail_sphere(layer: &mut Layer, rs: &RenderState, budget: usize) {
     let (Some(tile), Some(_)) = (&mut layer.data.detail.tile, &layer.renderers.detail_sphere)
     else {
@@ -115,10 +119,15 @@ fn rethin_detail_sphere(layer: &mut Layer, rs: &RenderState, budget: usize) {
     let Some(matrix) = tile.matrix.as_deref() else {
         return;
     };
+    let stride = stride_for(matrix.width, matrix.height, budget);
+    if tile.thinning.stride.max(1) as usize == stride {
+        return;
+    }
     let grid = mesh_grid(matrix, budget);
     tile.thinning = MeshGrid::thinning(grid.as_ref(), matrix);
     let m = grid.as_ref().map_or(matrix, |g| &g.matrix);
     sync_detail_sphere(&mut layer.renderers.detail_sphere, rs, m);
+    layer.data.touch_matrix();
 }
 
 /// Uploads `matrix` to `layer`'s active detail renderer (the sphere's when

@@ -18,16 +18,18 @@ impl SphereField<'_> {
     /// center (HEALPix pixels, which have no rows, by where they lie on the
     /// globe) and its value's height, as sphere.wgsl cuts blocks.
     pub(super) fn kept(&self, cell: (usize, usize), lon: f32, lat: f32) -> bool {
-        let placed = match self.matrix.grid.is_healpix() {
-            true => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
-            false => {
+        let detail = self.detail_reading(lon, lat);
+        let placed = match (self.matrix.grid.is_healpix(), detail.is_some()) {
+            (true, _) => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
+            (false, true) => self
+                .uv(lon, lat)
+                .is_some_and(|(u, v)| self.slice.keeps_uv(u, v)),
+            (false, false) => {
                 let grid = (self.matrix.width, self.matrix.height);
                 self.slice.keeps_cell(cell, grid)
             }
         };
-        let val = self
-            .detail_reading(lon, lat)
-            .unwrap_or_else(|| value_at(self.layer, self.matrix, cell.0, cell.1));
+        let val = detail.unwrap_or_else(|| value_at(self.layer, self.matrix, cell.0, cell.1));
         let h = self.scale.normalized(val);
         placed && self.slice.keeps_height(h, &self.scale, self.relief)
     }

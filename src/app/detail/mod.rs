@@ -1,29 +1,14 @@
-//! Detail tiles: a heatmap plotted from a coarse level of a multiscale
-//! variable (Auto) shows the visible part at the finest level that fits the
-//! screen once zooming or panning stops, drawn over the coarse plot (which
-//! stays as the placeholder until the tile arrives, and around it).
+//! Detail tiles: a heatmap or 3D sphere plotted from a coarse level of a
+//! multiscale variable (Auto) shows the visible part at the finest level
+//! that fits the screen once zooming, panning or orbiting stops, drawn over
+//! the coarse plot (which stays as the placeholder until the tile arrives,
+//! and around it).
 //!
-//! - `geometry.rs`: the plotted and visible windows on level 0's grid, the
-//!   finer level's cells covering them, and where those sit on the quad.
-//! - `want.rs`: the finer level the resting view asks for; stale tiles.
-//! - `tile.rs`: requesting a tile (cache first), slicing an arrived block
-//!   into it and uploading it to its layer's detail renderer, painted right
-//!   after that layer's heatmap (base, base tile, overlay, overlay tile).
+//! - `geometry.rs`: plotted and visible windows on level 0's grid and quad.
+//! - `sphere_view.rs`: visible `[u, v]` footprint on the 3D sphere.
+//! - `want.rs`: finer level the resting view asks for; stale tiles.
+//! - `tile.rs`: requesting, slicing and uploading a tile to its layer.
 //! - `follow.rs`: overlays' tiles, which follow the base layer's.
-//!
-//! A tile is asked for only once the view rests (`view_interacting` off and
-//! the view unchanged for `SETTLE` seconds, so the frames between mouse
-//! wheel ticks ask nothing) and playback is stopped, on regular grids
-//! without composites; it is kept while it still covers the view at the
-//! level the view wants, and dropped when the plot (selection, step)
-//! changes. The hover reads it where it is drawn (`ui/hover/detail.rs`).
-//!
-//! Each drawn overlay whose variable is multiscale reads, as soon as the
-//! base layer asks for a tile, the level of its own stack on the base
-//! tile's grid (`multiscale::level_matching`) over the same cells, so both
-//! tiles line up cell for cell at the same place on the quad; an overlay
-//! whose stack has no such level gets none. The hover's overlay rows read
-//! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod channel_tests;
