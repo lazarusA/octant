@@ -41,11 +41,8 @@ impl SphereField<'_> {
             1 => {
                 let [lon_min, lon_max] = grid.lon_bounds_rad();
                 let [lat_min, lat_max] = grid.lat_bounds_rad();
-                let lon = if lon_max > PI && lon < 0.0 {
-                    lon + 2.0 * PI
-                } else {
-                    lon
-                };
+                let lon_mid = 0.5 * (lon_min + lon_max);
+                let lon = lon_mid + ((lon - lon_mid + PI).rem_euclid(2.0 * PI) - PI);
                 let u = (lon - lon_min) / (lon_max - lon_min).abs().max(1e-6);
                 let v = (lat_max - lat) / (lat_max - lat_min).abs().max(1e-6);
                 Some((u, v))
@@ -117,5 +114,21 @@ pub fn sphere_detail_target_pos(
     let field = SphereField::new(app, matrix?);
     let (lon_c, lat_c) = field.lon_lat_of_uv(cell.center.0, cell.center.1);
     let r = field.span_at(lon_c, lat_c).1;
+    project_lon_lat(camera, lon_c, lat_c, r)
+}
+
+/// Forward projects the hovered cell's center, on the drawn globe, to screen
+/// space.
+pub fn sphere_target_pos(
+    app: &OctantApp,
+    matrix: &MatrixData,
+    camera: &Camera3D,
+    px: usize,
+    py: usize,
+) -> Option<Pos2> {
+    let (lon_c, lat_c) = matrix
+        .grid
+        .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
+    let r = SphereField::new(app, matrix).span_at(lon_c, lat_c).1;
     project_lon_lat(camera, lon_c, lat_c, r)
 }

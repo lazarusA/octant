@@ -10,8 +10,7 @@ use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
-use crate::ui::hover::sphere_slice::project_lon_lat;
-pub use crate::ui::hover::sphere_slice::sphere_detail_target_pos;
+pub use crate::ui::hover::sphere_slice::{sphere_detail_target_pos, sphere_target_pos};
 use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
 
@@ -246,20 +245,4 @@ pub fn raycast_sphere(
         ny,
         Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees())),
     ))
-}
-
-/// Forward projects the hovered cell's center, on the drawn globe, to screen
-/// space.
-pub fn sphere_target_pos(
-    app: &OctantApp,
-    matrix: &MatrixData,
-    camera: &Camera3D,
-    px: usize,
-    py: usize,
-) -> Option<Pos2> {
-    let (lon_c, lat_c) = matrix
-        .grid
-        .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
-    let r = SphereField::new(app, matrix).span(px, py, lon_c, lat_c).1;
-    project_lon_lat(camera, lon_c, lat_c, r)
 }
