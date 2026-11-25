@@ -143,7 +143,7 @@ fn show_sample(
     if plot_type == PlotType::Heatmap && point.is_none() {
         target = detail_overrides(app, hit, &transform, target, &mut fields);
     } else if plot_type == PlotType::Sphere {
-        let tile_cell = detail::detail_cell(app, hit.norm_x, hit.norm_y);
+        let tile_cell = detail::hovered_cell(app, hit.norm_x, hit.norm_y);
         if let Some(level) = detail::level_field(app, tile_cell.as_ref()) {
             fields.push(level);
         }

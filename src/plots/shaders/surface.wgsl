@@ -125,6 +125,7 @@ fn vs_main(
     // Heights back to normalized heights (the 0.6 or 0.8 of each mode).
     let height_scale = select(0.8, 0.6, uniforms.mode == 1u) * uniforms.displacement_strength;
     out.slice_at = vec3<f32>(slice_xy, select(0.0, pos_3d.y / height_scale, height_scale > 0.0));
+    out.hole_at = slice_xy;
     if (uniforms.mode == 2u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.

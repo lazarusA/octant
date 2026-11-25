@@ -30,7 +30,7 @@ pub(crate) fn resolve_2d_plot_entries(
     // The matrix is the full-resolution data, also under a pyramid; a
     // multiscale plot's detail tile, where it is drawn, is finer still.
     let idx = py * matrix.width + px;
-    let detail = super::detail::detail_cell(app, norm_x, norm_y);
+    let detail = super::detail::hovered_cell(app, norm_x, norm_y);
     let base = &app.layers.base;
     let cell = || {
         base.gpu_blended_cell(px, py)

@@ -97,14 +97,17 @@ struct VertexOutput {
     // Where the slicer reads the fragment: fractions of the grid's cells
     // along x and y, and its normalized height (`common/slice.wgsl`).
     @location(4) slice_at: vec3<f32>,
+    // Where the fragment lies on the grid, per fragment even for blocks
+    // (whose `slice_at` is their center): `hole_bounds` cuts exactly there.
+    @location(5) hole_at: vec2<f32>,
 };
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
     let hb = uniforms.hole_bounds;
     if (hb.z > hb.x
-        && in.slice_at.x >= hb.x && in.slice_at.x <= hb.z
-        && in.slice_at.y >= hb.y && in.slice_at.y <= hb.w) {
+        && in.hole_at.x >= hb.x && in.hole_at.x <= hb.z
+        && in.hole_at.y >= hb.y && in.hole_at.y <= hb.w) {
         discard;
     }
     if (!slice_box_keeps(uniforms.slice, in.slice_at)) {

@@ -31,8 +31,8 @@ impl OctantApp {
         let (u, v) = if plot_type == PlotType::Sphere {
             let aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
             let camera = self.nav.orbit_camera(PlotType::Sphere, aspect);
-            let grid = &self.layers.base.data.matrix.as_ref()?.grid;
-            super::sphere_view::visible_uv(&camera, grid)?
+            let m = self.layers.base.data.matrix.as_ref()?;
+            super::sphere_view::visible_uv(&camera, &m.grid, (m.width, m.height))?
         } else {
             crate::data::ViewportResampler::compute_visible_data_bounds(
                 view.pan,

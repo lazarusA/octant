@@ -105,41 +105,6 @@ impl OctantApp {
         ui.painter().add(callback);
     }
 
-    /// `layer`'s detail sphere draw call and coarse `hole_bounds`, when a
-    /// detail tile is shown on the sphere.
-    fn sphere_detail_draw(
-        &self,
-        layer: &Layer,
-        params: &mut crate::plots::Mesh3DUniformParams,
-    ) -> Option<crate::plots::MeshDetailDraw> {
-        let (tile, detail_renderer) = (
-            layer.data.detail.tile.as_ref()?,
-            layer.renderers.detail_sphere.as_ref()?,
-        );
-        params.hole_bounds = tile.uv;
-        let base = &self.layers.base;
-        let heights = (layer.id() != base.id())
-            .then(|| base.renderers.detail_sphere.clone())
-            .flatten();
-        let channels = channel_draw(
-            layer,
-            &layer.renderers.detail_channels,
-            probe_start(tile.probe.as_ref()),
-            None,
-        );
-        Some(crate::plots::MeshDetailDraw {
-            renderer: detail_renderer.clone(),
-            params: crate::plots::Mesh3DUniformParams {
-                tile_bounds: tile.uv,
-                hole_bounds: [0.0; 4],
-                ..*params
-            },
-            channels,
-            thinning: tile.thinning,
-            heights,
-        })
-    }
-
     fn paint_volume(&self, ui: &egui::Ui, layer: &Layer, view: &CanvasView) {
         let screen_aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
         // A dragged slider changes the frame every frame, as the camera

@@ -284,3 +284,27 @@ fn the_hover_names_the_level_under_the_pointer() {
     let value = level_field(&app, Some(&cell)).map(|f| f.value);
     assert_eq!(value.as_deref(), Some("0 of 3"), "the tile's level");
 }
+
+#[test]
+fn the_hover_reads_a_thinned_tile_by_its_drawn_cells() {
+    use crate::data::render::decimate::sample_index;
+    let mut app = plotted();
+    rest_at(&mut app, 4.0);
+    let tile = app.layers.base.data.detail.tile.as_mut().expect("tile");
+    // The detail sphere draws every second cell (`DetailTile::thinning`).
+    tile.thinning.stride = 2;
+    let (uv, origin) = (tile.uv, tile.origin);
+    let w = tile.matrix.as_ref().expect("tile matrix").width;
+    let cell = crate::ui::hover::detail::detail_cell(&app, 0.4, 0.4).expect("over the tile");
+    let dw = w.div_ceil(2);
+    let dx = (((0.4 - uv[0]) / (uv[2] - uv[0])) * dw as f32) as usize;
+    let flipped = app.layers.base.data.flipped_dims.iter().any(|d| d == "lon");
+    if !flipped {
+        assert_eq!(cell.x.1, origin[0] as usize + sample_index(dx, 2, w));
+    }
+    let center = uv[0] + (dx as f32 + 0.5) / dw as f32 * (uv[2] - uv[0]);
+    assert!(
+        (cell.center.0 - center).abs() < 1e-6,
+        "the drawn cell's center"
+    );
+}

@@ -10,6 +10,7 @@ pub(crate) mod mesh_grid;
 mod mesh_grid_tests;
 pub mod paint;
 mod paint_coastlines;
+mod paint_detail;
 pub mod paint_layer;
 mod paint_tiles;
 mod point_grid;

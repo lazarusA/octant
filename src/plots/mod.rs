@@ -30,6 +30,7 @@ pub mod limits;
 mod limits_tests;
 pub mod line;
 pub mod mesh;
+mod mesh_detail_draw;
 mod mesh_draw;
 mod mesh_heights;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -72,9 +73,9 @@ pub use heatmap_draw::QuadView;
 pub use labels::{LabelDraw, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;
+pub use mesh_detail_draw::MeshDetailDraw;
 pub use mesh_draw::{
-    Mesh3DCallback, MeshDetailDraw, SphereCallback, SphereRenderer, SurfaceCallback,
-    SurfaceRenderer,
+    Mesh3DCallback, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
 };
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use volume::{VolumeCallback, VolumeEncoding, VolumeRenderer, VolumeUniformParams};

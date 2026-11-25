@@ -23,25 +23,16 @@ fn sphere_lon_lat(
     grid_h: u32,
 ) -> vec2<f32> {
     if (is_subtile()) {
-        let tb = uniforms.tile_bounds;
+        // Edge fractions of the tile, as `tile_bounds` and the coarse `slice_at`.
+        let local_uv = (vec2<f32>(f32(cell_x), f32(cell_y)) + model_xy) / vec2<f32>(f32(grid_w), f32(grid_h));
         if (uniforms.coord_mode == 1u) {
-            let u = select(
-                (f32(cell_x) + model_xy.x - 0.5) / max(f32(grid_w) - 1.0, 1.0),
-                model_xy.x,
-                grid_w <= 1u,
-            );
-            let v = select(
-                (f32(cell_y) + model_xy.y - 0.5) / max(f32(grid_h) - 1.0, 1.0),
-                model_xy.y,
-                grid_h <= 1u,
-            );
-            let uv = mix(tb.xy, tb.zw, vec2<f32>(u, v));
-            let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, uv.x);
-            let lat = clamp(mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, uv.y), -1.5707963, 1.5707963);
+            // A regional tile's `lon_bounds`/`lat_bounds` are its own edges
+            // (`sphere_detail_draw`).
+            let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, local_uv.x);
+            let lat = clamp(mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, local_uv.y), -1.5707963, 1.5707963);
             return vec2<f32>(lon, lat);
         }
-        let local_uv = (vec2<f32>(f32(cell_x), f32(cell_y)) + model_xy) / vec2<f32>(f32(grid_w), f32(grid_h));
-        let uv = mix(tb.xy, tb.zw, local_uv);
+        let uv = mix(uniforms.tile_bounds.xy, uniforms.tile_bounds.zw, local_uv);
         let lon = (uv.x - 0.5) * 2.0 * 3.14159265;
         let lat = (0.5 - uv.y) * 3.14159265;
         return vec2<f32>(lon, lat);
@@ -163,6 +154,7 @@ fn vs_main(
     let height_scale = 0.4 * uniforms.displacement_strength;
     let h = select(0.0, (length(pos_3d) - 1.0) / height_scale, height_scale > 0.0);
     out.slice_at = vec3<f32>(slice_xy, h);
+    out.hole_at = slice_xy;
     if (uniforms.mode == 3u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.

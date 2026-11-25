@@ -4,6 +4,7 @@
 use super::channels::ChannelDraw;
 use super::common::{Mesh3DUniformParams, MeshVertex3D};
 use super::mesh::Mesh3DRenderer;
+use super::mesh_detail_draw::prepare_mesh;
 use super::oit::{Transparency, Variant, build_pipeline};
 use std::sync::Arc;
 
@@ -21,7 +22,7 @@ pub(super) const SURFACE_WGSL: &str = crate::assemble_plot_with_coords_shader!(c
 
 impl Mesh3DRenderer {
     /// Binds group 0 and the cube or quad template and draws every instance.
-    fn draw_geometry(&self, pass: &mut wgpu::RenderPass<'_>, cubes: bool) {
+    pub(super) fn draw_geometry(&self, pass: &mut wgpu::RenderPass<'_>, cubes: bool) {
         let (vertices, indices, count) = if cubes {
             (&self.cube_vertex_buffer, &self.cube_index_buffer, 36)
         } else {
@@ -57,42 +58,6 @@ impl Mesh3DRenderer {
     }
 }
 
-/// A multiscale sphere's finer detail tile drawn in the same pass as its
-/// coarse mesh (which discards its covered cells via `hole_bounds`).
-pub struct MeshDetailDraw {
-    pub renderer: Arc<Mesh3DRenderer>,
-    pub params: Mesh3DUniformParams,
-    pub channels: Option<ChannelDraw>,
-    pub thinning: super::Thinning,
-    pub heights: Option<Arc<Mesh3DRenderer>>,
-}
-
-impl MeshDetailDraw {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-    ) -> (super::BakeId, u64) {
-        self.renderer.update_uniforms(queue, &self.params);
-        if let Some(channels) = &self.channels {
-            let r = &self.renderer;
-            let target = (r.bake_id.id(), &r.data_buffer, self.thinning);
-            if channels.bake_into(device, queue, encoder, target) {
-                r.inputs.data_changed();
-            }
-        }
-        let base = self.heights.as_deref();
-        let size = (self.renderer.width, self.renderer.height);
-        self.renderer.heights.drape(device, size, base);
-        let base_key = base.map(|b| (b.heights.id(), b.inputs.key(())));
-        (
-            self.renderer.heights.id(),
-            self.renderer.inputs.key(base_key),
-        )
-    }
-}
-
 pub struct Mesh3DCallback {
     pub renderer: Arc<Mesh3DRenderer>,
     pub params: Mesh3DUniformParams,
@@ -109,12 +74,20 @@ pub struct Mesh3DCallback {
     /// `None` for the base, which reads its own.
     pub heights: Option<Arc<Mesh3DRenderer>>,
     /// A multiscale sphere's finer detail tile drawn in the same pass.
-    pub detail: Option<MeshDetailDraw>,
+    pub detail: Option<super::MeshDetailDraw>,
 }
 
 impl Mesh3DCallback {
     fn cubes(&self) -> bool {
         self.params.mode == self.cube_mode_idx
+    }
+
+    /// Draws the mesh, then its detail tile in the same pass.
+    fn draw(&self, pass: &mut wgpu::RenderPass<'_>, cubes: bool) {
+        self.renderer.draw_geometry(pass, cubes);
+        if let Some(d) = &self.detail {
+            d.renderer.draw_geometry(pass, cubes);
+        }
     }
 
     /// The pipeline drawing the mesh into egui's pass (or its cached frame).
@@ -143,26 +116,19 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
-        self.renderer.update_uniforms(queue, &self.params);
-        if let Some(channels) = &self.channels {
-            let r = &self.renderer;
-            let target = (r.bake_id.id(), &r.data_buffer, self.thinning);
-            if channels.bake_into(device, queue, encoder, target) {
-                r.inputs.data_changed();
-            }
-        }
         let (renderer, cubes) = (&self.renderer, self.cubes());
-        let base = self.heights.as_deref();
-        let own_size = (renderer.width, renderer.height);
-        renderer.heights.drape(device, own_size, base);
+        let base_key = prepare_mesh(
+            (renderer, &self.params),
+            self.channels.as_ref(),
+            self.thinning,
+            self.heights.as_deref(),
+            (device, queue, &mut *encoder),
+        );
         let detail_key = self
             .detail
             .as_ref()
             .map(|d| d.prepare(device, queue, encoder));
         let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-        // A draped overlay is drawn again when the base's heights change,
-        // and for a new base, whose upload count starts over.
-        let base_key = base.map(|b| (b.heights.id(), b.inputs.key(())));
         let key = renderer
             .inputs
             .key((cubes, self.transparency as u8, base_key, detail_key));
@@ -181,12 +147,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
                 cull_mode,
             ),
             (self.pipeline(), |v| renderer.oit_pipeline(device, cubes, v)),
-            |pass| {
-                renderer.draw_geometry(pass, cubes);
-                if let Some(d) = &self.detail {
-                    d.renderer.draw_geometry(pass, cubes);
-                }
-            },
+            |pass| self.draw(pass, cubes),
         );
         Vec::new()
     }
@@ -207,12 +168,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             (self.transparency, self.pipeline()),
             rpass,
             callback_resources,
-            |rpass| {
-                renderer.draw_geometry(rpass, cubes);
-                if let Some(d) = &self.detail {
-                    d.renderer.draw_geometry(rpass, cubes);
-                }
-            },
+            |rpass| self.draw(rpass, cubes),
         );
     }
 }

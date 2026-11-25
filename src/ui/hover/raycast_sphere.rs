@@ -25,6 +25,8 @@ pub struct SphereField<'a> {
     pub(super) slice: crate::app::Slicer,
     /// Whether the globe draws relief (`slice::has_relief`), for the cut.
     pub(super) relief: bool,
+    /// Whether the base layer's detail tile is drawn (`sphere_tiles_drawn`).
+    pub(super) tiles: bool,
 }
 
 impl<'a> SphereField<'a> {
@@ -38,6 +40,7 @@ impl<'a> SphereField<'a> {
             disp: mesh.sphere_displacement,
             slice: app.plot_configs.slice,
             relief: has_relief(&scale, true, mesh.sphere_mode, mesh.sphere_displacement),
+            tiles: app.sphere_tiles_drawn(),
         }
     }
 
@@ -45,7 +48,7 @@ impl<'a> SphereField<'a> {
     /// `[k, k + 1]`) on grids `get_lon_lat` places linearly (global and
     /// regional regular), and whether longitudes wrap around.
     fn cell_coords(&self, lon: f32, lat: f32) -> Option<(f32, f32, bool)> {
-        let (u, v) = self.uv(lon, lat)?;
+        let (u, v) = self.center_uv(lon, lat)?;
         let (w, h) = (self.matrix.width as f32, self.matrix.height as f32);
         match self.matrix.grid.sphere_coord_mode() {
             0 => Some((u * w, v * h, true)),
@@ -101,12 +104,9 @@ impl<'a> SphereField<'a> {
 
     /// Radii the drawn geometry spans toward `(lon, lat)` in cell `(px, py)`:
     /// a voxel's column from the unit sphere, else the surface's one radius.
-    fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
-        if let Some(dr) = self.detail_dr(lon, lat) {
-            return match self.mode {
-                3 => (1.0 + dr.min(0.0), 1.0 + dr.max(0.0)),
-                _ => (1.0 + dr, 1.0 + dr),
-            };
+    pub(super) fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
+        if let Some(span) = self.detail_span(lon, lat) {
+            return span;
         }
         let dr = self.dr_at(px, py);
         match self.mode {
@@ -119,12 +119,6 @@ impl<'a> SphereField<'a> {
         }
     }
 
-    /// [`Self::span`] at `(lon, lat)`.
-    pub(super) fn span_at(&self, lon: f32, lat: f32) -> (f32, f32) {
-        let (px, py) = self.grid_cell(lon, lat).unwrap_or((0, 0));
-        self.span(px, py, lon, lat)
-    }
-
     fn shape(&self) -> Shape {
         match self.mode {
             1 => Shape::Smooth,
@@ -133,8 +127,9 @@ impl<'a> SphereField<'a> {
         }
     }
 
-    /// Angular size of the smallest cell side, the march's step scale.
-    fn cell_angle(&self) -> f32 {
+    /// Angular size of the smallest drawn cell side, the march's step
+    /// scale, and its sample budget's factor (`detail_cell_angle`).
+    fn cell_angle(&self) -> (f32, usize) {
         let grid = &self.matrix.grid;
         let (w, h) = (
             self.matrix.width.max(1) as f32,
@@ -157,7 +152,7 @@ impl<'a> SphereField<'a> {
         self.cell(lon, lat).map_or(Probe::OFF_GRID, |(px, py)| {
             let (lo, hi) = self.span(px, py, lon, lat);
             Probe {
-                cell: Some((px, py)),
+                cell: Some(self.drawn_identity((px, py), lon, lat)),
                 side: Side::of(r, lo, hi),
             }
         })
@@ -186,9 +181,10 @@ impl<'a> SphereField<'a> {
             let (t_in, t_out) = sphere_span(ray, r_out)?;
             let t_stop = sphere_span(ray, r_in).map_or(t_out, |(t, _)| t);
             let (w, h) = (self.matrix.width, self.matrix.height);
-            let step = 0.5 * self.cell_angle();
+            let (angle, finer) = self.cell_angle();
             let probe = |t| self.probe(ray, t);
-            march((t_in, t_stop), step, max_steps(w, h), self.shape(), probe)
+            let budget = max_steps(w, h).saturating_mul(finer);
+            march((t_in, t_stop), 0.5 * angle, budget, self.shape(), probe)
         });
         let unit = || sphere_span(ray, 1.0).map(|(t_in, _)| t_in);
         let (lon, lat, _) = point(ray, marched.flatten().or_else(unit)?);
@@ -229,7 +225,8 @@ pub fn raycast_sphere(
     let world_ray = camera.cast_ray(hover_pos);
     let field = SphereField::new(app, matrix);
     let ((px, py), (lon, lat)) = field.hit_with_lon_lat(&world_ray)?;
-    if let Some((u, v)) = field.uv(lon, lat)
+    if field.tiles
+        && let Some((u, v)) = field.uv(lon, lat)
         && let Some(tile_cell) = crate::ui::hover::detail::detail_cell(app, u, v)
     {
         let (nx, ny) = tile_cell.center;

@@ -25,6 +25,7 @@ pub(crate) use geometry::Axis;
 #[cfg(test)]
 mod geometry_tests;
 mod sphere_view;
+pub(crate) use sphere_view::{center_of_edge, edge_of_center};
 #[cfg(test)]
 mod tests;
 mod tile;

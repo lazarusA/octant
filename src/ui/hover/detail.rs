@@ -4,6 +4,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
+use crate::data::render::decimate::sample_index;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::i18n::{HoverKey, fill, tr};
 use crate::ui::hover::enrich::{flipped_offset, is_flipped};
@@ -32,12 +33,8 @@ pub fn detail_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCe
         value,
         cell: (px, py),
         size: (w, h),
+        center,
     } = tile_reading(&app.layers.base, norm_x, norm_y)?;
-    let [u0, v0, u1, v1] = tile.uv;
-    let center = (
-        u0 + (px as f32 + 0.5) / w as f32 * (u1 - u0),
-        v0 + (py as f32 + 0.5) / h as f32 * (v1 - v0),
-    );
     let var = app
         .plotted()
         .metadata
@@ -65,6 +62,17 @@ pub fn detail_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCe
     })
 }
 
+/// [`detail_cell`] under the hover at `(norm_x, norm_y)`. On the sphere
+/// only where `raycast_sphere` hit the tile, which returns the tile cell's
+/// own center: a coarse cell hit beside the tile may center under it.
+pub fn hovered_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCell> {
+    if app.effective_canvas_plot_type() != crate::plots::PlotType::Sphere {
+        return detail_cell(app, norm_x, norm_y);
+    }
+    let cell = detail_cell(app, norm_x, norm_y).filter(|_| app.sphere_tiles_drawn())?;
+    (cell.center == (norm_x, norm_y)).then_some(cell)
+}
+
 /// The base layer's composite tile window under `(norm_x, norm_y)` on the
 /// plotted quad, and the tile cell there, for the channels' raw values.
 pub fn tile_probe(
@@ -84,6 +92,9 @@ pub struct TileReading {
     /// The cell and the tile's width and height.
     pub cell: (usize, usize),
     pub size: (usize, usize),
+    /// The drawn cell's center on the quad: a thinned tile's (the detail
+    /// sphere's, `DetailTile::thinning`) spans `stride` cells.
+    pub center: (f32, f32),
 }
 
 /// The reading of `layer`'s tile at `(norm_x, norm_y)` on the plotted quad,
@@ -100,7 +111,15 @@ pub fn tile_reading(layer: &Layer, norm_x: f32, norm_y: f32) -> Option<TileReadi
     let (w, h) = (matrix.width, matrix.height);
     let lx = (norm_x - u0) / (u1 - u0);
     let ly = (norm_y - v0) / (v1 - v0);
-    let (px, py) = matrix.grid.find_cell_from_norm(lx, ly, w, h);
+    // The drawn cell, then the tile cell it samples (`MatrixData::decimated`).
+    let k = (tile.thinning.stride as usize).max(1);
+    let (dw, dh) = (w.div_ceil(k), h.div_ceil(k));
+    let (dx, dy) = matrix.grid.find_cell_from_norm(lx, ly, dw, dh);
+    let (px, py) = (sample_index(dx, k, w), sample_index(dy, k, h));
+    let center = (
+        u0 + (dx as f32 + 0.5) / dw as f32 * (u1 - u0),
+        v0 + (dy as f32 + 0.5) / dh as f32 * (v1 - v0),
+    );
     let blended = (tile.probe.as_ref()).and_then(|p| layer.blended_cell(p, (px, py)));
     let value =
         blended.unwrap_or_else(|| matrix.values.get(py * w + px).copied().unwrap_or(f32::NAN));
@@ -108,6 +127,7 @@ pub fn tile_reading(layer: &Layer, norm_x: f32, norm_y: f32) -> Option<TileReadi
         value,
         cell: (px, py),
         size: (w, h),
+        center,
     })
 }
 
