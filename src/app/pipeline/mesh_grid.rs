@@ -118,15 +118,66 @@ fn rethin_detail_sphere(layer: &mut Layer, rs: &RenderState, budget: usize) {
     let grid = mesh_grid(matrix, budget);
     tile.thinning = MeshGrid::thinning(grid.as_ref(), matrix);
     let m = grid.as_ref().map_or(matrix, |g| &g.matrix);
-    layer.renderers.detail_sphere = Some(Arc::new(
-        crate::plots::SphereRenderer::new_sphere_with_coords(
+    sync_detail_sphere(&mut layer.renderers.detail_sphere, rs, m);
+}
+
+/// Uploads `matrix` to `layer`'s active detail renderer (the sphere's when
+/// `sphere` is true, else the heatmap's); headless (`rs` is `None`), only
+/// computes the sphere's [`crate::plots::Thinning`].
+pub(crate) fn upload_detail_renderers(
+    layer: &mut Layer,
+    rs: Option<&RenderState>,
+    sphere: bool,
+    budget: usize,
+    matrix: &MatrixData,
+    uv: [f32; 4],
+) -> crate::plots::Thinning {
+    let mesh = sphere.then(|| mesh_grid(matrix, budget)).flatten();
+    let thinning = MeshGrid::thinning(mesh.as_ref(), matrix);
+    let Some(rs) = rs else {
+        return thinning;
+    };
+    if sphere && layer.labels().is_none() {
+        let m = mesh.as_ref().map_or(matrix, |g| &g.matrix);
+        sync_detail_sphere(&mut layer.renderers.detail_sphere, rs, m);
+    } else {
+        let (w, h) = (matrix.width, matrix.height);
+        let r = match &layer.renderers.detail {
+            Some(r) if r.capacity() >= w.saturating_mul(h) => r.clone(),
+            _ => Arc::new(crate::plots::HeatmapRenderer::new(
+                &rs.device,
+                rs.target_format,
+                &matrix.values,
+                w,
+                h,
+            )),
+        };
+        r.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, uv);
+        layer.renderers.detail = Some(r);
+    }
+    thinning
+}
+
+fn sync_detail_sphere(
+    slot: &mut Option<Arc<crate::plots::SphereRenderer>>,
+    rs: &RenderState,
+    m: &MatrixData,
+) {
+    let (sw, sh) = (m.width, m.height);
+    let r = match slot {
+        Some(r) if (r.width, r.height) == (sw, sh) => {
+            r.update_data(&rs.queue, &m.values);
+            r.clone()
+        }
+        _ => Arc::new(crate::plots::SphereRenderer::new_sphere_with_coords(
             &rs.device,
             rs.target_format,
             &m.values,
-            m.width,
-            m.height,
+            sw,
+            sh,
             None,
             None,
-        ),
-    ));
+        )),
+    };
+    *slot = Some(r);
 }

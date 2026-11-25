@@ -142,7 +142,14 @@ impl OctantApp {
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;
-        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims, styled(base)))
+        readable.then(|| {
+            let h = plot_hash(plotted, step, &base.data.flipped_dims, styled(base));
+            if plot_type == PlotType::Sphere {
+                h ^ 1
+            } else {
+                h
+            }
+        })
     }
 
     /// Drops what no longer belongs to the plot (`context`, `None` when the

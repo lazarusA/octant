@@ -13,7 +13,7 @@ use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
-use crate::plots::{ChannelRenderer, HeatmapRenderer};
+use crate::plots::ChannelRenderer;
 
 /// A read of a finer level's window: its request, store, cache key, the
 /// level's dimension names and selection, and the step it reads.
@@ -150,8 +150,14 @@ impl OctantApp {
             return;
         };
         let mut tile = pending.tile;
-        tile.thinning =
-            upload_detail_renderers(layer, rs.as_ref(), sphere, budget, &matrix, tile.uv);
+        tile.thinning = crate::app::pipeline::mesh_grid::upload_detail_renderers(
+            layer,
+            rs.as_ref(),
+            sphere,
+            budget,
+            &matrix,
+            tile.uv,
+        );
         (tile.matrix, tile.probe) = (Some(Arc::new(matrix)), probe);
         layer.data.detail.tile = Some(tile);
     }
@@ -232,59 +238,4 @@ impl OctantApp {
             self.coordinate_loader.request(&source_id, store, var);
         }
     }
-}
-
-/// Uploads `matrix` to `layer`'s active detail renderer (the sphere's when
-/// `sphere` is true, else the heatmap's); headless (`rs` is `None`), only
-/// computes the sphere's [`crate::plots::Thinning`].
-fn upload_detail_renderers(
-    layer: &mut crate::app::layers::Layer,
-    rs: Option<&eframe::egui_wgpu::RenderState>,
-    sphere: bool,
-    budget: usize,
-    matrix: &MatrixData,
-    uv: [f32; 4],
-) -> crate::plots::Thinning {
-    let mesh = sphere
-        .then(|| crate::app::pipeline::mesh_grid::mesh_grid(matrix, budget))
-        .flatten();
-    let thinning = crate::app::layers::MeshGrid::thinning(mesh.as_ref(), matrix);
-    let Some(rs) = rs else {
-        return thinning;
-    };
-    if sphere && layer.labels().is_none() {
-        let m = mesh.as_ref().map_or(matrix, |g| &g.matrix);
-        let (sw, sh) = (m.width, m.height);
-        let r = match &layer.renderers.detail_sphere {
-            Some(r) if (r.width, r.height) == (sw, sh) => {
-                r.update_data(&rs.queue, &m.values);
-                r.clone()
-            }
-            _ => Arc::new(crate::plots::SphereRenderer::new_sphere_with_coords(
-                &rs.device,
-                rs.target_format,
-                &m.values,
-                sw,
-                sh,
-                None,
-                None,
-            )),
-        };
-        layer.renderers.detail_sphere = Some(r);
-    } else {
-        let (w, h) = (matrix.width, matrix.height);
-        let r = match &layer.renderers.detail {
-            Some(r) if r.capacity() >= w.saturating_mul(h) => r.clone(),
-            _ => Arc::new(HeatmapRenderer::new(
-                &rs.device,
-                rs.target_format,
-                &matrix.values,
-                w,
-                h,
-            )),
-        };
-        r.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, uv);
-        layer.renderers.detail = Some(r);
-    }
-    thinning
 }
