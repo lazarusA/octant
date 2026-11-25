@@ -117,13 +117,12 @@ pub fn covers(cover: (f64, f64), visible: (f64, f64)) -> bool {
     cover.0 <= visible.0 + EPS && cover.1 >= visible.1 - EPS
 }
 
-/// The screen pixels showing `visible` fractions `t0..t1` of the quad along
-/// one axis of `px` canvas pixels: the canvas spans `t0..t1` before clamping
-/// to the quad.
-pub fn pixels_over(px: u32, (t0, t1): (f64, f64)) -> u32 {
+/// The screen pixels' worth of cells over `read` fractions of the quad
+/// along one axis of `px` canvas pixels showing fractions `t0..t1`: the
+/// canvas spans `t0..t1` before clamping, and `read` (`t0..t1` on the
+/// heatmap; wider on the sphere) keeps that density.
+pub fn pixels_over(px: u32, (t0, t1): (f64, f64), read: (f64, f64)) -> u32 {
     let raw = (t1 - t0).max(EPS);
-    let shown = t1.min(1.0) - t0.max(0.0);
-    (f64::from(px) * (shown / raw).clamp(0.0, 1.0))
-        .round()
-        .max(1.0) as u32
+    let shown = (read.1.min(1.0) - read.0.max(0.0)).max(0.0);
+    (f64::from(px) * shown / raw).round().max(1.0) as u32
 }

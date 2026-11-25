@@ -107,6 +107,7 @@ impl OctantApp {
             dims,
             matrix: None,
             probe: None,
+            thinning: crate::plots::Thinning::NONE,
             context,
             ..base.clone()
         };

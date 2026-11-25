@@ -66,6 +66,8 @@ fn tiles_sit_where_their_cells_are_on_the_quad() {
 
 #[test]
 fn pixels_count_only_the_canvas_over_the_quad() {
-    assert_eq!(pixels_over(1000, (0.2, 0.4)), 1000);
-    assert_eq!(pixels_over(1000, (-0.5, 1.5)), 500);
+    assert_eq!(pixels_over(1000, (0.2, 0.4), (0.2, 0.4)), 1000);
+    assert_eq!(pixels_over(1000, (-0.5, 1.5), (-0.5, 1.5)), 500);
+    // A read window twice the screen's span holds twice its pixels.
+    assert_eq!(pixels_over(1000, (0.2, 0.4), (0.1, 0.5)), 2000);
 }

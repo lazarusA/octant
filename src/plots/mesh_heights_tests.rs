@@ -38,6 +38,8 @@ fn draw(
             flip_height: false,
             height_range: [color.cmin, color.cmax],
             height_composite: false,
+            tile_bounds: [0.0, 0.0, 1.0, 1.0],
+            hole_bounds: [0.0; 4],
         },
         cube_mode_idx: if sphere { 3 } else { 2 },
         rect: rect(),
@@ -45,6 +47,7 @@ fn draw(
         channels: None,
         thinning: super::Thinning::NONE,
         heights: heights.cloned(),
+        detail: None,
     }
 }
 

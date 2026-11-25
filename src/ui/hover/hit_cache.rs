@@ -57,6 +57,15 @@ pub fn mesh_hit_key(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> Option<u64>
         app.plot_configs.slice.hash_into(&mut h);
         std::hash::Hasher::finish(&h)
     };
+    let detail_tile = base.data.detail.tile.as_ref().map(|t| {
+        (
+            t.context,
+            t.level,
+            t.origin,
+            t.end,
+            app.sphere_tiles_drawn(),
+        )
+    });
     Some(hash_key((
         plot_type,
         floats,
@@ -65,6 +74,7 @@ pub fn mesh_hit_key(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> Option<u64>
         base.data.matrix_version,
         channels,
         slice,
+        detail_tile,
     )))
 }
 

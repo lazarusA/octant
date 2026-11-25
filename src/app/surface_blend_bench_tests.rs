@@ -66,6 +66,8 @@ pub(super) fn surface_callback(
             flip_height: false,
             height_range: [color.cmin, color.cmax],
             height_composite: true,
+            tile_bounds: [0.0, 0.0, 1.0, 1.0],
+            hole_bounds: [0.0; 4],
         },
         cube_mode_idx: 2,
         rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
@@ -73,6 +75,7 @@ pub(super) fn surface_callback(
         channels,
         thinning: crate::plots::Thinning::NONE,
         heights: None,
+        detail: None,
     }
 }
 

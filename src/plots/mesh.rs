@@ -92,6 +92,8 @@ impl Mesh3DRenderer {
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             height_range: [0.0, 1.0],
+            tile_bounds: super::quad::FULL_TILE,
+            hole_bounds: [0.0; 4],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -221,6 +223,8 @@ impl Mesh3DRenderer {
             lon_bounds: params.lon_bounds,
             lat_bounds: params.lat_bounds,
             height_range: params.height_range,
+            tile_bounds: params.tile_bounds,
+            hole_bounds: params.hole_bounds,
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

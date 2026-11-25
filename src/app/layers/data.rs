@@ -58,6 +58,23 @@ pub struct MeshGrid {
     pub stride: usize,
 }
 
+impl MeshGrid {
+    /// How `mesh` thins `full`, for the GPU bake of a multi-channel composite.
+    pub fn thinning(mesh: Option<&Self>, full: &MatrixData) -> crate::plots::Thinning {
+        let Some(mesh) = mesh else {
+            return crate::plots::Thinning::NONE;
+        };
+        let size = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        crate::plots::Thinning {
+            stride: size(mesh.stride),
+            width: size(mesh.matrix.width),
+            height: size(mesh.matrix.height),
+            full_width: size(full.width),
+            full_height: size(full.height),
+        }
+    }
+}
+
 /// A volume thinned for the point cloud: one voxel in `stride` along x and
 /// y (`VolumeData::thinned_planes`), every Z plane, `width` x `height` a
 /// plane.

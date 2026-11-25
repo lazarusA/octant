@@ -123,8 +123,56 @@ fn moving_views_and_other_plots_ask_for_nothing() {
     frame_at(&mut app, PlotType::Surface, 4.0, 1.0);
     assert!(
         app.layers.base.data.detail.pending.is_none(),
-        "heatmaps only"
+        "heatmaps and spheres only"
     );
+}
+
+#[test]
+fn sphere_zooming_in_reads_the_visible_cap_finer() {
+    let mut app = plotted_with(|_, sel| {
+        sel.plot_type = PlotType::Sphere;
+    });
+    let rest_sphere = |app: &mut OctantApp, distance: f32| {
+        app.nav.sphere_rotation_x = 0.0;
+        app.nav.sphere_rotation_y = 0.0;
+        app.nav.sphere_zoom = distance;
+        frame_at(app, PlotType::Sphere, 1.0, 1.0);
+        frame_at(app, PlotType::Sphere, 1.0, 1.0);
+        if app.layers.base.data.detail.pending.is_some() {
+            poll_until(app, |app| app.layers.base.data.detail.pending.is_none());
+        }
+    };
+
+    rest_sphere(&mut app, crate::plots::camera::DEFAULT_DISTANCE);
+    assert_eq!(tile_level(&app), None, "default distance fits the globe");
+
+    // 4x closer to the surface (`1.0 + 1.5 / 4.0 = 1.375`): reads level 0.
+    let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(20.0, 20.0));
+    let center = rect.center();
+    app.nav.sphere_zoom = 1.375;
+    let key_before = crate::ui::hover::hit_cache::mesh_hit_key(&app, rect, center);
+    rest_sphere(&mut app, 1.375);
+    assert_eq!(tile_level(&app), Some(0));
+    let key_after = crate::ui::hover::hit_cache::mesh_hit_key(&app, rect, center);
+    assert_ne!(
+        key_before, key_after,
+        "hit cache invalidates on tile arrival"
+    );
+
+    let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
+    let camera = crate::ui::hover::Camera3D::from_app(&app, rect);
+    let (nx, ny, _) = crate::ui::hover::raycast_sphere(&app, matrix, &camera, center).expect("hit");
+    let cell = crate::ui::hover::detail::detail_cell(&app, nx, ny).expect("detail cell");
+    assert_eq!(cell.level, 0);
+
+    // 2x closer to the surface (`1.0 + 1.5 / 2.0 = 1.75`): reads level 1.
+    rest_sphere(&mut app, 1.75);
+    assert_eq!(tile_level(&app), Some(1));
+
+    // Auto-rotating sphere drops the detail tile.
+    app.nav.sphere_auto_rotate = true;
+    rest_sphere(&mut app, 1.375);
+    assert_eq!(tile_level(&app), None);
 }
 
 #[test]
@@ -235,4 +283,28 @@ fn the_hover_names_the_level_under_the_pointer() {
     let cell = detail_cell(&app, 0.4, 0.4).expect("over the tile");
     let value = level_field(&app, Some(&cell)).map(|f| f.value);
     assert_eq!(value.as_deref(), Some("0 of 3"), "the tile's level");
+}
+
+#[test]
+fn the_hover_reads_a_thinned_tile_by_its_drawn_cells() {
+    use crate::data::render::decimate::sample_index;
+    let mut app = plotted();
+    rest_at(&mut app, 4.0);
+    let tile = app.layers.base.data.detail.tile.as_mut().expect("tile");
+    // The detail sphere draws every second cell (`DetailTile::thinning`).
+    tile.thinning.stride = 2;
+    let (uv, origin) = (tile.uv, tile.origin);
+    let w = tile.matrix.as_ref().expect("tile matrix").width;
+    let cell = crate::ui::hover::detail::detail_cell(&app, 0.4, 0.4).expect("over the tile");
+    let dw = w.div_ceil(2);
+    let dx = (((0.4 - uv[0]) / (uv[2] - uv[0])) * dw as f32) as usize;
+    let flipped = app.layers.base.data.flipped_dims.iter().any(|d| d == "lon");
+    if !flipped {
+        assert_eq!(cell.x.1, origin[0] as usize + sample_index(dx, 2, w));
+    }
+    let center = uv[0] + (dx as f32 + 0.5) / dw as f32 * (uv[2] - uv[0]);
+    assert!(
+        (cell.center.0 - center).abs() < 1e-6,
+        "the drawn cell's center"
+    );
 }

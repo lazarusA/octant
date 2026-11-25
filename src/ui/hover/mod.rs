@@ -14,7 +14,7 @@ pub mod entries_3d;
 pub mod field;
 pub mod format;
 pub mod hit;
-mod hit_cache;
+pub(crate) mod hit_cache;
 pub mod labels;
 mod march;
 pub mod overlays;
@@ -142,6 +142,14 @@ fn show_sample(
         resolve_target_screen_pos(app, matrix, camera, sampler, &transform, px, py, point);
     if plot_type == PlotType::Heatmap && point.is_none() {
         target = detail_overrides(app, hit, &transform, target, &mut fields);
+    } else if plot_type == PlotType::Sphere {
+        let tile_cell = detail::hovered_cell(app, hit.norm_x, hit.norm_y);
+        if let Some(level) = detail::level_field(app, tile_cell.as_ref()) {
+            fields.push(level);
+        }
+        if let Some(c) = tile_cell {
+            target = raycast_sphere::sphere_detail_target_pos(app, matrix, camera, c);
+        }
     } else if let Some(level) = detail::level_field_of(app, brick.map(|(l, _)| l)) {
         fields.push(level);
     }

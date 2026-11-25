@@ -17,7 +17,7 @@ const MIN_MESH_CELLS: usize = 256 * 1024;
 
 /// The most cells the sphere and surface draw at `detail` on a canvas of
 /// `canvas_px`, within one storage buffer.
-pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
+pub(crate) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
     let pixels = (w as usize).saturating_mul(h as usize);
     detail
         .budget(pixels)
@@ -26,7 +26,7 @@ pub(super) fn mesh_budget(detail: MeshDetail, [w, h]: [u32; 2]) -> usize {
 
 /// `data` thinned to at most `budget` cells for the sphere and surface;
 /// `None` when they draw every cell.
-pub(super) fn mesh_grid(data: &MatrixData, budget: usize) -> Option<MeshGrid> {
+pub(crate) fn mesh_grid(data: &MatrixData, budget: usize) -> Option<MeshGrid> {
     let stride = stride_for(data.width, data.height, budget);
     data.decimated(stride)
         .map(|matrix| MeshGrid { matrix, stride })
@@ -83,6 +83,10 @@ fn rethin_layer(
     if matrix.height < 2 || matrix.grid.is_healpix() || layer.labels().is_some() {
         return;
     }
+    rethin_detail_sphere(layer, rs, budget);
+    let Some(matrix) = layer.data.matrix.as_ref() else {
+        return;
+    };
     // An unchanged mesh is kept: writing it again would overwrite the
     // colors a GPU composite baked into it.
     let stride = stride_for(matrix.width, matrix.height, budget);
@@ -103,4 +107,86 @@ fn rethin_layer(
     layer.data.matrix = Some(matrix);
     layer.data.mesh = grid;
     layer.data.touch_matrix();
+}
+
+/// Thins `layer`'s detail sphere to `budget` cells when one is resident
+/// and its stride changes.
+fn rethin_detail_sphere(layer: &mut Layer, rs: &RenderState, budget: usize) {
+    let (Some(tile), Some(_)) = (&mut layer.data.detail.tile, &layer.renderers.detail_sphere)
+    else {
+        return;
+    };
+    let Some(matrix) = tile.matrix.as_deref() else {
+        return;
+    };
+    let stride = stride_for(matrix.width, matrix.height, budget);
+    if tile.thinning.stride.max(1) as usize == stride {
+        return;
+    }
+    let grid = mesh_grid(matrix, budget);
+    tile.thinning = MeshGrid::thinning(grid.as_ref(), matrix);
+    let m = grid.as_ref().map_or(matrix, |g| &g.matrix);
+    sync_detail_sphere(&mut layer.renderers.detail_sphere, rs, m);
+    layer.data.touch_matrix();
+}
+
+/// Uploads `matrix` to `layer`'s active detail renderer (the sphere's when
+/// `sphere` is true, else the heatmap's); headless (`rs` is `None`), only
+/// computes the sphere's [`crate::plots::Thinning`].
+pub(crate) fn upload_detail_renderers(
+    layer: &mut Layer,
+    rs: Option<&RenderState>,
+    sphere: bool,
+    budget: usize,
+    matrix: &MatrixData,
+    uv: [f32; 4],
+) -> crate::plots::Thinning {
+    let mesh = sphere.then(|| mesh_grid(matrix, budget)).flatten();
+    let thinning = MeshGrid::thinning(mesh.as_ref(), matrix);
+    let Some(rs) = rs else {
+        return thinning;
+    };
+    if sphere && layer.labels().is_none() {
+        let m = mesh.as_ref().map_or(matrix, |g| &g.matrix);
+        sync_detail_sphere(&mut layer.renderers.detail_sphere, rs, m);
+    } else {
+        let (w, h) = (matrix.width, matrix.height);
+        let r = match &layer.renderers.detail {
+            Some(r) if r.capacity() >= w.saturating_mul(h) => r.clone(),
+            _ => Arc::new(crate::plots::HeatmapRenderer::new(
+                &rs.device,
+                rs.target_format,
+                &matrix.values,
+                w,
+                h,
+            )),
+        };
+        r.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, uv);
+        layer.renderers.detail = Some(r);
+    }
+    thinning
+}
+
+fn sync_detail_sphere(
+    slot: &mut Option<Arc<crate::plots::SphereRenderer>>,
+    rs: &RenderState,
+    m: &MatrixData,
+) {
+    let (sw, sh) = (m.width, m.height);
+    let r = match slot {
+        Some(r) if (r.width, r.height) == (sw, sh) => {
+            r.update_data(&rs.queue, &m.values);
+            r.clone()
+        }
+        _ => Arc::new(crate::plots::SphereRenderer::new_sphere_with_coords(
+            &rs.device,
+            rs.target_format,
+            &m.values,
+            sw,
+            sh,
+            None,
+            None,
+        )),
+    };
+    *slot = Some(r);
 }

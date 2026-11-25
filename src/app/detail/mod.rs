@@ -1,29 +1,14 @@
-//! Detail tiles: a heatmap plotted from a coarse level of a multiscale
-//! variable (Auto) shows the visible part at the finest level that fits the
-//! screen once zooming or panning stops, drawn over the coarse plot (which
-//! stays as the placeholder until the tile arrives, and around it).
+//! Detail tiles: a heatmap or 3D sphere plotted from a coarse level of a
+//! multiscale variable (Auto) shows the visible part at the finest level
+//! that fits the screen once zooming, panning or orbiting stops, drawn over
+//! the coarse plot (which stays as the placeholder until the tile arrives,
+//! and around it).
 //!
-//! - `geometry.rs`: the plotted and visible windows on level 0's grid, the
-//!   finer level's cells covering them, and where those sit on the quad.
-//! - `want.rs`: the finer level the resting view asks for; stale tiles.
-//! - `tile.rs`: requesting a tile (cache first), slicing an arrived block
-//!   into it and uploading it to its layer's detail renderer, painted right
-//!   after that layer's heatmap (base, base tile, overlay, overlay tile).
+//! - `geometry.rs`: plotted and visible windows on level 0's grid and quad.
+//! - `sphere_view.rs`: visible `[u, v]` footprint on the 3D sphere.
+//! - `want.rs`: finer level the resting view asks for; stale tiles.
+//! - `tile.rs`: requesting, slicing and uploading a tile to its layer.
 //! - `follow.rs`: overlays' tiles, which follow the base layer's.
-//!
-//! A tile is asked for only once the view rests (`view_interacting` off and
-//! the view unchanged for `SETTLE` seconds, so the frames between mouse
-//! wheel ticks ask nothing) and playback is stopped, on regular grids
-//! without composites; it is kept while it still covers the view at the
-//! level the view wants, and dropped when the plot (selection, step)
-//! changes. The hover reads it where it is drawn (`ui/hover/detail.rs`).
-//!
-//! Each drawn overlay whose variable is multiscale reads, as soon as the
-//! base layer asks for a tile, the level of its own stack on the base
-//! tile's grid (`multiscale::level_matching`) over the same cells, so both
-//! tiles line up cell for cell at the same place on the quad; an overlay
-//! whose stack has no such level gets none. The hover's overlay rows read
-//! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod channel_tests;
@@ -39,6 +24,8 @@ mod geometry;
 pub(crate) use geometry::Axis;
 #[cfg(test)]
 mod geometry_tests;
+mod sphere_view;
+pub(crate) use sphere_view::{center_of_edge, edge_of_center};
 #[cfg(test)]
 mod tests;
 mod tile;
@@ -119,6 +106,8 @@ pub struct DetailTile {
     pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
     /// A composite tile's block window, for the hover's channel values.
     pub probe: Option<crate::data::slicing::CompositeProbe>,
+    /// How the detail sphere thins the tile's cells for GPU channel bakes.
+    pub thinning: crate::plots::Thinning,
     /// The plot it belongs to (`OctantApp::detail_context`).
     pub context: u64,
     /// Level-0 positions it covers along x and y.
@@ -197,9 +186,17 @@ impl OctantApp {
         if self.nav.view_interacting {
             return None;
         }
+        let (pan, zoom) = if plot_type == PlotType::Sphere {
+            (
+                [self.nav.sphere_rotation_x, self.nav.sphere_rotation_y],
+                self.nav.sphere_zoom,
+            )
+        } else {
+            (view.pan, view.zoom)
+        };
         let key = ViewKey {
-            pan: view.pan,
-            zoom: view.zoom,
+            pan,
+            zoom,
             aspect: view.aspect_scale,
             px: self.layout.canvas_px,
             context,
@@ -218,15 +215,15 @@ impl OctantApp {
             return None;
         }
         state.view = Some(key);
-        self.decide_detail(view, context);
+        self.decide_detail(plot_type, view, context);
         None
     }
 
     /// Asks for the tile the resting `view` wants, unless the tile shown or
     /// pending already covers it at that level; drops both when the plotted
     /// level fits the view.
-    fn decide_detail(&mut self, view: &CanvasView, context: u64) {
-        let Some(want) = self.detail_want(view, context) else {
+    fn decide_detail(&mut self, plot_type: PlotType, view: &CanvasView, context: u64) {
+        let Some(want) = self.detail_want(plot_type, view, context) else {
             let state = &mut self.layers.base.data.detail;
             state.tile = None;
             state.drop_request();

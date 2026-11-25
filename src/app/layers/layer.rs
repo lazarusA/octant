@@ -95,6 +95,7 @@ impl Layer {
         self.renderers.labels = None;
         self.renderers.channels = None;
         self.renderers.detail = None;
+        self.renderers.detail_sphere = None;
         self.renderers.detail_channels = None;
         self.data.detail.clear();
         self.renderers.sphere = None;
@@ -106,17 +107,12 @@ impl Layer {
     /// How this layer's surface and sphere grid thins its 2D data, for the
     /// bake of a composite the GPU blends.
     pub fn mesh_thinning(&self) -> crate::plots::Thinning {
-        let (Some(mesh), Some(full)) = (&self.data.mesh, &self.data.matrix) else {
-            return crate::plots::Thinning::NONE;
-        };
-        let size = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
-        crate::plots::Thinning {
-            stride: size(mesh.stride),
-            width: size(mesh.matrix.width),
-            height: size(mesh.matrix.height),
-            full_width: size(full.width),
-            full_height: size(full.height),
-        }
+        self.data
+            .matrix
+            .as_ref()
+            .map_or(crate::plots::Thinning::NONE, |full| {
+                super::MeshGrid::thinning(self.data.mesh.as_ref(), full)
+            })
     }
 
     /// The grid this layer's surface and sphere draw for its 2D data

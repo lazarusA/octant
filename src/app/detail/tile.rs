@@ -13,7 +13,7 @@ use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
-use crate::plots::{ChannelRenderer, HeatmapRenderer};
+use crate::plots::ChannelRenderer;
 
 /// A read of a finer level's window: its request, store, cache key, the
 /// level's dimension names and selection, and the step it reads.
@@ -73,6 +73,7 @@ impl OctantApp {
             end,
             matrix: None,
             probe: None,
+            thinning: crate::plots::Thinning::NONE,
             context: want.context,
             cover,
             uv: [u0, v0, u1, v1],
@@ -139,27 +140,24 @@ impl OctantApp {
         if pending.layer == LayerId::BASE {
             self.request_detail_coordinates(pending.tile.var_idx);
         }
+        let sphere = self.effective_canvas_plot_type() == crate::plots::PlotType::Sphere;
+        let budget = crate::app::pipeline::mesh_grid::mesh_budget(
+            self.plot_configs.mesh.detail,
+            self.layout.canvas_px,
+        );
         let rs = self.wgpu_render_state.clone();
         let Some(layer) = self.layers.get_mut(pending.layer) else {
             return;
         };
         let mut tile = pending.tile;
-        // Headless, the tile is decided and nothing draws it.
-        if let Some(rs) = rs {
-            let (w, h) = (matrix.width, matrix.height);
-            let renderer = match &layer.renderers.detail {
-                Some(r) if r.capacity() >= w.saturating_mul(h) => r.clone(),
-                _ => Arc::new(HeatmapRenderer::new(
-                    &rs.device,
-                    rs.target_format,
-                    &matrix.values,
-                    w,
-                    h,
-                )),
-            };
-            renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
-            layer.renderers.detail = Some(renderer);
-        }
+        tile.thinning = crate::app::pipeline::mesh_grid::upload_detail_renderers(
+            layer,
+            rs.as_ref(),
+            sphere,
+            budget,
+            &matrix,
+            tile.uv,
+        );
         (tile.matrix, tile.probe) = (Some(Arc::new(matrix)), probe);
         layer.data.detail.tile = Some(tile);
     }

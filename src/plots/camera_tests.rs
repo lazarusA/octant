@@ -101,3 +101,23 @@ fn points_behind_the_camera_do_not_project() {
     let behind = [eye[0] * 1.5, eye[1] * 1.5, eye[2] * 1.5];
     assert!(cam.project(behind).is_none());
 }
+
+#[test]
+fn the_ground_under_the_closest_sphere_camera_is_not_clipped() {
+    use crate::plots::PlotType;
+    use crate::plots::camera::min_distance;
+    let cam = OrbitCamera {
+        distance: min_distance(PlotType::Sphere),
+        ..OrbitCamera::default()
+    };
+    let eye = cam.eye();
+    let r = (eye[0] * eye[0] + eye[1] * eye[1] + eye[2] * eye[2]).sqrt();
+    let below = eye.map(|c| c / r);
+    assert!(
+        cam.near() < r - 1.0,
+        "near {} under height {}",
+        cam.near(),
+        r - 1.0
+    );
+    assert!(cam.project(below).is_some(), "the globe under the camera");
+}

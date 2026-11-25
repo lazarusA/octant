@@ -10,6 +10,8 @@ use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
+use crate::ui::hover::sphere_slice::TileHit;
+pub use crate::ui::hover::sphere_slice::{sphere_detail_target_pos, sphere_target_pos};
 use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
 
@@ -18,12 +20,14 @@ pub struct SphereField<'a> {
     pub(super) layer: &'a Layer,
     pub(super) matrix: &'a MatrixData,
     pub(super) scale: HeightScale,
-    mode: u32,
-    disp: f32,
+    pub(super) mode: u32,
+    pub(super) disp: f32,
     /// The slicer: cells its box cuts away are not drawn.
     pub(super) slice: crate::app::Slicer,
     /// Whether the globe draws relief (`slice::has_relief`), for the cut.
     pub(super) relief: bool,
+    /// Whether the base layer's detail tile is drawn (`sphere_tiles_drawn`).
+    pub(super) tiles: bool,
 }
 
 impl<'a> SphereField<'a> {
@@ -37,6 +41,7 @@ impl<'a> SphereField<'a> {
             disp: mesh.sphere_displacement,
             slice: app.plot_configs.slice,
             relief: has_relief(&scale, true, mesh.sphere_mode, mesh.sphere_displacement),
+            tiles: app.sphere_tiles_drawn(),
         }
     }
 
@@ -44,22 +49,11 @@ impl<'a> SphereField<'a> {
     /// `[k, k + 1]`) on grids `get_lon_lat` places linearly (global and
     /// regional regular), and whether longitudes wrap around.
     fn cell_coords(&self, lon: f32, lat: f32) -> Option<(f32, f32, bool)> {
-        let grid = &self.matrix.grid;
+        let (u, v) = self.center_uv(lon, lat)?;
         let (w, h) = (self.matrix.width as f32, self.matrix.height as f32);
-        match grid.sphere_coord_mode() {
-            0 => Some(((lon + PI) / (2.0 * PI) * w, (0.5 - lat / PI) * h, true)),
-            1 => {
-                let [lon_min, lon_max] = grid.lon_bounds_rad();
-                let [lat_min, lat_max] = grid.lat_bounds_rad();
-                let lon = if lon_max > PI && lon < 0.0 {
-                    lon + 2.0 * PI
-                } else {
-                    lon
-                };
-                let u = (lon - lon_min) / (lon_max - lon_min).abs().max(1e-6);
-                let v = (lat_max - lat) / (lat_max - lat_min).abs().max(1e-6);
-                Some((u * (w - 1.0) + 0.5, v * (h - 1.0) + 0.5, false))
-            }
+        match self.matrix.grid.sphere_coord_mode() {
+            0 => Some((u * w, v * h, true)),
+            1 => Some((u * (w - 1.0) + 0.5, v * (h - 1.0) + 0.5, false)),
             _ => None,
         }
     }
@@ -68,8 +62,9 @@ impl<'a> SphereField<'a> {
     /// strips regional grids draw past their bounds; none where the slicer
     /// cuts (`kept`).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
+        let tile = self.detail_at(lon, lat);
         self.grid_cell(lon, lat)
-            .filter(|&cell| self.kept(cell, lon, lat))
+            .filter(|&cell| self.kept(cell, lon, lat, tile.as_ref()))
     }
 
     fn grid_cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
@@ -111,7 +106,21 @@ impl<'a> SphereField<'a> {
 
     /// Radii the drawn geometry spans toward `(lon, lat)` in cell `(px, py)`:
     /// a voxel's column from the unit sphere, else the surface's one radius.
-    fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
+    pub(super) fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
+        self.span_under((px, py), lon, lat, self.detail_at(lon, lat).as_ref())
+    }
+
+    /// [`Self::span`] with the detail tile under `(lon, lat)` already read.
+    fn span_under(
+        &self,
+        (px, py): (usize, usize),
+        lon: f32,
+        lat: f32,
+        tile: Option<&TileHit>,
+    ) -> (f32, f32) {
+        if let Some(tile) = tile {
+            return self.detail_span(tile);
+        }
         let dr = self.dr_at(px, py);
         match self.mode {
             1 => {
@@ -131,14 +140,15 @@ impl<'a> SphereField<'a> {
         }
     }
 
-    /// Angular size of the smallest cell side, the march's step scale.
-    fn cell_angle(&self) -> f32 {
+    /// Angular size of the smallest drawn cell side, the march's step
+    /// scale, and its sample budget's factor (`detail_cell_angle`).
+    fn cell_angle(&self) -> (f32, usize) {
         let grid = &self.matrix.grid;
         let (w, h) = (
             self.matrix.width.max(1) as f32,
             self.matrix.height.max(1) as f32,
         );
-        if grid.sphere_coord_mode() == 1 {
+        let base = if grid.sphere_coord_mode() == 1 {
             let [lon_min, lon_max] = grid.lon_bounds_rad();
             let [lat_min, lat_max] = grid.lat_bounds_rad();
             let dx = (lon_max - lon_min).abs() / (w - 1.0).max(1.0);
@@ -146,18 +156,25 @@ impl<'a> SphereField<'a> {
             dx.min(dy).max(1e-5)
         } else {
             (2.0 * PI / w).min(PI / h)
-        }
+        };
+        self.detail_cell_angle(base)
     }
 
     fn probe(&self, ray: &Ray3D, t: f32) -> Probe {
         let (lon, lat, r) = point(ray, t);
-        self.cell(lon, lat).map_or(Probe::OFF_GRID, |(px, py)| {
-            let (lo, hi) = self.span(px, py, lon, lat);
-            Probe {
-                cell: Some((px, py)),
-                side: Side::of(r, lo, hi),
-            }
-        })
+        let Some(cell) = self.grid_cell(lon, lat) else {
+            return Probe::OFF_GRID;
+        };
+        // One tile lookup a sample: the march's hot loop.
+        let tile = self.detail_at(lon, lat);
+        if !self.kept(cell, lon, lat, tile.as_ref()) {
+            return Probe::OFF_GRID;
+        }
+        let (lo, hi) = self.span_under(cell, lon, lat, tile.as_ref());
+        Probe {
+            cell: Some(self.drawn_identity(cell, tile.as_ref())),
+            side: Side::of(r, lo, hi),
+        }
     }
 
     /// Radii the drawn globe spans, the unit sphere included (mode 0 draws
@@ -169,23 +186,22 @@ impl<'a> SphereField<'a> {
     }
 
     /// The cell where `ray` first meets the drawn globe, or crosses the unit
-    /// sphere when it meets nothing.
-    pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
+    /// sphere when it meets nothing, and the `(lon, lat)` radians there.
+    fn hit(&self, ray: &Ray3D) -> Option<((usize, usize), (f32, f32))> {
         let marched = (self.mode != 0).then(|| {
-            // Between the outermost and innermost drawn radii; below the
-            // innermost the ray only sees the inside of the globe.
             let (r_in, r_out) = self.radius_span();
             let (r_in, r_out) = (r_in - 1e-3, r_out + 1e-3);
             let (t_in, t_out) = sphere_span(ray, r_out)?;
             let t_stop = sphere_span(ray, r_in).map_or(t_out, |(t, _)| t);
             let (w, h) = (self.matrix.width, self.matrix.height);
-            let step = 0.5 * self.cell_angle();
+            let (angle, finer) = self.cell_angle();
             let probe = |t| self.probe(ray, t);
-            march((t_in, t_stop), step, max_steps(w, h), self.shape(), probe)
+            let budget = max_steps(w, h).saturating_mul(finer);
+            march((t_in, t_stop), 0.5 * angle, budget, self.shape(), probe)
         });
         let unit = || sphere_span(ray, 1.0).map(|(t_in, _)| t_in);
         let (lon, lat, _) = point(ray, marched.flatten().or_else(unit)?);
-        self.cell(lon, lat)
+        Some((self.cell(lon, lat)?, (lon, lat)))
     }
 }
 
@@ -220,7 +236,16 @@ pub fn raycast_sphere(
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
     let world_ray = camera.cast_ray(hover_pos);
-    let (px, py) = SphereField::new(app, matrix).hit(&world_ray)?;
+    let field = SphereField::new(app, matrix);
+    let ((px, py), (lon, lat)) = field.hit(&world_ray)?;
+    if field.tiles
+        && let Some((u, v)) = field.uv(lon, lat)
+        && let Some(tile_cell) = crate::ui::hover::detail::detail_cell(app, u, v)
+    {
+        let (nx, ny) = tile_cell.center;
+        let (lon_c, lat_c) = field.lon_lat_of_uv(nx, ny);
+        return Some((nx, ny, Some((lat_c.to_degrees(), lon_c.to_degrees()))));
+    }
     let (w, h) = (matrix.width, matrix.height);
     let (nx, ny) = matrix.grid.cell_center_norm(px, py, w, h);
     let (cell_lon_rad, cell_lat_rad) = matrix.grid.cell_center_lon_lat_rad(px, py, w, h);
@@ -230,25 +255,4 @@ pub fn raycast_sphere(
         ny,
         Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees())),
     ))
-}
-
-/// Forward projects the hovered cell's center, on the drawn globe, to screen
-/// space.
-pub fn sphere_target_pos(
-    app: &OctantApp,
-    matrix: &MatrixData,
-    camera: &Camera3D,
-    px: usize,
-    py: usize,
-) -> Option<Pos2> {
-    let (lon_c, lat_c) = matrix
-        .grid
-        .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
-    let r = SphereField::new(app, matrix).span(px, py, lon_c, lat_c).1;
-
-    let world_x = r * lat_c.cos() * lon_c.sin();
-    let world_y = r * lat_c.sin();
-    let world_z = r * lat_c.cos() * lon_c.cos();
-
-    camera.project_point([world_x, world_y, world_z])
 }

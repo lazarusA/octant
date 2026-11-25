@@ -111,6 +111,10 @@ pub struct Mesh3DUniforms {
     pub lat_bounds: [f32; 2],
     /// The color range of the layer whose values make the heights.
     pub height_range: [f32; 2],
+    /// Sub-region `[u0, v0, u1, v1]` of the plotted domain this mesh covers.
+    pub tile_bounds: [f32; 4],
+    /// Sub-region `[u0, v0, u1, v1]` discarded from this mesh for a finer detail tile.
+    pub hole_bounds: [f32; 4],
     pub color: PlotColorParams,
 }
 
@@ -131,6 +135,10 @@ pub struct Mesh3DUniformParams {
     /// the heights: the base layer's, also under an overlay draped on it.
     pub height_range: [f32; 2],
     pub height_composite: bool,
+    /// Sub-region `[u0, v0, u1, v1]` of the plotted domain this mesh covers.
+    pub tile_bounds: [f32; 4],
+    /// Sub-region `[u0, v0, u1, v1]` discarded from this mesh for a finer detail tile.
+    pub hole_bounds: [f32; 4],
 }
 
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and PaintCallbackInfo,

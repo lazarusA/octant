@@ -178,6 +178,8 @@ impl OctantApp {
             height_range: [height_color.cmin, height_color.cmax],
             height_composite: height_color.colormap
                 == crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
+            tile_bounds: [0.0, 0.0, 1.0, 1.0],
+            hole_bounds: [0.0; 4],
         }
     }
 

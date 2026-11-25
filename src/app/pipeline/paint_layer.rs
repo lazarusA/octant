@@ -79,7 +79,10 @@ impl OctantApp {
         let base = &self.layers.base;
         let heights = (layer.id() != base.id()).then(|| mesh(base)).flatten();
         let aspect_ratio = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_mesh_3d_uniform_params(layer, sphere, aspect_ratio);
+        let mut params = self.get_mesh_3d_uniform_params(layer, sphere, aspect_ratio);
+        let detail = sphere
+            .then(|| self.sphere_detail_draw(layer, &mut params))
+            .flatten();
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::Mesh3DCallback {
@@ -96,6 +99,7 @@ impl OctantApp {
                 ),
                 thinning: layer.mesh_thinning(),
                 heights,
+                detail,
             },
         );
         ui.painter().add(callback);

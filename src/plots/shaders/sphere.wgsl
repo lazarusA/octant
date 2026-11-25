@@ -10,6 +10,39 @@ fn get_normalized_radial_dr(height_val: f32) -> f32 {
     return h * 0.4 * uniforms.displacement_strength;
 }
 
+fn is_subtile() -> bool {
+    let tb = uniforms.tile_bounds;
+    return tb.x > 0.0 || tb.y > 0.0 || tb.z < 1.0 || tb.w < 1.0;
+}
+
+fn sphere_lon_lat(
+    cell_x: u32,
+    cell_y: u32,
+    model_xy: vec2<f32>,
+    grid_w: u32,
+    grid_h: u32,
+) -> vec2<f32> {
+    if (is_subtile()) {
+        // Edge fractions of the tile, as `tile_bounds` and the coarse `slice_at`.
+        let local_uv = (vec2<f32>(f32(cell_x), f32(cell_y)) + model_xy) / vec2<f32>(f32(grid_w), f32(grid_h));
+        if (uniforms.coord_mode == 1u) {
+            // A regional tile's `lon_bounds`/`lat_bounds` are its own edges
+            // (`sphere_detail_draw`).
+            let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, local_uv.x);
+            let lat = clamp(mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, local_uv.y), -1.5707963, 1.5707963);
+            return vec2<f32>(lon, lat);
+        }
+        let uv = mix(uniforms.tile_bounds.xy, uniforms.tile_bounds.zw, local_uv);
+        let lon = (uv.x - 0.5) * 2.0 * 3.14159265;
+        let lat = (0.5 - uv.y) * 3.14159265;
+        return vec2<f32>(lon, lat);
+    }
+    return get_lon_lat(
+        cell_x, cell_y, model_xy, grid_w, grid_h,
+        uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
+    );
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -28,17 +61,28 @@ fn vs_main(
     var raw_val = data_buffer[safe_idx];
     var height_val = height_value(safe_idx);
 
-    let coords = get_lon_lat(
-        cell_x, cell_y, model.position.xy, grid_w, grid_h,
-        uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
-    );
+    let coords = sphere_lon_lat(cell_x, cell_y, model.position.xy, grid_w, grid_h);
     var lon = coords.x;
     var lat = coords.y;
     let grid = vec2<f32>(f32(grid_w), f32(grid_h));
-    var slice_xy = (vec2<f32>(f32(cell_x), f32(cell_y)) + model.position.xy) / grid;
+    let tb = uniforms.tile_bounds;
+    var slice_xy = mix(tb.xy, tb.zw, (vec2<f32>(f32(cell_x), f32(cell_y)) + model.position.xy) / grid);
     if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
         // HEALPix pixels have no rows: fractions of the globe.
         slice_xy = vec2<f32>(lon / 6.2831853 + 0.5, 0.5 - lat / 3.14159265);
+    } else {
+        // Fast per-instance vertex culling for coarse cells strictly inside
+        // `hole_bounds` (depends only on `cell_x`/`cell_y`, never `model.position`,
+        // so every vertex of an instance is culled or kept together).
+        let hb = uniforms.hole_bounds;
+        let cell_center = mix(tb.xy, tb.zw, (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid);
+        let cell_pad = (tb.zw - tb.xy) * (1.5 / grid);
+        if (hb.z > hb.x
+            && cell_center.x - cell_pad.x >= hb.x && cell_center.x + cell_pad.x <= hb.z
+            && cell_center.y - cell_pad.y >= hb.y && cell_center.y + cell_pad.y <= hb.w) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
     }
 
     var pos_3d: vec3<f32>;
@@ -57,18 +101,22 @@ fn vs_main(
             raw_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, false);
             height_val = healpix_corner_mean(safe_idx, healpix_uv, nside, nested, true);
         } else {
-            let sx = smooth_corner(cell_x, model.position.x, grid_w, uniforms.coord_mode == 0u);
+            let wrap_x = uniforms.coord_mode == 0u && !is_subtile();
+            let sx = smooth_corner(cell_x, model.position.x, grid_w, wrap_x);
             let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
             let corner_idx = min(sy.cell * grid_w + sx.cell, max_idx);
             raw_val = data_buffer[corner_idx];
             height_val = height_value(corner_idx);
-            let corner = get_lon_lat(
+            let corner = sphere_lon_lat(
                 sx.at_cell, sy.at_cell, vec2<f32>(sx.frac, sy.frac), grid_w, grid_h,
-                uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
             );
             lon = corner.x;
             lat = corner.y;
-            slice_xy = (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid;
+            slice_xy = mix(
+                tb.xy,
+                tb.zw,
+                (vec2<f32>(f32(sx.at_cell), f32(sy.at_cell)) + vec2<f32>(sx.frac, sy.frac)) / grid,
+            );
         }
 
         let dr = get_normalized_radial_dr(height_val);
@@ -77,9 +125,8 @@ fn vs_main(
     } else if (uniforms.mode == 2u) {
         // Mode 2: Flat Steps
         let dr = get_normalized_radial_dr(height_val);
-        let center_coords = get_lon_lat(
+        let center_coords = sphere_lon_lat(
             cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h,
-            uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
         );
         pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
         normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
@@ -107,10 +154,11 @@ fn vs_main(
     let height_scale = 0.4 * uniforms.displacement_strength;
     let h = select(0.0, (length(pos_3d) - 1.0) / height_scale, height_scale > 0.0);
     out.slice_at = vec3<f32>(slice_xy, h);
+    out.hole_at = slice_xy;
     if (uniforms.mode == 3u && uniforms.coord_mode != 4u && uniforms.coord_mode != 5u) {
         // Blocks are kept or cut whole, by their cell's center and value,
         // so none is left open.
-        let center = (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid;
+        let center = mix(tb.xy, tb.zw, (vec2<f32>(f32(cell_x), f32(cell_y)) + 0.5) / grid);
         out.slice_at = vec3<f32>(center, select(0.0, get_normalized_radial_dr(height_val) / height_scale, height_scale > 0.0));
     }
     out.normal = norm_rot;

@@ -84,3 +84,31 @@ fn the_hover_reads_the_overlay_tile_under_the_pointer() {
     // The same values: the overlay's tile reads what the base tile does.
     assert_eq!(rows[0].value, HoverValue::Scalar(base.value));
 }
+
+#[test]
+fn an_overlay_without_a_sphere_tile_holds_back_tiles_on_relief() {
+    let (mut app, id) = overlaid();
+    rest_both(&mut app, id, 4.0);
+    assert!(app.layers.base.data.detail.tile.is_some());
+    (
+        app.plot_configs.mesh.sphere_mode,
+        app.plot_configs.mesh.sphere_displacement,
+    ) = (1, 1.0);
+    // Headless, the overlay has no detail sphere: it would stay coarse.
+    assert!(
+        !app.sphere_tiles_drawn(),
+        "the overlay parts from the relief"
+    );
+
+    app.plot_configs.mesh.sphere_displacement = 0.0;
+    assert!(app.sphere_tiles_drawn(), "no relief: the surfaces meet");
+
+    app.plot_configs.mesh.sphere_displacement = 1.0;
+    if let Some(overlay) = app.layers.get_mut(id) {
+        overlay.visible = false;
+    }
+    assert!(
+        app.sphere_tiles_drawn(),
+        "a hidden overlay holds nothing back"
+    );
+}

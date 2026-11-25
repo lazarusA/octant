@@ -19,6 +19,10 @@ struct Uniforms {
     lat_bounds: vec2<f32>,
     // The color range of the layer whose values make the heights.
     height_range: vec2<f32>,
+    // Sub-region [u0, v0, u1, v1] of the plotted domain this mesh covers.
+    tile_bounds: vec4<f32>,
+    // Sub-region [u0, v0, u1, v1] discarded from this mesh for a finer detail tile.
+    hole_bounds: vec4<f32>,
     color: ColorUniforms,
 };
 
@@ -93,10 +97,19 @@ struct VertexOutput {
     // Where the slicer reads the fragment: fractions of the grid's cells
     // along x and y, and its normalized height (`common/slice.wgsl`).
     @location(4) slice_at: vec3<f32>,
+    // Where the fragment lies on the grid, per fragment even for blocks
+    // (whose `slice_at` is their center): `hole_bounds` cuts exactly there.
+    @location(5) hole_at: vec2<f32>,
 };
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
+    let hb = uniforms.hole_bounds;
+    if (hb.z > hb.x
+        && in.hole_at.x >= hb.x && in.hole_at.x <= hb.z
+        && in.hole_at.y >= hb.y && in.hole_at.y <= hb.w) {
+        discard;
+    }
     if (!slice_box_keeps(uniforms.slice, in.slice_at)) {
         discard;
     }
