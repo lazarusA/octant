@@ -15,23 +15,34 @@ use crate::data::MatrixData;
 use crate::ui::hover::detail::{TileReading, tile_reading};
 use crate::utils::height::height_factor;
 
+/// A detail tile under a point: its quad fractions there and the drawn cell.
+pub(super) type TileHit = ((f32, f32), TileReading);
+
 impl SphereField<'_> {
     /// Whether the slicer keeps `cell`, met toward `(lon, lat)`: by its
     /// center (HEALPix pixels, which have no rows, by where they lie on the
     /// globe) and its value's height, as sphere.wgsl cuts blocks.
-    pub(super) fn kept(&self, cell: (usize, usize), lon: f32, lat: f32) -> bool {
-        let detail = self.detail_reading(lon, lat);
-        let placed = match (self.matrix.grid.is_healpix(), detail.is_some()) {
+    /// `tile` is the detail tile there ([`Self::detail_at`]), whose drawn
+    /// cell is read instead.
+    pub(super) fn kept(
+        &self,
+        cell: (usize, usize),
+        lon: f32,
+        lat: f32,
+        tile: Option<&TileHit>,
+    ) -> bool {
+        let placed = match (self.matrix.grid.is_healpix(), tile) {
             (true, _) => self.slice.keeps_uv(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI),
-            (false, true) => self
-                .uv(lon, lat)
-                .is_some_and(|(u, v)| self.slice.keeps_uv(u, v)),
-            (false, false) => {
+            (false, Some(&((u, v), _))) => self.slice.keeps_uv(u, v),
+            (false, None) => {
                 let grid = (self.matrix.width, self.matrix.height);
                 self.slice.keeps_cell(cell, grid)
             }
         };
-        let val = detail.unwrap_or_else(|| value_at(self.layer, self.matrix, cell.0, cell.1));
+        let val = tile.map_or_else(
+            || value_at(self.layer, self.matrix, cell.0, cell.1),
+            |t| t.1.value,
+        );
         let h = self.scale.normalized(val);
         placed && self.slice.keeps_height(h, &self.scale, self.relief)
     }
@@ -90,41 +101,35 @@ impl SphereField<'_> {
         }
     }
 
-    /// The active detail tile's drawn cell at `(lon, lat)`, when covered.
-    pub(super) fn detail_at(&self, lon: f32, lat: f32) -> Option<TileReading> {
-        let (u, v) = self.uv(lon, lat).filter(|_| self.tiles)?;
-        tile_reading(self.layer, u, v)
+    /// The active detail tile at `(lon, lat)`, when covered: the quad
+    /// fractions there and the drawn cell.
+    pub(super) fn detail_at(&self, lon: f32, lat: f32) -> Option<TileHit> {
+        let uv = self.uv(lon, lat).filter(|_| self.tiles)?;
+        Some((uv, tile_reading(self.layer, uv.0, uv.1)?))
     }
 
-    /// Value of the active detail tile at `(lon, lat)`, when covered.
-    pub(super) fn detail_reading(&self, lon: f32, lat: f32) -> Option<f32> {
-        self.detail_at(lon, lat).map(|r| r.value)
-    }
-
-    /// Radii the detail tile's drawn cell at `(lon, lat)` spans, when
-    /// covered (`SphereField::span`).
-    pub(super) fn detail_span(&self, lon: f32, lat: f32) -> Option<(f32, f32)> {
-        let val = self.detail_reading(lon, lat)?;
+    /// Radii `tile`'s drawn cell spans (`SphereField::span`).
+    pub(super) fn detail_span(&self, tile: &TileHit) -> (f32, f32) {
+        let val = tile.1.value;
         let dr = match val.is_finite() {
             true => self.scale.normalized(val) * height_factor(true, self.mode) * self.disp,
             false => 0.0,
         };
-        Some(match self.mode {
+        match self.mode {
             3 => (1.0 + dr.min(0.0), 1.0 + dr.max(0.0)),
             _ => (1.0 + dr, 1.0 + dr),
-        })
+        }
     }
 
-    /// The march's cell identity toward `(lon, lat)`: a detail tile's drawn
-    /// cell (past the coarse grid's indices) where one covers it, else
-    /// coarse `cell`, so patches and columns follow what is drawn.
+    /// The march's cell identity: `tile`'s drawn cell (past the coarse
+    /// grid's indices) where one covers the point, else coarse `cell`, so
+    /// patches and columns follow what is drawn.
     pub(super) fn drawn_identity(
         &self,
         cell: (usize, usize),
-        lon: f32,
-        lat: f32,
+        tile: Option<&TileHit>,
     ) -> (usize, usize) {
-        self.detail_at(lon, lat).map_or(cell, |d| {
+        tile.map_or(cell, |(_, d)| {
             (self.matrix.width + d.cell.0, self.matrix.height + d.cell.1)
         })
     }
@@ -170,7 +175,8 @@ pub fn sphere_detail_target_pos(
 ) -> Option<Pos2> {
     let field = SphereField::new(app, matrix?);
     let (lon_c, lat_c) = field.lon_lat_of_uv(cell.center.0, cell.center.1);
-    let r = field.detail_span(lon_c, lat_c).map_or(1.0, |s| s.1);
+    let tile = field.detail_at(lon_c, lat_c);
+    let r = tile.map_or(1.0, |t| field.detail_span(&t).1);
     project_lon_lat(camera, lon_c, lat_c, r)
 }
 

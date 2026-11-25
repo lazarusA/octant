@@ -10,6 +10,7 @@ use crate::ui::hover::camera::{Camera3D, Ray3D};
 use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
 use crate::ui::hover::raycast_surface::height_scale;
 use crate::ui::hover::smooth::{bracket, bracket_wrapped, index_sample, lerp, value_at};
+use crate::ui::hover::sphere_slice::TileHit;
 pub use crate::ui::hover::sphere_slice::{sphere_detail_target_pos, sphere_target_pos};
 use crate::utils::height::{HeightScale, height_factor};
 use egui::Pos2;
@@ -61,8 +62,9 @@ impl<'a> SphereField<'a> {
     /// strips regional grids draw past their bounds; none where the slicer
     /// cuts (`kept`).
     fn cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
+        let tile = self.detail_at(lon, lat);
         self.grid_cell(lon, lat)
-            .filter(|&cell| self.kept(cell, lon, lat))
+            .filter(|&cell| self.kept(cell, lon, lat, tile.as_ref()))
     }
 
     fn grid_cell(&self, lon: f32, lat: f32) -> Option<(usize, usize)> {
@@ -105,8 +107,19 @@ impl<'a> SphereField<'a> {
     /// Radii the drawn geometry spans toward `(lon, lat)` in cell `(px, py)`:
     /// a voxel's column from the unit sphere, else the surface's one radius.
     pub(super) fn span(&self, px: usize, py: usize, lon: f32, lat: f32) -> (f32, f32) {
-        if let Some(span) = self.detail_span(lon, lat) {
-            return span;
+        self.span_under((px, py), lon, lat, self.detail_at(lon, lat).as_ref())
+    }
+
+    /// [`Self::span`] with the detail tile under `(lon, lat)` already read.
+    fn span_under(
+        &self,
+        (px, py): (usize, usize),
+        lon: f32,
+        lat: f32,
+        tile: Option<&TileHit>,
+    ) -> (f32, f32) {
+        if let Some(tile) = tile {
+            return self.detail_span(tile);
         }
         let dr = self.dr_at(px, py);
         match self.mode {
@@ -149,13 +162,19 @@ impl<'a> SphereField<'a> {
 
     fn probe(&self, ray: &Ray3D, t: f32) -> Probe {
         let (lon, lat, r) = point(ray, t);
-        self.cell(lon, lat).map_or(Probe::OFF_GRID, |(px, py)| {
-            let (lo, hi) = self.span(px, py, lon, lat);
-            Probe {
-                cell: Some(self.drawn_identity((px, py), lon, lat)),
-                side: Side::of(r, lo, hi),
-            }
-        })
+        let Some(cell) = self.grid_cell(lon, lat) else {
+            return Probe::OFF_GRID;
+        };
+        // One tile lookup a sample: the march's hot loop.
+        let tile = self.detail_at(lon, lat);
+        if !self.kept(cell, lon, lat, tile.as_ref()) {
+            return Probe::OFF_GRID;
+        }
+        let (lo, hi) = self.span_under(cell, lon, lat, tile.as_ref());
+        Probe {
+            cell: Some(self.drawn_identity(cell, tile.as_ref())),
+            side: Side::of(r, lo, hi),
+        }
     }
 
     /// Radii the drawn globe spans, the unit sphere included (mode 0 draws
@@ -167,14 +186,8 @@ impl<'a> SphereField<'a> {
     }
 
     /// The cell where `ray` first meets the drawn globe, or crosses the unit
-    /// sphere when it meets nothing.
-    pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
-        self.hit_with_lon_lat(ray).map(|(cell, _)| cell)
-    }
-
-    /// [`Self::hit`] together with the `(lon, lat)` radians where `ray` met
-    /// the globe.
-    fn hit_with_lon_lat(&self, ray: &Ray3D) -> Option<((usize, usize), (f32, f32))> {
+    /// sphere when it meets nothing, and the `(lon, lat)` radians there.
+    fn hit(&self, ray: &Ray3D) -> Option<((usize, usize), (f32, f32))> {
         let marched = (self.mode != 0).then(|| {
             let (r_in, r_out) = self.radius_span();
             let (r_in, r_out) = (r_in - 1e-3, r_out + 1e-3);
@@ -224,7 +237,7 @@ pub fn raycast_sphere(
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
     let world_ray = camera.cast_ray(hover_pos);
     let field = SphereField::new(app, matrix);
-    let ((px, py), (lon, lat)) = field.hit_with_lon_lat(&world_ray)?;
+    let ((px, py), (lon, lat)) = field.hit(&world_ray)?;
     if field.tiles
         && let Some((u, v)) = field.uv(lon, lat)
         && let Some(tile_cell) = crate::ui::hover::detail::detail_cell(app, u, v)
