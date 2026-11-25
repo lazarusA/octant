@@ -40,8 +40,8 @@ const TEXT_CALLS: &[&str] = &[
 const ALLOWED: &[&str] = &[
     "Octant",
     "@lazarusA",
-    "github.com/lazarusA/octant",
-    "github.com/lazarusA/octant/issues",
+    "github.com/ndvis/octant",
+    "github.com/ndvis/octant/issues",
     "Zarr",
     "Icechunk",
     "NetCDF",

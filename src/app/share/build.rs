@@ -25,7 +25,7 @@ const ESCAPED: &AsciiSet = &CONTROLS
     .add(b'`');
 
 /// The deployed web app, the base of links made on the desktop.
-const WEB_APP: &str = "https://lazarusa.github.io/octant/";
+const WEB_APP: &str = "https://ndvis.github.io/octant/";
 
 impl OctantApp {
     /// Whether the plot has a share link: something plotted from a store a

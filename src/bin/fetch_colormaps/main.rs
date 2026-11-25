@@ -95,7 +95,7 @@ mod desktop {
          sRGB and resampled into 256-entry lookup tables for display; maps defined by \
          Matplotlib segment data or functions are sampled at 256 points as Matplotlib \
          does. No other changes are made.\n\n\
-         **Good-faith notice.** We have made a good-faith effort to identify the authors and licenses of all third-party software, fonts and colormap data included in Octant, and to comply with their terms. If you are a rights holder and believe that any material is used without proper permission, attribution or license compliance, please contact us by opening an issue at https://github.com/lazarusA/octant/issues. Any such issue is unintentional. We will review your report promptly and, where appropriate, correct the attribution, add the required notice, or remove the material.\n"
+         **Good-faith notice.** We have made a good-faith effort to identify the authors and licenses of all third-party software, fonts and colormap data included in Octant, and to comply with their terms. If you are a rights holder and believe that any material is used without proper permission, attribution or license compliance, please contact us by opening an issue at https://github.com/ndvis/octant/issues. Any such issue is unintentional. We will review your report promptly and, where appropriate, correct the attribution, add the required notice, or remove the material.\n"
             .to_string()
     }
 

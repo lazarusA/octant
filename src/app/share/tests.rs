@@ -11,7 +11,7 @@ fn open(source: &str) -> AppAction {
 
 #[test]
 fn a_link_reads_into_actions_in_a_fixed_order() {
-    let link = "https://lazarusa.github.io/octant/?plot=heatmap&lat=30..60\
+    let link = "https://ndvis.github.io/octant/?plot=heatmap&lat=30..60\
                 &overlay=sst&range=250..310&src=https://x.org/era5.zarr&var=t2m\
                 &time=2020-01-15T06:00&cmap=cmocean:thermal&axes=lon,lat&anim=time";
     let dim = |d: &str| Some(d.to_string());
@@ -191,7 +191,7 @@ fn a_plot_s_link_plots_the_same_again() {
     assert_eq!(first.playback.current_timestep, 1);
     let link = first.share_link().unwrap_or_default();
     for part in [
-        "https://lazarusa.github.io/octant/?src=https://share.test/tas.zarr&var=tas",
+        "https://ndvis.github.io/octant/?src=https://share.test/tas.zarr&var=tas",
         "axes=lon,lat",
         "anim=time",
         "step=2020-02-01",

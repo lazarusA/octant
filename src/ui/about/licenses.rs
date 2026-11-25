@@ -13,14 +13,13 @@ pub const THIRD_PARTY_LICENSES: &str =
     include_str!("../../../assets/licenses/THIRD_PARTY_LICENSES.md");
 
 const THIRD_PARTY_URL: &str =
-    "https://github.com/lazarusA/octant/blob/main/assets/licenses/THIRD_PARTY_LICENSES.md";
+    "https://github.com/ndvis/octant/blob/main/assets/licenses/THIRD_PARTY_LICENSES.md";
 /// The license of the bundled Chinese, Japanese and Korean font subsets,
 /// written by the `subset_fonts` tool.
 pub const FONT_LICENSES: &str = include_str!("../../../assets/fonts/LICENSE.md");
-const FONT_LICENSES_URL: &str =
-    "https://github.com/lazarusA/octant/blob/main/assets/fonts/LICENSE.md";
+const FONT_LICENSES_URL: &str = "https://github.com/ndvis/octant/blob/main/assets/fonts/LICENSE.md";
 const COLORMAP_LICENSES_URL: &str =
-    "https://github.com/lazarusA/octant/blob/main/assets/colormaps/LICENSES.md";
+    "https://github.com/ndvis/octant/blob/main/assets/colormaps/LICENSES.md";
 
 const VIEWER_HEIGHT: f32 = 300.0;
 const FONT_SIZE: f32 = 12.0;

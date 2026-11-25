@@ -1,36 +1,36 @@
-<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-dark.svg"><img alt="" src="https://raw.githubusercontent.com/lazarusA/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-light.svg" height="40" align="center"></picture> octant</h1>
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ndvis/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-dark.svg"><img alt="" src="https://raw.githubusercontent.com/ndvis/octant/17489ba8410364d3fd0d11c697eb809f990e3486/assets/brand/svg/octant-logo-light.svg" height="40" align="center"></picture> octant</h1>
 
 <p align="center">
-  <a href="https://github.com/lazarusA/octant"><img alt="github" src="https://img.shields.io/badge/github-lazarusA/octant-8da0cb?logo=github"></a>
-  <a href="https://lazarusa.github.io/octant/"><img alt="Live Demo" src="https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white"></a>
+  <a href="https://github.com/ndvis/octant"><img alt="github" src="https://img.shields.io/badge/github-ndvis/octant-8da0cb?logo=github"></a>
+  <a href="https://ndvis.github.io/octant/"><img alt="Live Demo" src="https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white"></a>
   <a href="https://crates.io/crates/octant"><img alt="Latest version" src="https://img.shields.io/crates/v/octant.svg"></a>
-  <a href="https://github.com/lazarusA/octant/actions/workflows/rust.yml"><img alt="Build Status" src="https://github.com/lazarusA/octant/actions/workflows/rust.yml/badge.svg"></a>
-  <a href="https://github.com/lazarusA/octant/blob/main/LICENSE-MIT"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://github.com/lazarusA/octant/blob/main/LICENSE-APACHE"><img alt="Apache" src="https://img.shields.io/badge/license-Apache-blue.svg"></a>
+  <a href="https://github.com/ndvis/octant/actions/workflows/rust.yml"><img alt="Build Status" src="https://github.com/ndvis/octant/actions/workflows/rust.yml/badge.svg"></a>
+  <a href="https://github.com/ndvis/octant/blob/main/LICENSE-MIT"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="https://github.com/ndvis/octant/blob/main/LICENSE-APACHE"><img alt="Apache" src="https://img.shields.io/badge/license-Apache-blue.svg"></a>
 </p>
 
 <p align="center">
-  <b>Download the desktop app</b> · or <a href="https://lazarusa.github.io/octant/">try it in your browser.</a>
+  <b>Download the desktop app</b> · or <a href="https://ndvis.github.io/octant/">try it in your browser.</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-macOS-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/macOS-Apple%20silicon-3a3f44?style=for-the-badge&labelColor=121416"></a>
-  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Windows-x64-setup.exe"><img alt="Download for Windows (x64)" src="https://img.shields.io/badge/Windows-x64-3a3f44?style=for-the-badge&labelColor=121416"></a>
-  <a href="https://github.com/lazarusA/octant/releases/latest/download/Octant-Linux-x86_64.AppImage"><img alt="Download for Linux (x86_64 AppImage)" src="https://img.shields.io/badge/Linux-AppImage-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/ndvis/octant/releases/latest/download/Octant-macOS-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/macOS-Apple%20silicon-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/ndvis/octant/releases/latest/download/Octant-Windows-x64-setup.exe"><img alt="Download for Windows (x64)" src="https://img.shields.io/badge/Windows-x64-3a3f44?style=for-the-badge&labelColor=121416"></a>
+  <a href="https://github.com/ndvis/octant/releases/latest/download/Octant-Linux-x86_64.AppImage"><img alt="Download for Linux (x86_64 AppImage)" src="https://img.shields.io/badge/Linux-AppImage-3a3f44?style=for-the-badge&labelColor=121416"></a>
 </p>
 
 An interactive viewer for N-dimensional datasets, stored locally or in cloud object storage. Built in Rust with GPU rendering, available on desktop and in the browser.
 
 https://github.com/user-attachments/assets/c749e1d1-9159-4928-9e05-9490fb466607
 
-![Octant screenshot](https://raw.githubusercontent.com/lazarusA/octant/refs/heads/main/assets/octant_ws10.png)
+![Octant screenshot](https://raw.githubusercontent.com/ndvis/octant/refs/heads/main/assets/octant_ws10.png)
 
 ## Install
 
 <details>
 <summary>Every installer, and how to install it</summary>
 
-Each [release](https://github.com/lazarusA/octant/releases/latest) holds:
+Each [release](https://github.com/ndvis/octant/releases/latest) holds:
 
 | System | File | Install |
 |---|---|---|
@@ -133,7 +133,7 @@ The tools below each do their job well, and you may prefer one of them for its o
 
 Libraries for building your own viewer: [Kiln](https://github.com/kilnrender/kiln-render) (WebGPU volume rendering of OME-Zarr), [Viv](https://github.com/hms-dbmi/viv) (OME-Zarr and OME-TIFF layers for deck.gl), [zarr-layer](https://github.com/carbonplan/zarr-layer) (Zarr on MapLibre and Mapbox maps), and [deck.gl-raster](https://github.com/developmentseed/deck.gl-raster) (COG and Zarr layers for deck.gl).
 
-Know a tool we missed? [Open an issue or a pull request](https://github.com/lazarusA/octant/issues).
+Know a tool we missed? [Open an issue or a pull request](https://github.com/ndvis/octant/issues).
 
 ## License
 
@@ -145,4 +145,4 @@ Bundled material retains its own licenses, listed with attributions in the files
 - Rust crates, egui's fonts, and (on desktop) the netCDF-C and HDF5 libraries: [assets/licenses/THIRD_PARTY_LICENSES.md](assets/licenses/THIRD_PARTY_LICENSES.md), generated by [`cargo-about`](https://github.com/EmbarkStudios/cargo-about).
 - Chinese, Japanese, and Korean fonts (Noto Sans CJK, SIL Open Font License 1.1): [assets/fonts/LICENSE.md](assets/fonts/LICENSE.md).
 
-We have made a good-faith effort to credit and comply with the licenses of all bundled materials. If you hold rights to material you believe is used without proper permission or attribution, please [open an issue](https://github.com/lazarusA/octant/issues): we will promptly correct the attribution, add the required notice, or remove the material.
+We have made a good-faith effort to credit and comply with the licenses of all bundled materials. If you hold rights to material you believe is used without proper permission or attribution, please [open an issue](https://github.com/ndvis/octant/issues): we will promptly correct the attribution, add the required notice, or remove the material.
