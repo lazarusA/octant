@@ -23,10 +23,12 @@ const FAR: f32 = 50.0;
 pub const TARGET_LIMIT: f32 = 5.0;
 
 /// Closest the camera may come to its target: the sphere keeps above its
-/// unit globe, other plots may come close to any point they are panned to.
+/// unit globe (about 6 km over the Earth, where a multiscale level 0 of
+/// ~120 m cells fits the screen up to ~85° latitude), other plots may come
+/// close to any point they are panned to.
 pub fn min_distance(plot_type: PlotType) -> f32 {
     if plot_type == PlotType::Sphere {
-        1.02
+        1.001
     } else {
         0.02
     }
@@ -84,9 +86,14 @@ impl OrbitCamera {
         ]
     }
 
-    /// Near plane: close enough for the nearest the camera comes.
+    /// Near plane: close enough for the nearest the camera comes, and
+    /// within half the height over the unit globe when just above it.
     pub fn near(&self) -> f32 {
-        (self.distance * 0.05).clamp(1e-4, 0.01)
+        let near = (self.distance * 0.05).clamp(1e-4, 0.01);
+        match self.distance > 1.0 {
+            true => near.min(0.5 * (self.distance - 1.0)).max(1e-4),
+            false => near,
+        }
     }
 
     /// Object space position in view space.

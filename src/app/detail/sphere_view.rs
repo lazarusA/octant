@@ -260,4 +260,25 @@ mod tests {
             assert!((edge_of_center(center_of_edge(p, 10), 10) - p).abs() < 1e-6);
         }
     }
+
+    #[test]
+    fn the_closest_camera_fits_120_m_level_0_at_60_degrees() {
+        use crate::plots::PlotType;
+        use crate::plots::camera::min_distance;
+        // A global 120 m grid (~0.00108 deg cells) on a 1600 x 1000 canvas.
+        let (w, h) = (333_600, 166_800);
+        let cam = (0..=90)
+            .map(|d| OrbitCamera {
+                rotation_x: (d as f32).to_radians(),
+                distance: min_distance(PlotType::Sphere),
+                aspect: 1.6,
+                ..OrbitCamera::default()
+            })
+            .find(|c| sub_point(c).1.abs() >= 60.0)
+            .expect("a camera over 60 degrees");
+        let win = visible_uv(&cam, &CoordinateGrid::GlobalRegular, (w, h)).expect("visible");
+        let cells = |(a, b): (f64, f64), n: usize| (b - a) * n as f64;
+        assert!(cells(win.u, w) <= 1600.0, "x: {}", cells(win.u, w));
+        assert!(cells(win.v, h) <= 1000.0, "y: {}", cells(win.v, h));
+    }
 }
