@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Zum nächsten Bereich",
         KeymapKey::PreviousRegion => "Zum vorherigen Bereich",
         KeymapKey::FocusTopBar => "Zur oberen Leiste",
+        KeymapKey::ToggleTopBar => "Obere Leiste ein- oder ausblenden",
         KeymapKey::PlayPause => "Abspielen oder anhalten",
         KeymapKey::StepPrev => "Vorheriger Schritt",
         KeymapKey::StepNext => "Nächster Schritt",

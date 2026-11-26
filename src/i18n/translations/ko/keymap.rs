@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "다음 영역으로 이동",
         KeymapKey::PreviousRegion => "이전 영역으로 이동",
         KeymapKey::FocusTopBar => "상단 바로 이동",
+        KeymapKey::ToggleTopBar => "상단 바 보기/숨기기",
         KeymapKey::PlayPause => "재생 또는 일시정지",
         KeymapKey::StepPrev => "이전 단계",
         KeymapKey::StepNext => "다음 단계",

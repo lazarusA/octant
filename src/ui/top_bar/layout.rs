@@ -46,6 +46,15 @@ pub(super) const COLLAPSE_ORDER: [TopBarItem; ITEM_COUNT] = [
     TopBarItem::Brand,
 ];
 
+/// Whether the bar is wider than `available` with every item compact, so
+/// the right-hand items (Cache, Voice, Language, Theme) go into the More menu.
+pub(super) fn overflows(widths: &[ItemWidths; ITEM_COUNT], available: f32) -> bool {
+    // Without Status: it comes and goes with fetches, and would swap the
+    // items for the More menu (closing their open popups) each time.
+    let status = widths[TopBarItem::Status as usize].compact;
+    widths.iter().map(|w| w.compact).sum::<f32>() - status > available
+}
+
 impl BarItem for TopBarItem {
     fn index(self) -> usize {
         self as usize

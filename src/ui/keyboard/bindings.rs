@@ -36,6 +36,7 @@ pub const TABLE: &[Shortcut] = &[
     s(Scope::Panel, ClosePanel, One(Key::Escape), NONE, K::ClosePanel),
     s(Scope::Free, ShowShortcuts, One(Key::Questionmark), NONE, K::ShowShortcuts),
     s(Scope::Free, ToggleHero, One(Key::H), NONE, K::ToggleHero),
+    s(Scope::Free, ToggleTopBar, One(Key::T), NONE, K::ToggleTopBar),
     s(Scope::Free, PlotTypePicker, One(Key::P), NONE, K::PlotTypePicker),
     s(Scope::Free, TypeCommand, One(Key::M), NONE, K::TypeCommand),
     s(Scope::Free, GoToPanel(Panel::Dataset), One(Key::D), NONE, K::GoToDataset),

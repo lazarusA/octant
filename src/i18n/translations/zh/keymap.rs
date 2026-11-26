@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "移到下一个区域",
         KeymapKey::PreviousRegion => "移到上一个区域",
         KeymapKey::FocusTopBar => "移到顶部栏",
+        KeymapKey::ToggleTopBar => "显示或隐藏顶部栏",
         KeymapKey::PlayPause => "播放或暂停",
         KeymapKey::StepPrev => "上一步",
         KeymapKey::StepNext => "下一步",

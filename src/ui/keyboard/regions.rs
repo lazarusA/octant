@@ -172,6 +172,11 @@ pub fn cycle(ctx: &Context, forward: bool) {
     }
 }
 
+/// Whether focus was in `region` as drawn last frame.
+pub fn holds_focus(ctx: &Context, region: Region) -> bool {
+    focus::last(ctx).is_some_and(|f| drawn(ctx)[region as usize].contains(f))
+}
+
 /// Focuses `region`'s entry, now when it was drawn last frame, else once
 /// it draws.
 pub fn enter(ctx: &Context, region: Region) {

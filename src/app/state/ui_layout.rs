@@ -18,6 +18,8 @@ pub struct UiLayoutState {
     pub variables_overlay_width: f32,
     pub variable_search: String,
     pub show_bottom_bar: bool,
+    /// The top bar, else the thin strip that shows it again.
+    pub show_top_bar: bool,
     pub show_hover_card: bool,
     /// Scale bar on 2D plots of images with a physical pixel size.
     pub show_scale_bar: bool,
@@ -61,6 +63,7 @@ impl Default for UiLayoutState {
             variables_overlay_width: 340.0,
             variable_search: String::new(),
             show_bottom_bar: true,
+            show_top_bar: true,
             show_hover_card: true,
             show_scale_bar: true,
             axis_style: Default::default(),

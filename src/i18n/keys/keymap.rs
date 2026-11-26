@@ -23,6 +23,7 @@ crate::i18n::keys::define_keys! {
     NextRegion,
     PreviousRegion,
     FocusTopBar,
+    ToggleTopBar,
     PlayPause,
     StepPrev,
     StepNext,

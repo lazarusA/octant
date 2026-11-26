@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "진행 중인 데이터 전송을 중단합니다",
         CommonKey::Voice => "음성",
         CommonKey::VoiceHover => "음성 입력: 마이크와 스펙트로그램",
+        CommonKey::More => "더 보기",
+        CommonKey::ShowTopBarHover => "상단 바 보기",
     })
 }

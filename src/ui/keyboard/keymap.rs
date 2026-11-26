@@ -24,6 +24,8 @@ pub enum Action {
     NextRegion,
     PreviousRegion,
     FocusTopBar,
+    /// Hides the top bar to a thin strip, or shows it again.
+    ToggleTopBar,
     PlayPause,
     StepPrev,
     StepNext,

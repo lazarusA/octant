@@ -15,25 +15,33 @@ pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) -> egui::Response {
     );
 
     egui::Popup::menu(&button_response).show(|ui| {
-        ui.set_min_width(180.0);
         ui.horizontal(|ui| {
             ui.icon(Icon::Language, IconSize::Sm);
             ui.label(egui::RichText::new(tr(CommonKey::Language)).strong());
         });
         ui.separator();
-
-        for &lang in Language::ALL {
-            let mut buf = [0; 48];
-            let label = stack_str(
-                &mut buf,
-                format_args!("{} ({})", lang.display_name(), lang.code()),
-            );
-            if ui.selectable_label(current_lang == lang, label).clicked() {
-                crate::i18n::set_language(lang);
-                crate::ui::fonts::FontEngine::on_language_changed(ui.ctx(), lang);
-                ui.close();
-            }
-        }
+        show_language_list(ui);
     });
     button_response
+}
+
+/// Every language, the current one selected: the language menu below its
+/// title.
+pub fn show_language_list(ui: &mut egui::Ui) {
+    let current_lang = crate::i18n::language();
+    ui.set_min_width(180.0);
+
+    for &lang in Language::ALL {
+        let mut buf = [0; 48];
+        let label = stack_str(
+            &mut buf,
+            format_args!("{} ({})", lang.display_name(), lang.code()),
+        );
+        if ui.selectable_label(current_lang == lang, label).clicked() {
+            crate::i18n::set_language(lang);
+            crate::ui::fonts::FontEngine::on_language_changed(ui.ctx(), lang);
+            // The menu, not the More menu's Language section holding it.
+            ui.close_kind(egui::UiKind::Menu);
+        }
+    }
 }

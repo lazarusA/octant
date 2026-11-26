@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "中断并中止正在进行的数据传输",
         CommonKey::Voice => "语音",
         CommonKey::VoiceHover => "语音输入：麦克风与频谱图",
+        CommonKey::More => "更多",
+        CommonKey::ShowTopBarHover => "显示顶部栏",
     })
 }

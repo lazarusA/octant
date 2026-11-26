@@ -66,7 +66,7 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
     }
 
     let trailing = match item {
-        TopBarItem::Cache | TopBarItem::Voice => spacing + separator,
+        TopBarItem::Cache | TopBarItem::Voice | TopBarItem::Language => spacing + separator,
         _ => spacing,
     };
     // Width depends only on label and mode, so any glyph measures the same.
@@ -174,7 +174,11 @@ fn panel_button(
 }
 
 /// Opens the voice bar listening, or closes it.
-fn show_voice_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
+pub(super) fn show_voice_toggle(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    compact: bool,
+) -> egui::Response {
     let btn = ToolbarButton::new(Icon::Microphone, tr(CommonKey::Voice))
         .compact(compact)
         .active(app.voice.is_open())
@@ -186,7 +190,11 @@ fn show_voice_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> e
     response
 }
 
-fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
+pub(super) fn show_theme_toggle(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    compact: bool,
+) -> egui::Response {
     let dark = is_dark(app);
     let (icon, text) = theme_icon_label(app);
     let hover = if dark {

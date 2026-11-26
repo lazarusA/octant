@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> &'static str {
         KeymapKey::NextRegion => "Move to the next area",
         KeymapKey::PreviousRegion => "Move to the previous area",
         KeymapKey::FocusTopBar => "Move to the top bar",
+        KeymapKey::ToggleTopBar => "Show or hide the top bar",
         KeymapKey::PlayPause => "Play or pause",
         KeymapKey::StepPrev => "Previous step",
         KeymapKey::StepNext => "Next step",
