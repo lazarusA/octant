@@ -106,6 +106,14 @@ pub fn draw_eye_off(c: &IconCanvas) {
     c.path_round(&[(4.0, 20.0), (20.0, 4.0)], c.stroke(Weight::Bold));
 }
 
+/// More: three dots in a row, the menu of items the bar has no room for
+/// (16x4 keyline).
+pub fn draw_more(c: &IconCanvas) {
+    for x in [5.0, key::C, 19.0] {
+        c.dot((x, key::C), 2.0, c.color);
+    }
+}
+
 /// Grip: a 2x3 grid of dots, the handle that drags a panel (8x14 keyline).
 pub fn draw_grip(c: &IconCanvas) {
     for x in [8.0, 16.0] {

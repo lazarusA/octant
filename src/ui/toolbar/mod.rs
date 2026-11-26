@@ -1,6 +1,7 @@
 //! Width-driven collapse shared by the top and bottom bars: items drop their
 //! labels (or, for data-only items, disappear) in a fixed priority order until
-//! the bar fits, instead of moving into an overflow menu. `roving` moves
+//! the bar fits (the top bar alone moves its right-hand items into a More
+//! menu once even the icons do not fit). `roving` moves
 //! keyboard focus along a bar.
 
 pub mod roving;
@@ -30,6 +31,11 @@ pub trait BarItem: Copy {
 pub struct CompactFlags<const N: usize>([bool; N]);
 
 impl<const N: usize> CompactFlags<N> {
+    /// Every item compact.
+    pub fn all() -> Self {
+        Self([true; N])
+    }
+
     #[inline]
     pub fn get(self, item: impl BarItem) -> bool {
         self.0.get(item.index()).copied().unwrap_or(false)

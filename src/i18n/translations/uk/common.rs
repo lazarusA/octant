@@ -30,5 +30,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "Перервати поточне передавання даних",
         CommonKey::Voice => "Голос",
         CommonKey::VoiceHover => "Голосове введення: мікрофон і спектрограма",
+        CommonKey::More => "Ще",
+        CommonKey::ShowTopBarHover => "Показати верхню панель",
     })
 }

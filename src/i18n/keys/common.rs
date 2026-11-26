@@ -33,5 +33,8 @@ crate::i18n::keys::define_keys! {
     // Voice input toggle
     Voice,
     VoiceHover,
+    // Top bar: overflow menu and the strip of a hidden bar
+    More,
+    ShowTopBarHover,
     }
 }

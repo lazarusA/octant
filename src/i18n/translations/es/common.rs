@@ -30,5 +30,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "Interrumpir y abortar la transferencia de datos en curso",
         CommonKey::Voice => "Voz",
         CommonKey::VoiceHover => "Entrada de voz: micrófono y espectrograma",
+        CommonKey::More => "Más",
+        CommonKey::ShowTopBarHover => "Mostrar la barra superior",
     })
 }

@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Siirry seuraavaan alueeseen",
         KeymapKey::PreviousRegion => "Siirry edelliseen alueeseen",
         KeymapKey::FocusTopBar => "Siirry yläpalkkiin",
+        KeymapKey::ToggleTopBar => "Näytä tai piilota yläpalkki",
         KeymapKey::PlayPause => "Toista tai keskeytä",
         KeymapKey::StepPrev => "Edellinen askel",
         KeymapKey::StepNext => "Seuraava askel",

@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "実行中のデータ転送を中断して中止します",
         CommonKey::Voice => "音声",
         CommonKey::VoiceHover => "音声入力: マイクとスペクトログラム",
+        CommonKey::More => "その他",
+        CommonKey::ShowTopBarHover => "上部バーを表示",
     })
 }

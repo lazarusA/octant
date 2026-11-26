@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Gå til neste område",
         KeymapKey::PreviousRegion => "Gå til forrige område",
         KeymapKey::FocusTopBar => "Gå til topplinjen",
+        KeymapKey::ToggleTopBar => "Vis eller skjul topplinjen",
         KeymapKey::PlayPause => "Spill av eller pause",
         KeymapKey::StepPrev => "Forrige trinn",
         KeymapKey::StepNext => "Neste trinn",

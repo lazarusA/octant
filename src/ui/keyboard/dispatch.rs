@@ -107,6 +107,7 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::FirstStep => app.step_first(),
         Action::LastStep => app.step_last(),
         Action::ToggleLoop => app.playback.loop_playback = !app.playback.loop_playback,
+        Action::ToggleTopBar => toggle_top_bar(app, ctx),
         Action::ShowShortcuts => app.layout.show_shortcuts = true,
         Action::ToggleHero => app.toggle_hero(),
         Action::LeaveHero => app.layout.show_hero = false,
@@ -121,9 +122,22 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(ctx) => {}
         Action::NextRegion => regions::cycle(ctx, true),
         Action::PreviousRegion => regions::cycle(ctx, false),
+        Action::FocusTopBar if !app.layout.show_top_bar => {
+            app.layout.show_top_bar = true;
+            regions::enter_when_drawn(ctx, regions::Region::TopBar);
+        }
         Action::FocusTopBar => regions::enter(ctx, regions::Region::TopBar),
         // Left for the canvas (`app::canvas::keys`), never taken here.
         Action::Canvas(_) => {}
+    }
+}
+
+/// Hides or shows the top bar; focus in the bar or its strip moves to what
+/// replaces it.
+fn toggle_top_bar(app: &mut OctantApp, ctx: &Context) {
+    app.layout.show_top_bar = !app.layout.show_top_bar;
+    if regions::holds_focus(ctx, regions::Region::TopBar) {
+        regions::enter_when_drawn(ctx, regions::Region::TopBar);
     }
 }
 

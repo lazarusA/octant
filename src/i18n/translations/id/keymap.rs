@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Pindah ke area berikutnya",
         KeymapKey::PreviousRegion => "Pindah ke area sebelumnya",
         KeymapKey::FocusTopBar => "Pindah ke bilah atas",
+        KeymapKey::ToggleTopBar => "Tampilkan atau sembunyikan bilah atas",
         KeymapKey::PlayPause => "Putar atau jeda",
         KeymapKey::StepPrev => "Langkah sebelumnya",
         KeymapKey::StepNext => "Langkah berikutnya",

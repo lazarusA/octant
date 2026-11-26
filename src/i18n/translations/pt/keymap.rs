@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Ir para a próxima área",
         KeymapKey::PreviousRegion => "Ir para a área anterior",
         KeymapKey::FocusTopBar => "Ir para a barra superior",
+        KeymapKey::ToggleTopBar => "Mostrar ou ocultar a barra superior",
         KeymapKey::PlayPause => "Reproduzir ou pausar",
         KeymapKey::StepPrev => "Passo anterior",
         KeymapKey::StepNext => "Próximo passo",

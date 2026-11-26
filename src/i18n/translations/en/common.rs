@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> &'static str {
         CommonKey::AbortHover => "Interrupt and abort ongoing data transfer",
         CommonKey::Voice => "Voice",
         CommonKey::VoiceHover => "Voice input: microphone and spectrogram",
+        CommonKey::More => "More",
+        CommonKey::ShowTopBarHover => "Show the top bar",
     }
 }

@@ -23,6 +23,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::NextRegion => "Перейти к следующей области",
         KeymapKey::PreviousRegion => "Перейти к предыдущей области",
         KeymapKey::FocusTopBar => "Перейти к верхней панели",
+        KeymapKey::ToggleTopBar => "Показать или скрыть верхнюю панель",
         KeymapKey::PlayPause => "Воспроизвести или приостановить",
         KeymapKey::StepPrev => "Предыдущий шаг",
         KeymapKey::StepNext => "Следующий шаг",

@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::AbortHover => "Avbryt pågående dataöverföring",
         CommonKey::Voice => "Röst",
         CommonKey::VoiceHover => "Röstinmatning: mikrofon och spektrogram",
+        CommonKey::More => "Mer",
+        CommonKey::ShowTopBarHover => "Visa toppfältet",
     })
 }
