@@ -2,7 +2,10 @@
 //! was as a notice. Names from the dataset or the user stay as they are.
 
 use super::{DimRole, Done, Failure, NameKind};
-use crate::i18n::{DatasetKey, ExportKey, KeymapKey, PlaybackKey, PlotKey, filled, tr};
+use crate::app::layers::LevelChoice;
+use crate::i18n::{
+    DatasetKey, ExportKey, KeymapKey, PlaybackKey, PlotKey, VariablesKey, filled, tr,
+};
 use crate::ui::toast::{Notice, Severity};
 
 pub(super) fn done_text(done: &Done) -> String {
@@ -53,6 +56,10 @@ pub(super) fn done_text(done: &Done) -> String {
         Done::Colormap(key) => filled(tr(PlaybackKey::VoiceDidColormap), &[key]),
         Done::ViewReset => tr(KeymapKey::ResetView).to_string(),
         Done::ViewSet => tr(PlaybackKey::VoiceDidView).to_string(),
+        Done::LevelSet(LevelChoice::Auto | LevelChoice::AutoFrom(_)) => {
+            tr(VariablesKey::LevelAuto).to_string()
+        }
+        Done::LevelSet(LevelChoice::Pinned(n)) => filled(tr(VariablesKey::LevelN), &[n]),
         Done::CompositeSet => tr(PlaybackKey::VoiceDidComposite).to_string(),
         Done::ColorStyleSet => tr(PlaybackKey::VoiceDidColors).to_string(),
     }

@@ -64,6 +64,11 @@ pub struct CommandQueue {
 pub(super) type VocabKey = (String, u64, usize, usize, u64);
 
 impl CommandQueue {
+    /// Where the action running came from.
+    pub(super) fn running(&self) -> Origin {
+        self.running
+    }
+
     pub(super) fn retrying(&self) -> bool {
         self.retrying
     }
@@ -154,10 +159,13 @@ impl OctantApp {
             self.commands.retrying = retry;
             self.commands.running = origin;
             let plots = matches!(action, AppAction::Plot { .. });
+            let levels = matches!(action, AppAction::SetLevel { .. });
             let outcome = self.dispatch(action.clone());
             self.commands.running = Origin::default();
             self.commands.retrying = false;
-            self.commands.plotting |= plots && outcome.is_ok();
+            // A SetLevel that plotted again holds the rest as a Plot does.
+            let plotted = plots || (levels && self.new_plot_pending());
+            self.commands.plotting |= plotted && outcome.is_ok();
             match outcome {
                 Err(Failure::Reading) => {
                     self.commands

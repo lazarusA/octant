@@ -14,6 +14,18 @@ pub enum LevelChoice {
     Auto,
     /// This level, or a coarser one when it exceeds the memory budget.
     Pinned(usize),
+    /// Auto that reads at least this level's detail (a share link's
+    /// `multiscale_level=auto:n`, the level its sender saw): a finer one when
+    /// the screen asks for it, and still Auto for detail tiles and volume
+    /// bricks, which refine it as the view needs.
+    AutoFrom(usize),
+}
+
+impl LevelChoice {
+    /// Whether the level follows the view (`Auto`, or `AutoFrom` a level).
+    pub fn is_auto(self) -> bool {
+        matches!(self, Self::Auto | Self::AutoFrom(_))
+    }
 }
 
 /// A dataset variable with its dimension roles, indices and ranges.

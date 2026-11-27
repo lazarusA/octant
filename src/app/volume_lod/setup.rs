@@ -8,7 +8,6 @@ use super::residency::Residency;
 use super::select::root_bricks;
 use crate::app::OctantApp;
 use crate::app::detail::plot_hash;
-use crate::app::layers::LevelChoice;
 use crate::data::multiscale::Multiscale;
 use crate::data::multiscale::bricks::{BRICK, Bricks, table_cells};
 use crate::plots::PlotType;
@@ -90,7 +89,7 @@ impl OctantApp {
         let bricked = volume.lod
             && plot_type == PlotType::Volume
             && !self.playback.is_playing
-            && plotted.level == LevelChoice::Auto
+            && plotted.level.is_auto()
             && var
                 .multiscale
                 .as_ref()

@@ -32,11 +32,12 @@ pub(crate) fn show_level_select(app: &mut OctantApp, ui: &mut egui::Ui) {
             egui::ComboBox::from_id_salt("settings_resolution_level")
                 .selected_text(choice_text(&mut shown, current))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut chosen,
-                        LevelChoice::Auto,
-                        tr(VariablesKey::LevelAuto),
-                    );
+                    // A link's AutoFrom shows as Auto; picking Auto drops
+                    // its base level.
+                    let auto = ui.selectable_label(current.is_auto(), tr(VariablesKey::LevelAuto));
+                    if auto.clicked() {
+                        chosen = LevelChoice::Auto;
+                    }
                     for level in 0..levels {
                         let mut buf = [0; 64];
                         let text = choice_text(&mut buf, LevelChoice::Pinned(level));
@@ -54,7 +55,7 @@ pub(crate) fn show_level_select(app: &mut OctantApp, ui: &mut egui::Ui) {
 /// The name of level choice `choice`, in `buf`.
 fn choice_text(buf: &mut [u8], choice: LevelChoice) -> &str {
     match choice {
-        LevelChoice::Auto => tr(VariablesKey::LevelAuto),
+        LevelChoice::Auto | LevelChoice::AutoFrom(_) => tr(VariablesKey::LevelAuto),
         LevelChoice::Pinned(level) => fill(buf, tr(VariablesKey::LevelN), &[&level]),
     }
 }

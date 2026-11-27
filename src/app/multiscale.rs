@@ -214,6 +214,11 @@ impl OctantApp {
         Some(match selection.level {
             LevelChoice::Auto => fit_level(set, &window, &demand),
             LevelChoice::Pinned(level) => pinned_level(set, level, &window, &demand),
+            // The sender's level, or finer when this screen asks for more.
+            LevelChoice::AutoFrom(level) => {
+                let fit = fit_level(set, &window, &demand);
+                pinned_level(set, level.min(fit), &window, &demand)
+            }
         })
     }
 

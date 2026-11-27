@@ -78,6 +78,8 @@ pub enum Done {
     Colormap(String),
     /// The heatmap zoomed to a window (`SetView`).
     ViewSet,
+    /// The staged variable's multiscale level (`SetLevel`).
+    LevelSet(crate::app::layers::LevelChoice),
     CompositeSet,
     ColorStyleSet,
     ViewReset,

@@ -4,9 +4,11 @@
 //! &plot=heatmap&cmap=cmocean:thermal&range=250..310`), replayed as
 //! `AppAction`s through the command queue (`Origin::Link`), so a link fails
 //! as a command does. Keys apply in a fixed order whatever their order:
-//! `src`, `var`, `axes` (x, y[, z] dimensions), `anim`, the dimensions (any
-//! other key, `dim.<name>` for one named like a key; `a..b` a range, since
-//! ISO times hold `:`), `step`, `plot`, then how it looks (`look_actions`):
+//! `src`, `var`, `multiscale_level` (`n` pinned, `auto:n` Auto from level
+//! n; the variable and its indices stay level 0's), `axes` (x, y[, z] dimensions), `anim`, the
+//! dimensions (any other key, `dim.<name>` for one named like a key; `a..b`
+//! a range, since ISO times hold `:`), `step`, `plot`, then how it looks
+//! (`look_actions`):
 //! `cmap`, the composite (`style.rs`), `range` and the colors, `view` and
 //! `overlay` (repeatable). Values are what the actions take: ISO dates,
 //! numbers in the coordinate's units, labels, `#n` positions.
@@ -18,6 +20,8 @@ use percent_encoding::percent_decode_str;
 use super::actions::{AppAction, DimRole};
 
 mod build;
+#[cfg(test)]
+mod level_tests;
 #[cfg(test)]
 mod network_tests;
 #[cfg(test)]
@@ -31,9 +35,10 @@ mod tests;
 mod view_tests;
 
 /// Keys that are no dimension; `dim.<key>` names a dimension called so.
-const KEYS: [&str; 19] = [
+const KEYS: [&str; 20] = [
     "src",
     "var",
+    "multiscale_level",
     "axes",
     "anim",
     "step",
@@ -78,6 +83,10 @@ pub fn parse_share(text: &str) -> Option<Vec<AppAction>> {
         return Some(actions);
     };
     actions.push(AppAction::SelectVariable { path: var.clone() });
+    // The multiscale level, the variable and indices staying level 0's.
+    if let Some(action) = last("multiscale_level").and_then(|l| level_action(l)) {
+        actions.push(action);
+    }
     let axes = last("axes").map_or("", |a| a.as_str()).split(',');
     for (dim, role) in axes.zip([DimRole::X, DimRole::Y, DimRole::Z]) {
         if !dim.is_empty() {
@@ -135,6 +144,23 @@ fn look_actions(pairs: &[(String, String)]) -> Vec<AppAction> {
         actions.push(AppAction::AddOverlay);
     }
     actions
+}
+
+/// `multiscale_level`: `n` pins level n, `auto:n` is Auto from level n,
+/// `auto` plain Auto; anything else is ignored.
+fn level_action(text: &str) -> Option<AppAction> {
+    let (auto, number) = match text.strip_prefix("auto") {
+        Some("") => {
+            return Some(AppAction::SetLevel {
+                level: None,
+                auto: true,
+            });
+        }
+        Some(rest) => (true, rest.strip_prefix(':')?),
+        None => (false, text),
+    };
+    let level = Some(number.parse().ok()?);
+    Some(AppAction::SetLevel { level, auto })
 }
 
 /// The value of the last `key` in `pairs`.

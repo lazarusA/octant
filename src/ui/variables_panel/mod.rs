@@ -104,7 +104,7 @@ fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::Variab
     let level = read.and_then(|v| Some(v.multiscale.as_ref()?.level));
     let mut buf = [0; 128];
     let text = match (level, choice) {
-        (Some(l), LevelChoice::Auto) => fill(
+        (Some(l), LevelChoice::Auto | LevelChoice::AutoFrom(_)) => fill(
             &mut buf,
             tr(VariablesKey::AutoLevelOf),
             &[&l, &base.set.len()],
@@ -112,7 +112,7 @@ fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::Variab
         (Some(l), LevelChoice::Pinned(_)) => {
             fill(&mut buf, tr(VariablesKey::LevelOf), &[&l, &base.set.len()])
         }
-        (None, LevelChoice::Auto) => tr(VariablesKey::LevelAuto),
+        (None, LevelChoice::Auto | LevelChoice::AutoFrom(_)) => tr(VariablesKey::LevelAuto),
         (None, LevelChoice::Pinned(level)) => fill(&mut buf, tr(VariablesKey::LevelN), &[&level]),
     };
     ui.horizontal(|ui| {

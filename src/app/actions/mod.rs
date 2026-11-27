@@ -87,6 +87,17 @@ pub enum AppAction {
     },
     /// What is plotted (what the dataset holds when nothing is).
     DescribeView,
+    /// Reads the staged multiscale variable at level `level` (0 is the
+    /// finest), or at the level that fits the screen without one; with
+    /// `auto`, reads at least `level`'s detail and still refines as the view
+    /// needs. A variable without levels stays as it is. Plots it again when
+    /// it is the one shown.
+    SetLevel {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        level: Option<usize>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        auto: bool,
+    },
     /// Plots the staged selection (Plot Data), as `plot_type` when given.
     Plot {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -209,6 +220,7 @@ impl OctantApp {
             AppAction::DescribeVariable { path } => self.describe_variable(path.as_deref()),
             AppAction::DescribeView => self.describe_view(),
             AppAction::SelectVariable { path } => self.select_by_name(&path),
+            AppAction::SetLevel { level, auto } => self.set_level(level, auto),
             AppAction::Plot { plot_type } => self.plot_as(plot_type.as_deref()),
             AppAction::SetDim { dim, value } => self.set_dim(dim.as_deref(), &value),
             AppAction::SetRange { dim, from, to } => self.set_dim_range(dim.as_deref(), &from, &to),
