@@ -9,17 +9,22 @@
 //! dimensions (any other key, `dim.<name>` for one named like a key; `a..b`
 //! a range, since ISO times hold `:`), `step`, `plot`, then how it looks
 //! (`look_actions`):
-//! `cmap`, the composite (`style.rs`), `range` and the colors, `view` and
-//! `overlay` (repeatable). Values are what the actions take: ISO dates,
-//! numbers in the coordinate's units, labels, `#n` positions.
+//! `cmap`, the composite (`style.rs`), `range` and the colors, `view`,
+//! `camera` and `overlay` (repeatable). Values are what the actions take:
+//! ISO dates, numbers in the coordinate's units, labels, `#n` positions.
 //! `view=x0..x1,y0..y1` is the heatmap's visible window, x then y as `axes`
-//! names them.
+//! names them; `camera=pitch,yaw,distance[,tx,ty,tz]` a 3D plot's camera,
+//! angles in degrees.
 
 use percent_encoding::percent_decode_str;
+
+use values::{camera_action, level_action, numbers, view_action};
 
 use super::actions::{AppAction, DimRole};
 
 mod build;
+#[cfg(test)]
+mod camera_tests;
 #[cfg(test)]
 mod level_tests;
 #[cfg(test)]
@@ -31,11 +36,12 @@ mod style;
 mod style_tests;
 #[cfg(test)]
 mod tests;
+mod values;
 #[cfg(test)]
 mod view_tests;
 
 /// Keys that are no dimension; `dim.<key>` names a dimension called so.
-const KEYS: [&str; 20] = [
+const KEYS: [&str; 21] = [
     "src",
     "var",
     "multiscale_level",
@@ -55,6 +61,7 @@ const KEYS: [&str; 20] = [
     "low",
     "high",
     "view",
+    "camera",
     "overlay",
 ];
 
@@ -139,28 +146,14 @@ fn look_actions(pairs: &[(String, String)]) -> Vec<AppAction> {
     if let Some(view) = last("view").and_then(|v| view_action(v)) {
         actions.push(view);
     }
+    if let Some(camera) = last("camera").and_then(|c| camera_action(c)) {
+        actions.push(camera);
+    }
     for (_, path) in pairs.iter().filter(|(k, _)| k == "overlay") {
         actions.push(AppAction::SelectVariable { path: path.clone() });
         actions.push(AppAction::AddOverlay);
     }
     actions
-}
-
-/// `multiscale_level`: `n` pins level n, `auto:n` is Auto from level n,
-/// `auto` plain Auto; anything else is ignored.
-fn level_action(text: &str) -> Option<AppAction> {
-    let (auto, number) = match text.strip_prefix("auto") {
-        Some("") => {
-            return Some(AppAction::SetLevel {
-                level: None,
-                auto: true,
-            });
-        }
-        Some(rest) => (true, rest.strip_prefix(':')?),
-        None => (false, text),
-    };
-    let level = Some(number.parse().ok()?);
-    Some(AppAction::SetLevel { level, auto })
 }
 
 /// The value of the last `key` in `pairs`.
@@ -194,25 +187,6 @@ fn dimension_actions(pairs: &[(String, String)]) -> Vec<AppAction> {
         });
     }
     actions
-}
-
-/// `x0..x1,y0..y1` as `SetView`.
-fn view_action(view: &str) -> Option<AppAction> {
-    let (x, y) = view.split_once(',')?;
-    let ((x_from, x_to), (y_from, y_to)) = (x.split_once("..")?, y.split_once("..")?);
-    Some(AppAction::SetView {
-        x_from: x_from.into(),
-        x_to: x_to.into(),
-        y_from: y_from.into(),
-        y_to: y_to.into(),
-    })
-}
-
-/// `a..b` as two finite numbers.
-fn numbers(range: &str) -> Option<(f32, f32)> {
-    let (a, b) = range.split_once("..")?;
-    let (a, b) = (a.trim().parse::<f32>().ok()?, b.trim().parse::<f32>().ok()?);
-    (a.is_finite() && b.is_finite()).then_some((a, b))
 }
 
 /// A query component: `+` is a space, `%XX` a byte.

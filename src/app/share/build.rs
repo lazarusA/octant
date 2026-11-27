@@ -1,5 +1,6 @@
 //! The share link of what is plotted: the base layer's store, variable,
-//! roles, dimension values, plot type and colors, and its overlays.
+//! roles, dimension values, plot type, colors, view or camera, and its
+//! overlays.
 
 use std::fmt::Write;
 
@@ -10,6 +11,7 @@ use crate::app::actions::{plot_type_id, value_text};
 use crate::app::layers::LevelChoice;
 use crate::app::multiscale::at_base;
 use crate::app::{AnimationRole, OctantApp, SpatialRole, VariableSelection};
+use crate::plots::PlotType;
 
 /// Escaped in a key or value: what ends or splits one; `/` and `:` stay
 /// readable.
@@ -77,6 +79,9 @@ impl OctantApp {
         if let Some(view) = self.view_value(sel) {
             pair(&mut q, "view", &view);
         }
+        if let Some(camera) = self.camera_value(sel.plot_type) {
+            pair(&mut q, "camera", &camera);
+        }
         for overlay in self.layers.overlays() {
             let base = at_base(overlay.selection());
             let sel = base.as_ref().unwrap_or(overlay.selection());
@@ -84,6 +89,34 @@ impl OctantApp {
             pair(&mut q, "overlay", name.trim_matches('/'));
         }
         Some(q)
+    }
+
+    /// A 3D plot's camera as drawn, `pitch,yaw,distance[,tx,ty,tz]`
+    /// (degrees, the yaw within [-180, 180); the target unless at the center,
+    /// never for the sphere, which looks at its center). Written for every
+    /// 3D plot, the default view too: nothing else moves the receiver's
+    /// camera back from where it was.
+    fn camera_value(&self, plot_type: PlotType) -> Option<String> {
+        if !plot_type.is_3d() {
+            return None;
+        }
+        let camera = self.nav.orbit_camera(plot_type, 1.0);
+        // Rounded first, so a panning residue writes no `,0,0,0`.
+        let target = Some(camera.target.map(|t| round(t, 2))).filter(|t| *t != [0.0; 3]);
+        // Rounded first, so 179.96 degrees wraps to -180, never 180.
+        let yaw = round(camera.rotation_y.to_degrees(), 1);
+        let yaw = yaw - 360.0 * ((yaw + 180.0) / 360.0).floor();
+        let mut text = format!(
+            "{},{},{}",
+            round(camera.rotation_x.to_degrees(), 1),
+            round(yaw, 1),
+            // Three decimals: the sphere comes as close as 1.001 (~6 km).
+            round(camera.distance, 3)
+        );
+        for t in target.iter().flatten() {
+            let _ = write!(text, ",{t}");
+        }
+        Some(text)
     }
 
     /// The level the plot reads: `n` when pinned, `auto:n` on Auto (the
@@ -186,4 +219,11 @@ fn base() -> String {
         }
     }
     WEB_APP.to_string()
+}
+
+/// `v` with at most `places` decimals, without trailing zeros (`-0` as `0`).
+fn round(v: f32, places: i32) -> f32 {
+    let scale = 10f32.powi(places);
+    let r = (v * scale).round() / scale;
+    if r == 0.0 { 0.0 } else { r }
 }

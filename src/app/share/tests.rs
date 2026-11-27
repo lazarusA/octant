@@ -139,6 +139,16 @@ fn tas_app() -> crate::app::OctantApp {
     app_of(store, "https://share.test/tas.zarr")
 }
 
+/// `app`'s share link, as if its in-memory store were remote (a local store
+/// makes no link).
+pub(super) fn link_of(app: &mut crate::app::OctantApp) -> String {
+    let target = &mut app.layers.base.selection_mut().store_target;
+    let local = std::mem::replace(target, "https://x.org/p.zarr".into());
+    let link = app.share_link().unwrap_or_default();
+    app.layers.base.selection_mut().store_target = local;
+    link
+}
+
 /// An app holding `store` as the remote dataset `target` (a URL of its own
 /// per test: caches keyed by store URL are shared by tests running at once).
 pub(super) fn app_of(

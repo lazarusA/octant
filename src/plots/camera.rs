@@ -21,6 +21,8 @@ pub const MAX_DISTANCE: f32 = 8.0;
 const FAR: f32 = 50.0;
 /// Farthest a panned target may move from the scene's center, per axis.
 pub const TARGET_LIMIT: f32 = 5.0;
+/// How far the camera tilts up or down (radians), short of the poles.
+pub const PITCH_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.05;
 
 /// Closest the camera may come to its target: the sphere keeps above its
 /// unit globe (about 6 km over the Earth, where a multiscale level 0 of
