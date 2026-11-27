@@ -18,6 +18,34 @@ impl OctantApp {
         Ok(Done::Selected(self.staged_name()))
     }
 
+    /// The staged variable's level, as Settings > Levels picks it: `None`
+    /// is Auto, `auto` Auto from `level` (`AutoFrom`), a level past the
+    /// coarsest the coarsest. A variable with one level keeps Auto, so a
+    /// link still opens a store re-published without its pyramid. The plot
+    /// reads it again when it shows the staged variable, except during a
+    /// link, whose own Plot follows.
+    pub(super) fn set_level(&mut self, level: Option<usize>, auto: bool) -> Outcome {
+        let info = self.selected_variable_info().ok_or(Failure::NoDataset)?;
+        let levels = info.multiscale.as_ref().map_or(1, |m| m.set.len());
+        let choice = match level {
+            Some(n) if levels > 1 && auto => LevelChoice::AutoFrom(n.min(levels - 1)),
+            Some(n) if levels > 1 => LevelChoice::Pinned(n.min(levels - 1)),
+            _ => LevelChoice::Auto,
+        };
+        // A link plots after its dimensions are set; reading now would fetch
+        // twice, the first time with the old ones.
+        let replot = self.has_plot()
+            && !self.is_exploring_unplotted_variable()
+            && self.commands.running() != super::Origin::Link;
+        if choice != self.selected.level {
+            self.selected.level = choice;
+            if replot {
+                self.plot_selection();
+            }
+        }
+        Ok(Done::LevelSet(choice))
+    }
+
     pub(super) fn plot_as(&mut self, plot_type: Option<&str>) -> Outcome {
         if self.selected_variable_info().is_none() {
             return Err(Failure::NoDataset);

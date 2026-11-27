@@ -33,7 +33,7 @@ pub fn render_stack_row(
             select(ctx, idx, LevelChoice::Auto);
         }
     }
-    let selected = ctx.selected_idx == idx && ctx.selected_level == LevelChoice::Auto;
+    let selected = ctx.selected_idx == idx && ctx.selected_level.is_auto();
     let kind = RowKind::Stack {
         open: state.is_open(),
     };

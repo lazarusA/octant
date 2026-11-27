@@ -7,6 +7,7 @@ use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
 use super::{KEYS, SCHEMES};
 use crate::app::actions::{plot_type_id, value_text};
+use crate::app::layers::LevelChoice;
 use crate::app::multiscale::at_base;
 use crate::app::{AnimationRole, OctantApp, SpatialRole, VariableSelection};
 
@@ -45,7 +46,8 @@ impl OctantApp {
 
     /// A multiscale plot names level 0 with level-0 indices: its coarser
     /// levels are no variables to select, and the opened link picks the
-    /// level for its own screen.
+    /// level for its own screen: from the one shown (`auto:n`), or the one
+    /// pinned (`n`).
     fn share_query(&self) -> Option<String> {
         let base = at_base(self.plotted());
         let sel = base.as_ref().unwrap_or(self.plotted());
@@ -53,6 +55,9 @@ impl OctantApp {
         let mut q = String::new();
         pair(&mut q, "src", &sel.store_target);
         pair(&mut q, "var", var.name.trim_matches('/'));
+        if let Some(level) = self.level_value() {
+            pair(&mut q, "multiscale_level", &level);
+        }
         let roles = [SpatialRole::X, SpatialRole::Y, SpatialRole::Z];
         let axes: Vec<&str> = roles
             .iter()
@@ -79,6 +84,17 @@ impl OctantApp {
             pair(&mut q, "overlay", name.trim_matches('/'));
         }
         Some(q)
+    }
+
+    /// The level the plot reads: `n` when pinned, `auto:n` on Auto (the
+    /// level shown, for the receiver to start from); `None` off a pyramid.
+    fn level_value(&self) -> Option<String> {
+        let plotted = self.plotted();
+        let shown = plotted.variable_info()?.multiscale.as_ref()?.level;
+        Some(match plotted.level {
+            LevelChoice::Pinned(level) => level.to_string(),
+            LevelChoice::Auto | LevelChoice::AutoFrom(_) => format!("auto:{shown}"),
+        })
     }
 
     /// Each dimension's `name=value` as its slider holds it (a range while

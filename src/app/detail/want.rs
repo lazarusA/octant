@@ -8,7 +8,6 @@ use std::hash::{Hash, Hasher};
 use super::Want;
 use super::geometry::{Axis, pixels_over};
 use crate::app::OctantApp;
-use crate::app::layers::LevelChoice;
 use crate::app::pipeline::paint_layer::CanvasView;
 use crate::app::state::navigation::MAX_ZOOM;
 use crate::data::multiscale::fit_level;
@@ -103,7 +102,7 @@ impl OctantApp {
         let plotted = self.plotted();
         let factor = plotted
             .variable_info()
-            .filter(|_| plotted.level == LevelChoice::Auto)
+            .filter(|_| plotted.level.is_auto())
             .and_then(|var| {
                 let r = var.multiscale.as_ref()?;
                 let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(&plotted.dim_config)
@@ -143,7 +142,7 @@ impl OctantApp {
             && regular
             && !self.playback.is_playing
             && !spinning
-            && plotted.level == LevelChoice::Auto
+            && plotted.level.is_auto()
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;
         readable.then(|| {
