@@ -3,6 +3,7 @@
 //! before Plot.
 
 use super::parse_share;
+use super::tests::link_of;
 use crate::app::OctantApp;
 use crate::app::actions::{AppAction, Origin};
 use crate::app::layers::LevelChoice;
@@ -17,16 +18,6 @@ fn plotted_pyramid(level: LevelChoice, px: u32) -> OctantApp {
     app.plot_selection();
     poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
     app
-}
-
-/// `app`'s share link, as if its in-memory store were remote (a local store
-/// makes no link).
-fn link_of(app: &mut OctantApp) -> String {
-    let target = &mut app.layers.base.selection_mut().store_target;
-    let local = std::mem::replace(target, "https://x.org/p.zarr".into());
-    let link = app.share_link().unwrap_or_default();
-    app.layers.base.selection_mut().store_target = local;
-    link
 }
 
 fn shown_name(app: &OctantApp) -> Option<String> {

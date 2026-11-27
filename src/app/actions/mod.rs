@@ -13,6 +13,7 @@ mod ask;
 #[cfg(test)]
 mod ask_tests;
 mod axes;
+mod camera;
 mod candidates;
 mod coord_match;
 #[cfg(test)]
@@ -20,6 +21,7 @@ mod dates_tests;
 mod dims;
 #[cfg(test)]
 mod dims_tests;
+mod dispatch;
 mod layers;
 #[cfg(test)]
 mod layers_tests;
@@ -46,7 +48,6 @@ mod view;
 
 use serde::{Deserialize, Serialize};
 
-use super::OctantApp;
 pub(crate) use candidates::plot_type_id;
 pub(crate) use coord_match::value_text;
 use outcome::resolved;
@@ -193,6 +194,15 @@ pub enum AppAction {
         y_from: String,
         y_to: String,
     },
+    /// Turns the 3D camera to `pitch` and `yaw` (degrees) at `distance`
+    /// from what it looks at, `target` (the center without one).
+    SetCamera {
+        pitch: f32,
+        yaw: f32,
+        distance: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target: Option<[f32; 3]>,
+    },
 }
 
 /// A dimension's role: a plot axis, animated, or neither.
@@ -204,54 +214,4 @@ pub enum DimRole {
     Z,
     Animate,
     None,
-}
-
-impl OctantApp {
-    /// Runs `action` against the app as it is now.
-    pub fn dispatch(&mut self, action: AppAction) -> Outcome {
-        match action {
-            AppAction::OpenSource { source } => self.open_by_name(&source),
-            AppAction::OpenCatalog => {
-                self.open_sample(crate::app::sources::CATALOG_SAMPLE);
-                Ok(Done::CatalogOpened)
-            }
-            AppAction::DescribeDataset { group } => self.describe_dataset(group.as_deref()),
-            AppAction::Search { text } => self.search_variables(&text),
-            AppAction::DescribeVariable { path } => self.describe_variable(path.as_deref()),
-            AppAction::DescribeView => self.describe_view(),
-            AppAction::SelectVariable { path } => self.select_by_name(&path),
-            AppAction::SetLevel { level, auto } => self.set_level(level, auto),
-            AppAction::Plot { plot_type } => self.plot_as(plot_type.as_deref()),
-            AppAction::SetDim { dim, value } => self.set_dim(dim.as_deref(), &value),
-            AppAction::SetRange { dim, from, to } => self.set_dim_range(dim.as_deref(), &from, &to),
-            AppAction::SetRole { dim, role } => self.set_dim_role(&dim, role),
-            AppAction::Play => self.play(true),
-            AppAction::Pause => self.play(false),
-            AppAction::Step { by } => self.step_by(by),
-            AppAction::AddOverlay => self.add_staged_overlay(),
-            AppAction::SetLayerVisible { layer, visible } => self.show_layer(&layer, visible),
-            AppAction::RemoveOverlay { layer } => self.remove_layer(&layer),
-            AppAction::SetColorRange { min, max, layer } => {
-                self.set_color_range(layer.as_deref(), min, max)
-            }
-            AppAction::Export { format } => self.open_export(format.as_deref()),
-            AppAction::OpenPlateWell { well, field } => {
-                self.open_plate_well(well.as_deref(), field)
-            }
-            AppAction::SetColormap { name, layer } => self.set_colormap(&name, layer.as_deref()),
-            AppAction::SetComposite { composite } => self.set_composite(&composite),
-            AppAction::SetColorStyle { style } => self.set_color_style(&style),
-            AppAction::SetView {
-                x_from,
-                x_to,
-                y_from,
-                y_to,
-            } => self.set_view((&x_from, &x_to), (&y_from, &y_to)),
-            AppAction::ResetView => {
-                let plot_type = self.effective_canvas_plot_type();
-                crate::app::controllers::controller_for(plot_type).reset_view(&mut self.nav);
-                Ok(Done::ViewReset)
-            }
-        }
-    }
 }

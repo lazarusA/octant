@@ -55,7 +55,7 @@ pub(super) fn done_text(done: &Done) -> String {
         Done::Stepped(_) => tr(PlaybackKey::NextStep).to_string(),
         Done::Colormap(key) => filled(tr(PlaybackKey::VoiceDidColormap), &[key]),
         Done::ViewReset => tr(KeymapKey::ResetView).to_string(),
-        Done::ViewSet => tr(PlaybackKey::VoiceDidView).to_string(),
+        Done::ViewSet | Done::CameraSet => tr(PlaybackKey::VoiceDidView).to_string(),
         Done::LevelSet(LevelChoice::Auto | LevelChoice::AutoFrom(_)) => {
             tr(VariablesKey::LevelAuto).to_string()
         }

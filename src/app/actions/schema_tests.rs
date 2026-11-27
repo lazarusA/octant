@@ -24,10 +24,11 @@ fn every_action_is_a_tool_with_a_description() {
         "export",
         "describe_view",
         "set_view",
+        "set_camera",
     ] {
         assert!(names.contains(&expected), "{expected} in {names:?}");
     }
-    assert_eq!(all.len(), 26, "one per AppAction variant: {names:?}");
+    assert_eq!(all.len(), 27, "one per AppAction variant: {names:?}");
     for t in &all {
         assert!(!t.description.is_empty(), "{}", t.name);
         assert_eq!(t.input_schema["type"], "object", "{}", t.name);

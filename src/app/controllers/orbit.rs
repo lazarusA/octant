@@ -6,7 +6,9 @@ use crate::app::state::NavigationState;
 use crate::data::VariableInfo;
 use crate::data::multiscale::{DimDemand, ResolutionDemand};
 use crate::plots::PlotType;
-use crate::plots::camera::{DEFAULT_DISTANCE, MAX_DISTANCE, OrbitCamera, TARGET_LIMIT};
+use crate::plots::camera::{
+    DEFAULT_DISTANCE, MAX_DISTANCE, OrbitCamera, PITCH_LIMIT, TARGET_LIMIT,
+};
 
 /// WebGPU's default `max_texture_dimension_3d`: volume textures larger than
 /// it may not be created (`plots/volume/textures.rs`).
@@ -97,10 +99,8 @@ impl PlotController for Orbit3DController {
     fn handle_drag(&self, nav: &mut NavigationState, delta: egui::Vec2) {
         let speed = self.turn_speed(nav);
         nav.sphere_rotation_y += delta.x * speed;
-        nav.sphere_rotation_x = (nav.sphere_rotation_x + delta.y * speed).clamp(
-            -std::f32::consts::FRAC_PI_2 + 0.05,
-            std::f32::consts::FRAC_PI_2 - 0.05,
-        );
+        nav.sphere_rotation_x =
+            (nav.sphere_rotation_x + delta.y * speed).clamp(-PITCH_LIMIT, PITCH_LIMIT);
     }
 
     fn handle_pan(&self, nav: &mut NavigationState, delta: egui::Vec2, rect: egui::Rect) {
