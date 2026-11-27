@@ -37,6 +37,49 @@ pub fn crop_rgba_buffer(
     (out, crop_w, crop_h)
 }
 
+/// The pixels `req` saves from the screenshot `image`: its crop of the
+/// canvas, scaled to cover `req.size` when it has one.
+pub fn request_pixels(
+    req: &super::PendingExportRequest,
+    image: &egui::ColorImage,
+) -> (Vec<u8>, u32, u32) {
+    let (w, h) = (image.width() as u32, image.height() as u32);
+    let (x, y, crop_w, crop_h) = req.compute_crop_rect(w, h);
+    let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
+    let (part, crop_w, crop_h) = crop_rgba_buffer(&rgba, w, h, x, y, crop_w, crop_h);
+    match req.size {
+        Some(size) => cover_rgba(part, crop_w, crop_h, size),
+        None => (part, crop_w, crop_h),
+    }
+}
+
+/// `rgba` (`src_w` x `src_h`) scaled to cover `[w, h]` and centre-cropped
+/// to exactly that: the widest centred window of the target's shape,
+/// resized. A zero target leaves the image as it is.
+pub fn cover_rgba(rgba: Vec<u8>, src_w: u32, src_h: u32, [w, h]: [u32; 2]) -> (Vec<u8>, u32, u32) {
+    if w == 0 || h == 0 {
+        return (rgba, src_w, src_h);
+    }
+    let (sw, sh, tw, th) = (src_w as u64, src_h as u64, w as u64, h as u64);
+    // Each side at most its source side, so the casts keep their values.
+    let (cw, ch) = if sw * th > sh * tw {
+        ((sh * tw / th) as u32, src_h)
+    } else {
+        (src_w, (sw * th / tw) as u32)
+    };
+    let (x, y) = ((src_w - cw) / 2, (src_h - ch) / 2);
+    let (part, cw, ch) = crop_rgba_buffer(&rgba, src_w, src_h, x, y, cw.max(1), ch.max(1));
+    let Some(image) = image::RgbaImage::from_raw(cw, ch, part) else {
+        return (rgba, src_w, src_h);
+    };
+    let filter = image::imageops::FilterType::Lanczos3;
+    (
+        image::imageops::resize(&image, w, h, filter).into_raw(),
+        w,
+        h,
+    )
+}
+
 /// Encodes raw RGBA8 image pixels into PNG, JPEG, or WebP byte streams.
 pub fn encode_raster_image(
     rgba: &[u8],

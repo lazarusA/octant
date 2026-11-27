@@ -25,6 +25,8 @@ pub struct UiLayoutState {
     pub show_scale_bar: bool,
     /// Ticks and grid lines on 2D plots' axes.
     pub axis_style: crate::ui::axes::AxisStyle,
+    /// Whether 2D plots draw their axes (off for `--snapshot --no-axes`).
+    pub show_axes: bool,
     pub settings_overlay_width: f32,
     pub panel_positions: crate::ui::panel_layout::PanelPositions,
     /// The canvas size in physical pixels, recorded every frame: the level
@@ -67,6 +69,7 @@ impl Default for UiLayoutState {
             show_hover_card: true,
             show_scale_bar: true,
             axis_style: Default::default(),
+            show_axes: true,
             settings_overlay_width: 0.0,
             panel_positions: Default::default(),
             canvas_px: [1920, 1080],

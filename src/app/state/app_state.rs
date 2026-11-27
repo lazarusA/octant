@@ -61,6 +61,9 @@ pub struct OctantApp {
     pub voice: crate::ui::voice_bar::VoiceBar,
     /// Spoken or typed commands waiting their turn (`app::actions`).
     pub commands: crate::app::actions::CommandQueue,
+    /// `--snapshot`: capturing the canvas once the plot settles.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub snapshot: Option<crate::app::snapshot::Snapshot>,
 
     // Coastline Overlay
     /// Whether to render the coastline overlay on geographic plot types.

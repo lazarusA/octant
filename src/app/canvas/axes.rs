@@ -27,7 +27,7 @@ pub fn draw_canvas_axes(
     plot_rect: egui::Rect,
     canvas_plot_type: PlotType,
 ) {
-    if canvas_plot_type.is_3d() {
+    if canvas_plot_type.is_3d() || !app.layout.show_axes {
         return;
     }
 

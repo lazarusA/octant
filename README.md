@@ -60,6 +60,8 @@ cargo install octant
 octant                      # or: octant <url or path>
 ```
 
+To save a share link's plot as an image without clicking through the app (for thumbnails or scripts), run `octant --snapshot out.png "<share link>"`. Add `--size 800x450` (the image's exact pixels, the plot scaled and centre-cropped to fit), `--timeout 120`, `--no-colorbar` or `--no-axes` as needed; the format follows the extension (png, jpg, webp, svg, pdf). Octant exits with 0 once the image is saved, 1 on a failure (the reason is printed), and 2 for a wrong command line. The window shows on screen while it captures.
+
 If the build fails because a dependency released a breaking update, install with the exact versions Octant was tested with:
 
 ```bash

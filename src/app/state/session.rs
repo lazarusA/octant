@@ -29,10 +29,7 @@ impl OctantApp {
         }
         app.load_colormap_prefs(cc.storage);
 
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Some(target) = std::env::args().nth(1) {
-            app.submit_or_activate_source(&target, None);
-        }
+        // The desktop's command line is opened by `start` (`app/snapshot`).
         // The page's own share link (`?src=...`); any other query is ignored.
         #[cfg(target_arch = "wasm32")]
         if let Some(window) = web_sys::window()

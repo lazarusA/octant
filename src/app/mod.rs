@@ -63,7 +63,10 @@ mod point_cloud_bench_tests;
 mod pyramid_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod rethin_bench_tests;
+mod settled;
 mod share;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod snapshot;
 pub mod sources;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]

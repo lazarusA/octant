@@ -7,7 +7,9 @@ pub mod raster;
 pub mod vector;
 
 pub use clipboard::reveal_in_file_manager;
-pub use raster::{crop_rgba_buffer, encode_raster_image, inject_display_p3_chunks};
+pub use raster::{
+    cover_rgba, crop_rgba_buffer, encode_raster_image, inject_display_p3_chunks, request_pixels,
+};
 pub use vector::{generate_pdf, generate_svg};
 
 use crate::i18n::{ExportKey, tr};
@@ -35,6 +37,13 @@ impl ExportFormat {
             Self::Svg => "svg",
             Self::Pdf => "pdf",
         }
+    }
+
+    /// The format a file extension names, any case; `jpeg` too.
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        let ext = ext.to_ascii_lowercase();
+        let ext = if ext == "jpeg" { "jpg" } else { ext.as_str() };
+        Self::ALL.into_iter().find(|f| f.extension() == ext)
     }
 
     pub fn mime(self) -> &'static str {
@@ -194,6 +203,9 @@ pub struct PendingExportRequest {
     pub output_path: Option<PathBuf>,
     pub canvas_rect_in_points: egui::Rect,
     pub pixels_per_point: f32,
+    /// The saved image's exact pixels (`--snapshot --size`): the capture
+    /// scaled to cover them and centre-cropped; `None` keeps the canvas's.
+    pub size: Option<[u32; 2]>,
     /// Filled by the screenshot callback once the frame's pixels are read.
     pub screenshot: ScreenshotSlot,
 }
@@ -286,6 +298,23 @@ mod tests {
         assert_eq!(cropped.len(), 8);
         assert_eq!(&cropped[0..4], &[20, 20, 20, 255]);
         assert_eq!(&cropped[4..8], &[40, 40, 40, 255]);
+    }
+
+    #[test]
+    fn cover_keeps_the_centre_and_gives_the_exact_size() {
+        // Three pixels in a row: a square target keeps the middle one.
+        let row = [10, 10, 10, 255, 20, 20, 20, 255, 30, 30, 30, 255];
+        let (out, w, h) = cover_rgba(row.to_vec(), 3, 1, [1, 1]);
+        assert_eq!((w, h, out), (1, 1, vec![20, 20, 20, 255]));
+        // A tall capture to a wide target: scaled and cut to exactly 4 x 2.
+        let (out, w, h) = cover_rgba(vec![128; 2 * 4 * 4], 2, 4, [4, 2]);
+        assert_eq!((w, h, out.len()), (4, 2, 4 * 2 * 4));
+        let unchanged = cover_rgba(row.to_vec(), 3, 1, [0, 5]);
+        assert_eq!(
+            unchanged,
+            (row.to_vec(), 3, 1),
+            "a zero target changes nothing"
+        );
     }
 
     #[test]

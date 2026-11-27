@@ -65,10 +65,12 @@ fn a_tile_refused_by_busy_workers_is_asked_again_once_one_frees() {
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     let state = &app.layers.base.data.detail;
     assert!(state.pending.is_none() && state.tile.is_none(), "refused");
+    assert!(!app.view_settled(), "a refused tile is still to come");
     // The busy fetch completes; the tile is asked for again and arrives.
     drop(open);
     poll_until(&mut app, |app| tile_level(app).is_some());
     assert_eq!(tile_level(&app), Some(0));
+    assert!(app.view_settled());
 }
 
 #[test]

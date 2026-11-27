@@ -62,14 +62,7 @@ pub(super) fn rest(app: &mut OctantApp) {
                 .is_none_or(|l| l.pending.is_empty())
         };
         poll_until(app, idle);
-        let done = app
-            .layers
-            .base
-            .data
-            .volume_lod
-            .lod
-            .as_ref()
-            .is_none_or(|l| l.queue.is_empty() && l.arrived.is_empty());
+        let done = !app.layers.base.data.volume_lod.busy();
         // Three frames a second apart settle any view.
         if done && frame >= 3 {
             return;
@@ -115,6 +108,15 @@ fn the_root_arrives_and_a_far_view_wants_no_more() {
     assert!(!holds(&app, 1) && !holds(&app, 0), "16 px fit level 2");
     let (level, _) = app.brick_reading([0, 0, 0], [16, 16, 4]).expect("bricked");
     assert_eq!(level, 2);
+}
+
+#[test]
+fn bricks_on_their_way_keep_the_view_unsettled() {
+    let mut app = plotted();
+    app.refresh_volume_lod(PlotType::Volume, &view(16.0), 0.5);
+    assert!(!app.view_settled(), "the root is asked for at once");
+    rest(&mut app);
+    assert!(app.view_settled());
 }
 
 #[test]
