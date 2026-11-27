@@ -64,6 +64,11 @@ RUST_LOG=octant=trace cargo run
 
 # Run in release mode for full GPU & prefetch performance
 cargo run --release
+
+# Save a share link's plot as an image and quit (desktop only; app.md "Snapshot")
+cargo run --release -- --snapshot out.png "?src=https://x.org/a.zarr&var=t2m&plot=heatmap"
+# Options: --size WxH (the image's exact pixels), --timeout <s>, --no-colorbar, --no-axes.
+# Exit 0 saved, 1 failed (reason on stderr), 2 wrong command line.
 ```
 
 ## 4. WebAssembly & Web Builds

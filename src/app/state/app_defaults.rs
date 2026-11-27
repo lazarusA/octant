@@ -48,6 +48,8 @@ impl Default for OctantApp {
             toasts: crate::ui::toast::Toasts::default(),
             voice: crate::ui::voice_bar::VoiceBar::default(),
             commands: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            snapshot: None,
 
             show_coastlines: false,
             coastline_color: None,

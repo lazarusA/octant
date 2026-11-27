@@ -15,13 +15,19 @@ use app::OctantApp;
 // NATIVE RUNTIME MAIN WINDOW TRIGGER
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    let startup = app::snapshot::Startup::from_args();
+    let snapshot = startup.snapshot.as_ref().map(|r| r.path.clone());
+    let size = match startup.snapshot {
+        Some(_) => app::snapshot::WINDOW,
+        None => [1150.0, 720.0],
+    };
     // let _ = env_logger::Builder::from_env(
     //     env_logger::Env::default().default_filter_or("info,octant=debug,wgpu=warn,zarrs=warn"),
     // )
     // .try_init();
 
     let viewport = egui::ViewportBuilder::default()
-        .with_inner_size([1150.0, 720.0])
+        .with_inner_size(size)
         .with_title(app::window_title::title_in(i18n::language()));
     // macOS keeps the app bundle's .icns in the Dock: eframe leaves the Dock icon alone for an
     // empty icon, and would otherwise put its own egui icon (no icon) or this edge-to-edge one there.
@@ -48,11 +54,18 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
+    let started = std::time::SystemTime::now();
     eframe::run_native(
         "Octant",
         native_options,
-        Box::new(|cc| Ok(Box::new(OctantApp::new(cc)))),
-    )
+        Box::new(|cc| {
+            let mut app = OctantApp::new(cc);
+            app.start(startup);
+            Ok(Box::new(app))
+        }),
+    )?;
+    app::snapshot::exit_unless_saved(snapshot.as_deref(), started);
+    Ok(())
 }
 
 // BROWSER INTERFACE MOUNT BRIDGE

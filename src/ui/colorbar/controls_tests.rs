@@ -61,6 +61,7 @@ fn controls_hide_during_export() {
         output_path: None,
         canvas_rect_in_points: Rect::NOTHING,
         pixels_per_point: 1.0,
+        size: None,
         screenshot: Default::default(),
     });
     let inside = h.pointer(panel(&h).center(), None, &mut run(&mut app));

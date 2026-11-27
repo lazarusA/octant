@@ -117,8 +117,8 @@ impl OctantApp {
         self.commands.waiting.extend(items);
     }
 
-    /// Whether no command waits (tests).
-    #[cfg(test)]
+    /// Whether no command waits (tests, `--snapshot`).
+    #[cfg(any(test, not(target_arch = "wasm32")))]
     pub(crate) fn commands_idle(&self) -> bool {
         self.commands.waiting.is_empty()
     }

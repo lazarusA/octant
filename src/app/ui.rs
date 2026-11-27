@@ -2,6 +2,11 @@ use super::OctantApp;
 
 impl eframe::App for OctantApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        // A snapshot leaves the user's saved preferences alone.
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.snapshot.is_some() {
+            return;
+        }
         self.save_language_pref(storage);
         self.save_colormap_prefs(storage);
     }
@@ -63,6 +68,8 @@ impl eframe::App for OctantApp {
 
         crate::ui::keyboard::dispatch(self, &ctx, !is_hero_active);
 
+        #[cfg(not(target_arch = "wasm32"))]
+        self.drive_snapshot(&ctx);
         // Process in-flight export / screenshot requests
         self.process_pending_export();
 

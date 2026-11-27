@@ -147,6 +147,16 @@ pub(crate) struct Placed {
     subs: subblocks::SubRanges,
 }
 
+impl VolumeLodState {
+    /// Whether bricks are being read, wait to be read or to be placed.
+    #[cfg(any(test, not(target_arch = "wasm32")))]
+    pub(crate) fn busy(&self) -> bool {
+        self.lod
+            .as_ref()
+            .is_some_and(|l| !(l.pending.is_empty() && l.queue.is_empty() && l.arrived.is_empty()))
+    }
+}
+
 impl Lod {
     fn bricks(&self) -> Bricks<'_> {
         Bricks {

@@ -29,19 +29,7 @@ impl OctantApp {
         };
 
         self.export_flash_timer = Some(web_time::Instant::now());
-        let (crop_x, crop_y, crop_w, crop_h) =
-            req.compute_crop_rect(image.width() as u32, image.height() as u32);
-        let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-
-        let (cropped_rgba, final_w, final_h) = crate::export::crop_rgba_buffer(
-            &rgba,
-            image.width() as u32,
-            image.height() as u32,
-            crop_x,
-            crop_y,
-            crop_w,
-            crop_h,
-        );
+        let (cropped_rgba, final_w, final_h) = crate::export::request_pixels(&req, &image);
 
         let var_name = self
             .effective_variable_info()

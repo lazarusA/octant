@@ -75,6 +75,12 @@ impl DetailState {
         *self = Self::default();
     }
 
+    /// Whether a tile is being read or waits for a free worker.
+    #[cfg(any(test, not(target_arch = "wasm32")))]
+    pub(crate) fn busy(&self) -> bool {
+        self.pending.is_some() || self.refused.is_some()
+    }
+
     /// Drops the tile shown, to be decided again once the view rests: its
     /// layer's composite stretched its channels anew.
     pub(crate) fn discard_tile(&mut self) {
