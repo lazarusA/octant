@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "key": "seasfire",
+      "title": "SeasFire Cube",
+      "description": "A global dataset for seasonal fire modeling in the Earth system, 8-day steps at 0.25°.",
+      "store": "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
+      "format": "zarr",
+      "domain": "climate",
+      "tags": [
+        "fire",
+        "earth-system",
+        "data-cube"
+      ],
+      "credit": "SeasFire project",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source_page": "https://seasfire.hua.gr/",
+      "open": {
+        "var": "fcci_ba",
+        "axes": "longitude,latitude",
+        "time": "2006-06-10",
+        "latitude": "90..-90",
+        "longitude": "-180..180",
+        "plot": "sphere",
+        "cmap": "colorcet:fire",
+        "range": "0..55897.12",
+        "scale": "log:1",
+        "nan": "01043bf3",
+        "camera": "-9.8,-21.2,1.886"
+      },
+      "desktop_only": false,
+      "thumbnail": "/gallery/seasfire.webp"
+    },
+    {
+      "key": "alaska-hrrr",
+      "title": "HRRR Alaska",
+      "description": "Hourly analyses (first forecast steps) of NOAA's 3 km High-Resolution Rapid Refresh model over Alaska, archived as Icechunk.",
+      "store": "https://data.source.coop/bkr/dmi/alaska_hrrr.icechunk",
+      "format": "icechunk",
+      "domain": "weather",
+      "tags": [],
+      "credit": "NOAA NWS NCEP (HRRR Alaska). Icechunk copy by Jacob Prince-Bieker (Source Cooperative, bkr/dmi).",
+      "license": "NOAA open data (NODD): no restrictions; attribution requested; no implied NOAA endorsement",
+      "license_url": "https://registry.opendata.aws/noaa-hrrr-pds/",
+      "source_page": "https://source.coop/bkr/dmi",
+      "open": {
+        "var": "2m_temperature",
+        "time": "#1279",
+        "dim.step": "#2",
+        "axes": "x,y",
+        "y": "#1..#919",
+        "x": "#1..#1299",
+        "plot": "heatmap",
+        "cmap": "cmocean:thermal",
+        "range": "271.8..295.2"
+      },
+      "desktop_only": false,
+      "thumbnail": "/gallery/alaska-hrrr.webp"
+    },
+    {
+      "key": "cryoet-vibrio",
+      "title": "Vibrio cholerae competence pilus, ComEA deletion (CryoET Data Portal run sma2022-07-13-10)",
+      "description": "Cryo-electron tomogram (1023 x 1440 x 400 at 13.328 Å) of a Vibrio cholerae ComEA deletion strain, from a study of the competence pilus.",
+      "store": "https://d39zu0xtgv0613.cloudfront.net/sma2022-07-13-10.zarr",
+      "format": "ome-zarr",
+      "domain": "microscopy",
+      "tags": [
+        "ome-zarr",
+        "multiscale",
+        "cryo-et"
+      ],
+      "credit": "Christopher Braxton Owens, Gus L. W. Hart, Andrew Darley, Stefano Maggi; CryoET Data Portal (Chan Zuckerberg Imaging Institute). Copy hosted by kiln-render.",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "source_page": "https://cryoetdataportal.czscience.com/runs/33589",
+      "citation": "Dataset publication: https://doi.org/10.1101/2025.04.23.650258 ; portal: CryoET Data Portal, Nature Methods 21, 2200-2202 (2024), https://doi.org/10.1038/s41592-024-02477-2",
+      "open": {
+        "var": "0",
+        "multiscale_level": "auto",
+        "plot": "heatmap",
+        "axes": "x,y",
+        "z": "#200",
+        "cmap": "cmocean:gray",
+        "range": "-25..20"
+      },
+      "desktop_only": false,
+      "thumbnail": "/gallery/cryoet-vibrio.webp"
+    },
+    {
+      "key": "copernicus-dem-30m-n50e011",
+      "title": "Copernicus DEM GLO-30, tile N50 E011",
+      "description": "30 m surface elevation over Thuringia, one degree tile",
+      "store": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E011_00_DEM/Copernicus_DSM_COG_10_N50_00_E011_00_DEM.tif",
+      "format": "geotiff",
+      "domain": "earth-observation",
+      "tags": [],
+      "credit": "© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+      "license": "Copernicus DEM licence (free, ESA)",
+      "license_url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+      "source_page": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "citation": "https://doi.org/10.5270/ESA-c5d3d65",
+      "open": {
+        "var": "band_1",
+        "plot": "heatmap",
+        "cmap": "scientific:batlow",
+        "range": "211..754.9"
+      },
+      "desktop_only": true,
+      "thumbnail": "/gallery/copernicus-dem-30m-n50e011.webp"
+    }
+  ]
+}

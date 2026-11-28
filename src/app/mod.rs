@@ -64,7 +64,7 @@ mod pyramid_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod rethin_bench_tests;
 mod settled;
-mod share;
+pub(crate) mod share;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod snapshot;
 pub mod sources;

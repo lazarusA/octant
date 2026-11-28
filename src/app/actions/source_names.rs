@@ -1,11 +1,11 @@
 //! The datasets a command can open by name: the landing samples, the
-//! catalog's entries and the datasets already open. One store is one
-//! choice, whatever names it goes by (the SeasFire sample and catalog entry
+//! gallery's entries and the datasets already open. One store is one
+//! choice, whatever names it goes by (the SeasFire sample and gallery entry
 //! are one).
 
 use super::resolve::Candidate;
 use super::text::Name;
-use crate::catalog::{CatalogCategoryFilter, CatalogEntry, get_catalog_entries};
+use crate::gallery::{GalleryEntry, all_entries, current};
 use crate::ui::hero::chips::SAMPLES;
 
 /// Where a named dataset is opened from.
@@ -13,8 +13,8 @@ use crate::ui::hero::chips::SAMPLES;
 pub enum SourceRef {
     /// A landing sample's store, opened as its pill does.
     Sample(&'static str),
-    /// A catalog entry, opened as its card does.
-    Entry(&'static CatalogEntry),
+    /// A gallery entry, opened as its card does.
+    Entry(Box<GalleryEntry>),
     /// A dataset already open (or any address), by its store.
     Store(String),
 }
@@ -32,15 +32,15 @@ impl SourceRef {
 /// Every dataset by name; `open` lists the open ones as (store, name).
 pub(super) fn source_candidates(open: &[(String, String)]) -> Vec<Candidate<SourceRef>> {
     let mut out: Vec<Candidate<SourceRef>> = Vec::new();
-    for entry in get_catalog_entries(CatalogCategoryFilter::All) {
+    for entry in all_entries(&current()) {
         out.push(Candidate {
-            value: SourceRef::Entry(entry),
-            shown: entry.label.to_string(),
-            names: vec![(0, Name::new(entry.label)), (0, Name::new(entry.key))],
+            value: SourceRef::Entry(Box::new(entry.clone())),
+            shown: entry.label.clone(),
+            names: vec![(0, Name::new(&entry.label)), (0, Name::new(&entry.key))],
         });
     }
     for (label, uri, _) in SAMPLES {
-        if uri == crate::app::sources::CATALOG_SAMPLE {
+        if uri == crate::app::sources::GALLERY_SAMPLE {
             continue;
         }
         let label = label.trim_start_matches('/');

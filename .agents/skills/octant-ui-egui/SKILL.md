@@ -39,12 +39,12 @@ UI and application files are decomposed into focused submodules (< 250 lines per
   - `overview.rs`: Architecture overview and subsystem capabilities.
   - `icons.rs`: Icon gallery preview grid.
   - `mod.rs`: Coordinator modal window `show_about_window`.
-- **Dataset Catalog (`src/ui/catalog/`)**:
+- **Dataset Gallery (`src/ui/gallery/`)**:
   - `header.rs`: Modal heading and zero-allocation count badge.
   - `filters.rs`: Search query text edit and category filter chips.
   - `card.rs`: Responsive desktop/mobile store cards.
   - `list.rs`: Scrollable results list and ASCII substring filtering.
-  - `mod.rs`: Modal coordinator `show_catalog_window`.
+  - `mod.rs`: Modal coordinator `show_gallery_window`.
 - **Color Picker (`src/ui/color_picker/`)**:
   - `shape.rs`: Geometric triangle, circle, and polygon painter (`ColorShape`).
   - `popup.rs`: Hex/RGB sliders and popup dropdown.
@@ -105,7 +105,7 @@ UI and application files are decomposed into focused submodules (< 250 lines per
 - Always sort floats with `f32::total_cmp` (`ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos))`) to prevent panics when encountering `NaN` or unnormalized coordinates.
 
 ### 5. UI Layout Hierarchy
-- **Top Panel**: Menu bar, dataset load/open dialog, store selector, preset catalog.
+- **Top Panel**: Menu bar, dataset load/open dialog, store selector, preset gallery.
 - **Side Panel (Left)**: Variables inspector, dimension axis mapping (X, Y, Z, Time, Elevation), slice sliders.
 - **Central Panel**: WGPU canvas viewport, dynamic aspect ratio framing, hover tooltips with raw scalar values.
 - **Bottom Panel**: Animation timeline, playback speed slider, loop toggle, step forward/backward buttons.

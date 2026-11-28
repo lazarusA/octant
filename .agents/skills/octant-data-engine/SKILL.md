@@ -11,7 +11,7 @@ description: >-
 
 This skill guides development and debugging of Octant's N-dimensional tensor extraction, caching, storage backends, codecs, and hyperslab slicing in `src/data/`.
 
-**Reference**: `data.md` (every `src/data/` module: blocks and prefetch, data workers, each backend, OME-Zarr, CRS, multiscale and detail tiles, codecs, coordinates, slicing, orientation) and `catalog.md`. Update them with the code they describe.
+**Reference**: `data.md` (every `src/data/` module: blocks and prefetch, data workers, each backend, OME-Zarr, CRS, multiscale and detail tiles, codecs, coordinates, slicing, orientation) and `gallery.md`. Update them with the code they describe.
 
 ## Architecture Overview
 

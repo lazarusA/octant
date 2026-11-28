@@ -77,7 +77,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["lapisan", "di atas", "sebagai lapisan"],
     well: &["sumur"],
     field: &["bidang"],
-    catalog: &["katalog"],
+    gallery: &["galeri", "katalog"],
     then: &["lalu", "kemudian", "setelah itu"],
     until: &["sampai", "hingga", "dan"],
 };

@@ -1,4 +1,4 @@
-//! Links of catalog plots drawn as composites open the same plot: the
+//! Links of gallery plots drawn as composites open the same plot: the
 //! Sentinel-2 TCI GeoTIFF with its bands reordered, and IDR's nuclei
 //! OME-Zarr image with one channel hidden. Run by hand with
 //! `cargo test --lib share_links_of_composites -- --ignored --nocapture`.

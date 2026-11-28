@@ -197,7 +197,7 @@ impl OctantApp {
 }
 
 /// Appends `key=value` (none for an empty value), escaped.
-pub(super) fn pair(query: &mut String, key: &str, value: &str) {
+pub(crate) fn pair(query: &mut String, key: &str, value: &str) {
     if value.is_empty() {
         return;
     }

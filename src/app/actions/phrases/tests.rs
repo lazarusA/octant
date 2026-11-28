@@ -59,7 +59,7 @@ fn every_language_says_every_verb_and_then() {
             );
         }
         assert!(!phrases.then.is_empty(), "{lang:?} has no 'then'");
-        assert!(!phrases.catalog.is_empty(), "{lang:?} has no catalog");
+        assert!(!phrases.gallery.is_empty(), "{lang:?} has no gallery");
     }
 }
 
@@ -200,8 +200,8 @@ fn a_named_dataset_or_variable_alone_opens_or_selects() {
         [select("t2m")]
     );
     assert_eq!(
-        parse("show the catalog", &vocab, Language::English),
-        [action(AppAction::OpenCatalog)]
+        parse("show the gallery", &vocab, Language::English),
+        [action(AppAction::OpenGallery)]
     );
 }
 

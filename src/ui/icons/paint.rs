@@ -51,7 +51,7 @@ impl Icon {
             Icon::FolderOpen => files::draw_folder_open(c),
             Icon::VariableDoc => store::draw_variable_doc(c),
             Icon::Icechunk => store::draw_icechunk(c),
-            Icon::Catalog => store::draw_catalog(c),
+            Icon::Gallery => store::draw_gallery(c),
             Icon::Save => store::draw_save(c),
             Icon::Snapshot => store::draw_snapshot(c),
             Icon::DropTray => store::draw_drop_tray(c),

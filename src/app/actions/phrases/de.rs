@@ -93,7 +93,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["überlagert", "als overlay", "darüber", "als ebene"],
     well: &["well", "vertiefung"],
     field: &["feld"],
-    catalog: &["katalog"],
+    gallery: &["galerie", "katalog"],
     then: &["dann", "danach", "und dann"],
     until: &["bis", "und"],
 };

@@ -10,7 +10,7 @@ use crate::plots::PlotType;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Done {
     Opening(String),
-    CatalogOpened,
+    GalleryOpened,
     Selected(String),
     OverlayAdded(String),
     LayerShown {
@@ -124,7 +124,7 @@ pub enum Failure {
     /// A field asked without a well named or picked.
     NoWellPicked,
     NotUnderstood(String),
-    /// The app refused and said why (a desktop-only catalog entry).
+    /// The app refused and said why (a desktop-only gallery entry).
     Refused,
     /// No overlay can be added: why.
     OverlayUnavailable(String),

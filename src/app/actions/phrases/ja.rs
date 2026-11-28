@@ -63,7 +63,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["オーバーレイ", "重ねて", "レイヤーとして"],
     well: &["ウェル"],
     field: &["視野"],
-    catalog: &["カタログ"],
+    gallery: &["ギャラリー", "カタログ"],
     then: &["それから", "その後", "次に"],
     until: &[],
 };

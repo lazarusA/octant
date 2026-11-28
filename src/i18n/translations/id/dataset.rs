@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "Muat",
         DatasetKey::TargetPathHint => "https://... atau jalur (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Katalog...",
+        DatasetKey::GalleryEllipsis => "Galeri...",
         DatasetKey::Clear => "Hapus",
         DatasetKey::FormatLabel => "Format:",
         DatasetKey::SampleSeasFire => "SeasFire Kebakaran Hutan Global (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " Ukuran Jendela (langkah)",
         DatasetKey::PrefetchWorkersSuffix => " Pekerja Prefetch (thread)",
         DatasetKey::FlushAllCaches => "Kosongkan & Hapus Semua Cache",
-        // Catalog
-        DatasetKey::CatalogTitle => "Katalog Dataset",
-        DatasetKey::CatalogStoreCount => "{} penyimpanan",
-        DatasetKey::CatalogBlurb => {
-            "Dataset cloud Zarr, Icechunk, dan kebenaran dasar prosedural pilihan. Pilih dataset mana pun untuk dimuat."
+        // Gallery
+        DatasetKey::GalleryTitle => "Galeri Dataset",
+        DatasetKey::GalleryStoreCount => "{} penyimpanan",
+        DatasetKey::GalleryBlurb => {
+            "Dataset dari galeri Octant, masing-masing dengan tampilan siap pakai, serta dataset kebenaran dasar prosedural. Pilih salah satu untuk dimuat."
         }
-        DatasetKey::CatalogSearchHint => "Saring menurut nama, deskripsi, atau URL...",
-        DatasetKey::CatalogCategory => "Kategori:",
+        DatasetKey::DomainClimate => "Iklim",
+        DatasetKey::DomainWeather => "Cuaca",
+        DatasetKey::DomainOcean => "Laut",
+        DatasetKey::DomainEarthObservation => "Observasi Bumi",
+        DatasetKey::DomainMedical => "Medis",
+        DatasetKey::DomainOther => "Lainnya",
+        DatasetKey::GalleryUnavailable => "Galeri tidak dapat dimuat. Periksa koneksi, lalu muat ulang.",
+        DatasetKey::GalleryLicense => "Lisensi",
+        DatasetKey::GalleryCitation => "Kutip sebagai",
+        DatasetKey::GallerySourcePage => "Halaman dataset",
+        DatasetKey::GalleryStore => "Penyimpanan",
+        DatasetKey::GalleryPage => "Halaman galeri",
+        DatasetKey::GalleryCopyUrl => "Salin alamat",
+        DatasetKey::GalleryCopyDetails => "Salin detail",
+        DatasetKey::GalleryUrlCopied => "Alamat disalin",
+        DatasetKey::GalleryDetailsCopied => "Detail disalin",
+        DatasetKey::GalleryFromDocs => "Dari galeri dokumentasi Octant:",
+        DatasetKey::GallerySearchHint => "Saring menurut nama, deskripsi, atau URL...",
+        DatasetKey::GalleryCategory => "Kategori:",
         DatasetKey::CategoryAll => "Semua",
         DatasetKey::CategoryProcedural => "Prosedural",
-        DatasetKey::NoCatalogMatches => "Tidak ada dataset yang cocok dengan pencarian Anda.",
+        DatasetKey::NoGalleryMatches => "Tidak ada dataset yang cocok dengan pencarian Anda.",
         DatasetKey::ClearSearch => "Hapus Pencarian",
-        DatasetKey::SelectAndLoadDataset => "Pilih & Muat Dataset",
-        DatasetKey::SelectAndLoad => "Pilih & Muat",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "Jenis tidak didukung",
         DatasetKey::DropReleaseToLoad => "Lepaskan untuk memuat dataset",
@@ -103,7 +118,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A Warna Asli COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Volume spasiotemporal 4D sintetis",
-        DatasetKey::HeroCatalogHover => "Jelajahi katalog dataset",
+        DatasetKey::HeroGalleryHover => "Jelajahi galeri dataset",
         DatasetKey::LoadSampleHover => "Muat contoh: {}",
         DatasetKey::HeroDropLong => "Lepas dataset untuk dimuat (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "Lepas dataset (.nc, .zarr, .icechunk, .tif)",
@@ -151,7 +166,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Tidak dapat membaca bidang pandang sumur. Klik untuk mencoba lagi"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
-        DatasetKey::CategorySoil => "Tanah",
         DatasetKey::BadgeDesktopOnly => "Hanya desktop",
         DatasetKey::DesktopOnlyHint => {
             "Server ini tidak mengizinkan akses dari peramban. Buka di aplikasi desktop Octant."

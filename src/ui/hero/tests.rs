@@ -117,28 +117,28 @@ fn arrows_move_from_intake_through_the_chips_and_back() {
 }
 
 #[test]
-fn clicking_catalog_chip_opens_catalog_window() {
+fn clicking_gallery_chip_opens_gallery_window() {
     let ctx = egui::Context::default();
     let mut app = OctantApp::default();
-    assert!(!app.layout.show_catalog_window);
+    assert!(!app.layout.show_gallery_window);
     frame(&ctx, &mut app, Vec::new(), true);
 
     press(&ctx, &mut app, Key::ArrowDown);
     press(&ctx, &mut app, Key::End);
     assert_eq!(focused(&ctx), Some(chip_id(3)));
     press(&ctx, &mut app, Key::Enter);
-    assert!(app.layout.show_catalog_window);
+    assert!(app.layout.show_gallery_window);
 }
 
 #[test]
-fn typing_catalog_in_intake_opens_catalog_window() {
+fn typing_gallery_in_intake_opens_gallery_window() {
     let ctx = egui::Context::default();
     let mut app = OctantApp::default();
-    assert!(!app.layout.show_catalog_window);
-    app.layout.hero_state.input = "/catalog".to_string();
+    assert!(!app.layout.show_gallery_window);
+    app.layout.hero_state.input = "/gallery".to_string();
     frame(&ctx, &mut app, Vec::new(), true);
     press(&ctx, &mut app, Key::Enter);
-    assert!(app.layout.show_catalog_window);
+    assert!(app.layout.show_gallery_window);
 }
 
 #[test]

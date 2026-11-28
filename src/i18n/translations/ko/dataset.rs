@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "불러오기",
         DatasetKey::TargetPathHint => "https://... 또는 경로 (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "카탈로그...",
+        DatasetKey::GalleryEllipsis => "갤러리...",
         DatasetKey::Clear => "지우기",
         DatasetKey::FormatLabel => "형식:",
         DatasetKey::SampleSeasFire => "SeasFire 전 지구 산불 (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " 프리페치 범위 (스텝)",
         DatasetKey::PrefetchWorkersSuffix => " 미리 가져오기 작업자 (스레드)",
         DatasetKey::FlushAllCaches => "모든 캐시 비우기",
-        // Catalog
-        DatasetKey::CatalogTitle => "데이터셋 카탈로그",
-        DatasetKey::CatalogStoreCount => "저장소 {}개",
-        DatasetKey::CatalogBlurb => {
-            "엄선한 클라우드 Zarr, Icechunk 및 절차적 기준 데이터셋입니다. 데이터셋을 선택하면 불러옵니다."
+        // Gallery
+        DatasetKey::GalleryTitle => "데이터셋 갤러리",
+        DatasetKey::GalleryStoreCount => "저장소 {}개",
+        DatasetKey::GalleryBlurb => {
+            "Octant 갤러리의 데이터셋(각각 준비된 보기 포함)과 절차적 기준 데이터셋입니다. 데이터셋을 선택하면 불러옵니다."
         }
-        DatasetKey::CatalogSearchHint => "이름, 설명 또는 URL로 필터...",
-        DatasetKey::CatalogCategory => "분류:",
+        DatasetKey::DomainClimate => "기후",
+        DatasetKey::DomainWeather => "날씨",
+        DatasetKey::DomainOcean => "해양",
+        DatasetKey::DomainEarthObservation => "지구 관측",
+        DatasetKey::DomainMedical => "의료",
+        DatasetKey::DomainOther => "기타",
+        DatasetKey::GalleryUnavailable => "갤러리를 불러오지 못했습니다. 연결을 확인한 후 다시 불러오세요.",
+        DatasetKey::GalleryLicense => "라이선스",
+        DatasetKey::GalleryCitation => "인용",
+        DatasetKey::GallerySourcePage => "데이터셋 페이지",
+        DatasetKey::GalleryStore => "저장소",
+        DatasetKey::GalleryPage => "갤러리 페이지",
+        DatasetKey::GalleryCopyUrl => "주소 복사",
+        DatasetKey::GalleryCopyDetails => "세부 정보 복사",
+        DatasetKey::GalleryUrlCopied => "주소를 복사했습니다",
+        DatasetKey::GalleryDetailsCopied => "세부 정보를 복사했습니다",
+        DatasetKey::GalleryFromDocs => "Octant 문서 갤러리에서:",
+        DatasetKey::GallerySearchHint => "이름, 설명 또는 URL로 필터...",
+        DatasetKey::GalleryCategory => "분류:",
         DatasetKey::CategoryAll => "전체",
         DatasetKey::CategoryProcedural => "절차적",
-        DatasetKey::NoCatalogMatches => "검색과 일치하는 데이터셋이 없습니다.",
+        DatasetKey::NoGalleryMatches => "검색과 일치하는 데이터셋이 없습니다.",
         DatasetKey::ClearSearch => "검색 지우기",
-        DatasetKey::SelectAndLoadDataset => "데이터셋 선택 및 불러오기",
-        DatasetKey::SelectAndLoad => "선택 및 불러오기",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "지원하지 않는 형식",
         DatasetKey::DropReleaseToLoad => "놓으면 데이터셋을 불러옵니다",
@@ -101,7 +116,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroSeasFireHover => "전 지구 산불 및 기후 재청크 데이터셋 (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A 트루 컬러 COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "합성 4D 시공간 볼륨",
-        DatasetKey::HeroCatalogHover => "데이터셋 카탈로그 둘러보기",
+        DatasetKey::HeroGalleryHover => "데이터셋 갤러리 둘러보기",
         DatasetKey::LoadSampleHover => "샘플 불러오기: {}",
         DatasetKey::HeroDropLong => "데이터셋을 놓아 불러오기 (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "데이터셋 놓기 (.nc, .zarr, .icechunk, .tif)",
@@ -147,7 +162,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "이 획득에는 시야가 없습니다",
         DatasetKey::PlateWellUnreadable => "웰의 시야를 읽을 수 없습니다. 클릭하여 다시 시도",
         DatasetKey::CategoryMicroscopy => "현미경 이미지",
-        DatasetKey::CategorySoil => "토양",
         DatasetKey::BadgeDesktopOnly => "데스크톱 전용",
         DatasetKey::DesktopOnlyHint => {
             "이 서버는 브라우저 접근을 허용하지 않습니다. Octant 데스크톱 앱에서 여세요."

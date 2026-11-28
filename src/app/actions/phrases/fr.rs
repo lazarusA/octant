@@ -92,7 +92,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     ],
     well: &["puits"],
     field: &["champ"],
-    catalog: &["catalogue"],
+    gallery: &["galerie", "catalogue"],
     then: &["puis", "ensuite", "et puis"],
     until: &["à", "au", "et"],
 };

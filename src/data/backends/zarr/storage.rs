@@ -79,7 +79,7 @@ pub fn build_sync_store(
 pub fn open_local_storage(
     _path: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
-    Err("Local file system is only available on desktop. Please provide a remote HTTP URL or choose a catalog dataset.".into())
+    Err("Local file system is only available on desktop. Please provide a remote HTTP URL or choose a gallery dataset.".into())
 }
 
 pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;

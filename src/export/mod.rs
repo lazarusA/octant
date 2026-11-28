@@ -342,7 +342,7 @@ mod tests {
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(pdf.ends_with(b"%%EOF\n"));
         let pdf_str = String::from_utf8_lossy(&pdf);
-        assert!(pdf_str.contains("/Type /Catalog"));
+        assert!(pdf_str.contains("/Type /Gallery"));
         assert!(pdf_str.contains("/Type /Pages"));
         assert!(pdf_str.contains("/Type /Page"));
         assert!(pdf_str.contains("xref"));

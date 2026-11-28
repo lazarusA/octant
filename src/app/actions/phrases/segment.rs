@@ -1,5 +1,5 @@
 //! One command of an utterance read into actions: its verbs, then the names
-//! it holds (a plot type, a colormap after a colormap verb, the catalog,
+//! it holds (a plot type, a colormap after a colormap verb, the gallery,
 //! dimensions and values, a variable, a dataset to open).
 
 use super::named::{Named, named};
@@ -41,7 +41,7 @@ pub(super) fn parse_segment(
 }
 
 /// A command without a verb: a plot type plots (the variable named, if
-/// any), a variable alone is selected, a dataset opened, the catalog shown.
+/// any), a variable alone is selected, a dataset opened, the gallery shown.
 fn names_alone(n: &Named, segment: &Segment) -> Vec<Parsed> {
     let mut out = Vec::new();
     match (&n.variable, &n.plot_type, &n.source) {
@@ -53,7 +53,7 @@ fn names_alone(n: &Named, segment: &Segment) -> Vec<Parsed> {
         }
         (Some(v), None, _) => out.push(select(v)),
         (None, None, Some(source)) => out.push(open(source)),
-        (None, None, None) if n.catalog => out.push(action(AppAction::OpenCatalog)),
+        (None, None, None) if n.gallery => out.push(action(AppAction::OpenGallery)),
         (None, None, None) if !n.dims.is_empty() || n.layers.plate.is_some() => {}
         (None, None, None) => out.push(not_understood(segment)),
     }
@@ -86,7 +86,7 @@ fn verb_actions(n: &Named, segment: &Segment, vocab: &Vocabulary) -> Vec<Parsed>
                 selected = true;
                 choose(n, verb, segment)
             }
-            Verb::Plot if n.catalog && n.variable.is_none() => action(AppAction::OpenCatalog),
+            Verb::Plot if n.gallery && n.variable.is_none() => action(AppAction::OpenGallery),
             Verb::Plot => {
                 if !selected && let Some(v) = plot_target(n, vocab) {
                     out.push(select(&v));
@@ -149,7 +149,7 @@ fn plain_action(n: &Named, verb: Verb, segment: &Segment, layer: Option<&str>) -
 
 /// "open" or "select": a dataset for "open" (a variable when only one is
 /// named), a variable for "select" (a dataset when only one is named), the
-/// catalog when named alone, else the leftover words as what was meant.
+/// gallery when named alone, else the leftover words as what was meant.
 fn choose(n: &Named, verb: Verb, segment: &Segment) -> Parsed {
     let opens = verb == Verb::Open;
     if let Some(address) = n.address.as_deref().filter(|_| opens) {
@@ -159,7 +159,7 @@ fn choose(n: &Named, verb: Verb, segment: &Segment) -> Parsed {
         (Some(s), None) => open(s),
         (Some(s), Some(_)) if opens => open(s),
         (_, Some(v)) => select(v),
-        (None, None) if n.catalog => action(AppAction::OpenCatalog),
+        (None, None) if n.gallery => action(AppAction::OpenGallery),
         (None, None) => match or_rest(n, &None) {
             Some(rest) if opens => open(&rest),
             Some(rest) => select(&rest),

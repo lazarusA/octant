@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "Carregar",
         DatasetKey::TargetPathHint => "https://... ou caminho (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Catálogo...",
+        DatasetKey::GalleryEllipsis => "Galeria...",
         DatasetKey::Clear => "Limpar",
         DatasetKey::FormatLabel => "Formato:",
         DatasetKey::SampleSeasFire => "SeasFire: incêndios florestais globais (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " Tamanho da janela (passos)",
         DatasetKey::PrefetchWorkersSuffix => " Workers de pré-carregamento (threads)",
         DatasetKey::FlushAllCaches => "Esvaziar e limpar todos os caches",
-        // Catalog
-        DatasetKey::CatalogTitle => "Catálogo de conjuntos de dados",
-        DatasetKey::CatalogStoreCount => "{} repositórios",
-        DatasetKey::CatalogBlurb => {
-            "Conjuntos de dados selecionados: Zarr e Icechunk na nuvem e dados procedurais de referência. Selecione um conjunto de dados para carregá-lo."
+        // Gallery
+        DatasetKey::GalleryTitle => "Galeria de conjuntos de dados",
+        DatasetKey::GalleryStoreCount => "{} repositórios",
+        DatasetKey::GalleryBlurb => {
+            "Conjuntos de dados da galeria do Octant, cada um com uma visualização pronta, e dados procedurais de referência. Selecione um para carregá-lo."
         }
-        DatasetKey::CatalogSearchHint => "Filtrar por nome, descrição ou URL...",
-        DatasetKey::CatalogCategory => "Categoria:",
+        DatasetKey::DomainClimate => "Clima",
+        DatasetKey::DomainWeather => "Meteorologia",
+        DatasetKey::DomainOcean => "Oceano",
+        DatasetKey::DomainEarthObservation => "Observação da Terra",
+        DatasetKey::DomainMedical => "Medicina",
+        DatasetKey::DomainOther => "Outros",
+        DatasetKey::GalleryUnavailable => "Não foi possível carregar a galeria. Verifique a conexão e recarregue.",
+        DatasetKey::GalleryLicense => "Licença",
+        DatasetKey::GalleryCitation => "Citar como",
+        DatasetKey::GallerySourcePage => "Página do conjunto de dados",
+        DatasetKey::GalleryStore => "Repositório",
+        DatasetKey::GalleryPage => "Página na galeria",
+        DatasetKey::GalleryCopyUrl => "Copiar endereço",
+        DatasetKey::GalleryCopyDetails => "Copiar detalhes",
+        DatasetKey::GalleryUrlCopied => "Endereço copiado",
+        DatasetKey::GalleryDetailsCopied => "Detalhes copiados",
+        DatasetKey::GalleryFromDocs => "Da galeria da documentação do Octant:",
+        DatasetKey::GallerySearchHint => "Filtrar por nome, descrição ou URL...",
+        DatasetKey::GalleryCategory => "Categoria:",
         DatasetKey::CategoryAll => "Todos",
         DatasetKey::CategoryProcedural => "Procedural",
-        DatasetKey::NoCatalogMatches => "Nenhum conjunto de dados corresponde à sua pesquisa.",
+        DatasetKey::NoGalleryMatches => "Nenhum conjunto de dados corresponde à sua pesquisa.",
         DatasetKey::ClearSearch => "Limpar pesquisa",
-        DatasetKey::SelectAndLoadDataset => "Selecionar e carregar conjunto de dados",
-        DatasetKey::SelectAndLoad => "Selecionar e carregar",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "Tipo não suportado",
         DatasetKey::DropReleaseToLoad => "Solte para carregar o conjunto de dados",
@@ -103,7 +118,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A em cor verdadeira, COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Volume espaço-temporal 4D sintético",
-        DatasetKey::HeroCatalogHover => "Explorar o catálogo de conjuntos de dados",
+        DatasetKey::HeroGalleryHover => "Explorar a galeria de conjuntos de dados",
         DatasetKey::LoadSampleHover => "Carregar exemplo: {}",
         DatasetKey::HeroDropLong => {
             "Solte o conjunto de dados para carregar (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -153,7 +168,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Não foi possível ler os campos do poço. Clique para tentar de novo"
         }
         DatasetKey::CategoryMicroscopy => "Microscopia",
-        DatasetKey::CategorySoil => "Solo",
         DatasetKey::BadgeDesktopOnly => "Apenas desktop",
         DatasetKey::DesktopOnlyHint => {
             "Este servidor não permite o acesso pelo navegador. Abra-o no aplicativo de desktop do Octant."

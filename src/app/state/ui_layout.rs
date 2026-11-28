@@ -37,14 +37,16 @@ pub struct UiLayoutState {
     pub colorbar_transparency: f32,
 
     // Modal windows
-    pub show_catalog_window: bool,
+    pub show_gallery_window: bool,
     pub show_about_window: bool,
     /// The keyboard shortcut list.
     pub show_shortcuts: bool,
     /// The centered plot type picker.
     pub show_plot_picker: bool,
-    pub catalog_search_query: String,
-    pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
+    pub gallery_search_query: String,
+    /// The gallery's domain and format chips; `None`: All.
+    pub gallery_domain: Option<crate::gallery::Domain>,
+    pub gallery_format: Option<crate::gallery::Format>,
     /// Panels opened (`true`) or closed since keyboard focus last followed
     /// them (`OctantApp::follow_panel_focus`).
     pub(crate) panel_focus: Vec<(Panel, bool)>,
@@ -76,12 +78,13 @@ impl Default for UiLayoutState {
             theme_preference: egui::ThemePreference::System,
             enforce_data_aspect_ratio: true,
             colorbar_transparency: 0.0,
-            show_catalog_window: false,
+            show_gallery_window: false,
             show_about_window: false,
             show_shortcuts: false,
             show_plot_picker: false,
-            catalog_search_query: String::new(),
-            catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
+            gallery_search_query: String::new(),
+            gallery_domain: None,
+            gallery_format: None,
             panel_focus: Vec::new(),
         }
     }
@@ -117,7 +120,7 @@ impl super::app_state::OctantApp {
         }
         self.show_panel(Panel::Settings, true);
         let layout = &mut self.layout;
-        layout.show_catalog_window = false;
+        layout.show_gallery_window = false;
         layout.show_about_window = false;
         layout.show_shortcuts = false;
         layout.show_plot_picker = false;

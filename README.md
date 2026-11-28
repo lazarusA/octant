@@ -3,6 +3,7 @@
 <p align="center">
   <a href="https://github.com/ndvis/octant"><img alt="github" src="https://img.shields.io/badge/github-ndvis/octant-8da0cb?logo=github"></a>
   <a href="https://ndvis.github.io/octant/"><img alt="Live Demo" src="https://img.shields.io/badge/demo-online%20(wasm)-blue?logo=webassembly&logoColor=white"></a>
+  <a href="https://ndvis.github.io/octant-docs/"><img alt="octant-docs" src="https://img.shields.io/badge/docs-octant--docs-6f42c1?logo=readthedocs&logoColor=white"></a>
   <a href="https://crates.io/crates/octant"><img alt="Latest version" src="https://img.shields.io/crates/v/octant.svg"></a>
   <a href="https://github.com/ndvis/octant/actions/workflows/rust.yml"><img alt="Build Status" src="https://github.com/ndvis/octant/actions/workflows/rust.yml/badge.svg"></a>
   <a href="https://github.com/ndvis/octant/blob/main/LICENSE-MIT"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
@@ -76,7 +77,7 @@ cargo install octant --locked
 - [NetCDF](https://www.unidata.ucar.edu/software/netcdf/) (classic and NetCDF-4), [HDF5](https://www.hdfgroup.org/solutions/hdf5/), and MATLAB v7.3 `.mat` files, local or remote (HTTP or S3), on desktop and in the browser.
 - GRIB2 files, local or remote (HTTP or S3), on desktop and in the browser (JPEG2000-packed fields on desktop only). On desktop, NOAA and ECMWF sidecar indexes (`.idx`, `.index`) speed up remote files. Zarr and Icechunk stores built on GRIB files, such as [dynamical.org](https://dynamical.org/)'s, read too.
 - Multiscale pyramids (OME-Zarr, GeoZarr `multiscales`, GeoTIFF overviews): Octant reads the level that fits the screen and loads finer detail as you zoom.
-- A built-in catalog of public datasets, from climate reanalysis to microscopy.
+- A gallery of public datasets, from climate reanalysis to microscopy, each opening on a ready view (from [octant-docs](https://ndvis.github.io/octant-docs/gallery)).
 
 ## Viewing
 

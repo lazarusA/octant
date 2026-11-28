@@ -20,7 +20,7 @@ impl OctantApp {
         }
         self.run_commands();
         self.follow_panel_focus(&ctx);
-        crate::ui::catalog::show_catalog_window(self, &ctx);
+        crate::ui::gallery::show_gallery_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);
         crate::ui::keyboard::help::show(self, &ctx);

@@ -1,4 +1,4 @@
-//! Colorbars sit in the middle order: the floating panels and the catalog's
+//! Colorbars sit in the middle order: the floating panels and the gallery's
 //! backdrop cover them, even after a colorbar was clicked (which raises it
 //! within its order).
 
@@ -23,11 +23,11 @@ fn with_settings(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     }
 }
 
-/// One frame of the colorbars and the catalog.
-fn with_catalog(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
+/// One frame of the colorbars and the gallery.
+fn with_gallery(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     |ui| {
         show_colorbar_overlay(app, ui.ctx(), SCREEN);
-        crate::ui::catalog::show_catalog_window(app, ui.ctx());
+        crate::ui::gallery::show_gallery_window(app, ui.ctx());
     }
 }
 
@@ -54,24 +54,24 @@ fn panels_draw_over_colorbars_even_after_a_colorbar_click() {
 }
 
 #[test]
-fn the_catalog_backdrop_covers_colorbars() {
+fn the_gallery_backdrop_covers_colorbars() {
     let mut app = OctantApp::default();
     let mut h = Harness::new(SCREEN);
-    h.settle(3, &mut with_catalog(&mut app));
+    h.settle(3, &mut with_gallery(&mut app));
     let at = h.area(colorbar_id()).center();
-    // Open and close the catalog, then click the colorbar, raising it.
-    app.layout.show_catalog_window = true;
-    h.settle(1, &mut with_catalog(&mut app));
-    app.layout.show_catalog_window = false;
-    h.settle(2, &mut with_catalog(&mut app));
-    h.click(at, &mut with_catalog(&mut app));
-    app.layout.show_catalog_window = true;
-    h.settle(3, &mut with_catalog(&mut app));
+    // Open and close the gallery, then click the colorbar, raising it.
+    app.layout.show_gallery_window = true;
+    h.settle(1, &mut with_gallery(&mut app));
+    app.layout.show_gallery_window = false;
+    h.settle(2, &mut with_gallery(&mut app));
+    h.click(at, &mut with_gallery(&mut app));
+    app.layout.show_gallery_window = true;
+    h.settle(3, &mut with_gallery(&mut app));
     // The modal dialog takes every hit, so compare stacking order instead.
     let order = h
         .ctx
         .memory(|m| m.layer_ids().map(|l| l.id).collect::<Vec<_>>());
     let index = |id| order.iter().position(|&l| l == id);
-    let backdrop = index(Id::unique("catalog_modal_backdrop"));
+    let backdrop = index(Id::unique("gallery_modal_backdrop"));
     assert!(backdrop > index(colorbar_id()), "{order:?}");
 }

@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "Last inn",
         DatasetKey::TargetPathHint => "https://... eller bane (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Katalog...",
+        DatasetKey::GalleryEllipsis => "Galleri...",
         DatasetKey::Clear => "Tøm",
         DatasetKey::FormatLabel => "Format:",
         DatasetKey::SampleSeasFire => "SeasFire globale skogbranner (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " vindusstørrelse (steg)",
         DatasetKey::PrefetchWorkersSuffix => " forhåndshentere (tråder)",
         DatasetKey::FlushAllCaches => "Tøm alle hurtigbuffere",
-        // Catalog
-        DatasetKey::CatalogTitle => "Datasettkatalog",
-        DatasetKey::CatalogStoreCount => "{} lagre",
-        DatasetKey::CatalogBlurb => {
-            "Utvalgte Zarr- og Icechunk-datasett i skyen og prosedyriske fasitdatasett. Velg et datasett for å laste det inn."
+        // Gallery
+        DatasetKey::GalleryTitle => "Datasettgalleri",
+        DatasetKey::GalleryStoreCount => "{} lagre",
+        DatasetKey::GalleryBlurb => {
+            "Datasett fra Octant-galleriet, hvert med en ferdig visning, og prosedyriske fasitdatasett. Velg et datasett for å laste det inn."
         }
-        DatasetKey::CatalogSearchHint => "Filtrer etter navn, beskrivelse eller URL...",
-        DatasetKey::CatalogCategory => "Kategori:",
+        DatasetKey::DomainClimate => "Klima",
+        DatasetKey::DomainWeather => "Vær",
+        DatasetKey::DomainOcean => "Hav",
+        DatasetKey::DomainEarthObservation => "Jordobservasjon",
+        DatasetKey::DomainMedical => "Medisin",
+        DatasetKey::DomainOther => "Annet",
+        DatasetKey::GalleryUnavailable => "Kunne ikke laste galleriet. Sjekk tilkoblingen og last inn på nytt.",
+        DatasetKey::GalleryLicense => "Lisens",
+        DatasetKey::GalleryCitation => "Siter som",
+        DatasetKey::GallerySourcePage => "Datasettets side",
+        DatasetKey::GalleryStore => "Lager",
+        DatasetKey::GalleryPage => "Gallerisiden",
+        DatasetKey::GalleryCopyUrl => "Kopier adressen",
+        DatasetKey::GalleryCopyDetails => "Kopier detaljer",
+        DatasetKey::GalleryUrlCopied => "Adressen er kopiert",
+        DatasetKey::GalleryDetailsCopied => "Detaljene er kopiert",
+        DatasetKey::GalleryFromDocs => "Fra galleriet i Octant-dokumentasjonen:",
+        DatasetKey::GallerySearchHint => "Filtrer etter navn, beskrivelse eller URL...",
+        DatasetKey::GalleryCategory => "Kategori:",
         DatasetKey::CategoryAll => "Alle",
         DatasetKey::CategoryProcedural => "Prosedyrisk",
-        DatasetKey::NoCatalogMatches => "Ingen datasett samsvarer med søket.",
+        DatasetKey::NoGalleryMatches => "Ingen datasett samsvarer med søket.",
         DatasetKey::ClearSearch => "Tøm søk",
-        DatasetKey::SelectAndLoadDataset => "Velg og last inn datasett",
-        DatasetKey::SelectAndLoad => "Velg og last inn",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "Typen støttes ikke",
         DatasetKey::DropReleaseToLoad => "Slipp for å laste inn datasettet",
@@ -103,7 +118,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A ekte farger COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Syntetisk 4D-volum i rom og tid",
-        DatasetKey::HeroCatalogHover => "Bla gjennom datasettkatalogen",
+        DatasetKey::HeroGalleryHover => "Bla gjennom datasettgalleriet",
         DatasetKey::LoadSampleHover => "Last inn eksempel: {}",
         DatasetKey::HeroDropLong => {
             "Slipp datasett for å laste inn (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -151,7 +166,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "Ingen felt i dette opptaket",
         DatasetKey::PlateWellUnreadable => "Kunne ikke lese brønnens felt. Klikk for å prøve igjen",
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
-        DatasetKey::CategorySoil => "Jord",
         DatasetKey::BadgeDesktopOnly => "Kun skrivebord",
         DatasetKey::DesktopOnlyHint => {
             "Denne serveren tillater ikke tilgang fra nettleseren. Åpne den i Octant-skrivebordsappen."

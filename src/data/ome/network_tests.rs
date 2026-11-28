@@ -1,15 +1,19 @@
-//! Opens every Microscopy catalog entry over the network, through the
+//! Opens every OME-Zarr entry of the docs gallery over the network, through the
 //! desktop path: run by hand with
-//! `cargo test --lib ome_catalog_entries_open -- --ignored --nocapture`.
+//! `cargo test --lib ome_gallery_entries_open -- --ignored --nocapture`.
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 #[ignore = "reads remote stores"]
-fn ome_catalog_entries_open() {
+fn ome_gallery_entries_open() {
     use crate::data::blocks::BlockStore;
     let mut failures = Vec::new();
-    for entry in crate::catalog::MICROSCOPY_CATALOG {
-        let opened = crate::data::backends::zarr::ZarrBlockStore::open_remote(entry.store)
+    let gallery = crate::gallery::remote::fetch_blocking();
+    let ome = gallery
+        .iter()
+        .filter(|e| e.format == crate::gallery::Format::OmeZarr);
+    for entry in ome {
+        let opened = crate::data::backends::zarr::ZarrBlockStore::open_remote(&entry.store)
             .map_err(|e| e.to_string())
             .and_then(|store| store.inspect().map_err(|e| e.to_string()));
         match opened {
@@ -36,7 +40,7 @@ fn ome_catalog_entries_open() {
                     }),
                 );
                 if let Ok(storage) =
-                    crate::data::backends::zarr::storage::build_sync_store(entry.store)
+                    crate::data::backends::zarr::storage::build_sync_store(&entry.store)
                     && let Some(found) =
                         super::discover_direct(storage, &super::MetaCache::shared())
                 {

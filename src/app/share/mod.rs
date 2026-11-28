@@ -23,6 +23,7 @@ use values::{camera_action, level_action, numbers, view_action};
 use super::actions::{AppAction, DimRole};
 
 mod build;
+pub(crate) use build::pair;
 #[cfg(test)]
 mod camera_tests;
 #[cfg(test)]

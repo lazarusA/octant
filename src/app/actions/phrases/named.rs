@@ -1,5 +1,5 @@
 //! What one command names: its verbs, then a plot type, a colormap (only
-//! after a colormap verb), the catalog or the dataset, its dimensions and
+//! after a colormap verb), the gallery or the dataset, its dimensions and
 //! values, a variable, a dataset to open, a group, each outside the others.
 
 use std::ops::Range;
@@ -47,10 +47,10 @@ pub(super) struct Named {
     pub colormap: Option<String>,
     pub plot_type: Option<String>,
     pub variable: Option<String>,
-    /// A dataset to open: a landing sample, catalog entry or open dataset.
+    /// A dataset to open: a landing sample, gallery entry or open dataset.
     pub source: Option<String>,
-    /// Whether it names the dataset catalog.
-    pub catalog: bool,
+    /// Whether it names the dataset gallery.
+    pub gallery: bool,
     /// Whether it names the dataset itself.
     pub dataset: bool,
     /// A group of the dataset's variables.
@@ -85,7 +85,7 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
     } else {
         None
     };
-    let catalog = take(word_of(segment, phrases.catalog, &taken), &mut taken).is_some();
+    let gallery = take(word_of(segment, phrases.gallery, &taken), &mut taken).is_some();
     let dataset = take(word_of(segment, phrases.dataset, &taken), &mut taken).is_some();
     let layers = layer_words(segment, phrases, vocab, &verbs, &mut taken);
     let dims = super::dims::dim_actions(segment, phrases, vocab, &verbs, &mut taken);
@@ -101,7 +101,7 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
         plot_type,
         variable,
         source,
-        catalog,
+        gallery,
         dataset,
         group,
         query,

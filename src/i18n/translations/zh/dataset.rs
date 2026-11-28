@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "加载",
         DatasetKey::TargetPathHint => "https://... 或路径 (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "目录...",
+        DatasetKey::GalleryEllipsis => "图库...",
         DatasetKey::Clear => "清除",
         DatasetKey::FormatLabel => "格式：",
         DatasetKey::SampleSeasFire => "SeasFire 全球野火 (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " 窗口大小（时间步）",
         DatasetKey::PrefetchWorkersSuffix => " 预取线程数",
         DatasetKey::FlushAllCaches => "清空所有缓存",
-        // Catalog
-        DatasetKey::CatalogTitle => "数据集目录",
-        DatasetKey::CatalogStoreCount => "{} 个存储",
-        DatasetKey::CatalogBlurb => {
-            "精选的云端 Zarr、Icechunk 以及程序生成的真值数据集。选择任一数据集即可加载。"
+        // Gallery
+        DatasetKey::GalleryTitle => "数据集图库",
+        DatasetKey::GalleryStoreCount => "{} 个存储",
+        DatasetKey::GalleryBlurb => {
+            "来自 Octant 图库的数据集（各带预设视图），以及程序生成的真值数据集。选择任一数据集即可加载。"
         }
-        DatasetKey::CatalogSearchHint => "按名称、描述或 URL 筛选...",
-        DatasetKey::CatalogCategory => "类别：",
+        DatasetKey::DomainClimate => "气候",
+        DatasetKey::DomainWeather => "天气",
+        DatasetKey::DomainOcean => "海洋",
+        DatasetKey::DomainEarthObservation => "对地观测",
+        DatasetKey::DomainMedical => "医学",
+        DatasetKey::DomainOther => "其他",
+        DatasetKey::GalleryUnavailable => "无法加载图库。请检查网络连接后重新加载。",
+        DatasetKey::GalleryLicense => "许可",
+        DatasetKey::GalleryCitation => "引用格式",
+        DatasetKey::GallerySourcePage => "数据集页面",
+        DatasetKey::GalleryStore => "存储",
+        DatasetKey::GalleryPage => "图库页面",
+        DatasetKey::GalleryCopyUrl => "复制地址",
+        DatasetKey::GalleryCopyDetails => "复制详细信息",
+        DatasetKey::GalleryUrlCopied => "已复制地址",
+        DatasetKey::GalleryDetailsCopied => "已复制详细信息",
+        DatasetKey::GalleryFromDocs => "来自 Octant 文档图库：",
+        DatasetKey::GallerySearchHint => "按名称、描述或 URL 筛选...",
+        DatasetKey::GalleryCategory => "类别：",
         DatasetKey::CategoryAll => "全部",
         DatasetKey::CategoryProcedural => "程序生成",
-        DatasetKey::NoCatalogMatches => "没有找到与搜索匹配的数据集。",
+        DatasetKey::NoGalleryMatches => "没有找到与搜索匹配的数据集。",
         DatasetKey::ClearSearch => "清除搜索",
-        DatasetKey::SelectAndLoadDataset => "选择并加载数据集",
-        DatasetKey::SelectAndLoad => "选择并加载",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "不支持此类型",
         DatasetKey::DropReleaseToLoad => "松开以加载数据集",
@@ -101,7 +116,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroSeasFireHover => "全球野火与气候重分块数据集 (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A 真彩色 COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "合成的 4D 时空体数据",
-        DatasetKey::HeroCatalogHover => "浏览数据集目录",
+        DatasetKey::HeroGalleryHover => "浏览数据集图库",
         DatasetKey::LoadSampleHover => "加载示例：{}",
         DatasetKey::HeroDropLong => "拖放数据集以加载 (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "拖放数据集 (.nc, .zarr, .icechunk, .tif)",
@@ -145,7 +160,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "此采集中没有视野",
         DatasetKey::PlateWellUnreadable => "无法读取孔的视野。点击重试",
         DatasetKey::CategoryMicroscopy => "显微成像",
-        DatasetKey::CategorySoil => "土壤",
         DatasetKey::BadgeDesktopOnly => "仅限桌面版",
         DatasetKey::DesktopOnlyHint => "此服务器不允许浏览器访问。请在 Octant 桌面版中打开。",
     })

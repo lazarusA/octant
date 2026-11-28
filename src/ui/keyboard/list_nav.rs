@@ -1,5 +1,5 @@
 //! Up, Down, Home and End between the focusable items of a list drawn in
-//! order (the catalog's cards), without collecting them: each item is
+//! order (the gallery's cards), without collecting them: each item is
 //! offered as it draws, and the move lands once the list has drawn. A search
 //! field over a list (`Above`) leads into it: Down in the field enters the
 //! list, Up on its first item returns to the field.

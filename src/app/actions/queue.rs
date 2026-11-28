@@ -61,7 +61,7 @@ pub struct CommandQueue {
 
 /// What a vocabulary was built from: the active dataset (its store and
 /// metadata), the open datasets, the open plate's wells and the colormaps.
-pub(super) type VocabKey = (String, u64, usize, usize, u64);
+pub(super) type VocabKey = (String, u64, usize, usize, u64, u64);
 
 impl CommandQueue {
     /// Where the action running came from.
@@ -71,6 +71,15 @@ impl CommandQueue {
 
     pub(super) fn retrying(&self) -> bool {
         self.retrying
+    }
+
+    /// Runs `actions` next, before the commands waiting, as the running
+    /// action's: what it stands for runs first, and fails as it would.
+    pub(super) fn run_next(&mut self, actions: Vec<AppAction>) {
+        let origin = self.running;
+        for action in actions.into_iter().rev() {
+            self.waiting.push_front((origin, Item::Action(action)));
+        }
     }
 
     pub(super) fn await_dataset(&mut self, store: &str) {

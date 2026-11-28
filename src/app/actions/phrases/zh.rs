@@ -49,7 +49,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["叠加", "作为图层"],
     well: &["孔"],
     field: &["视野"],
-    catalog: &["目录"],
+    gallery: &["图库", "画廊", "目录"],
     then: &["然后", "接着", "之后"],
     until: &[],
 };

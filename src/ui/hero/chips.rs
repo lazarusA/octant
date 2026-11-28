@@ -8,7 +8,7 @@ use crate::ui::keyboard::focus as key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
-/// The landing samples: label, store (or the catalog) and hover text.
+/// The landing samples: label, store (or the gallery) and hover text.
 pub(crate) const SAMPLES: [(&str, &str, DatasetKey); 4] = [
     (
         "/seasfire",
@@ -26,9 +26,9 @@ pub(crate) const SAMPLES: [(&str, &str, DatasetKey); 4] = [
         DatasetKey::HeroVolume4DHover,
     ),
     (
-        "/catalog",
-        crate::app::sources::CATALOG_SAMPLE,
-        DatasetKey::HeroCatalogHover,
+        "/gallery",
+        crate::app::sources::GALLERY_SAMPLE,
+        DatasetKey::HeroGalleryHover,
     ),
 ];
 const COUNT: usize = SAMPLES.len();
@@ -168,7 +168,7 @@ fn render_chip(
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_ui(|ui| {
-            if label.ends_with("catalog") {
+            if label.ends_with("gallery") {
                 ui.label(desc);
             } else {
                 let mut buf = [0u8; 256];

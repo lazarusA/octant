@@ -19,18 +19,19 @@ fn settle(app: &mut OctantApp) -> Vec<super::Outcome> {
 }
 
 #[test]
-fn samples_and_catalog_entries_are_one_dataset_by_any_of_their_names() {
+fn samples_and_gallery_entries_are_one_dataset_by_any_of_their_names() {
+    crate::gallery::remote::install_fixture();
     let vocab = Vocabulary::new(None, &[]);
     let Resolution::Resolved(SourceRef::Entry(entry)) = vocab.source("seasfire") else {
-        panic!("seasfire is a catalog entry");
+        panic!("seasfire is a gallery entry");
     };
     assert_eq!(
         vocab.source("SeasFire Cube"),
         Resolution::Resolved(SourceRef::Entry(entry))
     );
-    // The landing pill and the catalog entry of one store are one choice.
+    // The landing pill and the gallery entry of one store are one choice.
     let Resolution::Resolved(SourceRef::Entry(entry)) = vocab.source("procedural 4d") else {
-        panic!("the procedural pill is a catalog entry");
+        panic!("the procedural pill is a gallery entry");
     };
     assert_eq!(entry.store, "procedural://volume4d");
 }
@@ -51,6 +52,26 @@ fn the_commands_after_open_wait_for_the_dataset() {
     assert_eq!(app.selected.store_target, "procedural://volume4d");
 }
 
+/// A gallery entry opens through its view (a share link) run as the
+/// command itself, so the commands after it wait for that store: not for
+/// the one open before, nor dropped while nothing was open.
+#[test]
+fn the_commands_after_a_gallery_entry_wait_for_its_store() {
+    crate::gallery::remote::install_fixture();
+    let mut app = OctantApp::default();
+    let first = app.run_utterance("open fixture matrix, then plot");
+    assert!(
+        matches!(first.first(), Some(Ok(Done::Opening(_)))),
+        "{first:?}"
+    );
+    let rest = settle(&mut app);
+    assert!(
+        rest.iter().any(|o| matches!(o, Ok(Done::Plotted { .. }))),
+        "{rest:?}"
+    );
+    assert_eq!(app.selected.store_target, "procedural://matrix2d");
+}
+
 #[test]
 fn a_dataset_that_fails_to_load_drops_the_commands_after_it() {
     let (mut app, _) = memory_app();
@@ -66,11 +87,11 @@ fn a_dataset_that_fails_to_load_drops_the_commands_after_it() {
 }
 
 #[test]
-fn open_catalog_shows_it() {
+fn open_gallery_shows_it() {
     let (mut app, _) = memory_app();
     assert_eq!(
-        app.run_utterance("open the catalog"),
-        vec![Ok(Done::CatalogOpened)]
+        app.run_utterance("open the gallery"),
+        vec![Ok(Done::GalleryOpened)]
     );
-    assert!(app.layout.show_catalog_window);
+    assert!(app.layout.show_gallery_window);
 }

@@ -47,7 +47,7 @@ define_icons! {
         Layers,
     ],
     "Data Store & Files" => [
-        Dataset, Folder, FolderOpen, VariableDoc, Icechunk, Catalog, Save, Snapshot, DropTray,
+        Dataset, Folder, FolderOpen, VariableDoc, Icechunk, Gallery, Save, Snapshot, DropTray,
         Search, Trash, Clipboard, Share,
     ],
     "Tools & Status Badges" => [

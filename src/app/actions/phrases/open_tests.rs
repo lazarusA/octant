@@ -1,4 +1,4 @@
-//! Datasets, the catalog and typed addresses opened in every language.
+//! Datasets, the gallery and typed addresses opened in every language.
 
 use super::tests::{action, say, vocab};
 use super::{Verb, commands, parse, table};
@@ -6,15 +6,15 @@ use crate::app::actions::AppAction;
 use crate::i18n::Language;
 
 #[test]
-fn every_language_opens_the_catalog_and_a_dataset_by_name() {
+fn every_language_opens_the_gallery_and_a_dataset_by_name() {
     let vocab = vocab();
     for &lang in Language::ALL {
         let open = say(lang, Verb::Open);
-        let catalog = format!("{open} {}", table(lang).catalog[0]);
+        let gallery = format!("{open} {}", table(lang).gallery[0]);
         assert_eq!(
-            parse(&catalog, &vocab, lang),
-            [action(AppAction::OpenCatalog)],
-            "{lang:?} '{catalog}'"
+            parse(&gallery, &vocab, lang),
+            [action(AppAction::OpenGallery)],
+            "{lang:?} '{gallery}'"
         );
         let entry = format!("{open} seasfire");
         assert_eq!(
@@ -126,6 +126,6 @@ fn punctuation_after_a_wide_space_ends_the_command() {
         ("open the catalog\u{202f}!", Language::English),
     ] {
         let parsed = parse(said, &vocab, lang);
-        assert_eq!(parsed, [action(AppAction::OpenCatalog)], "{said}");
+        assert_eq!(parsed, [action(AppAction::OpenGallery)], "{said}");
     }
 }
