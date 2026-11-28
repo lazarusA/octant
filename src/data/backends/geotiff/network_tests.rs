@@ -1,9 +1,8 @@
-//! Opens every GeoTIFF and Soil catalog entry over the network, through the
+//! Opens every GeoTIFF entry of the docs gallery over the network, through the
 //! desktop path, and checks that the browser can read exactly the entries not
 //! marked desktop-only (their servers answer a cross-origin request): run by
-//! hand with `cargo test --lib geotiff_catalog_entries_open -- --ignored --nocapture`.
+//! hand with `cargo test --lib geotiff_gallery_entries_open -- --ignored --nocapture`.
 
-use crate::catalog::{CatalogCategoryFilter, get_catalog_entries};
 use crate::data::blocks::BlockStore;
 
 /// Whether `url` answers a cross-origin range request with an
@@ -25,21 +24,24 @@ fn allows_browser(client: &reqwest::blocking::Client, url: &str) -> Result<bool,
 
 #[test]
 #[ignore = "reads remote stores"]
-fn geotiff_catalog_entries_open() {
+fn geotiff_gallery_entries_open() {
     let client = reqwest::blocking::Client::new();
     let mut failures = Vec::new();
-    let categories = [CatalogCategoryFilter::GeoTiff, CatalogCategoryFilter::Soil];
-    for entry in categories.into_iter().flat_map(get_catalog_entries) {
-        match allows_browser(&client, entry.store) {
-            Ok(cors) if cors == entry.desktop_only() => failures.push(format!(
+    let gallery = crate::gallery::remote::fetch_blocking();
+    let geotiffs = gallery
+        .iter()
+        .filter(|e| e.format == crate::gallery::Format::GeoTiff);
+    for entry in geotiffs {
+        let store = entry.store.as_str();
+        match allows_browser(&client, store) {
+            Ok(cors) if cors == entry.desktop_only => failures.push(format!(
                 "{}: CORS {cors}, but desktop_only is {}",
-                entry.key,
-                entry.desktop_only()
+                entry.key, entry.desktop_only
             )),
             Ok(_) => {}
             Err(e) => failures.push(format!("{}: {e}", entry.key)),
         }
-        let opened = super::store::GeoTiffBlockStore::open(entry.store)
+        let opened = super::store::GeoTiffBlockStore::open(store)
             .map_err(|e| e.to_string())
             .and_then(|store| store.inspect().map_err(|e| e.to_string()));
         match opened {
@@ -69,11 +71,8 @@ fn geotiff_catalog_entries_open() {
 #[test]
 #[ignore = "reads remote stores"]
 fn scaled_geotiff_reads_physical_values() {
-    let entry = crate::catalog::SOIL_CATALOG
-        .iter()
-        .find(|e| e.key == "olm-soildb-ph-120m")
-        .expect("pH entry");
-    let store = super::store::GeoTiffBlockStore::open(entry.store).expect("open");
+    let ph = "https://s3.opengeohub.org/global-soil/global_soil_props_v20250204_mosaics/ph.h2o_iso.10390.2021.index_m_120m_b0cm..30cm_20200101_20221231_g_epsg.4326_v20250204.tif";
+    let store = super::store::GeoTiffBlockStore::open(ph).expect("open");
     let meta = store.inspect().expect("inspect");
     let coarsest = meta
         .variables

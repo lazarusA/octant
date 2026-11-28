@@ -42,6 +42,7 @@ const ALLOWED: &[&str] = &[
     "@lazarusA",
     "github.com/ndvis/octant",
     "github.com/ndvis/octant/issues",
+    "ndvis.github.io/octant-docs",
     "Zarr",
     "Icechunk",
     "NetCDF",

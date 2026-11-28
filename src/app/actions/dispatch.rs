@@ -9,9 +9,9 @@ impl OctantApp {
     pub fn dispatch(&mut self, action: AppAction) -> Outcome {
         match action {
             AppAction::OpenSource { source } => self.open_by_name(&source),
-            AppAction::OpenCatalog => {
-                self.open_sample(crate::app::sources::CATALOG_SAMPLE);
-                Ok(Done::CatalogOpened)
+            AppAction::OpenGallery => {
+                self.open_sample(crate::app::sources::GALLERY_SAMPLE);
+                Ok(Done::GalleryOpened)
             }
             AppAction::DescribeDataset { group } => self.describe_dataset(group.as_deref()),
             AppAction::Search { text } => self.search_variables(&text),

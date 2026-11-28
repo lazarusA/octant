@@ -1,5 +1,6 @@
-//! Opening a dataset by name through the calls the pills and the catalog
-//! make (`app::sources`); the commands after it wait for it to load.
+//! Opening a dataset by name through the calls the pills and the gallery
+//! make (`app::sources`); the commands after it wait for it to load, and a
+//! gallery entry's view.
 
 use super::resolve::Resolution;
 use super::source_names::SourceRef;
@@ -19,10 +20,19 @@ impl OctantApp {
                 name.to_string()
             }
             SourceRef::Entry(entry) => {
-                if !self.open_catalog_entry(entry) {
+                if self.gallery_entry_refused(entry) {
                     return Err(Failure::Refused);
                 }
-                entry.label.to_string()
+                self.layout.show_gallery_window = false;
+                // Its view (a share link) runs next, as this command: its
+                // `OpenSource` waits for the store, and the commands after
+                // it wait for the view.
+                if let Some(actions) = crate::app::share::parse_share(&entry.link()) {
+                    self.commands.run_next(actions);
+                    return Ok(Done::Opening(entry.label.clone()));
+                }
+                self.submit_or_activate_source(&entry.store, None);
+                entry.label.clone()
             }
             SourceRef::Store(uri) => {
                 self.submit_or_activate_source(uri, None);

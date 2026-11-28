@@ -24,7 +24,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BadgeStore => "Сховище",
         DatasetKey::Load => "Завантажити",
         DatasetKey::TargetPathHint => "https://... або шлях (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Каталог...",
+        DatasetKey::GalleryEllipsis => "Галерея...",
         DatasetKey::Clear => "Очистити",
         DatasetKey::FormatLabel => "Формат:",
         DatasetKey::SampleSeasFire => "SeasFire: глобальні пожежі (Zarr)",
@@ -73,19 +73,34 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " розмір вікна (кроки)",
         DatasetKey::PrefetchWorkersSuffix => " обробники завантаження (потоки)",
         DatasetKey::FlushAllCaches => "Скинути та очистити всі кеші",
-        DatasetKey::CatalogTitle => "Каталог наборів даних",
-        DatasetKey::CatalogStoreCount => "Сховищ: {}",
-        DatasetKey::CatalogBlurb => {
-            "Добірка хмарних Zarr, Icechunk та процедурних еталонних наборів даних. Виберіть будь-який набір, щоб завантажити."
+        DatasetKey::GalleryTitle => "Галерея наборів даних",
+        DatasetKey::GalleryStoreCount => "Сховищ: {}",
+        DatasetKey::GalleryBlurb => {
+            "Набори даних із галереї Octant, кожен із готовим виглядом, і процедурні еталонні дані. Виберіть будь-який набір, щоб завантажити."
         }
-        DatasetKey::CatalogSearchHint => "Фільтр за назвою, описом або URL...",
-        DatasetKey::CatalogCategory => "Категорія:",
+        DatasetKey::DomainClimate => "Клімат",
+        DatasetKey::DomainWeather => "Погода",
+        DatasetKey::DomainOcean => "Океан",
+        DatasetKey::DomainEarthObservation => "Спостереження Землі",
+        DatasetKey::DomainMedical => "Медицина",
+        DatasetKey::DomainOther => "Інше",
+        DatasetKey::GalleryUnavailable => "Не вдалося завантажити галерею. Перевірте з'єднання та перезавантажте.",
+        DatasetKey::GalleryLicense => "Ліцензія",
+        DatasetKey::GalleryCitation => "Цитувати як",
+        DatasetKey::GallerySourcePage => "Сторінка набору даних",
+        DatasetKey::GalleryStore => "Сховище",
+        DatasetKey::GalleryPage => "Сторінка в галереї",
+        DatasetKey::GalleryCopyUrl => "Копіювати адресу",
+        DatasetKey::GalleryCopyDetails => "Копіювати відомості",
+        DatasetKey::GalleryUrlCopied => "Адресу скопійовано",
+        DatasetKey::GalleryDetailsCopied => "Відомості скопійовано",
+        DatasetKey::GalleryFromDocs => "З галереї документації Octant:",
+        DatasetKey::GallerySearchHint => "Фільтр за назвою, описом або URL...",
+        DatasetKey::GalleryCategory => "Категорія:",
         DatasetKey::CategoryAll => "Усі",
         DatasetKey::CategoryProcedural => "Процедурні",
-        DatasetKey::NoCatalogMatches => "Не знайдено наборів даних за вашим запитом.",
+        DatasetKey::NoGalleryMatches => "Не знайдено наборів даних за вашим запитом.",
         DatasetKey::ClearSearch => "Очистити пошук",
-        DatasetKey::SelectAndLoadDataset => "Вибрати та завантажити набір",
-        DatasetKey::SelectAndLoad => "Вибрати та завантажити",
         DatasetKey::DropTypeNotSupported => "Тип не підтримується",
         DatasetKey::DropReleaseToLoad => "Відпустіть, щоб завантажити набір даних",
         DatasetKey::DropSupportedList => "Підтримуються: {}",
@@ -94,7 +109,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A COG у справжніх кольорах (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Синтетичний 4D просторово-часовий об'єм",
-        DatasetKey::HeroCatalogHover => "Переглянути каталог наборів даних",
+        DatasetKey::HeroGalleryHover => "Переглянути галерею наборів даних",
         DatasetKey::LoadSampleHover => "Завантажити зразок: {}",
         DatasetKey::HeroDropLong => {
             "Відпустіть набір даних, щоб завантажити (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -143,7 +158,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Не вдалося прочитати поля лунки. Натисніть, щоб повторити"
         }
         DatasetKey::CategoryMicroscopy => "Мікроскопія",
-        DatasetKey::CategorySoil => "Ґрунт",
         DatasetKey::BadgeDesktopOnly => "Лише для ПК",
         DatasetKey::DesktopOnlyHint => {
             "Цей сервер не дозволяє доступ із браузера. Відкрийте його в настільному застосунку Octant."

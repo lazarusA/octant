@@ -110,8 +110,17 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     ui.horizontal_wrapped(|ui| {
-        ui.icon(Icon::Catalog, IconSize::Sm);
+        ui.icon(Icon::Gallery, IconSize::Sm);
         ui.hyperlink_to("github.com/ndvis/octant", "https://github.com/ndvis/octant");
+    });
+    // The guides and dataset gallery (octant-docs); the API documentation
+    // (docs.rs) is the next link.
+    ui.horizontal_wrapped(|ui| {
+        ui.icon(Icon::Info, IconSize::Sm);
+        ui.hyperlink_to(
+            "ndvis.github.io/octant-docs",
+            "https://ndvis.github.io/octant-docs/",
+        );
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::VariableDoc, IconSize::Sm);

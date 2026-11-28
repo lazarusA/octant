@@ -11,7 +11,7 @@ use crate::ui::toast::{Notice, Severity};
 pub(super) fn done_text(done: &Done) -> String {
     match done {
         Done::Opening(name) => filled(tr(PlaybackKey::VoiceDidOpen), &[name]),
-        Done::CatalogOpened => tr(DatasetKey::CatalogTitle).to_string(),
+        Done::GalleryOpened => tr(DatasetKey::GalleryTitle).to_string(),
         Done::DatasetShown {
             name, variables, ..
         } => filled(tr(PlaybackKey::VoiceDatasetSummary), &[name, variables]),

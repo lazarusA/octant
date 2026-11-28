@@ -14,7 +14,7 @@ use super::AppAction;
 
 /// Names listed as an argument's `enum` at most; past it the argument is
 /// free text.
-// shortcut: a fixed cut-off, not yet measured on the catalog's datasets;
+// shortcut: a fixed cut-off, not yet measured on the gallery's datasets;
 // measure the tool list's tokens there when the assistant (phase 5) lands.
 const MAX_ENUM: usize = 200;
 

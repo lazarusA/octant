@@ -1,33 +1,34 @@
-//! Responsive Dataset Catalog modal dialog.
+//! Responsive Dataset Gallery modal dialog.
 
 pub mod card;
+mod details;
 pub mod filters;
 pub mod header;
 pub mod list;
 #[cfg(test)]
 mod tests;
+mod thumbs;
 
-pub use card::render_entry_card;
 pub use filters::render_search_and_filters;
 pub use header::render_header;
-pub use list::{contains_ignore_ascii_case, render_entries_list};
+pub use list::render_entries_list;
 
 use crate::app::OctantApp;
 use crate::ui::keyboard::windows;
 
-/// Render the responsive, centered Dataset Catalog modal dialog.
-pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
-    let modal_id = egui::Id::unique("catalog_modal_dialog");
-    let opened = windows::follow_window(ctx, modal_id, app.layout.show_catalog_window);
-    if !app.layout.show_catalog_window {
+/// Render the responsive, centered Dataset Gallery modal dialog.
+pub fn show_gallery_window(app: &mut OctantApp, ctx: &egui::Context) {
+    let modal_id = egui::Id::unique("gallery_modal_dialog");
+    let opened = windows::follow_window(ctx, modal_id, app.layout.show_gallery_window);
+    if !app.layout.show_gallery_window {
         return;
     }
 
     let screen_rect = ctx.viewport_rect();
     let is_mobile = screen_rect.width() < 520.0;
 
-    let modal_w = (screen_rect.width() - 24.0).clamp(280.0, 780.0);
-    let modal_h = (screen_rect.height() - 36.0).clamp(320.0, 680.0);
+    let modal_w = (screen_rect.width() - 24.0).clamp(280.0, 920.0);
+    let modal_h = (screen_rect.height() - 36.0).clamp(320.0, 760.0);
     let modal_rect =
         egui::Rect::from_center_size(screen_rect.center(), egui::vec2(modal_w, modal_h));
 
@@ -36,7 +37,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut should_close = windows::dismissed(ctx, modal_rect);
 
     // 1. Scrim / Backdrop overlay: dims the background
-    let backdrop_id = egui::Id::unique("catalog_modal_backdrop");
+    let backdrop_id = egui::Id::unique("gallery_modal_backdrop");
     egui::Area::new(backdrop_id)
         .fixed_pos(screen_rect.min)
         .order(egui::Order::Middle)
@@ -63,21 +64,23 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                 .inner_margin(egui::Margin::symmetric(14, 12))
                 .corner_radius(8.0)
                 .show(ui, |ui| {
-                    let total_count = crate::catalog::total_entries();
+                    // Read once a frame: the list and its counts agree.
+                    let gallery = crate::gallery::current();
+                    let total_count = crate::gallery::all_entries(&gallery).count();
 
                     render_header(ui, total_count, &mut should_close);
                     ui.add_space(8.0);
 
-                    let search = render_search_and_filters(app, ui, is_mobile, total_count, opened);
+                    let search = render_search_and_filters(app, ui, is_mobile, &gallery, opened);
                     ui.add_space(8.0);
                     ui.separator();
                     ui.add_space(4.0);
 
-                    render_entries_list(app, ui, is_mobile, &mut should_close, search);
+                    render_entries_list(app, ui, &gallery, is_mobile, &mut should_close, search);
                 });
         });
 
     if should_close {
-        app.layout.show_catalog_window = false;
+        app.layout.show_gallery_window = false;
     }
 }

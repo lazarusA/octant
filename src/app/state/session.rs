@@ -28,6 +28,7 @@ impl OctantApp {
             crate::data::backends::local::install_drop_listener(&cc.egui_ctx);
         }
         app.load_colormap_prefs(cc.storage);
+        crate::gallery::remote::fetch(&cc.egui_ctx);
 
         // The desktop's command line is opened by `start` (`app/snapshot`).
         // The page's own share link (`?src=...`); any other query is ignored.

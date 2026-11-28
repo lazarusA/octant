@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "Charger",
         DatasetKey::TargetPathHint => "https://... ou chemin (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Catalogue...",
+        DatasetKey::GalleryEllipsis => "Galerie...",
         DatasetKey::Clear => "Effacer",
         DatasetKey::FormatLabel => "Format :",
         DatasetKey::SampleSeasFire => "SeasFire, feux de forêt mondiaux (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " taille de fenêtre (pas)",
         DatasetKey::PrefetchWorkersSuffix => " workers de préchargement (threads)",
         DatasetKey::FlushAllCaches => "Vider tous les caches",
-        // Catalog
-        DatasetKey::CatalogTitle => "Catalogue de jeux de données",
-        DatasetKey::CatalogStoreCount => "{} dépôts",
-        DatasetKey::CatalogBlurb => {
-            "Jeux de données Zarr et Icechunk dans le cloud et jeux procéduraux de vérité terrain, sélectionnés avec soin. Sélectionnez un jeu de données pour le charger."
+        // Gallery
+        DatasetKey::GalleryTitle => "Galerie de jeux de données",
+        DatasetKey::GalleryStoreCount => "{} dépôts",
+        DatasetKey::GalleryBlurb => {
+            "Jeux de données de la galerie Octant, chacun ouvert sur une vue prête, et jeux procéduraux de vérité terrain. Sélectionnez-en un pour le charger."
         }
-        DatasetKey::CatalogSearchHint => "Filtrer par nom, description ou URL...",
-        DatasetKey::CatalogCategory => "Catégorie :",
+        DatasetKey::DomainClimate => "Climat",
+        DatasetKey::DomainWeather => "Météo",
+        DatasetKey::DomainOcean => "Océan",
+        DatasetKey::DomainEarthObservation => "Observation de la Terre",
+        DatasetKey::DomainMedical => "Médical",
+        DatasetKey::DomainOther => "Autres",
+        DatasetKey::GalleryUnavailable => "Impossible de charger la galerie. Vérifiez la connexion, puis rechargez.",
+        DatasetKey::GalleryLicense => "Licence",
+        DatasetKey::GalleryCitation => "Citer comme",
+        DatasetKey::GallerySourcePage => "Page du jeu de données",
+        DatasetKey::GalleryStore => "Dépôt",
+        DatasetKey::GalleryPage => "Page de la galerie",
+        DatasetKey::GalleryCopyUrl => "Copier l'adresse",
+        DatasetKey::GalleryCopyDetails => "Copier les détails",
+        DatasetKey::GalleryUrlCopied => "Adresse copiée",
+        DatasetKey::GalleryDetailsCopied => "Détails copiés",
+        DatasetKey::GalleryFromDocs => "Issus de la galerie de la documentation d'Octant :",
+        DatasetKey::GallerySearchHint => "Filtrer par nom, description ou URL...",
+        DatasetKey::GalleryCategory => "Catégorie :",
         DatasetKey::CategoryAll => "Tous",
         DatasetKey::CategoryProcedural => "Procédural",
-        DatasetKey::NoCatalogMatches => "Aucun jeu de données ne correspond à votre recherche.",
+        DatasetKey::NoGalleryMatches => "Aucun jeu de données ne correspond à votre recherche.",
         DatasetKey::ClearSearch => "Effacer la recherche",
-        DatasetKey::SelectAndLoadDataset => "Sélectionner et charger le jeu de données",
-        DatasetKey::SelectAndLoad => "Sélectionner et charger",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "Type non pris en charge",
         DatasetKey::DropReleaseToLoad => "Relâchez pour charger le jeu de données",
@@ -101,7 +116,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroSeasFireHover => "Jeu de données mondial feux et climat, rechunké (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A couleurs vraies COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Volume spatio-temporel 4D synthétique",
-        DatasetKey::HeroCatalogHover => "Parcourir le catalogue de jeux de données",
+        DatasetKey::HeroGalleryHover => "Parcourir la galerie de jeux de données",
         DatasetKey::LoadSampleHover => "Charger l'exemple : {}",
         DatasetKey::HeroDropLong => {
             "Déposez un jeu de données à charger (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -153,7 +168,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Impossible de lire les champs du puits. Cliquez pour réessayer"
         }
         DatasetKey::CategoryMicroscopy => "Microscopie",
-        DatasetKey::CategorySoil => "Sol",
         DatasetKey::BadgeDesktopOnly => "Bureau uniquement",
         DatasetKey::DesktopOnlyHint => {
             "Ce serveur n'autorise pas l'accès depuis le navigateur. Ouvrez-le dans l'application de bureau Octant."

@@ -3,7 +3,7 @@
 use super::Verb;
 use crate::i18n::Language;
 
-/// A language's phrasings of each verb, the catalog's name, and the words
+/// A language's phrasings of each verb, the gallery's name, and the words
 /// that end one command and start the next ("then").
 pub(super) struct Phrases {
     pub verbs: &'static [(Verb, &'static [&'static str])],
@@ -20,8 +20,8 @@ pub(super) struct Phrases {
     /// A plate's well and a well's field.
     pub well: &'static [&'static str],
     pub field: &'static [&'static str],
-    /// The dataset catalog's name.
-    pub catalog: &'static [&'static str],
+    /// The dataset gallery's name.
+    pub gallery: &'static [&'static str],
     pub then: &'static [&'static str],
     /// The words between the two ends of a range of days ("15 to 20
     /// January"); none in Chinese, Japanese and Korean, whose days are

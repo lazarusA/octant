@@ -24,7 +24,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BadgeStore => "Säilö",
         DatasetKey::Load => "Lataa",
         DatasetKey::TargetPathHint => "https://... tai polku (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Luettelo...",
+        DatasetKey::GalleryEllipsis => "Galleria...",
         DatasetKey::Clear => "Tyhjennä",
         DatasetKey::FormatLabel => "Muoto:",
         DatasetKey::SampleSeasFire => "SeasFire, maailman maastopalot (Zarr)",
@@ -73,19 +73,34 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " ikkunan koko (askelta)",
         DatasetKey::PrefetchWorkersSuffix => " esihakusäiettä",
         DatasetKey::FlushAllCaches => "Tyhjennä kaikki välimuistit",
-        DatasetKey::CatalogTitle => "Aineistoluettelo",
-        DatasetKey::CatalogStoreCount => "{} säilöä",
-        DatasetKey::CatalogBlurb => {
-            "Valikoituja Zarr- ja Icechunk-pilviaineistoja sekä proseduraalisia vertailuaineistoja. Valitse aineisto ladataksesi sen."
+        DatasetKey::GalleryTitle => "Aineistogalleria",
+        DatasetKey::GalleryStoreCount => "{} säilöä",
+        DatasetKey::GalleryBlurb => {
+            "Octant-gallerian aineistoja valmiine näkymineen sekä proseduraalisia vertailuaineistoja. Valitse aineisto ladataksesi sen."
         }
-        DatasetKey::CatalogSearchHint => "Suodata nimen, kuvauksen tai URL:n mukaan...",
-        DatasetKey::CatalogCategory => "Luokka:",
+        DatasetKey::DomainClimate => "Ilmasto",
+        DatasetKey::DomainWeather => "Sää",
+        DatasetKey::DomainOcean => "Meri",
+        DatasetKey::DomainEarthObservation => "Kaukokartoitus",
+        DatasetKey::DomainMedical => "Lääketiede",
+        DatasetKey::DomainOther => "Muut",
+        DatasetKey::GalleryUnavailable => "Galleriaa ei voitu ladata. Tarkista yhteys ja lataa uudelleen.",
+        DatasetKey::GalleryLicense => "Lisenssi",
+        DatasetKey::GalleryCitation => "Viittaa",
+        DatasetKey::GallerySourcePage => "Aineiston sivu",
+        DatasetKey::GalleryStore => "Säilö",
+        DatasetKey::GalleryPage => "Gallerian sivu",
+        DatasetKey::GalleryCopyUrl => "Kopioi osoite",
+        DatasetKey::GalleryCopyDetails => "Kopioi tiedot",
+        DatasetKey::GalleryUrlCopied => "Osoite kopioitu",
+        DatasetKey::GalleryDetailsCopied => "Tiedot kopioitu",
+        DatasetKey::GalleryFromDocs => "Octant-dokumentaation galleriasta:",
+        DatasetKey::GallerySearchHint => "Suodata nimen, kuvauksen tai URL:n mukaan...",
+        DatasetKey::GalleryCategory => "Luokka:",
         DatasetKey::CategoryAll => "Kaikki",
         DatasetKey::CategoryProcedural => "Proseduraalinen",
-        DatasetKey::NoCatalogMatches => "Hakuasi vastaavia aineistoja ei löytynyt.",
+        DatasetKey::NoGalleryMatches => "Hakuasi vastaavia aineistoja ei löytynyt.",
         DatasetKey::ClearSearch => "Tyhjennä haku",
-        DatasetKey::SelectAndLoadDataset => "Valitse ja lataa aineisto",
-        DatasetKey::SelectAndLoad => "Valitse ja lataa",
         DatasetKey::DropTypeNotSupported => "Tyyppiä ei tueta",
         DatasetKey::DropReleaseToLoad => "Vapauta ladataksesi aineiston",
         DatasetKey::DropSupportedList => "Tuetut: {}",
@@ -94,7 +109,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         }
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A, luonnolliset värit, COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Synteettinen 4D-aika-avaruustilavuus",
-        DatasetKey::HeroCatalogHover => "Selaa aineistoluetteloa",
+        DatasetKey::HeroGalleryHover => "Selaa aineistogalleriaa",
         DatasetKey::LoadSampleHover => "Lataa esimerkki: {}",
         DatasetKey::HeroDropLong => {
             "Pudota aineisto ladataksesi (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -143,7 +158,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Kuopan kenttiä ei voitu lukea. Yritä uudelleen napsauttamalla"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopia",
-        DatasetKey::CategorySoil => "Maaperä",
         DatasetKey::BadgeDesktopOnly => "Vain työpöytä",
         DatasetKey::DesktopOnlyHint => {
             "Tämä palvelin ei salli selaimen käyttöä. Avaa se Octantin työpöytäsovelluksessa."

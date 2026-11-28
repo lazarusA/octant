@@ -221,6 +221,7 @@ impl crate::app::OctantApp {
             self.dataset_manager.len(),
             wells,
             crate::utils::colormap::registry::generation(),
+            crate::gallery::remote::generation(),
         );
         let kept = match self.commands.vocab.take() {
             Some((k, vocab)) if k == key => vocab,

@@ -17,11 +17,7 @@ fn crs_of_real_stores() {
         handle.inspect().expect("inspect")
     };
     let tci = "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif";
-    let eopf = crate::catalog::get_catalog_entries(crate::catalog::CatalogCategoryFilter::Zarr)
-        .iter()
-        .find(|e| e.key == "eopf-s2-l2a-krasnokutsk")
-        .expect("EOPF entry")
-        .store;
+    let eopf = "https://s3.explorer.eopf.copernicus.eu/esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a/S2C_MSIL2A_20260120T084301_N0511_R064_T36UXA_20260120T122910.zarr/measurements/reflectance";
     for (kind, target) in [
         (StoreKind::RemoteGeoTiff, tci),
         (StoreKind::RemoteZarr, eopf),

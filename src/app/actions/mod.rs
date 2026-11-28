@@ -64,13 +64,13 @@ pub enum AppAction {
     SelectVariable {
         path: String,
     },
-    /// Opens a dataset: a landing sample, catalog entry or open dataset by
+    /// Opens a dataset: a landing sample, gallery entry or open dataset by
     /// name, or an address; the commands after it wait until it loads.
     OpenSource {
         source: String,
     },
-    /// Shows the dataset catalog.
-    OpenCatalog,
+    /// Shows the dataset gallery.
+    OpenGallery,
     /// What the active dataset (or its group `group`) holds.
     DescribeDataset {
         #[serde(default, skip_serializing_if = "Option::is_none")]

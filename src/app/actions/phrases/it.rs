@@ -81,7 +81,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["sovrapposto", "sovrapposizione", "sopra", "come livello"],
     well: &["pozzetto"],
     field: &["campo"],
-    catalog: &["catalogo"],
+    gallery: &["galleria", "catalogo"],
     then: &["poi", "quindi", "e poi", "dopo"],
     until: &["a", "al", "fino", "e"],
 };

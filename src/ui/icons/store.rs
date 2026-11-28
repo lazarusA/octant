@@ -63,8 +63,8 @@ pub fn draw_icechunk(c: &IconCanvas) {
     }
 }
 
-/// Catalog: three volumes on a shelf, the last one leaning (18x17 keyline).
-pub fn draw_catalog(c: &IconCanvas) {
+/// Gallery: three volumes on a shelf, the last one leaning (18x17 keyline).
+pub fn draw_gallery(c: &IconCanvas) {
     let s = c.stroke(Weight::Base);
     c.rrect((4.0, 5.0), (8.0, 20.0), 1.0, c.body(), s);
     c.rrect((9.5, 3.5), (13.5, 20.0), 1.0, c.shade(Shade::Soft), s);

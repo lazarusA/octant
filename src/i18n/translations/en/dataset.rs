@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> &'static str {
         // Source intake
         DatasetKey::Load => "Load",
         DatasetKey::TargetPathHint => "https://... or path (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "Catalog...",
+        DatasetKey::GalleryEllipsis => "Gallery...",
         DatasetKey::Clear => "Clear",
         DatasetKey::FormatLabel => "Format:",
         DatasetKey::SampleSeasFire => "SeasFire Global Wildfire (Zarr)",
@@ -79,20 +79,25 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::WindowSizeSuffix => " Window Size (steps)",
         DatasetKey::PrefetchWorkersSuffix => " Prefetch Workers (threads)",
         DatasetKey::FlushAllCaches => "Flush & Clear All Caches",
-        // Catalog
-        DatasetKey::CatalogTitle => "Dataset Catalog",
-        DatasetKey::CatalogStoreCount => "{} stores",
-        DatasetKey::CatalogBlurb => {
-            "Curated cloud Zarr, Icechunk, and procedural ground-truth datasets. Select any dataset to load."
+        // Gallery
+        DatasetKey::GalleryTitle => "Dataset Gallery",
+        DatasetKey::GalleryStoreCount => "{} stores",
+        DatasetKey::GalleryBlurb => {
+            "Datasets from the Octant gallery, each opening on a ready-made view, plus procedural ground-truth datasets. Select one to load."
         }
-        DatasetKey::CatalogSearchHint => "Filter by name, description, or URL...",
-        DatasetKey::CatalogCategory => "Category:",
+        DatasetKey::GalleryStore => "Store",
+        DatasetKey::GalleryPage => "Gallery page",
+        DatasetKey::GalleryCopyUrl => "Copy address",
+        DatasetKey::GalleryCopyDetails => "Copy details",
+        DatasetKey::GalleryUrlCopied => "Address copied",
+        DatasetKey::GalleryDetailsCopied => "Details copied",
+        DatasetKey::GalleryFromDocs => "Listed in the Octant docs gallery:",
+        DatasetKey::GallerySearchHint => "Filter by name, description, or URL...",
+        DatasetKey::GalleryCategory => "Category:",
         DatasetKey::CategoryAll => "All",
         DatasetKey::CategoryProcedural => "Procedural",
-        DatasetKey::NoCatalogMatches => "No datasets found matching your search.",
+        DatasetKey::NoGalleryMatches => "No datasets found matching your search.",
         DatasetKey::ClearSearch => "Clear Search",
-        DatasetKey::SelectAndLoadDataset => "Select & Load Dataset",
-        DatasetKey::SelectAndLoad => "Select & Load",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "Type not supported",
         DatasetKey::DropReleaseToLoad => "Release to load dataset",
@@ -101,7 +106,7 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::HeroSeasFireHover => "Global wildfire & climate rechunked dataset (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A True Color COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Synthetic 4D spatiotemporal volume",
-        DatasetKey::HeroCatalogHover => "Browse dataset catalog",
+        DatasetKey::HeroGalleryHover => "Browse the dataset gallery",
         DatasetKey::LoadSampleHover => "Load sample: {}",
         DatasetKey::HeroDropLong => "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "Drop dataset (.nc, .zarr, .icechunk, .tif)",
@@ -147,10 +152,19 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::PlateNoFields => "No fields in this acquisition",
         DatasetKey::PlateWellUnreadable => "Couldn't read the well's fields. Click to try again",
         DatasetKey::CategoryMicroscopy => "Microscopy",
-        DatasetKey::CategorySoil => "Soil",
         DatasetKey::BadgeDesktopOnly => "Desktop only",
         DatasetKey::DesktopOnlyHint => {
             "This server does not allow browser access. Open it in the Octant desktop app."
         }
+        DatasetKey::DomainClimate => "Climate",
+        DatasetKey::DomainWeather => "Weather",
+        DatasetKey::DomainOcean => "Ocean",
+        DatasetKey::DomainEarthObservation => "Earth observation",
+        DatasetKey::DomainMedical => "Medical",
+        DatasetKey::DomainOther => "Other",
+        DatasetKey::GalleryUnavailable => "Couldn't load the gallery. Check your connection, then reload.",
+        DatasetKey::GalleryLicense => "License",
+        DatasetKey::GalleryCitation => "Cite as",
+        DatasetKey::GallerySourcePage => "Dataset page",
     }
 }

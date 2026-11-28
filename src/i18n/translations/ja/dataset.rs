@@ -27,7 +27,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         // Source intake
         DatasetKey::Load => "読み込み",
         DatasetKey::TargetPathHint => "https://... またはパス (.zarr, .nc, .tif)",
-        DatasetKey::CatalogEllipsis => "カタログ...",
+        DatasetKey::GalleryEllipsis => "ギャラリー...",
         DatasetKey::Clear => "クリア",
         DatasetKey::FormatLabel => "形式:",
         DatasetKey::SampleSeasFire => "SeasFire 世界の山火事 (Zarr)",
@@ -79,20 +79,35 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::WindowSizeSuffix => " ウィンドウサイズ (ステップ)",
         DatasetKey::PrefetchWorkersSuffix => " 先読みワーカー (スレッド)",
         DatasetKey::FlushAllCaches => "すべてのキャッシュを破棄",
-        // Catalog
-        DatasetKey::CatalogTitle => "データセットカタログ",
-        DatasetKey::CatalogStoreCount => "{} 個のストア",
-        DatasetKey::CatalogBlurb => {
-            "厳選したクラウドの Zarr、Icechunk、手続き型の正解データセットです。データセットを選ぶと読み込みます。"
+        // Gallery
+        DatasetKey::GalleryTitle => "データセットギャラリー",
+        DatasetKey::GalleryStoreCount => "{} 個のストア",
+        DatasetKey::GalleryBlurb => {
+            "Octant ギャラリーのデータセット (それぞれ表示設定付き) と手続き型の正解データセットです。データセットを選ぶと読み込みます。"
         }
-        DatasetKey::CatalogSearchHint => "名前、説明、URLで絞り込み...",
-        DatasetKey::CatalogCategory => "カテゴリ:",
+        DatasetKey::DomainClimate => "気候",
+        DatasetKey::DomainWeather => "気象",
+        DatasetKey::DomainOcean => "海洋",
+        DatasetKey::DomainEarthObservation => "地球観測",
+        DatasetKey::DomainMedical => "医療",
+        DatasetKey::DomainOther => "その他",
+        DatasetKey::GalleryUnavailable => "ギャラリーを読み込めませんでした。接続を確認して再読み込みしてください。",
+        DatasetKey::GalleryLicense => "ライセンス",
+        DatasetKey::GalleryCitation => "引用",
+        DatasetKey::GallerySourcePage => "データセットのページ",
+        DatasetKey::GalleryStore => "ストア",
+        DatasetKey::GalleryPage => "ギャラリーのページ",
+        DatasetKey::GalleryCopyUrl => "アドレスをコピー",
+        DatasetKey::GalleryCopyDetails => "詳細をコピー",
+        DatasetKey::GalleryUrlCopied => "アドレスをコピーしました",
+        DatasetKey::GalleryDetailsCopied => "詳細をコピーしました",
+        DatasetKey::GalleryFromDocs => "Octant ドキュメントのギャラリーより:",
+        DatasetKey::GallerySearchHint => "名前、説明、URLで絞り込み...",
+        DatasetKey::GalleryCategory => "カテゴリ:",
         DatasetKey::CategoryAll => "すべて",
         DatasetKey::CategoryProcedural => "手続き型",
-        DatasetKey::NoCatalogMatches => "検索に一致するデータセットはありません。",
+        DatasetKey::NoGalleryMatches => "検索に一致するデータセットはありません。",
         DatasetKey::ClearSearch => "検索をクリア",
-        DatasetKey::SelectAndLoadDataset => "データセットを選択して読み込み",
-        DatasetKey::SelectAndLoad => "選択して読み込み",
         // Drop zone
         DatasetKey::DropTypeNotSupported => "非対応の形式です",
         DatasetKey::DropReleaseToLoad => "離すとデータセットを読み込みます",
@@ -101,7 +116,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroSeasFireHover => "世界の山火事と気候の再チャンク済みデータセット (Zarr)",
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A トゥルーカラー COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "合成された4D時空間ボリューム",
-        DatasetKey::HeroCatalogHover => "データセットカタログを見る",
+        DatasetKey::HeroGalleryHover => "データセットギャラリーを見る",
         DatasetKey::LoadSampleHover => "サンプルを読み込み: {}",
         DatasetKey::HeroDropLong => {
             "ドロップしてデータセットを読み込み (.nc, .h5, .zarr, .icechunk, .tif)"
@@ -149,7 +164,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "この撮像には視野がありません",
         DatasetKey::PlateWellUnreadable => "ウェルの視野を読み込めませんでした。クリックして再試行",
         DatasetKey::CategoryMicroscopy => "顕微鏡画像",
-        DatasetKey::CategorySoil => "土壌",
         DatasetKey::BadgeDesktopOnly => "デスクトップ版のみ",
         DatasetKey::DesktopOnlyHint => {
             "このサーバーはブラウザからのアクセスを許可していません。Octant のデスクトップ版で開いてください。"

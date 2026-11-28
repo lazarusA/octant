@@ -41,7 +41,7 @@ pub(super) const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 10] = [
 ];
 
 /// Renders the source intake controls: URL/path text input, format selection,
-/// quick sample presets, catalog opener, and drop zone.
+/// quick sample presets, gallery opener, and drop zone.
 pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.label(egui::RichText::new(tr(DatasetKey::SourceUrlOrPath)).strong());
 
@@ -124,10 +124,10 @@ fn load_button(ui: &mut egui::Ui, loading: bool) -> bool {
 fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) {
     ui.horizontal_wrapped(|ui| {
         if ui
-            .icon_button(Icon::Catalog, tr(DatasetKey::CatalogEllipsis))
+            .icon_button(Icon::Gallery, tr(DatasetKey::GalleryEllipsis))
             .clicked()
         {
-            app.layout.show_catalog_window = true;
+            app.layout.show_gallery_window = true;
         }
 
         let samples_btn = ui.icon_button(Icon::FolderOpen, tr(DatasetKey::SampleDatasets));

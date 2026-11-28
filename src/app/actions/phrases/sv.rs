@@ -51,7 +51,7 @@ pub(super) static PHRASES: Phrases = Phrases {
     overlay: &["överlägg", "ovanpå", "som lager"],
     well: &["brunn"],
     field: &["fält"],
-    catalog: &["katalog", "katalogen"],
+    gallery: &["galleri", "galleriet", "katalog", "katalogen"],
     then: &["sedan", "därefter", "och sedan"],
     until: &["till", "och"],
 };

@@ -1,4 +1,4 @@
-//! Prefetch and playback from remote catalog stores, through the desktop
+//! Prefetch and playback from remote gallery stores, through the desktop
 //! loading path: a range of steps plotted paused must arrive whole (timing
 //! the first block and the range), and ERA5 `u10` with `sst` overlaid plays
 //! with and without a buffer. Run by hand with
@@ -153,12 +153,13 @@ fn prefetch_network_era5_t2m_range() {
 #[test]
 #[ignore = "reads remote stores"]
 fn prefetch_network_microscopy_time_lapses() {
-    for key in ["idr0101-time-lapse", "idr0052-mitosis"] {
-        let entry = crate::catalog::MICROSCOPY_CATALOG
-            .iter()
-            .find(|e| e.key == key)
-            .expect("catalog entry");
-        let (mut app, meta) = open_remote(entry.store, entry.store_kind);
+    let idr = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4";
+    for (key, path) in [
+        ("idr0101-time-lapse", "idr0101A/13457537.zarr"),
+        ("idr0052-mitosis", "idr0052A/5514375.zarr"),
+    ] {
+        let store = format!("{idr}/{path}");
+        let (mut app, meta) = open_remote(&store, StoreKind::RemoteZarr);
         let (idx, time) = smallest_level(&meta).expect("a level with a t axis");
         check_range(&mut app, key, idx, time);
     }
